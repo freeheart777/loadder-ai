@@ -6,7 +6,10 @@ import crypto from "crypto";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const databasePath = path.join(__dirname, "loadder.sqlite");
+const databasePath = path.join(
+  __dirname,
+  "loadder.sqlite"
+);
 
 const db = new Database(databasePath);
 
@@ -117,6 +120,114 @@ db.exec(`
     created_at TEXT NOT NULL,
     FOREIGN KEY (customer_id) REFERENCES customers(id)
   );
+
+  /* =======================================================
+     MARKETING ACQUISITION
+  ======================================================= */
+
+  CREATE TABLE IF NOT EXISTS marketing_channels (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    name_fa TEXT NOT NULL,
+    type TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS marketing_platforms (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    name_fa TEXT NOT NULL,
+    provider_key TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (channel_id) REFERENCES marketing_channels(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS advertising_services (
+    id TEXT PRIMARY KEY,
+    platform_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    name_fa TEXT NOT NULL,
+    service_type TEXT NOT NULL,
+    format TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (platform_id) REFERENCES marketing_platforms(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS marketing_campaigns (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
+    platform_id TEXT NOT NULL,
+    service_id TEXT,
+    name TEXT NOT NULL,
+    strategy TEXT NOT NULL DEFAULT 'acquisition',
+    objective TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    budget INTEGER NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'IRR',
+    external_id TEXT,
+    started_at TEXT,
+    ended_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (channel_id) REFERENCES marketing_channels(id),
+    FOREIGN KEY (platform_id) REFERENCES marketing_platforms(id),
+    FOREIGN KEY (service_id) REFERENCES advertising_services(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS campaign_metrics (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL,
+    metric_date TEXT NOT NULL,
+
+    spend INTEGER NOT NULL DEFAULT 0,
+    impressions INTEGER NOT NULL DEFAULT 0,
+    views INTEGER NOT NULL DEFAULT 0,
+    clicks INTEGER NOT NULL DEFAULT 0,
+    sessions INTEGER NOT NULL DEFAULT 0,
+    leads INTEGER NOT NULL DEFAULT 0,
+    orders INTEGER NOT NULL DEFAULT 0,
+    customers INTEGER NOT NULL DEFAULT 0,
+    conversions INTEGER NOT NULL DEFAULT 0,
+    revenue INTEGER NOT NULL DEFAULT 0,
+
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+
+    FOREIGN KEY (campaign_id) REFERENCES marketing_campaigns(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS attribution_touchpoints (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT,
+    lead_id TEXT,
+    campaign_id TEXT,
+    channel_id TEXT,
+    platform_id TEXT,
+    service_id TEXT,
+
+    touch_type TEXT NOT NULL,
+    session_id TEXT,
+    external_click_id TEXT,
+
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+
+    occurred_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (lead_id) REFERENCES leads(id),
+    FOREIGN KEY (campaign_id) REFERENCES marketing_campaigns(id),
+    FOREIGN KEY (channel_id) REFERENCES marketing_channels(id),
+    FOREIGN KEY (platform_id) REFERENCES marketing_platforms(id),
+    FOREIGN KEY (service_id) REFERENCES advertising_services(id)
+  );
 `);
 
 /* =========================================================
@@ -135,6 +246,18 @@ function parseJson(value, fallback) {
   }
 }
 
+function safeDivide(a, b) {
+  if (!b) {
+    return 0;
+  }
+
+  return a / b;
+}
+
+/* =========================================================
+   MAPPERS
+========================================================= */
+
 function mapAutomation(row) {
   return {
     id: row.id,
@@ -142,8 +265,14 @@ function mapAutomation(row) {
     trigger: row.trigger,
     enabled: Boolean(row.enabled),
     delayMinutes: row.delay_minutes,
-    conditions: parseJson(row.conditions_json, []),
-    actions: parseJson(row.actions_json, []),
+    conditions: parseJson(
+      row.conditions_json,
+      []
+    ),
+    actions: parseJson(
+      row.actions_json,
+      []
+    ),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -162,7 +291,10 @@ function mapExecution(row) {
     template: row.template,
     recipient: row.recipient,
     status: row.status,
-    result: parseJson(row.result_json, {}),
+    result: parseJson(
+      row.result_json,
+      {}
+    ),
   };
 }
 
@@ -195,7 +327,8 @@ function mapLead(row) {
     source: row.source,
     score: row.score,
     status: row.status,
-    opportunityValue: row.opportunity_value,
+    opportunityValue:
+      row.opportunity_value,
     customerId: row.customer_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -209,7 +342,8 @@ function mapOrder(row) {
     totalAmount: row.total_amount,
     status: row.status,
     source: row.source,
-    paymentStatus: row.payment_status,
+    paymentStatus:
+      row.payment_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -233,7 +367,116 @@ function mapCustomerEvent(row) {
     id: row.id,
     customerId: row.customer_id,
     type: row.type,
-    metadata: parseJson(row.metadata_json, {}),
+    metadata: parseJson(
+      row.metadata_json,
+      {}
+    ),
+    createdAt: row.created_at,
+  };
+}
+
+function mapMarketingChannel(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    nameFa: row.name_fa,
+    type: row.type,
+    enabled: Boolean(row.enabled),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapMarketingPlatform(row) {
+  return {
+    id: row.id,
+    channelId: row.channel_id,
+    name: row.name,
+    nameFa: row.name_fa,
+    providerKey: row.provider_key,
+    enabled: Boolean(row.enabled),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapAdvertisingService(row) {
+  return {
+    id: row.id,
+    platformId: row.platform_id,
+    name: row.name,
+    nameFa: row.name_fa,
+    serviceType: row.service_type,
+    format: row.format,
+    enabled: Boolean(row.enabled),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapMarketingCampaign(row) {
+  return {
+    id: row.id,
+    channelId: row.channel_id,
+    platformId: row.platform_id,
+    serviceId: row.service_id,
+    name: row.name,
+    strategy: row.strategy,
+    objective: row.objective,
+    status: row.status,
+    budget: row.budget,
+    currency: row.currency,
+    externalId: row.external_id,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCampaignMetric(row) {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    metricDate: row.metric_date,
+
+    spend: row.spend,
+    impressions: row.impressions,
+    views: row.views,
+    clicks: row.clicks,
+    sessions: row.sessions,
+    leads: row.leads,
+    orders: row.orders,
+    customers: row.customers,
+    conversions: row.conversions,
+    revenue: row.revenue,
+
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapAttributionTouchpoint(row) {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    leadId: row.lead_id,
+    campaignId: row.campaign_id,
+    channelId: row.channel_id,
+    platformId: row.platform_id,
+    serviceId: row.service_id,
+
+    touchType: row.touch_type,
+    sessionId: row.session_id,
+    externalClickId:
+      row.external_click_id,
+
+    metadata: parseJson(
+      row.metadata_json,
+      {}
+    ),
+
+    occurredAt: row.occurred_at,
     createdAt: row.created_at,
   };
 }
@@ -262,7 +505,9 @@ export function getAutomationById(id) {
     `)
     .get(id);
 
-  return row ? mapAutomation(row) : null;
+  return row
+    ? mapAutomation(row)
+    : null;
 }
 
 export function createAutomation({
@@ -304,8 +549,12 @@ export function createAutomation({
   return getAutomationById(id);
 }
 
-export function updateAutomation(id, updates) {
-  const current = getAutomationById(id);
+export function updateAutomation(
+  id,
+  updates
+) {
+  const current =
+    getAutomationById(id);
 
   if (!current) {
     return null;
@@ -332,8 +581,12 @@ export function updateAutomation(id, updates) {
     next.trigger,
     next.enabled ? 1 : 0,
     Number(next.delayMinutes) || 0,
-    JSON.stringify(next.conditions ?? []),
-    JSON.stringify(next.actions ?? []),
+    JSON.stringify(
+      next.conditions ?? []
+    ),
+    JSON.stringify(
+      next.actions ?? []
+    ),
     now(),
     id
   );
@@ -361,14 +614,21 @@ export function automationCount() {
     .get().count;
 }
 
-export function seedDefaultAutomations(automations) {
+export function seedDefaultAutomations(
+  automations
+) {
   if (automationCount() > 0) {
     return;
   }
 
   db.transaction(() => {
-    for (const automation of automations) {
-      createAutomation(automation);
+    for (
+      const automation
+      of automations
+    ) {
+      createAutomation(
+        automation
+      );
     }
   })();
 }
@@ -389,14 +649,18 @@ export function saveEvent(event) {
   `).run(
     event.id,
     event.type,
-    JSON.stringify(event.payload ?? {}),
+    JSON.stringify(
+      event.payload ?? {}
+    ),
     event.createdAt
   );
 
   return event;
 }
 
-export function saveExecution(execution) {
+export function saveExecution(
+  execution
+) {
   db.prepare(`
     INSERT INTO executions (
       id,
@@ -424,12 +688,18 @@ export function saveExecution(execution) {
     execution.template ?? null,
     execution.recipient ?? null,
     execution.status,
-    JSON.stringify(execution.result ?? {}),
+    JSON.stringify(
+      execution.result ?? {}
+    ),
     execution.timestamp
   );
+
+  return execution;
 }
 
-export function getExecutions(limit = 100) {
+export function getExecutions(
+  limit = 100
+) {
   return db
     .prepare(`
       SELECT *
@@ -441,41 +711,64 @@ export function getExecutions(limit = 100) {
     .map(mapExecution);
 }
 
-export function getExecutionsByCustomerId(customerId) {
+export function getExecutionsByCustomerId(
+  customerId
+) {
   const rows = db
     .prepare(`
       SELECT
         executions.*,
-        events.payload_json AS event_payload_json
+        events.payload_json
+          AS event_payload_json
       FROM executions
       LEFT JOIN events
-        ON events.id = executions.event_id
-      ORDER BY executions.created_at DESC
+        ON events.id =
+           executions.event_id
+      ORDER BY
+        executions.created_at DESC
     `)
     .all();
 
   return rows
     .filter((row) => {
-      const payload = parseJson(
-        row.event_payload_json,
-        {}
-      );
+      const payload =
+        parseJson(
+          row.event_payload_json,
+          {}
+        );
 
-      return payload.customerId === customerId;
+      return (
+        payload.customerId ===
+        customerId
+      );
     })
     .map((row) => ({
       id: row.id,
-      timestamp: row.created_at,
-      eventId: row.event_id,
-      eventType: row.event_type,
-      workflowId: row.workflow_id,
-      workflowTitle: row.workflow_title,
-      actionType: row.action_type,
-      channel: row.channel,
-      template: row.template,
-      recipient: row.recipient,
-      status: row.status,
-      result: parseJson(row.result_json, {}),
+      timestamp:
+        row.created_at,
+      eventId:
+        row.event_id,
+      eventType:
+        row.event_type,
+      workflowId:
+        row.workflow_id,
+      workflowTitle:
+        row.workflow_title,
+      actionType:
+        row.action_type,
+      channel:
+        row.channel,
+      template:
+        row.template,
+      recipient:
+        row.recipient,
+      status:
+        row.status,
+      result:
+        parseJson(
+          row.result_json,
+          {}
+        ),
     }));
 }
 
@@ -509,7 +802,9 @@ export function getCustomerById(id) {
     `)
     .get(id);
 
-  return row ? mapCustomer(row) : null;
+  return row
+    ? mapCustomer(row)
+    : null;
 }
 
 export function createCustomer({
@@ -554,11 +849,11 @@ export function createCustomer({
     company,
     source,
     status,
-    totalSpent,
-    ordersCount,
+    Number(totalSpent) || 0,
+    Number(ordersCount) || 0,
     lastPurchaseAt,
-    lifetimeValue,
-    riskScore,
+    Number(lifetimeValue) || 0,
+    Number(riskScore) || 0,
     timestamp,
     timestamp
   );
@@ -575,7 +870,9 @@ export function getLeads() {
     .prepare(`
       SELECT *
       FROM leads
-      ORDER BY score DESC, created_at DESC
+      ORDER BY
+        score DESC,
+        created_at DESC
     `)
     .all()
     .map(mapLead);
@@ -618,9 +915,9 @@ export function createLead({
     email,
     company,
     source,
-    score,
+    Number(score) || 0,
     status,
-    opportunityValue,
+    Number(opportunityValue) || 0,
     customerId,
     timestamp,
     timestamp
@@ -634,7 +931,9 @@ export function createLead({
     `)
     .get(id);
 
-  return row ? mapLead(row) : null;
+  return row
+    ? mapLead(row)
+    : null;
 }
 
 /* =========================================================
@@ -652,7 +951,9 @@ export function getOrders() {
     .map(mapOrder);
 }
 
-export function getOrdersByCustomerId(customerId) {
+export function getOrdersByCustomerId(
+  customerId
+) {
   return db
     .prepare(`
       SELECT *
@@ -689,7 +990,7 @@ export function createOrder({
   `).run(
     id,
     customerId,
-    totalAmount,
+    Number(totalAmount) || 0,
     status,
     source,
     paymentStatus,
@@ -705,7 +1006,9 @@ export function createOrder({
     `)
     .get(id);
 
-  return row ? mapOrder(row) : null;
+  return row
+    ? mapOrder(row)
+    : null;
 }
 
 /* =========================================================
@@ -723,7 +1026,9 @@ export function getCarts() {
     .map(mapCart);
 }
 
-export function getCartsByCustomerId(customerId) {
+export function getCartsByCustomerId(
+  customerId
+) {
   return db
     .prepare(`
       SELECT *
@@ -760,7 +1065,7 @@ export function createCart({
   `).run(
     id,
     customerId,
-    totalAmount,
+    Number(totalAmount) || 0,
     status,
     abandonedAt,
     recoveredAt,
@@ -776,14 +1081,18 @@ export function createCart({
     `)
     .get(id);
 
-  return row ? mapCart(row) : null;
+  return row
+    ? mapCart(row)
+    : null;
 }
 
 /* =========================================================
    CUSTOMER EVENTS
 ========================================================= */
 
-export function getCustomerEvents(customerId) {
+export function getCustomerEvents(
+  customerId
+) {
   return db
     .prepare(`
       SELECT *
@@ -833,47 +1142,93 @@ export function createCustomerEvent({
    CUSTOMER 360
 ========================================================= */
 
-export function getCustomer360(customerId) {
-  const customer = getCustomerById(customerId);
+export function getCustomer360(
+  customerId
+) {
+  const customer =
+    getCustomerById(
+      customerId
+    );
 
   if (!customer) {
     return null;
   }
 
-  const orders = getOrdersByCustomerId(customerId);
-  const carts = getCartsByCustomerId(customerId);
-  const events = getCustomerEvents(customerId);
-  const executions = getExecutionsByCustomerId(customerId);
+  const orders =
+    getOrdersByCustomerId(
+      customerId
+    );
 
-  const completedOrders = orders.filter(
-    (order) => order.status === "completed"
-  );
+  const carts =
+    getCartsByCustomerId(
+      customerId
+    );
 
-  const totalRevenue = completedOrders.reduce(
-    (sum, order) => sum + order.totalAmount,
-    0
-  );
+  const events =
+    getCustomerEvents(
+      customerId
+    );
 
-  const abandonedCarts = carts.filter(
-    (cart) => cart.status === "abandoned"
-  );
+  const executions =
+    getExecutionsByCustomerId(
+      customerId
+    );
 
-  const activeCarts = carts.filter(
-    (cart) => cart.status === "active"
-  );
+  const completedOrders =
+    orders.filter(
+      (order) =>
+        order.status ===
+        "completed"
+    );
+
+  const totalRevenue =
+    completedOrders.reduce(
+      (sum, order) =>
+        sum +
+        order.totalAmount,
+      0
+    );
+
+  const abandonedCarts =
+    carts.filter(
+      (cart) =>
+        cart.status ===
+        "abandoned"
+    );
+
+  const activeCarts =
+    carts.filter(
+      (cart) =>
+        cart.status ===
+        "active"
+    );
 
   return {
     customer,
 
     summary: {
-      ordersCount: orders.length,
-      completedOrders: completedOrders.length,
+      ordersCount:
+        orders.length,
+
+      completedOrders:
+        completedOrders.length,
+
       totalRevenue,
-      abandonedCarts: abandonedCarts.length,
-      activeCarts: activeCarts.length,
-      lifetimeValue: customer.lifetimeValue,
-      riskScore: customer.riskScore,
-      workflowExecutions: executions.length,
+
+      abandonedCarts:
+        abandonedCarts.length,
+
+      activeCarts:
+        activeCarts.length,
+
+      lifetimeValue:
+        customer.lifetimeValue,
+
+      riskScore:
+        customer.riskScore,
+
+      workflowExecutions:
+        executions.length,
     },
 
     orders,
@@ -920,7 +1275,11 @@ export function getCRMStats() {
 
   const onlineRevenue = db
     .prepare(`
-      SELECT COALESCE(SUM(total_amount), 0) AS total
+      SELECT
+        COALESCE(
+          SUM(total_amount),
+          0
+        ) AS total
       FROM orders
       WHERE status = 'completed'
     `)
@@ -942,6 +1301,544 @@ export function getCRMStats() {
     onlineRevenue,
     abandonedCarts,
   };
+}
+
+/* =========================================================
+   MARKETING CHANNELS
+========================================================= */
+
+export function getMarketingChannels() {
+  return db
+    .prepare(`
+      SELECT *
+      FROM marketing_channels
+      ORDER BY name_fa
+    `)
+    .all()
+    .map(
+      mapMarketingChannel
+    );
+}
+
+/* =========================================================
+   MARKETING PLATFORMS
+========================================================= */
+
+export function getMarketingPlatforms(
+  channelId = null
+) {
+  if (channelId) {
+    return db
+      .prepare(`
+        SELECT *
+        FROM marketing_platforms
+        WHERE channel_id = ?
+        ORDER BY name_fa
+      `)
+      .all(channelId)
+      .map(
+        mapMarketingPlatform
+      );
+  }
+
+  return db
+    .prepare(`
+      SELECT *
+      FROM marketing_platforms
+      ORDER BY name_fa
+    `)
+    .all()
+    .map(
+      mapMarketingPlatform
+    );
+}
+
+/* =========================================================
+   ADVERTISING SERVICES
+========================================================= */
+
+export function getAdvertisingServices(
+  platformId = null
+) {
+  if (platformId) {
+    return db
+      .prepare(`
+        SELECT *
+        FROM advertising_services
+        WHERE platform_id = ?
+        ORDER BY name_fa
+      `)
+      .all(platformId)
+      .map(
+        mapAdvertisingService
+      );
+  }
+
+  return db
+    .prepare(`
+      SELECT *
+      FROM advertising_services
+      ORDER BY name_fa
+    `)
+    .all()
+    .map(
+      mapAdvertisingService
+    );
+}
+
+/* =========================================================
+   MARKETING CAMPAIGNS
+========================================================= */
+
+export function getMarketingCampaigns() {
+  return db
+    .prepare(`
+      SELECT *
+      FROM marketing_campaigns
+      ORDER BY created_at DESC
+    `)
+    .all()
+    .map(
+      mapMarketingCampaign
+    );
+}
+
+export function getCampaignById(id) {
+  const row = db
+    .prepare(`
+      SELECT *
+      FROM marketing_campaigns
+      WHERE id = ?
+    `)
+    .get(id);
+
+  return row
+    ? mapMarketingCampaign(
+        row
+      )
+    : null;
+}
+
+export function createMarketingCampaign({
+  id = crypto.randomUUID(),
+  channelId,
+  platformId,
+  serviceId = null,
+  name,
+  strategy = "acquisition",
+  objective = null,
+  status = "draft",
+  budget = 0,
+  currency = "IRR",
+  externalId = null,
+  startedAt = null,
+  endedAt = null,
+}) {
+  const timestamp = now();
+
+  db.prepare(`
+    INSERT INTO marketing_campaigns (
+      id,
+      channel_id,
+      platform_id,
+      service_id,
+      name,
+      strategy,
+      objective,
+      status,
+      budget,
+      currency,
+      external_id,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    channelId,
+    platformId,
+    serviceId,
+    name,
+    strategy,
+    objective,
+    status,
+    Number(budget) || 0,
+    currency,
+    externalId,
+    startedAt,
+    endedAt,
+    timestamp,
+    timestamp
+  );
+
+  return getCampaignById(
+    id
+  );
+}
+
+/* =========================================================
+   CAMPAIGN METRICS
+========================================================= */
+
+export function getCampaignMetrics(
+  campaignId
+) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM campaign_metrics
+      WHERE campaign_id = ?
+      ORDER BY metric_date DESC
+    `)
+    .all(campaignId)
+    .map(
+      mapCampaignMetric
+    );
+}
+
+export function saveCampaignMetric({
+  id = crypto.randomUUID(),
+  campaignId,
+  metricDate =
+    new Date()
+      .toISOString()
+      .slice(0, 10),
+
+  spend = 0,
+  impressions = 0,
+  views = 0,
+  clicks = 0,
+  sessions = 0,
+  leads = 0,
+  orders = 0,
+  customers = 0,
+  conversions = 0,
+  revenue = 0,
+}) {
+  const timestamp = now();
+
+  db.prepare(`
+    INSERT INTO campaign_metrics (
+      id,
+      campaign_id,
+      metric_date,
+      spend,
+      impressions,
+      views,
+      clicks,
+      sessions,
+      leads,
+      orders,
+      customers,
+      conversions,
+      revenue,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    campaignId,
+    metricDate,
+    Number(spend) || 0,
+    Number(impressions) || 0,
+    Number(views) || 0,
+    Number(clicks) || 0,
+    Number(sessions) || 0,
+    Number(leads) || 0,
+    Number(orders) || 0,
+    Number(customers) || 0,
+    Number(conversions) || 0,
+    Number(revenue) || 0,
+    timestamp,
+    timestamp
+  );
+
+  const row = db
+    .prepare(`
+      SELECT *
+      FROM campaign_metrics
+      WHERE id = ?
+    `)
+    .get(id);
+
+  return row
+    ? mapCampaignMetric(row)
+    : null;
+}
+
+/* =========================================================
+   KPI ENGINE
+========================================================= */
+
+export function calculateCampaignKPIs(
+  metrics
+) {
+  const totals = metrics.reduce(
+    (acc, item) => {
+      acc.spend += item.spend;
+      acc.impressions +=
+        item.impressions;
+      acc.views += item.views;
+      acc.clicks += item.clicks;
+      acc.sessions +=
+        item.sessions;
+      acc.leads += item.leads;
+      acc.orders += item.orders;
+      acc.customers +=
+        item.customers;
+      acc.conversions +=
+        item.conversions;
+      acc.revenue +=
+        item.revenue;
+
+      return acc;
+    },
+    {
+      spend: 0,
+      impressions: 0,
+      views: 0,
+      clicks: 0,
+      sessions: 0,
+      leads: 0,
+      orders: 0,
+      customers: 0,
+      conversions: 0,
+      revenue: 0,
+    }
+  );
+
+  return {
+    ...totals,
+
+    cpm:
+      safeDivide(
+        totals.spend,
+        totals.impressions
+      ) * 1000,
+
+    cpv:
+      safeDivide(
+        totals.spend,
+        totals.views
+      ),
+
+    cpc:
+      safeDivide(
+        totals.spend,
+        totals.clicks
+      ),
+
+    /* Cost Per Session */
+    cps:
+      safeDivide(
+        totals.spend,
+        totals.sessions
+      ),
+
+    cpl:
+      safeDivide(
+        totals.spend,
+        totals.leads
+      ),
+
+    cpo:
+      safeDivide(
+        totals.spend,
+        totals.orders
+      ),
+
+    cac:
+      safeDivide(
+        totals.spend,
+        totals.customers
+      ),
+
+    cpa:
+      safeDivide(
+        totals.spend,
+        totals.conversions
+      ),
+
+    ctr:
+      safeDivide(
+        totals.clicks,
+        totals.impressions
+      ) * 100,
+
+    viewRate:
+      safeDivide(
+        totals.views,
+        totals.impressions
+      ) * 100,
+
+    sessionRate:
+      safeDivide(
+        totals.sessions,
+        totals.clicks
+      ) * 100,
+
+    leadRate:
+      safeDivide(
+        totals.leads,
+        totals.sessions
+      ) * 100,
+
+    orderRate:
+      safeDivide(
+        totals.orders,
+        totals.leads
+      ) * 100,
+
+    customerRate:
+      safeDivide(
+        totals.customers,
+        totals.orders
+      ) * 100,
+
+    conversionRate:
+      safeDivide(
+        totals.conversions,
+        totals.clicks
+      ) * 100,
+
+    roas:
+      safeDivide(
+        totals.revenue,
+        totals.spend
+      ),
+  };
+}
+
+/* =========================================================
+   ATTRIBUTION
+========================================================= */
+
+export function getAttributionTouchpoints({
+  customerId = null,
+  leadId = null,
+  campaignId = null,
+} = {}) {
+  let sql = `
+    SELECT *
+    FROM attribution_touchpoints
+    WHERE 1 = 1
+  `;
+
+  const params = [];
+
+  if (customerId) {
+    sql += `
+      AND customer_id = ?
+    `;
+
+    params.push(
+      customerId
+    );
+  }
+
+  if (leadId) {
+    sql += `
+      AND lead_id = ?
+    `;
+
+    params.push(
+      leadId
+    );
+  }
+
+  if (campaignId) {
+    sql += `
+      AND campaign_id = ?
+    `;
+
+    params.push(
+      campaignId
+    );
+  }
+
+  sql += `
+    ORDER BY occurred_at DESC
+  `;
+
+  return db
+    .prepare(sql)
+    .all(...params)
+    .map(
+      mapAttributionTouchpoint
+    );
+}
+
+export function createAttributionTouchpoint({
+  id = crypto.randomUUID(),
+
+  customerId = null,
+  leadId = null,
+
+  campaignId = null,
+  channelId = null,
+  platformId = null,
+  serviceId = null,
+
+  touchType,
+
+  sessionId = null,
+  externalClickId = null,
+
+  metadata = {},
+
+  occurredAt = now(),
+}) {
+  const createdAt = now();
+
+  db.prepare(`
+    INSERT INTO attribution_touchpoints (
+      id,
+      customer_id,
+      lead_id,
+      campaign_id,
+      channel_id,
+      platform_id,
+      service_id,
+      touch_type,
+      session_id,
+      external_click_id,
+      metadata_json,
+      occurred_at,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    customerId,
+    leadId,
+    campaignId,
+    channelId,
+    platformId,
+    serviceId,
+    touchType,
+    sessionId,
+    externalClickId,
+    JSON.stringify(metadata),
+    occurredAt,
+    createdAt
+  );
+
+  const row = db
+    .prepare(`
+      SELECT *
+      FROM attribution_touchpoints
+      WHERE id = ?
+    `)
+    .get(id);
+
+  return row
+    ? mapAttributionTouchpoint(
+        row
+      )
+    : null;
 }
 
 /* =========================================================
@@ -1047,6 +1944,7 @@ export function seedCRMData() {
     createCustomerEvent({
       customerId: "customer-001",
       type: "order.completed",
+
       metadata: {
         orderId: "order-001",
         amount: 3200000,
@@ -1056,11 +1954,523 @@ export function seedCRMData() {
     createCustomerEvent({
       customerId: "customer-001",
       type: "cart.abandoned",
+
       metadata: {
         cartId: "cart-001",
         amount: 4500000,
       },
     });
+  })();
+}
+
+/* =========================================================
+   MARKETING SEED
+========================================================= */
+
+export function seedMarketingData() {
+  const existing = db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM marketing_channels
+    `)
+    .get().count;
+
+  if (existing > 0) {
+    return;
+  }
+
+  const timestamp = now();
+
+  const insertChannel =
+    db.prepare(`
+      INSERT INTO marketing_channels (
+        id,
+        name,
+        name_fa,
+        type,
+        enabled,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, 1, ?, ?)
+    `);
+
+  const insertPlatform =
+    db.prepare(`
+      INSERT INTO marketing_platforms (
+        id,
+        channel_id,
+        name,
+        name_fa,
+        provider_key,
+        enabled,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+    `);
+
+  const insertService =
+    db.prepare(`
+      INSERT INTO advertising_services (
+        id,
+        platform_id,
+        name,
+        name_fa,
+        service_type,
+        format,
+        enabled,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `);
+
+  db.transaction(() => {
+    /* =========================
+       CHANNELS
+    ========================= */
+
+    insertChannel.run(
+      "google_ads",
+      "Google Ads",
+      "گوگل ادز",
+      "paid_search",
+      timestamp,
+      timestamp
+    );
+
+    insertChannel.run(
+      "iranian_ads",
+      "Iranian Ads",
+      "تبلیغات ایران",
+      "ad_network",
+      timestamp,
+      timestamp
+    );
+
+    insertChannel.run(
+      "social_ads",
+      "Social Ads",
+      "تبلیغات شبکه‌های اجتماعی",
+      "social",
+      timestamp,
+      timestamp
+    );
+
+    insertChannel.run(
+      "app_ads",
+      "App Ads",
+      "تبلیغات اپلیکیشن",
+      "app",
+      timestamp,
+      timestamp
+    );
+
+    insertChannel.run(
+      "sms_marketing",
+      "SMS Marketing",
+      "اس‌ام‌اس مارکتینگ",
+      "direct",
+      timestamp,
+      timestamp
+    );
+
+    insertChannel.run(
+      "affiliate",
+      "Affiliate",
+      "افیلیت مارکتینگ",
+      "affiliate",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       PLATFORMS
+    ========================= */
+
+    insertPlatform.run(
+      "google",
+      "google_ads",
+      "Google",
+      "گوگل",
+      "google_ads",
+      timestamp,
+      timestamp
+    );
+
+    insertPlatform.run(
+      "taavous",
+      "iranian_ads",
+      "Taavous",
+      "طاووس",
+      "taavous",
+      timestamp,
+      timestamp
+    );
+
+    insertPlatform.run(
+      "yektanet",
+      "iranian_ads",
+      "Yektanet",
+      "یکتانت",
+      "yektanet",
+      timestamp,
+      timestamp
+    );
+
+    insertPlatform.run(
+      "tapsell",
+      "iranian_ads",
+      "Tapsell",
+      "تپسل",
+      "tapsell",
+      timestamp,
+      timestamp
+    );
+
+    insertPlatform.run(
+      "instagram",
+      "social_ads",
+      "Instagram",
+      "اینستاگرام",
+      "instagram",
+      timestamp,
+      timestamp
+    );
+
+    insertPlatform.run(
+      "meta",
+      "social_ads",
+      "Meta",
+      "متا",
+      "meta",
+      timestamp,
+      timestamp
+    );
+
+    insertPlatform.run(
+      "smsir",
+      "sms_marketing",
+      "SMS.ir",
+      "اس‌ام‌اس دات آی‌آر",
+      "smsir",
+      timestamp,
+      timestamp
+    );
+
+    insertPlatform.run(
+      "affiliate-network",
+      "affiliate",
+      "Affiliate Network",
+      "شبکه افیلیت",
+      "affiliate",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       GOOGLE SERVICES
+    ========================= */
+
+    insertService.run(
+      "google-search",
+      "google",
+      "Search",
+      "جستجو",
+      "search",
+      "text",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "google-display",
+      "google",
+      "Display",
+      "بنری",
+      "display",
+      "banner",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "google-video",
+      "google",
+      "Video",
+      "ویدئویی",
+      "video",
+      "video",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "google-shopping",
+      "google",
+      "Shopping",
+      "شاپینگ",
+      "shopping",
+      "product",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "google-performance-max",
+      "google",
+      "Performance Max",
+      "پرفورمنس مکس",
+      "performance_max",
+      "mixed",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "google-app",
+      "google",
+      "App Campaign",
+      "کمپین اپلیکیشن",
+      "app_install",
+      "app",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       TAAVOUS
+    ========================= */
+
+    insertService.run(
+      "taavous-native",
+      "taavous",
+      "Native",
+      "نیتیو",
+      "native",
+      "native",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "taavous-banner",
+      "taavous",
+      "Banner",
+      "بنری",
+      "display",
+      "banner",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "taavous-video",
+      "taavous",
+      "Video",
+      "ویدئویی",
+      "video",
+      "video",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       YEKTANET
+    ========================= */
+
+    insertService.run(
+      "yektanet-native",
+      "yektanet",
+      "Native",
+      "نیتیو",
+      "native",
+      "native",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "yektanet-banner",
+      "yektanet",
+      "Banner",
+      "بنری",
+      "display",
+      "banner",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "yektanet-push",
+      "yektanet",
+      "Push",
+      "پوش",
+      "push",
+      "push",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       TAPSELL
+    ========================= */
+
+    insertService.run(
+      "tapsell-preroll",
+      "tapsell",
+      "Pre-roll",
+      "پری‌رول",
+      "video",
+      "preroll",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "tapsell-app-install",
+      "tapsell",
+      "App Install",
+      "نصب اپلیکیشن",
+      "app_install",
+      "app",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "tapsell-banner",
+      "tapsell",
+      "Banner",
+      "بنری",
+      "display",
+      "banner",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       SOCIAL
+    ========================= */
+
+    insertService.run(
+      "instagram-feed",
+      "instagram",
+      "Feed Ads",
+      "تبلیغات فید",
+      "social",
+      "feed",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "instagram-story",
+      "instagram",
+      "Story Ads",
+      "تبلیغات استوری",
+      "social",
+      "story",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "instagram-reels",
+      "instagram",
+      "Reels Ads",
+      "تبلیغات ریلز",
+      "video",
+      "reels",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "instagram-lead",
+      "instagram",
+      "Lead Ads",
+      "تبلیغات لید",
+      "lead_generation",
+      "lead_form",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       SMS
+    ========================= */
+
+    insertService.run(
+      "sms-bulk",
+      "smsir",
+      "Bulk SMS",
+      "پیامک انبوه",
+      "sms",
+      "bulk",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "sms-segmented",
+      "smsir",
+      "Segmented SMS",
+      "پیامک سگمنت‌شده",
+      "sms",
+      "segmented",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "sms-triggered",
+      "smsir",
+      "Triggered SMS",
+      "پیامک اتوماتیک",
+      "sms",
+      "triggered",
+      timestamp,
+      timestamp
+    );
+
+    /* =========================
+       AFFILIATE
+    ========================= */
+
+    insertService.run(
+      "affiliate-publisher",
+      "affiliate-network",
+      "Publisher",
+      "ناشر",
+      "affiliate",
+      "publisher",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "affiliate-influencer",
+      "affiliate-network",
+      "Influencer",
+      "اینفلوئنسر",
+      "affiliate",
+      "influencer",
+      timestamp,
+      timestamp
+    );
+
+    insertService.run(
+      "affiliate-referral",
+      "affiliate-network",
+      "Referral Partner",
+      "همکار فروش",
+      "affiliate",
+      "referral",
+      timestamp,
+      timestamp
+    );
   })();
 }
 
