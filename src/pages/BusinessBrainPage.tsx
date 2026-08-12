@@ -17,13 +17,20 @@ import {
   Megaphone,
   ChartLineUp,
   Funnel,
-  Gear,
   Plus,
   PencilSimple,
   ShieldCheck,
   Clock,
   Globe,
+  ShoppingCart,
+  Storefront,
+  CurrencyCircleDollar,
+  Repeat,
+  Gauge,
+  Eye,
 } from "@phosphor-icons/react";
+
+import { businessData } from "../data/businessData";
 
 type MemoryItem = {
   id: number;
@@ -41,45 +48,62 @@ type DataSource = {
   status: "متصل" | "آماده اتصال" | "در حال توسعه";
 };
 
-type BusinessSignal = {
-  title: string;
-  value: string;
-  description: string;
-  tone: "positive" | "warning" | "neutral";
-};
+function faNumber(value: number) {
+  return value.toLocaleString("fa-IR");
+}
+
+function faPercent(value: number) {
+  return `${value.toLocaleString("fa-IR")}٪`;
+}
 
 const memories: MemoryItem[] = [
   {
     id: 1,
     title: "هدف اصلی رشد",
-    description:
-      "تمرکز فعلی روی افزایش فروش و بهبود نرخ تبدیل است.",
+    description: `تمرکز فعلی روی «${businessData.goals.primary}» است.`,
     time: "امروز",
     category: "هدف",
   },
   {
     id: 2,
-    title: "مخاطب اصلی",
-    description:
-      "مدیران و صاحبان کسب‌وکار با نیاز به رشد دیجیتال.",
-    time: "۲ روز پیش",
-    category: "مخاطب",
+    title: "فرصت فروش فوری",
+    description: `${faNumber(
+      businessData.ecommerce.abandonedCarts
+    )} سبد خرید رهاشده برای بازیابی فروش شناسایی شده است.`,
+    time: "امروز",
+    category: "فروش",
   },
   {
     id: 3,
-    title: "کانال پربازده",
-    description:
-      "تبلیغات جست‌وجویی بیشترین کیفیت لید را ایجاد کرده است.",
-    time: "۳ روز پیش",
-    category: "تبلیغات",
+    title: "لیدهای با اولویت بالا",
+    description: `${faNumber(
+      businessData.crm.hotLeads
+    )} مشتری بالقوه با احتمال خرید بالا در CRM وجود دارد.`,
+    time: "امروز",
+    category: "مشتری",
   },
   {
     id: 4,
-    title: "موضوع محتوایی موفق",
-    description:
-      "محتوای آموزشی بیشترین تعامل را ایجاد کرده است.",
-    time: "۵ روز پیش",
+    title: "هزینه جذب مشتری",
+    description: `هزینه جذب فعلی ${businessData.marketing.cacLabel} است و باید در سناریوی رشد کاهش پیدا کند.`,
+    time: "امروز",
+    category: "بازاریابی",
+  },
+  {
+    id: 5,
+    title: "محتوای موفق",
+    description: `${businessData.content.bestContentType} با موضوع ${businessData.content.topTopic} بهترین عملکرد فعلی را داشته است.`,
+    time: "۲ روز پیش",
     category: "محتوا",
+  },
+  {
+    id: 6,
+    title: "خرید مجدد",
+    description: `نرخ خرید مجدد فعلی ${faPercent(
+      businessData.ecommerce.repeatCustomerRate
+    )} است.`,
+    time: "۳ روز پیش",
+    category: "مشتری",
   },
 ];
 
@@ -87,93 +111,106 @@ const dataSources: DataSource[] = [
   {
     id: "brand",
     title: "برند بوک",
-    description:
-      "لحن، شخصیت، پیام و هویت برند",
+    description: "هویت، لحن، پیام و شخصیت برند",
     icon: BookOpenText,
     status: "متصل",
   },
   {
     id: "crm",
-    title: "اطلاعات مشتریان",
-    description:
-      "مشتریان، لیدها و رفتار فروش",
+    title: "مشتری و CRM",
+    description: "لید، مشتری، خرید و ارزش مشتری",
     icon: UsersThree,
+    status: "متصل",
+  },
+  {
+    id: "ecommerce",
+    title: "فروش آنلاین سایت",
+    description: "سفارش، پرداخت، سبد خرید و خرید مجدد",
+    icon: Storefront,
     status: "متصل",
   },
   {
     id: "ads",
     title: "تبلیغات",
-    description:
-      "کمپین‌ها، بودجه و عملکرد کانال‌ها",
+    description: "هزینه جذب، بازده تبلیغات و کانال‌های جذب",
     icon: Megaphone,
     status: "متصل",
   },
   {
     id: "analytics",
     title: "تحلیل و گزارش",
-    description:
-      "روند رشد و شاخص‌های عملکرد",
+    description: "رفتار سایت، فروش و عملکرد کانال‌ها",
     icon: ChartLineUp,
+    status: "متصل",
+  },
+  {
+    id: "predictive",
+    title: "پیش‌بینی آینده",
+    description: "سناریوهای رشد، ثبات و افت",
+    icon: TrendUp,
     status: "متصل",
   },
   {
     id: "website",
     title: "وب‌سایت",
-    description:
-      "رفتار کاربران و نرخ تبدیل",
+    description: "بازدید، محصول، سبد و نرخ تبدیل",
     icon: Globe,
-    status: "آماده اتصال",
+    status: "متصل",
   },
   {
     id: "automation",
     title: "اتوماسیون",
-    description:
-      "جریان‌های کاری و اقدامات خودکار",
+    description: "اجرای خودکار تصمیم‌های هوشمند",
     icon: Lightning,
     status: "در حال توسعه",
   },
 ];
 
-const businessSignals: BusinessSignal[] = [
+const strengths = [
   {
     title: "سلامت کلی کسب‌وکار",
-    value: "۸۶٪",
-    description:
-      "وضعیت کلی مثبت و رو به رشد",
-    tone: "positive",
+    value: faPercent(businessData.business.healthScore),
   },
   {
-    title: "آمادگی برای رشد",
-    value: "۸۱٪",
-    description:
-      "زیرساخت رشد مناسب است",
-    tone: "positive",
+    title: "احتمال رشد",
+    value: faPercent(businessData.predictive.growthProbability),
   },
   {
-    title: "ریسک فعلی",
-    value: "۱۸٪",
-    description:
-      "نیاز به بهبود نرخ تبدیل",
-    tone: "warning",
+    title: "عملکرد محتوا",
+    value: faPercent(businessData.content.performanceScore),
   },
   {
-    title: "کیفیت داده",
-    value: "۷۸٪",
-    description:
-      "بخشی از داده‌ها هنوز کامل نیست",
-    tone: "neutral",
+    title: "حفظ مشتری",
+    value: faPercent(businessData.crm.retentionRate),
+  },
+];
+
+const risks = [
+  {
+    title: "سبد خرید رهاشده",
+    value: faNumber(businessData.ecommerce.abandonedCarts),
+  },
+  {
+    title: "هزینه جذب مشتری",
+    value: businessData.marketing.cacLabel,
+  },
+  {
+    title: "ریسک کسب‌وکار",
+    value: faPercent(businessData.business.riskScore),
+  },
+  {
+    title: "ریزش مشتری",
+    value: faPercent(businessData.crm.churnRate),
   },
 ];
 
 export default function BusinessBrainPage() {
-  const [activeGoal, setActiveGoal] =
-    useState("افزایش فروش");
+  const [activeGoal, setActiveGoal] = useState(
+    businessData.goals.primary
+  );
 
-  const [notice, setNotice] =
-    useState("");
-
-  const [memoryFilter, setMemoryFilter] =
-    useState("همه");
+  const [notice, setNotice] = useState("");
+  const [memoryFilter, setMemoryFilter] = useState("همه");
 
   const filteredMemories = useMemo(() => {
     if (memoryFilter === "همه") {
@@ -181,14 +218,11 @@ export default function BusinessBrainPage() {
     }
 
     return memories.filter(
-      (item) =>
-        item.category === memoryFilter
+      (item) => item.category === memoryFilter
     );
   }, [memoryFilter]);
 
-  const showNotice = (
-    message: string
-  ) => {
+  const showNotice = (message: string) => {
     setNotice(message);
 
     window.setTimeout(() => {
@@ -201,7 +235,6 @@ export default function BusinessBrainPage() {
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
-      {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
@@ -235,10 +268,10 @@ export default function BusinessBrainPage() {
             type="button"
             onClick={() =>
               showNotice(
-                "ویرایش پروفایل هوشمند در مرحله بعد فعال می‌شود."
+                "ویرایش پروفایل هوشمند در مرحله بعد به تنظیمات کسب‌وکار متصل می‌شود."
               )
             }
-            className="flex items-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold shadow-[0_10px_30px_rgba(99,102,241,.18)]"
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold"
           >
             <PencilSimple size={17} />
             ویرایش شناخت کسب‌وکار
@@ -246,8 +279,7 @@ export default function BusinessBrainPage() {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto max-w-[1550px] px-8 py-8">
-        {/* HERO */}
+      <div className="mx-auto max-w-[1550px] px-8 py-8">
         <section className="relative overflow-hidden rounded-[34px] border border-violet-400/15 bg-[#080d1d]/68 p-8 backdrop-blur-xl">
           <div className="pointer-events-none absolute -right-24 -top-24 h-[360px] w-[360px] rounded-full bg-violet-600/[0.13] blur-[130px]" />
 
@@ -256,33 +288,30 @@ export default function BusinessBrainPage() {
           <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/15 bg-violet-500/[0.08] px-4 py-2 text-sm text-violet-200">
-                <Sparkle
-                  size={16}
-                  weight="fill"
-                />
+                <Sparkle size={16} weight="fill" />
                 هسته هوشمندی Loadder
               </div>
 
               <h2 className="mt-5 max-w-4xl text-3xl font-bold leading-[1.55]">
-                Loadder باید کسب‌وکار را
+                همه داده‌های کسب‌وکار
                 <span className="bg-gradient-to-l from-cyan-300 via-blue-400 to-violet-400 bg-clip-text text-transparent">
                   {" "}
-                  بشناسد، به خاطر بسپارد و از آن یاد بگیرد.
+                  در یک مغز مشترک جمع می‌شوند.
                 </span>
               </h2>
 
               <p className="mt-4 max-w-3xl text-base leading-9 text-white/50">
-                مغز هوشمند اطلاعات برند، مشتری، محصول، محتوا، تبلیغات،
-                فروش و عملکرد را به یک تصویر واحد تبدیل می‌کند تا تمام
-                ابزارها و ایجنت‌های آینده Loadder از یک شناخت مشترک
-                استفاده کنند.
+                فروش، CRM، رفتار سایت، تبلیغات، محتوا، KPI و
+                پیش‌بینی آینده حالا از یک هسته داده مشترک خوانده
+                می‌شوند تا تصمیم‌های Loadder از یک تصویر واحد از
+                کسب‌وکار ساخته شوند.
               </p>
             </div>
 
             <div className="relative flex min-h-[250px] items-center justify-center">
-              <div className="absolute h-[210px] w-[210px] rounded-full border border-violet-400/15 bg-violet-500/[0.05]" />
+              <div className="absolute h-[220px] w-[220px] rounded-full border border-violet-400/15 bg-violet-500/[0.05]" />
 
-              <div className="absolute h-[155px] w-[155px] rounded-full border border-cyan-400/10 bg-cyan-500/[0.04]" />
+              <div className="absolute h-[160px] w-[160px] rounded-full border border-cyan-400/10 bg-cyan-500/[0.04]" />
 
               <div className="relative flex h-28 w-28 items-center justify-center rounded-[32px] border border-violet-300/20 bg-gradient-to-br from-violet-500/20 to-cyan-500/10 shadow-[0_0_55px_rgba(139,92,246,.2)]">
                 <Brain
@@ -295,21 +324,46 @@ export default function BusinessBrainPage() {
           </div>
         </section>
 
-        {/* SIGNALS */}
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {businessSignals.map(
-            (signal) => (
-              <SignalCard
-                key={signal.title}
-                {...signal}
-              />
-            )
-          )}
+          <SignalCard
+            title="سلامت کسب‌وکار"
+            value={faPercent(
+              businessData.business.healthScore
+            )}
+            description="وضعیت کلی کسب‌وکار"
+            tone="positive"
+          />
+
+          <SignalCard
+            title="آمادگی رشد"
+            value={faPercent(
+              businessData.business.growthReadiness
+            )}
+            description="توان فعلی برای توسعه"
+            tone="positive"
+          />
+
+          <SignalCard
+            title="ریسک"
+            value={faPercent(
+              businessData.business.riskScore
+            )}
+            description="سطح ریسک فعلی"
+            tone="warning"
+          />
+
+          <SignalCard
+            title="کیفیت داده"
+            value={faPercent(
+              businessData.business.dataQuality
+            )}
+            description="میزان اتکاپذیری اطلاعات"
+            tone="neutral"
+          />
         </section>
 
-        {/* BUSINESS PROFILE */}
         <section className="mt-8 grid gap-5 xl:grid-cols-[1.25fr_1fr]">
-          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold">
@@ -317,7 +371,7 @@ export default function BusinessBrainPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  اطلاعاتی که مغز Loadder از کسب‌وکار می‌داند
+                  تصویری که Loadder از کسب‌وکار ساخته است
                 </p>
               </div>
 
@@ -337,42 +391,41 @@ export default function BusinessBrainPage() {
 
               <ProfileCard
                 icon={UsersThree}
-                title="مخاطب اصلی"
-                value="مدیران و صاحبان کسب‌وکار"
+                title="کل مشتریان"
+                value={faNumber(
+                  businessData.crm.totalCustomers
+                )}
               />
 
               <ProfileCard
-                icon={Package}
-                title="پیشنهاد اصلی"
-                value="رشد یکپارچه با هوش مصنوعی"
+                icon={Storefront}
+                title="فروش آنلاین"
+                value={
+                  businessData.ecommerce.onlineRevenueLabel
+                }
               />
 
               <ProfileCard
-                icon={TrendUp}
-                title="مزیت رقابتی"
-                value="اتصال همه ابزارهای رشد"
+                icon={CurrencyCircleDollar}
+                title="درآمد کل"
+                value={businessData.sales.revenueLabel}
               />
             </div>
 
             <div className="mt-6">
               <div className="mb-3 text-sm text-white/45">
-                هدف فعلی کسب‌وکار
+                هدف فعلی
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {[
-                  "افزایش فروش",
-                  "جذب مشتری",
-                  "رشد برند",
-                  "کاهش هزینه",
-                  "افزایش وفاداری",
+                  businessData.goals.primary,
+                  ...businessData.goals.secondary,
                 ].map((goal) => (
                   <button
                     key={goal}
                     type="button"
-                    onClick={() =>
-                      setActiveGoal(goal)
-                    }
+                    onClick={() => setActiveGoal(goal)}
                     className={`rounded-xl border px-4 py-2.5 text-sm transition ${
                       activeGoal === goal
                         ? "border-violet-400/25 bg-violet-500/[0.10] text-violet-200"
@@ -386,8 +439,7 @@ export default function BusinessBrainPage() {
             </div>
           </div>
 
-          {/* AI READINESS */}
-          <aside className="rounded-[30px] border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.07] via-[#080d1d]/70 to-cyan-500/[0.04] p-7 backdrop-blur-xl">
+          <aside className="rounded-[30px] border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.07] via-[#080d1d]/70 to-cyan-500/[0.04] p-7">
             <div className="flex items-center gap-3">
               <ShieldCheck
                 size={24}
@@ -401,7 +453,7 @@ export default function BusinessBrainPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  میزان شناخت فعلی Loadder
+                  کیفیت شناخت فعلی Loadder
                 </p>
               </div>
             </div>
@@ -410,13 +462,22 @@ export default function BusinessBrainPage() {
               <div
                 className="relative flex h-[190px] w-[190px] items-center justify-center rounded-full"
                 style={{
-                  background:
-                    "conic-gradient(#22d3ee 0deg, #8b5cf6 288deg, rgba(255,255,255,.06) 288deg)",
+                  background: `conic-gradient(
+                    #22d3ee 0deg,
+                    #8b5cf6 ${
+                      businessData.business.dataQuality * 3.6
+                    }deg,
+                    rgba(255,255,255,.06) ${
+                      businessData.business.dataQuality * 3.6
+                    }deg
+                  )`,
                 }}
               >
                 <div className="flex h-[145px] w-[145px] flex-col items-center justify-center rounded-full bg-[#080d1d]">
                   <div className="text-4xl font-bold">
-                    ۸۰٪
+                    {faPercent(
+                      businessData.business.dataQuality
+                    )}
                   </div>
 
                   <div className="mt-1 text-xs text-white/35">
@@ -427,13 +488,13 @@ export default function BusinessBrainPage() {
             </div>
 
             <p className="mt-6 text-center text-sm leading-7 text-white/45">
-              با اتصال کامل داده‌های وب‌سایت، فروش و اتوماسیون،
-              کیفیت تصمیم‌گیری AI بیشتر می‌شود.
+              هرچه داده واقعی بیشتری از فروش، سایت، مشتری و
+              اتوماسیون وارد شود، کیفیت تصمیم‌های AI افزایش پیدا
+              می‌کند.
             </p>
           </aside>
         </section>
 
-        {/* DATA SOURCES */}
         <section className="mt-8">
           <div className="flex items-end justify-between">
             <div>
@@ -442,35 +503,150 @@ export default function BusinessBrainPage() {
               </h2>
 
               <p className="mt-1 text-sm text-white/40">
-                داده‌هایی که مغز Loadder از آن‌ها یاد می‌گیرد.
+                داده‌هایی که مغز Loadder از آن‌ها یاد می‌گیرد
               </p>
             </div>
 
             <span className="text-xs text-cyan-300/70">
-              ۴ منبع متصل
+              {dataSources.filter(
+                (item) => item.status === "متصل"
+              ).length.toLocaleString("fa-IR")}{" "}
+              منبع متصل
             </span>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {dataSources.map(
-              (source) => (
-                <DataSourceCard
-                  key={source.id}
-                  source={source}
-                  onClick={() =>
-                    showNotice(
-                      `${source.title}: ${source.status}`
-                    )
-                  }
-                />
-              )
-            )}
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {dataSources.map((source) => (
+              <DataSourceCard
+                key={source.id}
+                source={source}
+                onClick={() =>
+                  showNotice(
+                    `${source.title}: ${source.status}`
+                  )
+                }
+              />
+            ))}
           </div>
         </section>
 
-        {/* MEMORY */}
+        <section className="mt-8 grid gap-5 xl:grid-cols-[1.15fr_1fr]">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center gap-3">
+              <Storefront
+                size={23}
+                weight="duotone"
+                className="text-cyan-300"
+              />
+
+              <div>
+                <h2 className="text-xl font-semibold">
+                  هوش فروش آنلاین
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  وضعیت تجارت الکترونیک در مغز Loadder
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <CommerceMetric
+                title="فروش آنلاین"
+                value={
+                  businessData.ecommerce.onlineRevenueLabel
+                }
+              />
+
+              <CommerceMetric
+                title="خرید موفق"
+                value={faNumber(
+                  businessData.ecommerce.completedPurchases
+                )}
+              />
+
+              <CommerceMetric
+                title="سبد رهاشده"
+                value={faNumber(
+                  businessData.ecommerce.abandonedCarts
+                )}
+              />
+
+              <CommerceMetric
+                title="خرید مجدد"
+                value={faPercent(
+                  businessData.ecommerce.repeatCustomerRate
+                )}
+              />
+
+              <CommerceMetric
+                title="میانگین سفارش"
+                value={
+                  businessData.ecommerce.averageOrderValueLabel
+                }
+              />
+
+              <CommerceMetric
+                title="ارزش طول عمر مشتری"
+                value={
+                  businessData.ecommerce.customerLifetimeValueLabel
+                }
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center gap-3">
+              <Megaphone
+                size={23}
+                weight="duotone"
+                className="text-violet-300"
+              />
+
+              <div>
+                <h2 className="text-xl font-semibold">
+                  هوش بازاریابی
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  هزینه و بازده جذب مشتری
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <CommerceMetric
+                title="هزینه جذب مشتری"
+                value={businessData.marketing.cacLabel}
+              />
+
+              <CommerceMetric
+                title="بازده هزینه تبلیغات"
+                value={`${businessData.marketing.roas.toLocaleString(
+                  "fa-IR"
+                )} برابر`}
+              />
+
+              <CommerceMetric
+                title="هزینه تبلیغات"
+                value={
+                  businessData.marketing.adSpendLabel
+                }
+              />
+
+              <CommerceMetric
+                title="درآمد سایت از تبلیغات"
+                value={
+                  businessData.marketing
+                    .websiteRevenueFromAdsLabel
+                }
+              />
+            </div>
+          </div>
+        </section>
+
         <section className="mt-8 grid gap-5 xl:grid-cols-[1.35fr_1fr]">
-          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold">
@@ -478,7 +654,7 @@ export default function BusinessBrainPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  تصمیم‌ها و شناخت‌های مهم که Loadder باید به خاطر بسپارد.
+                  شناخت‌ها و تصمیم‌هایی که Loadder باید حفظ کند
                 </p>
               </div>
 
@@ -486,7 +662,7 @@ export default function BusinessBrainPage() {
                 type="button"
                 onClick={() =>
                   showNotice(
-                    "افزودن حافظه جدید در مرحله بعد فعال می‌شود."
+                    "افزودن حافظه دستی در مرحله بعد فعال می‌شود."
                   )
                 }
                 className="flex items-center gap-2 rounded-xl border border-violet-300/15 bg-violet-500/[0.07] px-4 py-2.5 text-sm text-violet-200"
@@ -500,8 +676,9 @@ export default function BusinessBrainPage() {
               {[
                 "همه",
                 "هدف",
-                "مخاطب",
-                "تبلیغات",
+                "فروش",
+                "مشتری",
+                "بازاریابی",
                 "محتوا",
               ].map((filter) => (
                 <button
@@ -522,18 +699,15 @@ export default function BusinessBrainPage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              {filteredMemories.map(
-                (memory) => (
-                  <MemoryRow
-                    key={memory.id}
-                    memory={memory}
-                  />
-                )
-              )}
+              {filteredMemories.map((memory) => (
+                <MemoryRow
+                  key={memory.id}
+                  memory={memory}
+                />
+              ))}
             </div>
           </div>
 
-          {/* BUSINESS RISKS */}
           <aside className="space-y-5">
             <div className="rounded-[28px] border border-emerald-400/15 bg-emerald-500/[0.05] p-6">
               <div className="flex items-center gap-3">
@@ -549,20 +723,12 @@ export default function BusinessBrainPage() {
               </div>
 
               <div className="mt-5 space-y-3">
-                <SimpleRow
-                  title="رشد فروش"
-                  value="مثبت"
-                />
-
-                <SimpleRow
-                  title="کیفیت محتوا"
-                  value="بالا"
-                />
-
-                <SimpleRow
-                  title="تعامل مشتری"
-                  value="خوب"
-                />
+                {strengths.map((item) => (
+                  <SimpleRow
+                    key={item.title}
+                    {...item}
+                  />
+                ))}
               </div>
             </div>
 
@@ -580,27 +746,18 @@ export default function BusinessBrainPage() {
               </div>
 
               <div className="mt-5 space-y-3">
-                <SimpleRow
-                  title="نرخ تبدیل"
-                  value="نیاز به بهبود"
-                />
-
-                <SimpleRow
-                  title="هزینه جذب"
-                  value="رو به افزایش"
-                />
-
-                <SimpleRow
-                  title="داده وب‌سایت"
-                  value="ناقص"
-                />
+                {risks.map((item) => (
+                  <SimpleRow
+                    key={item.title}
+                    {...item}
+                  />
+                ))}
               </div>
             </div>
           </aside>
         </section>
 
-        {/* DECISION MAP */}
-        <section className="mt-8 rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+        <section className="mt-8 rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold">
@@ -608,7 +765,7 @@ export default function BusinessBrainPage() {
               </h2>
 
               <p className="mt-1 text-sm text-white/40">
-                اطلاعات چگونه تبدیل به تصمیم می‌شوند.
+                داده چگونه به تصمیم و اقدام تبدیل می‌شود
               </p>
             </div>
 
@@ -622,38 +779,37 @@ export default function BusinessBrainPage() {
           <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <DecisionStep
               number="۱"
-              title="شناخت برند"
-              value="هویت و پیام"
+              title="داده"
+              value="سایت، CRM و فروش"
             />
 
             <DecisionStep
               number="۲"
-              title="شناخت مشتری"
-              value="رفتار و نیاز"
+              title="تحلیل"
+              value="KPI و Analytics"
             />
 
             <DecisionStep
               number="۳"
-              title="تحلیل عملکرد"
-              value="داده و KPI"
+              title="شناخت"
+              value="حافظه کسب‌وکار"
             />
 
             <DecisionStep
               number="۴"
               title="پیش‌بینی"
-              value="رشد و ریسک"
+              value="رشد، ثبات یا افت"
             />
 
             <DecisionStep
               number="۵"
               title="اقدام"
-              value="پیشنهاد یا اجرا"
+              value="اتوماسیون هوشمند"
             />
           </div>
         </section>
 
-        {/* AI BRAIN */}
-        <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8 backdrop-blur-xl">
+        <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8">
           <div className="grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
               <div className="flex items-center gap-3">
@@ -671,35 +827,41 @@ export default function BusinessBrainPage() {
                   </h2>
 
                   <p className="mt-1 text-sm text-white/40">
-                    تحلیل مشترک تمام بخش‌های کسب‌وکار
+                    جمع‌بندی کل کسب‌وکار
                   </p>
                 </div>
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                بر اساس داده‌های فعلی، مهم‌ترین فرصت رشد در بهبود نرخ تبدیل
-                و افزایش سرعت پیگیری مشتریان بالقوه قرار دارد. Loadder در
-                آینده می‌تواند این تحلیل را به اتوماسیون و ایجنت‌های تخصصی
-                منتقل کند تا اقدامات بعدی به‌صورت هماهنگ اجرا شوند.
+                بر اساس داده فعلی، بیشترین فرصت کوتاه‌مدت در
+                بازیابی سبدهای خرید رهاشده و پیگیری لیدهای داغ است.
+                در سطح رشد پایدار نیز کاهش هزینه جذب مشتری و افزایش
+                خرید مجدد بیشترین اثر را خواهند داشت.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
                 <AIInsightCard
-                  icon={Target}
-                  title="اولویت اول"
-                  value="بهبود نرخ تبدیل"
+                  icon={ShoppingCart}
+                  title="اقدام فوری"
+                  value={`${faNumber(
+                    businessData.ecommerce.abandonedCarts
+                  )} سبد رهاشده`}
                 />
 
                 <AIInsightCard
                   icon={UsersThree}
-                  title="اولویت دوم"
-                  value="پیگیری لیدهای داغ"
+                  title="فرصت فروش"
+                  value={`${faNumber(
+                    businessData.crm.hotLeads
+                  )} لید داغ`}
                 />
 
                 <AIInsightCard
-                  icon={Megaphone}
-                  title="اولویت سوم"
-                  value="بهینه‌سازی بودجه"
+                  icon={TrendUp}
+                  title="احتمال رشد"
+                  value={faPercent(
+                    businessData.predictive.growthProbability
+                  )}
                 />
               </div>
             </div>
@@ -713,46 +875,31 @@ export default function BusinessBrainPage() {
                 />
 
                 <span className="font-semibold">
-                  سطح اختیار AI
+                  اقدام بعدی
                 </span>
               </div>
 
               <div className="mt-5 space-y-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    showNotice(
-                      "حالت تحلیل انتخاب شد."
-                    )
-                  }
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/60"
+                <Link
+                  to="/dashboard/crm"
+                  className="block w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-center text-sm text-white/60"
                 >
-                  فقط تحلیل کن
-                </button>
+                  مشاهده فرصت‌های فروش
+                </Link>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    showNotice(
-                      "حالت پیشنهاد انتخاب شد."
-                    )
-                  }
-                  className="w-full rounded-xl border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-3 text-sm text-cyan-200"
+                <Link
+                  to="/dashboard/predictive"
+                  className="block w-full rounded-xl border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-3 text-center text-sm text-cyan-200"
                 >
-                  پیشنهاد بده
-                </button>
+                  بررسی سناریوهای آینده
+                </Link>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    showNotice(
-                      "اجرای هوشمند بعداً به Automation و AI Agents متصل می‌شود."
-                    )
-                  }
-                  className="w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold"
+                <Link
+                  to="/dashboard/automation"
+                  className="block w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-center text-sm font-semibold"
                 >
-                  اجرا با تأیید من
-                </button>
+                  ساخت اقدام خودکار
+                </Link>
               </div>
             </div>
           </div>
@@ -773,7 +920,12 @@ function SignalCard({
   value,
   description,
   tone,
-}: BusinessSignal) {
+}: {
+  title: string;
+  value: string;
+  description: string;
+  tone: "positive" | "warning" | "neutral";
+}) {
   const toneClass =
     tone === "positive"
       ? "text-emerald-300"
@@ -782,14 +934,12 @@ function SignalCard({
         : "text-cyan-300";
 
   return (
-    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
+    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5">
       <div className="text-sm text-white/40">
         {title}
       </div>
 
-      <div
-        className={`mt-3 text-3xl font-bold ${toneClass}`}
-      >
+      <div className={`mt-3 text-3xl font-bold ${toneClass}`}>
         {value}
       </div>
 
@@ -840,8 +990,7 @@ function DataSourceCard({
   const statusClass =
     source.status === "متصل"
       ? "border-emerald-400/10 bg-emerald-500/[0.07] text-emerald-300"
-      : source.status ===
-          "آماده اتصال"
+      : source.status === "آماده اتصال"
         ? "border-cyan-400/10 bg-cyan-500/[0.07] text-cyan-300"
         : "border-amber-400/10 bg-amber-500/[0.07] text-amber-300";
 
@@ -849,7 +998,7 @@ function DataSourceCard({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 text-right backdrop-blur-xl transition hover:-translate-y-1 hover:border-violet-300/20"
+      className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 text-right transition hover:-translate-y-1 hover:border-violet-300/20"
     >
       <div className="flex items-start justify-between">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.07] bg-black/20">
@@ -875,6 +1024,26 @@ function DataSourceCard({
         {source.description}
       </p>
     </button>
+  );
+}
+
+function CommerceMetric({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5">
+      <div className="text-xs text-white/35">
+        {title}
+      </div>
+
+      <div className="mt-2 text-lg font-bold text-cyan-300">
+        {value}
+      </div>
+    </div>
   );
 }
 
