@@ -1,14 +1,13 @@
 {
-  "name": "server",
+  "name": "loadder-ai-server",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Loadder AI backend and workflow engine",
+  "type": "module",
+  "main": "index.mjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch index.mjs",
+    "start": "node index.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
