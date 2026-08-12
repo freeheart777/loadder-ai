@@ -34,7 +34,11 @@ import {
   getCustomer360,
 
   getLeads,
+  getLeadById,
   createLead,
+  updateLead,
+  convertLeadToCustomer,
+  transferLeadAttributionToCustomer,
 
   getOrders,
   createOrder,
@@ -49,7 +53,7 @@ import {
   seedCRMData,
 
   /* =========================
-     MARKETING ACQUISITION
+     MARKETING
   ========================= */
 
   getMarketingChannels,
@@ -67,6 +71,9 @@ import {
 
   getAttributionTouchpoints,
   createAttributionTouchpoint,
+
+  attributeOrderToCustomerCampaign,
+  getCampaignAttributedPerformance,
 
   seedMarketingData,
 } from "./db/database.mjs";
@@ -88,287 +95,161 @@ const PORT =
 const defaultAutomations = [
   {
     id: "abandoned-cart",
-
-    title:
-      "بازیابی سبد خرید رهاشده",
-
-    trigger:
-      "cart.abandoned",
-
+    title: "بازیابی سبد خرید رهاشده",
+    trigger: "cart.abandoned",
     enabled: true,
-
     delayMinutes: 120,
 
     conditions: [
       {
-        field:
-          "cartValue",
-
-        operator:
-          "gte",
-
+        field: "cartValue",
+        operator: "gte",
         value: 0,
       },
     ],
 
     actions: [
       {
-        type:
-          "send_message",
-
-        channel:
-          "sms",
-
-        template:
-          "cart_recovery",
+        type: "send_message",
+        channel: "sms",
+        template: "cart_recovery",
       },
     ],
   },
 
   {
-    id:
-      "hot-lead",
-
-    title:
-      "پیگیری لید داغ",
-
-    trigger:
-      "lead.hot",
-
-    enabled:
-      true,
-
-    delayMinutes:
-      0,
+    id: "hot-lead",
+    title: "پیگیری لید داغ",
+    trigger: "lead.hot",
+    enabled: true,
+    delayMinutes: 0,
 
     conditions: [
       {
-        field:
-          "score",
-
-        operator:
-          "gte",
-
-        value:
-          80,
+        field: "score",
+        operator: "gte",
+        value: 80,
       },
     ],
 
     actions: [
       {
-        type:
-          "create_task",
-
-        assignee:
-          "sales",
-
-        template:
-          "hot_lead_followup",
+        type: "create_task",
+        assignee: "sales",
+        template: "hot_lead_followup",
       },
     ],
   },
 
   {
-    id:
-      "order-completed",
-
-    title:
-      "پیگیری پس از خرید",
-
-    trigger:
-      "order.completed",
-
-    enabled:
-      true,
-
-    delayMinutes:
-      10,
-
-    conditions:
-      [],
+    id: "order-completed",
+    title: "پیگیری پس از خرید",
+    trigger: "order.completed",
+    enabled: true,
+    delayMinutes: 10,
+    conditions: [],
 
     actions: [
       {
-        type:
-          "send_message",
-
-        channel:
-          "sms",
-
-        template:
-          "purchase_thank_you",
+        type: "send_message",
+        channel: "sms",
+        template: "purchase_thank_you",
       },
     ],
   },
 
   {
-    id:
-      "repeat-purchase",
-
-    title:
-      "پیشنهاد مشتری تکرارشونده",
-
-    trigger:
-      "customer.repeat_purchase",
-
-    enabled:
-      true,
-
-    delayMinutes:
-      0,
+    id: "repeat-purchase",
+    title: "پیشنهاد مشتری تکرارشونده",
+    trigger: "customer.repeat_purchase",
+    enabled: true,
+    delayMinutes: 0,
 
     conditions: [
       {
-        field:
-          "orderCount",
-
-        operator:
-          "gte",
-
-        value:
-          2,
+        field: "orderCount",
+        operator: "gte",
+        value: 2,
       },
     ],
 
     actions: [
       {
-        type:
-          "send_offer",
-
-        channel:
-          "sms",
-
-        template:
-          "repeat_customer_offer",
+        type: "send_offer",
+        channel: "sms",
+        template: "repeat_customer_offer",
       },
     ],
   },
 
   {
-    id:
-      "churn-risk",
-
-    title:
-      "بازگشت مشتری در معرض ریزش",
-
-    trigger:
-      "customer.churn_risk",
-
-    enabled:
-      true,
-
-    delayMinutes:
-      0,
+    id: "churn-risk",
+    title: "بازگشت مشتری در معرض ریزش",
+    trigger: "customer.churn_risk",
+    enabled: true,
+    delayMinutes: 0,
 
     conditions: [
       {
-        field:
-          "riskScore",
-
-        operator:
-          "gte",
-
-        value:
-          70,
+        field: "riskScore",
+        operator: "gte",
+        value: 70,
       },
     ],
 
     actions: [
       {
-        type:
-          "create_campaign",
-
-        channel:
-          "crm",
-
-        template:
-          "winback_campaign",
+        type: "create_campaign",
+        channel: "crm",
+        template: "winback_campaign",
       },
     ],
   },
 
   {
-    id:
-      "high-cac",
-
-    title:
-      "هشدار هزینه جذب بالا",
-
-    trigger:
-      "marketing.cac_high",
-
-    enabled:
-      true,
-
-    delayMinutes:
-      0,
+    id: "high-cac",
+    title: "هشدار هزینه جذب بالا",
+    trigger: "marketing.cac_high",
+    enabled: true,
+    delayMinutes: 0,
 
     conditions: [
       {
-        field:
-          "cac",
-
-        operator:
-          "gte",
-
-        value:
-          500000,
+        field: "cac",
+        operator: "gte",
+        value: 500000,
       },
     ],
 
     actions: [
       {
-        type:
-          "create_alert",
-
-        channel:
-          "dashboard",
-
-        template:
-          "high_cac_alert",
+        type: "create_alert",
+        channel: "dashboard",
+        template: "high_cac_alert",
       },
     ],
   },
 
   {
-    id:
-      "conversion-drop",
-
-    title:
-      "هشدار افت نرخ تبدیل",
-
-    trigger:
-      "website.conversion_drop",
-
-    enabled:
-      true,
-
-    delayMinutes:
-      0,
+    id: "conversion-drop",
+    title: "هشدار افت نرخ تبدیل",
+    trigger: "website.conversion_drop",
+    enabled: true,
+    delayMinutes: 0,
 
     conditions: [
       {
-        field:
-          "conversionRate",
-
-        operator:
-          "lte",
-
-        value:
-          5.5,
+        field: "conversionRate",
+        operator: "lte",
+        value: 5.5,
       },
     ],
 
     actions: [
       {
-        type:
-          "create_alert",
-
-        channel:
-          "dashboard",
-
-        template:
-          "conversion_drop_alert",
+        type: "create_alert",
+        channel: "dashboard",
+        template: "conversion_drop_alert",
       },
     ],
   },
@@ -383,11 +264,10 @@ seedDefaultAutomations(
 );
 
 seedCRMData();
-
 seedMarketingData();
 
 /* =========================================================
-   AUTOMATION HELPERS
+   HELPERS
 ========================================================= */
 
 function evaluateCondition(
@@ -457,9 +337,7 @@ function workflowMatches(
   workflow,
   event
 ) {
-  if (
-    !workflow.enabled
-  ) {
+  if (!workflow.enabled) {
     return false;
   }
 
@@ -484,8 +362,8 @@ function buildMessage(
   event
 ) {
   const customerName =
-    event.payload
-      .customerName ||
+    event.payload.customerName ||
+    event.payload.leadName ||
     "مشتری عزیز";
 
   switch (
@@ -511,6 +389,10 @@ function buildMessage(
   }
 }
 
+/* =========================================================
+   WORKFLOW ENGINE
+========================================================= */
+
 async function executeAction(
   action,
   event,
@@ -518,8 +400,7 @@ async function executeAction(
 ) {
   let executionResult = {
     ok: true,
-    status:
-      "simulated",
+    status: "simulated",
   };
 
   if (
@@ -531,14 +412,10 @@ async function executeAction(
     const recipient =
       action.channel ===
       "email"
-        ? event.payload
-            .email ||
-          event.payload
-            .recipient
-        : event.payload
-            .phone ||
-          event.payload
-            .recipient;
+        ? event.payload.email ||
+          event.payload.recipient
+        : event.payload.phone ||
+          event.payload.recipient;
 
     executionResult =
       await sendMessage({
@@ -572,6 +449,11 @@ async function executeAction(
               .customerId ||
             null,
 
+          leadId:
+            event.payload
+              .leadId ||
+            null,
+
           orderId:
             event.payload
               .orderId ||
@@ -586,17 +468,13 @@ async function executeAction(
   ) {
     executionResult = {
       ok: true,
-
       provider:
         "loadder-simulator",
-
       action:
         "create_task",
-
       assignee:
         action.assignee ||
         "sales",
-
       status:
         "simulated",
     };
@@ -608,13 +486,10 @@ async function executeAction(
   ) {
     executionResult = {
       ok: true,
-
       provider:
         "loadder-simulator",
-
       action:
         "create_campaign",
-
       status:
         "simulated",
     };
@@ -626,13 +501,10 @@ async function executeAction(
   ) {
     executionResult = {
       ok: true,
-
       provider:
         "loadder-simulator",
-
       action:
         "create_alert",
-
       status:
         "simulated",
     };
@@ -670,17 +542,13 @@ async function executeAction(
       null,
 
     recipient:
-      event.payload
-        .phone ||
-      event.payload
-        .email ||
-      event.payload
-        .recipient ||
+      event.payload.phone ||
+      event.payload.email ||
+      event.payload.recipient ||
       null,
 
     status:
-      executionResult
-        .status ||
+      executionResult.status ||
       "completed",
 
     result:
@@ -698,8 +566,7 @@ async function runWorkflow(
   workflow,
   event
 ) {
-  const executions =
-    [];
+  const executions = [];
 
   for (
     const action
@@ -734,9 +601,7 @@ async function runWorkflow(
 async function processEvent(
   event
 ) {
-  saveEvent(
-    event
-  );
+  saveEvent(event);
 
   if (
     event.payload
@@ -815,6 +680,12 @@ app.get(
       attribution:
         true,
 
+      leadConversion:
+        true,
+
+      revenueAttribution:
+        true,
+
       timestamp:
         new Date()
           .toISOString(),
@@ -831,6 +702,7 @@ app.get(
   (req, res) => {
     res.json({
       ok: true,
+
       data:
         getCRMStats(),
     });
@@ -855,7 +727,6 @@ app.get(
           .status(404)
           .json({
             ok: false,
-
             message:
               "مشتری پیدا نشد.",
           });
@@ -900,7 +771,6 @@ app.post(
         .status(404)
         .json({
           ok: false,
-
           message:
             "مشتری پیدا نشد.",
         });
@@ -953,8 +823,7 @@ app.post(
           ok: false,
 
           message:
-            channel ===
-            "email"
+            channel === "email"
               ? "برای این مشتری ایمیل ثبت نشده است."
               : "برای این مشتری شماره موبایل ثبت نشده است.",
         });
@@ -985,7 +854,6 @@ app.post(
           customer.email,
 
         channel,
-
         recipient,
 
         message:
@@ -994,9 +862,7 @@ app.post(
     };
 
     try {
-      saveEvent(
-        event
-      );
+      saveEvent(event);
 
       createCustomerEvent({
         customerId:
@@ -1075,20 +941,7 @@ app.post(
           result?.status ||
           "completed",
 
-        result: {
-          ...result,
-
-          metadata: {
-            customerId:
-              customer.id,
-
-            customerName:
-              customer.name,
-
-            source:
-              "customer_360",
-          },
-        },
+        result,
       };
 
       saveExecution(
@@ -1114,7 +967,7 @@ app.post(
       });
     } catch (error) {
       console.error(
-        "Direct customer message error:",
+        "Direct message error:",
         error
       );
 
@@ -1125,57 +978,6 @@ app.post(
 
           message:
             "خطا در ارسال پیام به مشتری.",
-        });
-    }
-  }
-);
-
-/* =========================================================
-   CUSTOMER EVENTS
-========================================================= */
-
-app.get(
-  "/api/customers/:id/events",
-  (req, res) => {
-    try {
-      const customer =
-        getCustomerById(
-          req.params.id
-        );
-
-      if (!customer) {
-        return res
-          .status(404)
-          .json({
-            ok: false,
-            message:
-              "مشتری پیدا نشد.",
-          });
-      }
-
-      const data =
-        getCustomerEvents(
-          req.params.id
-        );
-
-      res.json({
-        ok: true,
-        count:
-          data.length,
-        data,
-      });
-    } catch (error) {
-      console.error(
-        "Customer events error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-          message:
-            "خطا در دریافت رویدادهای مشتری.",
         });
     }
   }
@@ -1275,8 +1077,64 @@ app.post(
         .status(500)
         .json({
           ok: false,
+
           message:
             "خطا در ساخت مشتری.",
+        });
+    }
+  }
+);
+
+/* =========================================================
+   CUSTOMER EVENTS
+========================================================= */
+
+app.get(
+  "/api/customers/:id/events",
+  (req, res) => {
+    try {
+      const customer =
+        getCustomerById(
+          req.params.id
+        );
+
+      if (!customer) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+
+            message:
+              "مشتری پیدا نشد.",
+          });
+      }
+
+      const data =
+        getCustomerEvents(
+          req.params.id
+        );
+
+      res.json({
+        ok: true,
+
+        count:
+          data.length,
+
+        data,
+      });
+    } catch (error) {
+      console.error(
+        "Customer events error:",
+        error
+      );
+
+      res
+        .status(500)
+        .json({
+          ok: false,
+
+          message:
+            "خطا در دریافت رویدادهای مشتری.",
         });
     }
   }
@@ -1294,10 +1152,99 @@ app.get(
 
     res.json({
       ok: true,
+
       count:
         data.length,
+
       data,
     });
+  }
+);
+
+app.get(
+  "/api/leads/:id",
+  (req, res) => {
+    const lead =
+      getLeadById(
+        req.params.id
+      );
+
+    if (!lead) {
+      return res
+        .status(404)
+        .json({
+          ok: false,
+
+          message:
+            "لید پیدا نشد.",
+        });
+    }
+
+    const attribution =
+      getAttributionTouchpoints({
+        leadId:
+          lead.id,
+      });
+
+    res.json({
+      ok: true,
+
+      data: {
+        lead,
+
+        attribution: {
+          count:
+            attribution.length,
+
+          touchpoints:
+            attribution,
+        },
+      },
+    });
+  }
+);
+
+app.patch(
+  "/api/leads/:id",
+  (req, res) => {
+    try {
+      const lead =
+        updateLead(
+          req.params.id,
+          req.body
+        );
+
+      if (!lead) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+
+            message:
+              "لید پیدا نشد.",
+          });
+      }
+
+      res.json({
+        ok: true,
+        data:
+          lead,
+      });
+    } catch (error) {
+      console.error(
+        "Update lead error:",
+        error
+      );
+
+      res
+        .status(500)
+        .json({
+          ok: false,
+
+          message:
+            "خطا در ویرایش لید.",
+        });
+    }
   }
 );
 
@@ -1318,6 +1265,30 @@ app.post(
 
       opportunityValue =
         0,
+
+      campaignId =
+        null,
+
+      channelId =
+        null,
+
+      platformId =
+        null,
+
+      serviceId =
+        null,
+
+      sessionId =
+        null,
+
+      externalClickId =
+        null,
+
+      touchType =
+        "lead_created",
+
+      attributionMetadata =
+        {},
     } = req.body;
 
     if (!name) {
@@ -1325,6 +1296,7 @@ app.post(
         .status(400)
         .json({
           ok: false,
+
           message:
             "نام لید الزامی است.",
         });
@@ -1338,18 +1310,48 @@ app.post(
           email,
           company,
           source,
-
           score,
-
           status,
-
           opportunityValue,
         });
 
+      let attribution =
+        null;
+
       if (
-        Number(
-          score
-        ) >= 80
+        campaignId ||
+        channelId ||
+        platformId ||
+        serviceId ||
+        sessionId ||
+        externalClickId
+      ) {
+        attribution =
+          createAttributionTouchpoint({
+            leadId:
+              lead.id,
+
+            campaignId,
+            channelId,
+            platformId,
+            serviceId,
+
+            touchType,
+
+            sessionId,
+
+            externalClickId,
+
+            metadata: {
+              source,
+
+              ...attributionMetadata,
+            },
+          });
+      }
+
+      if (
+        Number(score) >= 80
       ) {
         const event = {
           id:
@@ -1373,9 +1375,12 @@ app.post(
             email,
 
             score:
-              Number(
-                score
-              ),
+              Number(score),
+
+            campaignId,
+            channelId,
+            platformId,
+            serviceId,
           },
         };
 
@@ -1388,8 +1393,11 @@ app.post(
         .status(201)
         .json({
           ok: true,
-          data:
+
+          data: {
             lead,
+            attribution,
+          },
         });
     } catch (error) {
       console.error(
@@ -1401,8 +1409,150 @@ app.post(
         .status(500)
         .json({
           ok: false,
+
           message:
             "خطا در ساخت لید.",
+        });
+    }
+  }
+);
+
+/* =========================================================
+   LEAD → CUSTOMER
+========================================================= */
+
+app.post(
+  "/api/leads/:id/convert",
+  async (req, res) => {
+    const lead =
+      getLeadById(
+        req.params.id
+      );
+
+    if (!lead) {
+      return res
+        .status(404)
+        .json({
+          ok: false,
+
+          message:
+            "لید پیدا نشد.",
+        });
+    }
+
+    try {
+      const conversion =
+        convertLeadToCustomer(
+          lead.id,
+          req.body || {}
+        );
+
+      if (!conversion) {
+        return res
+          .status(500)
+          .json({
+            ok: false,
+
+            message:
+              "تبدیل لید انجام نشد.",
+          });
+      }
+
+      let transferred =
+        [];
+
+      if (
+        conversion.customer &&
+        !conversion
+          .alreadyConverted
+      ) {
+        transferred =
+          transferLeadAttributionToCustomer(
+            lead.id,
+
+            conversion
+              .customer.id
+          );
+      }
+
+      const event = {
+        id:
+          crypto.randomUUID(),
+
+        type:
+          "lead.converted",
+
+        createdAt:
+          new Date()
+            .toISOString(),
+
+        payload: {
+          leadId:
+            lead.id,
+
+          customerId:
+            conversion
+              .customer?.id ||
+            null,
+
+          leadName:
+            lead.name,
+
+          customerName:
+            conversion
+              .customer?.name ||
+            lead.name,
+
+          phone:
+            conversion
+              .customer?.phone ||
+            lead.phone,
+
+          email:
+            conversion
+              .customer?.email ||
+            lead.email,
+
+          source:
+            lead.source,
+
+          attributionCount:
+            transferred.length,
+        },
+      };
+
+      await processEvent(
+        event
+      );
+
+      res.json({
+        ok: true,
+
+        data: {
+          ...conversion,
+
+          attribution: {
+            transferred:
+              transferred.length,
+
+            touchpoints:
+              transferred,
+          },
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Lead conversion error:",
+        error
+      );
+
+      res
+        .status(500)
+        .json({
+          ok: false,
+
+          message:
+            "خطا در تبدیل لید به مشتری.",
         });
     }
   }
@@ -1420,8 +1570,10 @@ app.get(
 
     res.json({
       ok: true,
+
       count:
         data.length,
+
       data,
     });
   }
@@ -1470,6 +1622,7 @@ app.post(
         .status(404)
         .json({
           ok: false,
+
           message:
             "مشتری پیدا نشد.",
         });
@@ -1491,6 +1644,39 @@ app.post(
 
           paymentStatus,
         });
+
+      let attribution = {
+        attributed:
+          false,
+
+        reason:
+          "order_not_completed_or_paid",
+      };
+
+      /*
+       * Revenue Attribution فقط برای
+       * سفارش completed + paid
+       */
+
+      if (
+        status ===
+          "completed" &&
+        paymentStatus ===
+          "paid"
+      ) {
+        attribution =
+          attributeOrderToCustomerCampaign({
+            customerId,
+
+            orderId:
+              order.id,
+
+            revenue:
+              Number(
+                totalAmount
+              ),
+          });
+      }
 
       if (
         status ===
@@ -1526,6 +1712,18 @@ app.post(
               Number(
                 totalAmount
               ),
+
+            paymentStatus,
+
+            attributed:
+              attribution
+                .attributed ||
+              false,
+
+            campaignId:
+              attribution
+                .campaignId ||
+              null,
           },
         };
 
@@ -1538,8 +1736,11 @@ app.post(
         .status(201)
         .json({
           ok: true,
-          data:
+
+          data: {
             order,
+            attribution,
+          },
         });
     } catch (error) {
       console.error(
@@ -1551,6 +1752,7 @@ app.post(
         .status(500)
         .json({
           ok: false,
+
           message:
             "خطا در ساخت سفارش.",
         });
@@ -1570,8 +1772,10 @@ app.get(
 
     res.json({
       ok: true,
+
       count:
         data.length,
+
       data,
     });
   }
@@ -1728,6 +1932,7 @@ app.get(
 
     res.json({
       ok: true,
+
       data:
         automation,
     });
@@ -1783,6 +1988,7 @@ app.post(
         .status(201)
         .json({
           ok: true,
+
           data:
             automation,
         });
@@ -1796,6 +2002,7 @@ app.post(
         .status(500)
         .json({
           ok: false,
+
           message:
             "خطا در ساخت اتوماسیون.",
         });
@@ -1818,6 +2025,7 @@ app.patch(
           .status(404)
           .json({
             ok: false,
+
             message:
               "اتوماسیون پیدا نشد.",
           });
@@ -1825,6 +2033,7 @@ app.patch(
 
       res.json({
         ok: true,
+
         data:
           automation,
       });
@@ -1838,6 +2047,7 @@ app.patch(
         .status(500)
         .json({
           ok: false,
+
           message:
             "خطا در ویرایش اتوماسیون.",
         });
@@ -1859,6 +2069,7 @@ app.delete(
           .status(404)
           .json({
             ok: false,
+
             message:
               "اتوماسیون پیدا نشد.",
           });
@@ -1877,6 +2088,7 @@ app.delete(
         .status(500)
         .json({
           ok: false,
+
           message:
             "خطا در حذف اتوماسیون.",
         });
@@ -1885,7 +2097,7 @@ app.delete(
 );
 
 /* =========================================================
-   MANUAL WORKFLOW RUN
+   MANUAL WORKFLOW
 ========================================================= */
 
 app.post(
@@ -1901,18 +2113,18 @@ app.post(
         .status(404)
         .json({
           ok: false,
+
           message:
             "اتوماسیون پیدا نشد.",
         });
     }
 
-    if (
-      !workflow.enabled
-    ) {
+    if (!workflow.enabled) {
       return res
         .status(400)
         .json({
           ok: false,
+
           message:
             "این Workflow متوقف است.",
         });
@@ -1935,30 +2147,8 @@ app.post(
     };
 
     try {
-      saveEvent(
-        event
-      );
-
-      if (
-        event.payload
-          .customerId
-      ) {
-        createCustomerEvent({
-          customerId:
-            event.payload
-              .customerId,
-
-          type:
-            event.type,
-
-          metadata:
-            event.payload,
-        });
-      }
-
       const result =
-        await runWorkflow(
-          workflow,
+        await processEvent(
           event
         );
 
@@ -1969,7 +2159,7 @@ app.post(
       });
     } catch (error) {
       console.error(
-        "Manual workflow execution error:",
+        "Manual workflow error:",
         error
       );
 
@@ -1977,6 +2167,7 @@ app.post(
         .status(500)
         .json({
           ok: false,
+
           message:
             "خطا در اجرای Workflow.",
         });
@@ -2014,7 +2205,6 @@ app.post(
         crypto.randomUUID(),
 
       type,
-
       payload,
 
       createdAt:
@@ -2033,11 +2223,11 @@ app.post(
 
       res.json({
         ok: true,
-
         event,
 
         matchedWorkflows:
-          matchedWorkflows.length,
+          matchedWorkflows
+            .length,
 
         results,
       });
@@ -2078,8 +2268,10 @@ app.get(
 
     res.json({
       ok: true,
+
       count:
         data.length,
+
       data,
     });
   }
@@ -2125,8 +2317,10 @@ app.get(
 
       res.json({
         ok: true,
+
         count:
           data.length,
+
         data,
       });
     } catch (error) {
@@ -2192,7 +2386,7 @@ app.get(
 );
 
 /* =========================================================
-   ADVERTISING SERVICES
+   AD SERVICES
 ========================================================= */
 
 app.get(
@@ -2260,18 +2454,26 @@ app.get(
             platforms:
               platforms
                 .filter(
-                  (platform) =>
-                    platform.channelId ===
+                  (
+                    platform
+                  ) =>
+                    platform
+                      .channelId ===
                     channel.id
                 )
                 .map(
-                  (platform) => ({
+                  (
+                    platform
+                  ) => ({
                     ...platform,
 
                     services:
                       services.filter(
-                        (service) =>
-                          service.platformId ===
+                        (
+                          service
+                        ) =>
+                          service
+                            .platformId ===
                           platform.id
                       ),
                   })
@@ -2306,7 +2508,7 @@ app.get(
 );
 
 /* =========================================================
-   MARKETING CAMPAIGNS
+   CAMPAIGNS
 ========================================================= */
 
 app.get(
@@ -2341,10 +2543,6 @@ app.get(
     }
   }
 );
-
-/* =========================================================
-   CREATE MARKETING CAMPAIGN
-========================================================= */
 
 app.post(
   "/api/marketing/campaigns",
@@ -2399,77 +2597,6 @@ app.post(
     }
 
     try {
-      const channels =
-        getMarketingChannels();
-
-      const channel =
-        channels.find(
-          (item) =>
-            item.id ===
-            channelId
-        );
-
-      if (!channel) {
-        return res
-          .status(400)
-          .json({
-            ok: false,
-
-            message:
-              "کانال تبلیغاتی معتبر نیست.",
-          });
-      }
-
-      const platforms =
-        getMarketingPlatforms(
-          channelId
-        );
-
-      const platform =
-        platforms.find(
-          (item) =>
-            item.id ===
-            platformId
-        );
-
-      if (!platform) {
-        return res
-          .status(400)
-          .json({
-            ok: false,
-
-            message:
-              "پلتفرم انتخاب‌شده متعلق به این کانال نیست.",
-          });
-      }
-
-      if (
-        serviceId
-      ) {
-        const services =
-          getAdvertisingServices(
-            platformId
-          );
-
-        const service =
-          services.find(
-            (item) =>
-              item.id ===
-              serviceId
-          );
-
-        if (!service) {
-          return res
-            .status(400)
-            .json({
-              ok: false,
-
-              message:
-                "سرویس انتخاب‌شده متعلق به این پلتفرم نیست.",
-            });
-        }
-      }
-
       const campaign =
         createMarketingCampaign({
           channelId,
@@ -2495,12 +2622,13 @@ app.post(
         .status(201)
         .json({
           ok: true,
+
           data:
             campaign,
         });
     } catch (error) {
       console.error(
-        "Create marketing campaign error:",
+        "Create campaign error:",
         error
       );
 
@@ -2621,8 +2749,10 @@ app.get(
 
       res.json({
         ok: true,
+
         count:
           data.length,
+
         data,
       });
     } catch (error) {
@@ -2637,7 +2767,7 @@ app.get(
           ok: false,
 
           message:
-            "خطا در دریافت داده کمپین.",
+            "خطا در دریافت داده‌های کمپین.",
         });
     }
   }
@@ -2662,47 +2792,13 @@ app.post(
         });
     }
 
-    const {
-      metricDate,
-
-      spend = 0,
-      impressions = 0,
-      views = 0,
-      clicks = 0,
-
-      sessions = 0,
-
-      leads = 0,
-
-      orders = 0,
-
-      customers = 0,
-
-      conversions = 0,
-
-      revenue = 0,
-    } = req.body;
-
     try {
       const metric =
         saveCampaignMetric({
           campaignId:
             campaign.id,
 
-          metricDate,
-
-          spend,
-          impressions,
-          views,
-          clicks,
-
-          sessions,
-
-          leads,
-          orders,
-          customers,
-          conversions,
-          revenue,
+          ...req.body,
         });
 
       const metrics =
@@ -2727,7 +2823,7 @@ app.post(
         });
     } catch (error) {
       console.error(
-        "Save campaign metric error:",
+        "Save campaign metrics error:",
         error
       );
 
@@ -2737,7 +2833,7 @@ app.post(
           ok: false,
 
           message:
-            "خطا در ذخیره متریک‌های کمپین.",
+            "خطا در ذخیره داده کمپین.",
         });
     }
   }
@@ -2800,6 +2896,61 @@ app.get(
 );
 
 /* =========================================================
+   REAL ATTRIBUTED PERFORMANCE
+========================================================= */
+
+app.get(
+  "/api/marketing/campaigns/:id/performance",
+  (req, res) => {
+    try {
+      const campaign =
+        getCampaignById(
+          req.params.id
+        );
+
+      if (!campaign) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+
+            message:
+              "کمپین پیدا نشد.",
+          });
+      }
+
+      const performance =
+        getCampaignAttributedPerformance(
+          campaign.id
+        );
+
+      res.json({
+        ok: true,
+
+        data: {
+          campaign,
+          performance,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Campaign performance error:",
+        error
+      );
+
+      res
+        .status(500)
+        .json({
+          ok: false,
+
+          message:
+            "خطا در محاسبه عملکرد واقعی کمپین.",
+        });
+    }
+  }
+);
+
+/* =========================================================
    ATTRIBUTION
 ========================================================= */
 
@@ -2835,7 +2986,7 @@ app.get(
       });
     } catch (error) {
       console.error(
-        "Attribution read error:",
+        "Attribution error:",
         error
       );
 
@@ -2855,37 +3006,7 @@ app.post(
   "/api/marketing/attribution",
   (req, res) => {
     const {
-      customerId =
-        null,
-
-      leadId =
-        null,
-
-      campaignId =
-        null,
-
-      channelId =
-        null,
-
-      platformId =
-        null,
-
-      serviceId =
-        null,
-
       touchType,
-
-      sessionId =
-        null,
-
-      externalClickId =
-        null,
-
-      metadata =
-        {},
-
-      occurredAt =
-        null,
     } = req.body;
 
     if (!touchType) {
@@ -2901,27 +3022,9 @@ app.post(
 
     try {
       const data =
-        createAttributionTouchpoint({
-          customerId,
-          leadId,
-          campaignId,
-          channelId,
-          platformId,
-          serviceId,
-
-          touchType,
-
-          sessionId,
-
-          externalClickId,
-
-          metadata,
-
-          occurredAt:
-            occurredAt ||
-            new Date()
-              .toISOString(),
-        });
+        createAttributionTouchpoint(
+          req.body
+        );
 
       res
         .status(201)
@@ -2971,48 +3074,17 @@ app.get(
                 metrics
               );
 
+            const performance =
+              getCampaignAttributedPerformance(
+                campaign.id
+              );
+
             return {
               campaign,
               kpis,
+              performance,
             };
           }
-        );
-
-      const totals =
-        calculateCampaignKPIs(
-          campaignData.map(
-            (item) => ({
-              spend:
-                item.kpis.spend,
-
-              impressions:
-                item.kpis.impressions,
-
-              views:
-                item.kpis.views,
-
-              clicks:
-                item.kpis.clicks,
-
-              sessions:
-                item.kpis.sessions,
-
-              leads:
-                item.kpis.leads,
-
-              orders:
-                item.kpis.orders,
-
-              customers:
-                item.kpis.customers,
-
-              conversions:
-                item.kpis.conversions,
-
-              revenue:
-                item.kpis.revenue,
-            })
-          )
         );
 
       res.json({
@@ -3021,8 +3093,6 @@ app.get(
         data: {
           campaignsCount:
             campaigns.length,
-
-          totals,
 
           campaigns:
             campaignData,
@@ -3040,7 +3110,7 @@ app.get(
           ok: false,
 
           message:
-            "خطا در دریافت داشبورد مارکتینگ.",
+            "خطا در دریافت نمای کلی مارکتینگ.",
         });
     }
   }
@@ -3053,9 +3123,6 @@ app.get(
 app.get(
   "/api/database/status",
   (req, res) => {
-    const crm =
-      getCRMStats();
-
     res.json({
       ok: true,
 
@@ -3077,7 +3144,14 @@ app.get(
       attribution:
         true,
 
-      crm,
+      leadConversion:
+        true,
+
+      revenueAttribution:
+        true,
+
+      crm:
+        getCRMStats(),
 
       marketingChannels:
         getMarketingChannels()
@@ -3129,7 +3203,7 @@ app.get(
           ok: false,
 
           message:
-            "خطا در دریافت وضعیت سرویس پیام‌رسانی.",
+            "خطا در دریافت وضعیت پیام‌رسانی.",
         });
     }
   }
@@ -3202,11 +3276,23 @@ app.listen(
     );
 
     console.log(
-      "CRM Data Layer: READY"
+      "Lead Auto Attribution: READY"
     );
 
     console.log(
-      "E-commerce Data Layer: READY"
+      "Lead Conversion: READY"
+    );
+
+    console.log(
+      "Order Attribution: READY"
+    );
+
+    console.log(
+      "Revenue Attribution: READY"
+    );
+
+    console.log(
+      "Real ROAS Engine: READY"
     );
 
     console.log(

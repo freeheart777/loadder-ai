@@ -121,10 +121,6 @@ db.exec(`
     FOREIGN KEY (customer_id) REFERENCES customers(id)
   );
 
-  /* =======================================================
-     MARKETING ACQUISITION
-  ======================================================= */
-
   CREATE TABLE IF NOT EXISTS marketing_channels (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -247,10 +243,7 @@ function parseJson(value, fallback) {
 }
 
 function safeDivide(a, b) {
-  if (!b) {
-    return 0;
-  }
-
+  if (!b) return 0;
   return a / b;
 }
 
@@ -265,14 +258,8 @@ function mapAutomation(row) {
     trigger: row.trigger,
     enabled: Boolean(row.enabled),
     delayMinutes: row.delay_minutes,
-    conditions: parseJson(
-      row.conditions_json,
-      []
-    ),
-    actions: parseJson(
-      row.actions_json,
-      []
-    ),
+    conditions: parseJson(row.conditions_json, []),
+    actions: parseJson(row.actions_json, []),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -291,10 +278,7 @@ function mapExecution(row) {
     template: row.template,
     recipient: row.recipient,
     status: row.status,
-    result: parseJson(
-      row.result_json,
-      {}
-    ),
+    result: parseJson(row.result_json, {}),
   };
 }
 
@@ -327,8 +311,7 @@ function mapLead(row) {
     source: row.source,
     score: row.score,
     status: row.status,
-    opportunityValue:
-      row.opportunity_value,
+    opportunityValue: row.opportunity_value,
     customerId: row.customer_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -342,8 +325,7 @@ function mapOrder(row) {
     totalAmount: row.total_amount,
     status: row.status,
     source: row.source,
-    paymentStatus:
-      row.payment_status,
+    paymentStatus: row.payment_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -367,10 +349,7 @@ function mapCustomerEvent(row) {
     id: row.id,
     customerId: row.customer_id,
     type: row.type,
-    metadata: parseJson(
-      row.metadata_json,
-      {}
-    ),
+    metadata: parseJson(row.metadata_json, {}),
     createdAt: row.created_at,
   };
 }
@@ -439,7 +418,6 @@ function mapCampaignMetric(row) {
     id: row.id,
     campaignId: row.campaign_id,
     metricDate: row.metric_date,
-
     spend: row.spend,
     impressions: row.impressions,
     views: row.views,
@@ -450,7 +428,6 @@ function mapCampaignMetric(row) {
     customers: row.customers,
     conversions: row.conversions,
     revenue: row.revenue,
-
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -465,17 +442,10 @@ function mapAttributionTouchpoint(row) {
     channelId: row.channel_id,
     platformId: row.platform_id,
     serviceId: row.service_id,
-
     touchType: row.touch_type,
     sessionId: row.session_id,
-    externalClickId:
-      row.external_click_id,
-
-    metadata: parseJson(
-      row.metadata_json,
-      {}
-    ),
-
+    externalClickId: row.external_click_id,
+    metadata: parseJson(row.metadata_json, {}),
     occurredAt: row.occurred_at,
     createdAt: row.created_at,
   };
@@ -505,9 +475,7 @@ export function getAutomationById(id) {
     `)
     .get(id);
 
-  return row
-    ? mapAutomation(row)
-    : null;
+  return row ? mapAutomation(row) : null;
 }
 
 export function createAutomation({
@@ -549,16 +517,9 @@ export function createAutomation({
   return getAutomationById(id);
 }
 
-export function updateAutomation(
-  id,
-  updates
-) {
-  const current =
-    getAutomationById(id);
-
-  if (!current) {
-    return null;
-  }
+export function updateAutomation(id, updates) {
+  const current = getAutomationById(id);
+  if (!current) return null;
 
   const next = {
     ...current,
@@ -581,12 +542,8 @@ export function updateAutomation(
     next.trigger,
     next.enabled ? 1 : 0,
     Number(next.delayMinutes) || 0,
-    JSON.stringify(
-      next.conditions ?? []
-    ),
-    JSON.stringify(
-      next.actions ?? []
-    ),
+    JSON.stringify(next.conditions ?? []),
+    JSON.stringify(next.actions ?? []),
     now(),
     id
   );
@@ -614,21 +571,12 @@ export function automationCount() {
     .get().count;
 }
 
-export function seedDefaultAutomations(
-  automations
-) {
-  if (automationCount() > 0) {
-    return;
-  }
+export function seedDefaultAutomations(automations) {
+  if (automationCount() > 0) return;
 
   db.transaction(() => {
-    for (
-      const automation
-      of automations
-    ) {
-      createAutomation(
-        automation
-      );
+    for (const automation of automations) {
+      createAutomation(automation);
     }
   })();
 }
@@ -649,18 +597,14 @@ export function saveEvent(event) {
   `).run(
     event.id,
     event.type,
-    JSON.stringify(
-      event.payload ?? {}
-    ),
+    JSON.stringify(event.payload ?? {}),
     event.createdAt
   );
 
   return event;
 }
 
-export function saveExecution(
-  execution
-) {
+export function saveExecution(execution) {
   db.prepare(`
     INSERT INTO executions (
       id,
@@ -688,18 +632,14 @@ export function saveExecution(
     execution.template ?? null,
     execution.recipient ?? null,
     execution.status,
-    JSON.stringify(
-      execution.result ?? {}
-    ),
+    JSON.stringify(execution.result ?? {}),
     execution.timestamp
   );
 
   return execution;
 }
 
-export function getExecutions(
-  limit = 100
-) {
+export function getExecutions(limit = 100) {
   return db
     .prepare(`
       SELECT *
@@ -711,64 +651,37 @@ export function getExecutions(
     .map(mapExecution);
 }
 
-export function getExecutionsByCustomerId(
-  customerId
-) {
+export function getExecutionsByCustomerId(customerId) {
   const rows = db
     .prepare(`
       SELECT
         executions.*,
-        events.payload_json
-          AS event_payload_json
+        events.payload_json AS event_payload_json
       FROM executions
       LEFT JOIN events
-        ON events.id =
-           executions.event_id
-      ORDER BY
-        executions.created_at DESC
+        ON events.id = executions.event_id
+      ORDER BY executions.created_at DESC
     `)
     .all();
 
   return rows
     .filter((row) => {
-      const payload =
-        parseJson(
-          row.event_payload_json,
-          {}
-        );
-
-      return (
-        payload.customerId ===
-        customerId
-      );
+      const payload = parseJson(row.event_payload_json, {});
+      return payload.customerId === customerId;
     })
     .map((row) => ({
       id: row.id,
-      timestamp:
-        row.created_at,
-      eventId:
-        row.event_id,
-      eventType:
-        row.event_type,
-      workflowId:
-        row.workflow_id,
-      workflowTitle:
-        row.workflow_title,
-      actionType:
-        row.action_type,
-      channel:
-        row.channel,
-      template:
-        row.template,
-      recipient:
-        row.recipient,
-      status:
-        row.status,
-      result:
-        parseJson(
-          row.result_json,
-          {}
-        ),
+      timestamp: row.created_at,
+      eventId: row.event_id,
+      eventType: row.event_type,
+      workflowId: row.workflow_id,
+      workflowTitle: row.workflow_title,
+      actionType: row.action_type,
+      channel: row.channel,
+      template: row.template,
+      recipient: row.recipient,
+      status: row.status,
+      result: parseJson(row.result_json, {}),
     }));
 }
 
@@ -802,9 +715,7 @@ export function getCustomerById(id) {
     `)
     .get(id);
 
-  return row
-    ? mapCustomer(row)
-    : null;
+  return row ? mapCustomer(row) : null;
 }
 
 export function createCustomer({
@@ -870,12 +781,22 @@ export function getLeads() {
     .prepare(`
       SELECT *
       FROM leads
-      ORDER BY
-        score DESC,
-        created_at DESC
+      ORDER BY score DESC, created_at DESC
     `)
     .all()
     .map(mapLead);
+}
+
+export function getLeadById(id) {
+  const row = db
+    .prepare(`
+      SELECT *
+      FROM leads
+      WHERE id = ?
+    `)
+    .get(id);
+
+  return row ? mapLead(row) : null;
 }
 
 export function createLead({
@@ -923,17 +844,86 @@ export function createLead({
     timestamp
   );
 
-  const row = db
-    .prepare(`
-      SELECT *
-      FROM leads
-      WHERE id = ?
-    `)
-    .get(id);
+  return getLeadById(id);
+}
 
-  return row
-    ? mapLead(row)
-    : null;
+export function updateLead(id, updates = {}) {
+  const current = getLeadById(id);
+  if (!current) return null;
+
+  const next = {
+    ...current,
+    ...updates,
+  };
+
+  db.prepare(`
+    UPDATE leads
+    SET
+      name = ?,
+      phone = ?,
+      email = ?,
+      company = ?,
+      source = ?,
+      score = ?,
+      status = ?,
+      opportunity_value = ?,
+      customer_id = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).run(
+    next.name,
+    next.phone ?? null,
+    next.email ?? null,
+    next.company ?? null,
+    next.source ?? null,
+    Number(next.score) || 0,
+    next.status || "new",
+    Number(next.opportunityValue) || 0,
+    next.customerId ?? null,
+    now(),
+    id
+  );
+
+  return getLeadById(id);
+}
+
+export function convertLeadToCustomer(
+  leadId,
+  overrides = {}
+) {
+  const lead = getLeadById(leadId);
+
+  if (!lead) return null;
+
+  if (lead.customerId) {
+    return {
+      lead,
+      customer: getCustomerById(lead.customerId),
+      alreadyConverted: true,
+    };
+  }
+
+  const customer = createCustomer({
+    name: overrides.name ?? lead.name,
+    phone: overrides.phone ?? lead.phone,
+    email: overrides.email ?? lead.email,
+    company: overrides.company ?? lead.company,
+    source: overrides.source ?? lead.source,
+    status: overrides.status ?? "active",
+    lifetimeValue: Number(overrides.lifetimeValue) || 0,
+    riskScore: Number(overrides.riskScore) || 0,
+  });
+
+  const updatedLead = updateLead(leadId, {
+    customerId: customer.id,
+    status: "converted",
+  });
+
+  return {
+    lead: updatedLead,
+    customer,
+    alreadyConverted: false,
+  };
 }
 
 /* =========================================================
@@ -951,9 +941,7 @@ export function getOrders() {
     .map(mapOrder);
 }
 
-export function getOrdersByCustomerId(
-  customerId
-) {
+export function getOrdersByCustomerId(customerId) {
   return db
     .prepare(`
       SELECT *
@@ -1006,9 +994,7 @@ export function createOrder({
     `)
     .get(id);
 
-  return row
-    ? mapOrder(row)
-    : null;
+  return row ? mapOrder(row) : null;
 }
 
 /* =========================================================
@@ -1026,9 +1012,7 @@ export function getCarts() {
     .map(mapCart);
 }
 
-export function getCartsByCustomerId(
-  customerId
-) {
+export function getCartsByCustomerId(customerId) {
   return db
     .prepare(`
       SELECT *
@@ -1081,18 +1065,14 @@ export function createCart({
     `)
     .get(id);
 
-  return row
-    ? mapCart(row)
-    : null;
+  return row ? mapCart(row) : null;
 }
 
 /* =========================================================
    CUSTOMER EVENTS
 ========================================================= */
 
-export function getCustomerEvents(
-  customerId
-) {
+export function getCustomerEvents(customerId) {
   return db
     .prepare(`
       SELECT *
@@ -1142,99 +1122,56 @@ export function createCustomerEvent({
    CUSTOMER 360
 ========================================================= */
 
-export function getCustomer360(
-  customerId
-) {
-  const customer =
-    getCustomerById(
-      customerId
-    );
+export function getCustomer360(customerId) {
+  const customer = getCustomerById(customerId);
 
-  if (!customer) {
-    return null;
-  }
+  if (!customer) return null;
 
-  const orders =
-    getOrdersByCustomerId(
-      customerId
-    );
+  const orders = getOrdersByCustomerId(customerId);
+  const carts = getCartsByCustomerId(customerId);
+  const events = getCustomerEvents(customerId);
+  const executions = getExecutionsByCustomerId(customerId);
+  const attribution = getAttributionTouchpoints({
+    customerId,
+  });
 
-  const carts =
-    getCartsByCustomerId(
-      customerId
-    );
+  const completedOrders = orders.filter(
+    (order) => order.status === "completed"
+  );
 
-  const events =
-    getCustomerEvents(
-      customerId
-    );
+  const totalRevenue = completedOrders.reduce(
+    (sum, order) => sum + order.totalAmount,
+    0
+  );
 
-  const executions =
-    getExecutionsByCustomerId(
-      customerId
-    );
+  const abandonedCarts = carts.filter(
+    (cart) => cart.status === "abandoned"
+  );
 
-  const completedOrders =
-    orders.filter(
-      (order) =>
-        order.status ===
-        "completed"
-    );
-
-  const totalRevenue =
-    completedOrders.reduce(
-      (sum, order) =>
-        sum +
-        order.totalAmount,
-      0
-    );
-
-  const abandonedCarts =
-    carts.filter(
-      (cart) =>
-        cart.status ===
-        "abandoned"
-    );
-
-  const activeCarts =
-    carts.filter(
-      (cart) =>
-        cart.status ===
-        "active"
-    );
+  const activeCarts = carts.filter(
+    (cart) => cart.status === "active"
+  );
 
   return {
     customer,
 
     summary: {
-      ordersCount:
-        orders.length,
-
-      completedOrders:
-        completedOrders.length,
-
+      ordersCount: orders.length,
+      completedOrders: completedOrders.length,
       totalRevenue,
-
-      abandonedCarts:
-        abandonedCarts.length,
-
-      activeCarts:
-        activeCarts.length,
-
-      lifetimeValue:
-        customer.lifetimeValue,
-
-      riskScore:
-        customer.riskScore,
-
-      workflowExecutions:
-        executions.length,
+      abandonedCarts: abandonedCarts.length,
+      activeCarts: activeCarts.length,
+      lifetimeValue: customer.lifetimeValue,
+      riskScore: customer.riskScore,
+      workflowExecutions: executions.length,
+      attributionTouchpoints: attribution.length,
     },
 
     orders,
     carts,
     events,
     executions,
+    attribution,
   };
 }
 
@@ -1276,10 +1213,7 @@ export function getCRMStats() {
   const onlineRevenue = db
     .prepare(`
       SELECT
-        COALESCE(
-          SUM(total_amount),
-          0
-        ) AS total
+        COALESCE(SUM(total_amount), 0) AS total
       FROM orders
       WHERE status = 'completed'
     `)
@@ -1304,7 +1238,7 @@ export function getCRMStats() {
 }
 
 /* =========================================================
-   MARKETING CHANNELS
+   MARKETING READ
 ========================================================= */
 
 export function getMarketingChannels() {
@@ -1315,18 +1249,10 @@ export function getMarketingChannels() {
       ORDER BY name_fa
     `)
     .all()
-    .map(
-      mapMarketingChannel
-    );
+    .map(mapMarketingChannel);
 }
 
-/* =========================================================
-   MARKETING PLATFORMS
-========================================================= */
-
-export function getMarketingPlatforms(
-  channelId = null
-) {
+export function getMarketingPlatforms(channelId = null) {
   if (channelId) {
     return db
       .prepare(`
@@ -1336,9 +1262,7 @@ export function getMarketingPlatforms(
         ORDER BY name_fa
       `)
       .all(channelId)
-      .map(
-        mapMarketingPlatform
-      );
+      .map(mapMarketingPlatform);
   }
 
   return db
@@ -1348,18 +1272,10 @@ export function getMarketingPlatforms(
       ORDER BY name_fa
     `)
     .all()
-    .map(
-      mapMarketingPlatform
-    );
+    .map(mapMarketingPlatform);
 }
 
-/* =========================================================
-   ADVERTISING SERVICES
-========================================================= */
-
-export function getAdvertisingServices(
-  platformId = null
-) {
+export function getAdvertisingServices(platformId = null) {
   if (platformId) {
     return db
       .prepare(`
@@ -1369,9 +1285,7 @@ export function getAdvertisingServices(
         ORDER BY name_fa
       `)
       .all(platformId)
-      .map(
-        mapAdvertisingService
-      );
+      .map(mapAdvertisingService);
   }
 
   return db
@@ -1381,14 +1295,8 @@ export function getAdvertisingServices(
       ORDER BY name_fa
     `)
     .all()
-    .map(
-      mapAdvertisingService
-    );
+    .map(mapAdvertisingService);
 }
-
-/* =========================================================
-   MARKETING CAMPAIGNS
-========================================================= */
 
 export function getMarketingCampaigns() {
   return db
@@ -1398,9 +1306,7 @@ export function getMarketingCampaigns() {
       ORDER BY created_at DESC
     `)
     .all()
-    .map(
-      mapMarketingCampaign
-    );
+    .map(mapMarketingCampaign);
 }
 
 export function getCampaignById(id) {
@@ -1412,12 +1318,60 @@ export function getCampaignById(id) {
     `)
     .get(id);
 
-  return row
-    ? mapMarketingCampaign(
-        row
-      )
-    : null;
+  return row ? mapMarketingCampaign(row) : null;
 }
+
+export function getCampaignMetrics(campaignId) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM campaign_metrics
+      WHERE campaign_id = ?
+      ORDER BY metric_date DESC
+    `)
+    .all(campaignId)
+    .map(mapCampaignMetric);
+}
+
+export function getAttributionTouchpoints({
+  customerId = null,
+  leadId = null,
+  campaignId = null,
+} = {}) {
+  let sql = `
+    SELECT *
+    FROM attribution_touchpoints
+    WHERE 1 = 1
+  `;
+
+  const params = [];
+
+  if (customerId) {
+    sql += ` AND customer_id = ?`;
+    params.push(customerId);
+  }
+
+  if (leadId) {
+    sql += ` AND lead_id = ?`;
+    params.push(leadId);
+  }
+
+  if (campaignId) {
+    sql += ` AND campaign_id = ?`;
+    params.push(campaignId);
+  }
+
+  sql += ` ORDER BY occurred_at DESC`;
+
+  return db
+    .prepare(sql)
+    .all(...params)
+    .map(mapAttributionTouchpoint);
+}
+
+/* =========================================================
+   MARKETING WRITE
+========================================================= */
 
 export function createMarketingCampaign({
   id = crypto.randomUUID(),
@@ -1473,39 +1427,13 @@ export function createMarketingCampaign({
     timestamp
   );
 
-  return getCampaignById(
-    id
-  );
-}
-
-/* =========================================================
-   CAMPAIGN METRICS
-========================================================= */
-
-export function getCampaignMetrics(
-  campaignId
-) {
-  return db
-    .prepare(`
-      SELECT *
-      FROM campaign_metrics
-      WHERE campaign_id = ?
-      ORDER BY metric_date DESC
-    `)
-    .all(campaignId)
-    .map(
-      mapCampaignMetric
-    );
+  return getCampaignById(id);
 }
 
 export function saveCampaignMetric({
   id = crypto.randomUUID(),
   campaignId,
-  metricDate =
-    new Date()
-      .toISOString()
-      .slice(0, 10),
-
+  metricDate = new Date().toISOString().slice(0, 10),
   spend = 0,
   impressions = 0,
   views = 0,
@@ -1564,35 +1492,136 @@ export function saveCampaignMetric({
     `)
     .get(id);
 
-  return row
-    ? mapCampaignMetric(row)
-    : null;
+  return row ? mapCampaignMetric(row) : null;
+}
+
+export function createAttributionTouchpoint({
+  id = crypto.randomUUID(),
+
+  customerId = null,
+  leadId = null,
+
+  campaignId = null,
+  channelId = null,
+  platformId = null,
+  serviceId = null,
+
+  touchType,
+
+  sessionId = null,
+  externalClickId = null,
+
+  metadata = {},
+
+  occurredAt = now(),
+}) {
+  const createdAt = now();
+
+  db.prepare(`
+    INSERT INTO attribution_touchpoints (
+      id,
+      customer_id,
+      lead_id,
+      campaign_id,
+      channel_id,
+      platform_id,
+      service_id,
+      touch_type,
+      session_id,
+      external_click_id,
+      metadata_json,
+      occurred_at,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    customerId,
+    leadId,
+    campaignId,
+    channelId,
+    platformId,
+    serviceId,
+    touchType,
+    sessionId,
+    externalClickId,
+    JSON.stringify(metadata),
+    occurredAt,
+    createdAt
+  );
+
+  const row = db
+    .prepare(`
+      SELECT *
+      FROM attribution_touchpoints
+      WHERE id = ?
+    `)
+    .get(id);
+
+  return row ? mapAttributionTouchpoint(row) : null;
+}
+
+export function transferLeadAttributionToCustomer(
+  leadId,
+  customerId
+) {
+  const touchpoints = getAttributionTouchpoints({
+    leadId,
+  });
+
+  const created = [];
+
+  for (const touchpoint of touchpoints) {
+    if (touchpoint.touchType === "lead_converted") {
+      continue;
+    }
+
+    const cloned = createAttributionTouchpoint({
+      customerId,
+      leadId,
+
+      campaignId: touchpoint.campaignId,
+      channelId: touchpoint.channelId,
+      platformId: touchpoint.platformId,
+      serviceId: touchpoint.serviceId,
+
+      touchType: "lead_converted",
+
+      sessionId: touchpoint.sessionId,
+      externalClickId: touchpoint.externalClickId,
+
+      metadata: {
+        ...touchpoint.metadata,
+        sourceTouchpointId: touchpoint.id,
+        convertedFromLeadId: leadId,
+      },
+
+      occurredAt: now(),
+    });
+
+    created.push(cloned);
+  }
+
+  return created;
 }
 
 /* =========================================================
    KPI ENGINE
 ========================================================= */
 
-export function calculateCampaignKPIs(
-  metrics
-) {
+export function calculateCampaignKPIs(metrics) {
   const totals = metrics.reduce(
     (acc, item) => {
       acc.spend += item.spend;
-      acc.impressions +=
-        item.impressions;
+      acc.impressions += item.impressions;
       acc.views += item.views;
       acc.clicks += item.clicks;
-      acc.sessions +=
-        item.sessions;
+      acc.sessions += item.sessions;
       acc.leads += item.leads;
       acc.orders += item.orders;
-      acc.customers +=
-        item.customers;
-      acc.conversions +=
-        item.conversions;
-      acc.revenue +=
-        item.revenue;
+      acc.customers += item.customers;
+      acc.conversions += item.conversions;
+      acc.revenue += item.revenue;
 
       return acc;
     },
@@ -1631,7 +1660,7 @@ export function calculateCampaignKPIs(
         totals.clicks
       ),
 
-    /* Cost Per Session */
+    // CPS = Cost Per Session
     cps:
       safeDivide(
         totals.spend,
@@ -1713,135 +1742,6 @@ export function calculateCampaignKPIs(
 }
 
 /* =========================================================
-   ATTRIBUTION
-========================================================= */
-
-export function getAttributionTouchpoints({
-  customerId = null,
-  leadId = null,
-  campaignId = null,
-} = {}) {
-  let sql = `
-    SELECT *
-    FROM attribution_touchpoints
-    WHERE 1 = 1
-  `;
-
-  const params = [];
-
-  if (customerId) {
-    sql += `
-      AND customer_id = ?
-    `;
-
-    params.push(
-      customerId
-    );
-  }
-
-  if (leadId) {
-    sql += `
-      AND lead_id = ?
-    `;
-
-    params.push(
-      leadId
-    );
-  }
-
-  if (campaignId) {
-    sql += `
-      AND campaign_id = ?
-    `;
-
-    params.push(
-      campaignId
-    );
-  }
-
-  sql += `
-    ORDER BY occurred_at DESC
-  `;
-
-  return db
-    .prepare(sql)
-    .all(...params)
-    .map(
-      mapAttributionTouchpoint
-    );
-}
-
-export function createAttributionTouchpoint({
-  id = crypto.randomUUID(),
-
-  customerId = null,
-  leadId = null,
-
-  campaignId = null,
-  channelId = null,
-  platformId = null,
-  serviceId = null,
-
-  touchType,
-
-  sessionId = null,
-  externalClickId = null,
-
-  metadata = {},
-
-  occurredAt = now(),
-}) {
-  const createdAt = now();
-
-  db.prepare(`
-    INSERT INTO attribution_touchpoints (
-      id,
-      customer_id,
-      lead_id,
-      campaign_id,
-      channel_id,
-      platform_id,
-      service_id,
-      touch_type,
-      session_id,
-      external_click_id,
-      metadata_json,
-      occurred_at,
-      created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    customerId,
-    leadId,
-    campaignId,
-    channelId,
-    platformId,
-    serviceId,
-    touchType,
-    sessionId,
-    externalClickId,
-    JSON.stringify(metadata),
-    occurredAt,
-    createdAt
-  );
-
-  const row = db
-    .prepare(`
-      SELECT *
-      FROM attribution_touchpoints
-      WHERE id = ?
-    `)
-    .get(id);
-
-  return row
-    ? mapAttributionTouchpoint(
-        row
-      )
-    : null;
-}
-
-/* =========================================================
    SEED CRM / ECOMMERCE
 ========================================================= */
 
@@ -1853,9 +1753,7 @@ export function seedCRMData() {
     `)
     .get().count;
 
-  if (customerCount > 0) {
-    return;
-  }
+  if (customerCount > 0) return;
 
   db.transaction(() => {
     createCustomer({
@@ -1944,7 +1842,6 @@ export function seedCRMData() {
     createCustomerEvent({
       customerId: "customer-001",
       type: "order.completed",
-
       metadata: {
         orderId: "order-001",
         amount: 3200000,
@@ -1954,7 +1851,6 @@ export function seedCRMData() {
     createCustomerEvent({
       customerId: "customer-001",
       type: "cart.abandoned",
-
       metadata: {
         cartId: "cart-001",
         amount: 4500000,
@@ -1975,62 +1871,53 @@ export function seedMarketingData() {
     `)
     .get().count;
 
-  if (existing > 0) {
-    return;
-  }
+  if (existing > 0) return;
 
   const timestamp = now();
 
-  const insertChannel =
-    db.prepare(`
-      INSERT INTO marketing_channels (
-        id,
-        name,
-        name_fa,
-        type,
-        enabled,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, 1, ?, ?)
-    `);
+  const insertChannel = db.prepare(`
+    INSERT INTO marketing_channels (
+      id,
+      name,
+      name_fa,
+      type,
+      enabled,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, 1, ?, ?)
+  `);
 
-  const insertPlatform =
-    db.prepare(`
-      INSERT INTO marketing_platforms (
-        id,
-        channel_id,
-        name,
-        name_fa,
-        provider_key,
-        enabled,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-    `);
+  const insertPlatform = db.prepare(`
+    INSERT INTO marketing_platforms (
+      id,
+      channel_id,
+      name,
+      name_fa,
+      provider_key,
+      enabled,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+  `);
 
-  const insertService =
-    db.prepare(`
-      INSERT INTO advertising_services (
-        id,
-        platform_id,
-        name,
-        name_fa,
-        service_type,
-        format,
-        enabled,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-    `);
+  const insertService = db.prepare(`
+    INSERT INTO advertising_services (
+      id,
+      platform_id,
+      name,
+      name_fa,
+      service_type,
+      format,
+      enabled,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `);
 
   db.transaction(() => {
-    /* =========================
-       CHANNELS
-    ========================= */
-
     insertChannel.run(
       "google_ads",
       "Google Ads",
@@ -2084,10 +1971,6 @@ export function seedMarketingData() {
       timestamp,
       timestamp
     );
-
-    /* =========================
-       PLATFORMS
-    ========================= */
 
     insertPlatform.run(
       "google",
@@ -2169,10 +2052,6 @@ export function seedMarketingData() {
       timestamp
     );
 
-    /* =========================
-       GOOGLE SERVICES
-    ========================= */
-
     insertService.run(
       "google-search",
       "google",
@@ -2239,10 +2118,6 @@ export function seedMarketingData() {
       timestamp
     );
 
-    /* =========================
-       TAAVOUS
-    ========================= */
-
     insertService.run(
       "taavous-native",
       "taavous",
@@ -2275,10 +2150,6 @@ export function seedMarketingData() {
       timestamp,
       timestamp
     );
-
-    /* =========================
-       YEKTANET
-    ========================= */
 
     insertService.run(
       "yektanet-native",
@@ -2313,10 +2184,6 @@ export function seedMarketingData() {
       timestamp
     );
 
-    /* =========================
-       TAPSELL
-    ========================= */
-
     insertService.run(
       "tapsell-preroll",
       "tapsell",
@@ -2349,10 +2216,6 @@ export function seedMarketingData() {
       timestamp,
       timestamp
     );
-
-    /* =========================
-       SOCIAL
-    ========================= */
 
     insertService.run(
       "instagram-feed",
@@ -2398,10 +2261,6 @@ export function seedMarketingData() {
       timestamp
     );
 
-    /* =========================
-       SMS
-    ========================= */
-
     insertService.run(
       "sms-bulk",
       "smsir",
@@ -2434,10 +2293,6 @@ export function seedMarketingData() {
       timestamp,
       timestamp
     );
-
-    /* =========================
-       AFFILIATE
-    ========================= */
 
     insertService.run(
       "affiliate-publisher",
@@ -2473,5 +2328,266 @@ export function seedMarketingData() {
     );
   })();
 }
+/* =========================================================
+   ORDER + REVENUE ATTRIBUTION
+========================================================= */
 
+export function attributeOrderToCustomerCampaign({
+  customerId,
+  orderId,
+  revenue = 0,
+}) {
+  const customerTouchpoints =
+    getAttributionTouchpoints({
+      customerId,
+    });
+
+  if (
+    customerTouchpoints.length === 0
+  ) {
+    return {
+      attributed: false,
+      reason:
+        "customer_has_no_marketing_attribution",
+      touchpoint: null,
+    };
+  }
+
+  /*
+   * فعلاً مدل Attribution:
+   * Last Marketing Touch
+   *
+   * چون getAttributionTouchpoints بر اساس
+   * occurred_at DESC مرتب می‌شود،
+   * اولین Touchpoint جدیدترین Touch است.
+   *
+   * بعداً First Touch / Linear /
+   * Position Based / Data Driven
+   * را اضافه می‌کنیم.
+   */
+
+  const sourceTouchpoint =
+    customerTouchpoints.find(
+      (touchpoint) =>
+        touchpoint.campaignId
+    );
+
+  if (!sourceTouchpoint) {
+    return {
+      attributed: false,
+      reason:
+        "customer_has_no_campaign_attribution",
+      touchpoint: null,
+    };
+  }
+
+  const touchpoint =
+    createAttributionTouchpoint({
+      customerId,
+
+      leadId:
+        sourceTouchpoint.leadId,
+
+      campaignId:
+        sourceTouchpoint.campaignId,
+
+      channelId:
+        sourceTouchpoint.channelId,
+
+      platformId:
+        sourceTouchpoint.platformId,
+
+      serviceId:
+        sourceTouchpoint.serviceId,
+
+      touchType:
+        "order_completed",
+
+      sessionId:
+        sourceTouchpoint.sessionId,
+
+      externalClickId:
+        sourceTouchpoint.externalClickId,
+
+      metadata: {
+        orderId,
+
+        revenue:
+          Number(revenue) || 0,
+
+        attributionModel:
+          "last_marketing_touch",
+
+        sourceTouchpointId:
+          sourceTouchpoint.id,
+      },
+
+      occurredAt:
+        now(),
+    });
+
+  return {
+    attributed: true,
+
+    campaignId:
+      sourceTouchpoint.campaignId,
+
+    touchpoint,
+  };
+}
+
+/* =========================================================
+   ATTRIBUTED CAMPAIGN PERFORMANCE
+========================================================= */
+
+export function getCampaignAttributedPerformance(
+  campaignId
+) {
+  const touchpoints =
+    getAttributionTouchpoints({
+      campaignId,
+    });
+
+  const leadIds =
+    new Set();
+
+  const customerIds =
+    new Set();
+
+  const orderIds =
+    new Set();
+
+  let attributedRevenue = 0;
+
+  for (
+    const touchpoint
+    of touchpoints
+  ) {
+    if (
+      touchpoint.leadId
+    ) {
+      leadIds.add(
+        touchpoint.leadId
+      );
+    }
+
+    if (
+      touchpoint.customerId
+    ) {
+      customerIds.add(
+        touchpoint.customerId
+      );
+    }
+
+    if (
+      touchpoint.touchType ===
+      "order_completed"
+    ) {
+      const orderId =
+        touchpoint.metadata
+          ?.orderId;
+
+      if (
+        orderId &&
+        !orderIds.has(orderId)
+      ) {
+        orderIds.add(
+          orderId
+        );
+
+        attributedRevenue +=
+          Number(
+            touchpoint.metadata
+              ?.revenue
+          ) || 0;
+      }
+    }
+  }
+
+  const metrics =
+    getCampaignMetrics(
+      campaignId
+    );
+
+  const providerKPIs =
+    calculateCampaignKPIs(
+      metrics
+    );
+
+  return {
+    campaignId,
+
+    attributionModel:
+      "last_marketing_touch",
+
+    attributed: {
+      leads:
+        leadIds.size,
+
+      customers:
+        customerIds.size,
+
+      orders:
+        orderIds.size,
+
+      revenue:
+        attributedRevenue,
+    },
+
+    media: {
+      spend:
+        providerKPIs.spend,
+
+      impressions:
+        providerKPIs.impressions,
+
+      views:
+        providerKPIs.views,
+
+      clicks:
+        providerKPIs.clicks,
+
+      sessions:
+        providerKPIs.sessions,
+    },
+
+    kpis: {
+      cpm:
+        providerKPIs.cpm,
+
+      cpv:
+        providerKPIs.cpv,
+
+      cpc:
+        providerKPIs.cpc,
+
+      cps:
+        providerKPIs.cps,
+
+      cpl:
+        leadIds.size > 0
+          ? providerKPIs.spend /
+            leadIds.size
+          : 0,
+
+      cpo:
+        orderIds.size > 0
+          ? providerKPIs.spend /
+            orderIds.size
+          : 0,
+
+      cac:
+        customerIds.size > 0
+          ? providerKPIs.spend /
+            customerIds.size
+          : 0,
+
+      roas:
+        providerKPIs.spend > 0
+          ? attributedRevenue /
+            providerKPIs.spend
+          : 0,
+    },
+  };
+}
 export default db;
