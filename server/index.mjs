@@ -16,6 +16,25 @@ import {
   getExecutions,
   clearExecutions,
   seedDefaultAutomations,
+
+  getCustomers,
+  getCustomerById,
+  createCustomer,
+
+  getLeads,
+  createLead,
+
+  getOrders,
+  createOrder,
+
+  getCarts,
+  createCart,
+
+  getCustomerEvents,
+  createCustomerEvent,
+
+  getCRMStats,
+  seedCRMData,
 } from "./db/database.mjs";
 
 dotenv.config();
@@ -28,63 +47,16 @@ app.use(express.json());
 const PORT = process.env.PORT || 3001;
 
 /* =========================================================
-   BUSINESS DATA
-   فعلاً داخل حافظه ثابت است.
-   بعداً می‌بریم داخل Database.
-========================================================= */
-
-const business = {
-  name: "کسب‌وکار من",
-
-  healthScore: 86,
-  growthReadiness: 81,
-  riskScore: 18,
-  dataQuality: 78,
-
-  crm: {
-    totalCustomers: 1248,
-    newLeads: 213,
-    hotLeads: 32,
-    activeCustomers: 986,
-    retentionRate: 72,
-    churnRate: 4.5,
-  },
-
-  ecommerce: {
-    onlineRevenue: 384000000,
-    completedPurchases: 186,
-    abandonedCarts: 46,
-    repeatCustomers: 58,
-    repeatCustomerRate: 31.2,
-  },
-
-  marketing: {
-    cac: 480000,
-    roas: 4.8,
-  },
-
-  website: {
-    conversionRate: 6.8,
-  },
-};
-
-/* =========================================================
-   DEFAULT WORKFLOWS
-   فقط در اولین اجرای دیتابیس Seed می‌شوند.
+   DEFAULT AUTOMATIONS
 ========================================================= */
 
 const defaultAutomations = [
   {
     id: "abandoned-cart",
-
     title: "بازیابی سبد خرید رهاشده",
-
     trigger: "cart.abandoned",
-
     enabled: true,
-
     delayMinutes: 120,
-
     conditions: [
       {
         field: "cartValue",
@@ -92,7 +64,6 @@ const defaultAutomations = [
         value: 0,
       },
     ],
-
     actions: [
       {
         type: "send_message",
@@ -104,15 +75,10 @@ const defaultAutomations = [
 
   {
     id: "hot-lead",
-
     title: "پیگیری لید داغ",
-
     trigger: "lead.hot",
-
     enabled: true,
-
     delayMinutes: 0,
-
     conditions: [
       {
         field: "score",
@@ -120,7 +86,6 @@ const defaultAutomations = [
         value: 80,
       },
     ],
-
     actions: [
       {
         type: "create_task",
@@ -132,17 +97,11 @@ const defaultAutomations = [
 
   {
     id: "order-completed",
-
     title: "پیگیری پس از خرید",
-
     trigger: "order.completed",
-
     enabled: true,
-
     delayMinutes: 10,
-
     conditions: [],
-
     actions: [
       {
         type: "send_message",
@@ -154,15 +113,10 @@ const defaultAutomations = [
 
   {
     id: "repeat-purchase",
-
     title: "پیشنهاد مشتری تکرارشونده",
-
     trigger: "customer.repeat_purchase",
-
     enabled: true,
-
     delayMinutes: 0,
-
     conditions: [
       {
         field: "orderCount",
@@ -170,7 +124,6 @@ const defaultAutomations = [
         value: 2,
       },
     ],
-
     actions: [
       {
         type: "send_offer",
@@ -182,15 +135,10 @@ const defaultAutomations = [
 
   {
     id: "churn-risk",
-
     title: "بازگشت مشتری در معرض ریزش",
-
     trigger: "customer.churn_risk",
-
     enabled: true,
-
     delayMinutes: 0,
-
     conditions: [
       {
         field: "riskScore",
@@ -198,7 +146,6 @@ const defaultAutomations = [
         value: 70,
       },
     ],
-
     actions: [
       {
         type: "create_campaign",
@@ -210,15 +157,10 @@ const defaultAutomations = [
 
   {
     id: "high-cac",
-
     title: "هشدار هزینه جذب بالا",
-
     trigger: "marketing.cac_high",
-
     enabled: true,
-
     delayMinutes: 0,
-
     conditions: [
       {
         field: "cac",
@@ -226,7 +168,6 @@ const defaultAutomations = [
         value: 500000,
       },
     ],
-
     actions: [
       {
         type: "create_alert",
@@ -238,15 +179,10 @@ const defaultAutomations = [
 
   {
     id: "conversion-drop",
-
     title: "هشدار افت نرخ تبدیل",
-
     trigger: "website.conversion_drop",
-
     enabled: true,
-
     delayMinutes: 0,
-
     conditions: [
       {
         field: "conversionRate",
@@ -254,7 +190,6 @@ const defaultAutomations = [
         value: 5.5,
       },
     ],
-
     actions: [
       {
         type: "create_alert",
@@ -266,10 +201,11 @@ const defaultAutomations = [
 ];
 
 /* =========================================================
-   SEED DATABASE
+   SEED
 ========================================================= */
 
 seedDefaultAutomations(defaultAutomations);
+seedCRMData();
 
 /* =========================================================
    HELPERS
@@ -308,22 +244,13 @@ function evaluateCondition(eventPayload, condition) {
 }
 
 function workflowMatches(workflow, event) {
-  if (!workflow.enabled) {
-    return false;
-  }
-
-  if (workflow.trigger !== event.type) {
-    return false;
-  }
+  if (!workflow.enabled) return false;
+  if (workflow.trigger !== event.type) return false;
 
   return workflow.conditions.every((condition) =>
     evaluateCondition(event.payload, condition)
   );
 }
-
-/* =========================================================
-   MESSAGE BUILDER
-========================================================= */
 
 function buildMessage(action, event) {
   const customerName =
@@ -350,10 +277,6 @@ function buildMessage(action, event) {
   }
 }
 
-/* =========================================================
-   ACTION EXECUTOR
-========================================================= */
-
 async function executeAction(action, event, workflow) {
   let executionResult = {
     ok: true,
@@ -364,74 +287,37 @@ async function executeAction(action, event, workflow) {
     action.type === "send_message" ||
     action.type === "send_offer"
   ) {
-    let recipient = null;
-
-    if (action.channel === "email") {
-      recipient =
-        event.payload.email ||
-        event.payload.recipient;
-    } else {
-      recipient =
-        event.payload.phone ||
-        event.payload.recipient;
-    }
+    const recipient =
+      action.channel === "email"
+        ? event.payload.email || event.payload.recipient
+        : event.payload.phone || event.payload.recipient;
 
     executionResult = await sendMessage({
       channel: action.channel || "sms",
-
       recipient,
-
       message: buildMessage(action, event),
-
       metadata: {
         eventId: event.id,
-
         eventType: event.type,
-
         workflowId: workflow.id,
-
         workflowTitle: workflow.title,
-
-        template: action.template || null,
-
-        customerId:
-          event.payload.customerId || null,
-
-        orderId:
-          event.payload.orderId || null,
+        customerId: event.payload.customerId || null,
+        orderId: event.payload.orderId || null,
       },
     });
   }
 
   if (action.type === "create_task") {
-    console.log("");
-    console.log("========== LOADDER TASK ==========");
-    console.log(
-      "ASSIGNEE:",
-      action.assignee || "sales"
-    );
-    console.log("EVENT:", event.type);
-    console.log("PAYLOAD:", event.payload);
-    console.log("===================================");
-    console.log("");
-
     executionResult = {
       ok: true,
       provider: "loadder-simulator",
       action: "create_task",
-      status: "simulated",
       assignee: action.assignee || "sales",
+      status: "simulated",
     };
   }
 
   if (action.type === "create_campaign") {
-    console.log("");
-    console.log("======== LOADDER CAMPAIGN ========");
-    console.log("EVENT:", event.type);
-    console.log("TEMPLATE:", action.template);
-    console.log("===================================");
-    console.log("");
-
     executionResult = {
       ok: true,
       provider: "loadder-simulator",
@@ -441,13 +327,6 @@ async function executeAction(action, event, workflow) {
   }
 
   if (action.type === "create_alert") {
-    console.log("");
-    console.log("========== LOADDER ALERT ==========");
-    console.log("EVENT:", event.type);
-    console.log("TEMPLATE:", action.template);
-    console.log("====================================");
-    console.log("");
-
     executionResult = {
       ok: true,
       provider: "loadder-simulator",
@@ -458,32 +337,20 @@ async function executeAction(action, event, workflow) {
 
   const execution = {
     id: crypto.randomUUID(),
-
     timestamp: new Date().toISOString(),
-
     eventId: event.id,
-
     eventType: event.type,
-
     workflowId: workflow.id,
-
     workflowTitle: workflow.title,
-
     actionType: action.type,
-
     channel: action.channel || null,
-
     template: action.template || null,
-
     recipient:
       event.payload.phone ||
       event.payload.email ||
       event.payload.recipient ||
       null,
-
-    status:
-      executionResult.status || "completed",
-
+    status: executionResult.status || "completed",
     result: executionResult,
   };
 
@@ -491,10 +358,6 @@ async function executeAction(action, event, workflow) {
 
   return execution;
 }
-
-/* =========================================================
-   WORKFLOW RUNNER
-========================================================= */
 
 async function runWorkflow(workflow, event) {
   const executions = [];
@@ -511,12 +374,38 @@ async function runWorkflow(workflow, event) {
 
   return {
     workflowId: workflow.id,
-
     workflowTitle: workflow.title,
-
     delayMinutes: workflow.delayMinutes,
-
     executions,
+  };
+}
+
+async function processEvent(event) {
+  saveEvent(event);
+
+  if (event.payload.customerId) {
+    createCustomerEvent({
+      customerId: event.payload.customerId,
+      type: event.type,
+      metadata: event.payload,
+    });
+  }
+
+  const automations = getAutomations();
+
+  const matchedWorkflows = automations.filter((workflow) =>
+    workflowMatches(workflow, event)
+  );
+
+  const results = await Promise.all(
+    matchedWorkflows.map((workflow) =>
+      runWorkflow(workflow, event)
+    )
+  );
+
+  return {
+    matchedWorkflows,
+    results,
   };
 }
 
@@ -527,28 +416,334 @@ async function runWorkflow(workflow, event) {
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
-
     service: "Loadder AI Backend",
-
-    message: "Backend is running successfully",
-
-    database: "sqlite",
-
+    database: "SQLite",
     persistence: true,
-
     timestamp: new Date().toISOString(),
   });
 });
 
 /* =========================================================
-   BUSINESS DATA
+   CRM STATS
 ========================================================= */
 
-app.get("/api/business", (req, res) => {
+app.get("/api/crm/stats", (req, res) => {
   res.json({
     ok: true,
-    data: business,
+    data: getCRMStats(),
   });
+});
+
+/* =========================================================
+   CUSTOMERS
+========================================================= */
+
+app.get("/api/customers", (req, res) => {
+  const data = getCustomers();
+
+  res.json({
+    ok: true,
+    count: data.length,
+    data,
+  });
+});
+
+app.get("/api/customers/:id", (req, res) => {
+  const customer = getCustomerById(req.params.id);
+
+  if (!customer) {
+    return res.status(404).json({
+      ok: false,
+      message: "مشتری پیدا نشد.",
+    });
+  }
+
+  res.json({
+    ok: true,
+    data: customer,
+  });
+});
+
+app.get(
+  "/api/customers/:id/events",
+  (req, res) => {
+    const data = getCustomerEvents(req.params.id);
+
+    res.json({
+      ok: true,
+      count: data.length,
+      data,
+    });
+  }
+);
+
+app.post("/api/customers", (req, res) => {
+  const {
+    name,
+    phone,
+    email,
+    company,
+    source,
+  } = req.body;
+
+  if (!name) {
+    return res.status(400).json({
+      ok: false,
+      message: "نام مشتری الزامی است.",
+    });
+  }
+
+  try {
+    const customer = createCustomer({
+      name,
+      phone,
+      email,
+      company,
+      source,
+    });
+
+    res.status(201).json({
+      ok: true,
+      data: customer,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      ok: false,
+      message: "خطا در ساخت مشتری.",
+    });
+  }
+});
+
+/* =========================================================
+   LEADS
+========================================================= */
+
+app.get("/api/leads", (req, res) => {
+  const data = getLeads();
+
+  res.json({
+    ok: true,
+    count: data.length,
+    data,
+  });
+});
+
+app.post("/api/leads", async (req, res) => {
+  const {
+    name,
+    phone,
+    email,
+    company,
+    source,
+    score = 0,
+    status = "new",
+    opportunityValue = 0,
+  } = req.body;
+
+  if (!name) {
+    return res.status(400).json({
+      ok: false,
+      message: "نام لید الزامی است.",
+    });
+  }
+
+  try {
+    const lead = createLead({
+      name,
+      phone,
+      email,
+      company,
+      source,
+      score,
+      status,
+      opportunityValue,
+    });
+
+    if (Number(score) >= 80) {
+      const event = {
+        id: crypto.randomUUID(),
+        type: "lead.hot",
+        createdAt: new Date().toISOString(),
+        payload: {
+          leadId: lead.id,
+          leadName: name,
+          phone,
+          email,
+          score: Number(score),
+        },
+      };
+
+      await processEvent(event);
+    }
+
+    res.status(201).json({
+      ok: true,
+      data: lead,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      ok: false,
+      message: "خطا در ساخت لید.",
+    });
+  }
+});
+
+/* =========================================================
+   ORDERS
+========================================================= */
+
+app.get("/api/orders", (req, res) => {
+  const data = getOrders();
+
+  res.json({
+    ok: true,
+    count: data.length,
+    data,
+  });
+});
+
+app.post("/api/orders", async (req, res) => {
+  const {
+    customerId,
+    totalAmount,
+    status = "completed",
+    source = "website",
+    paymentStatus = "paid",
+  } = req.body;
+
+  if (!customerId || totalAmount === undefined) {
+    return res.status(400).json({
+      ok: false,
+      message:
+        "customerId و totalAmount الزامی هستند.",
+    });
+  }
+
+  const customer = getCustomerById(customerId);
+
+  if (!customer) {
+    return res.status(404).json({
+      ok: false,
+      message: "مشتری پیدا نشد.",
+    });
+  }
+
+  try {
+    const order = createOrder({
+      customerId,
+      totalAmount: Number(totalAmount),
+      status,
+      source,
+      paymentStatus,
+    });
+
+    if (status === "completed") {
+      const event = {
+        id: crypto.randomUUID(),
+        type: "order.completed",
+        createdAt: new Date().toISOString(),
+        payload: {
+          customerId,
+          customerName: customer.name,
+          phone: customer.phone,
+          email: customer.email,
+          orderId: order.id,
+          amount: Number(totalAmount),
+        },
+      };
+
+      await processEvent(event);
+    }
+
+    res.status(201).json({
+      ok: true,
+      data: order,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      ok: false,
+      message: "خطا در ساخت سفارش.",
+    });
+  }
+});
+
+/* =========================================================
+   CARTS
+========================================================= */
+
+app.get("/api/carts", (req, res) => {
+  const data = getCarts();
+
+  res.json({
+    ok: true,
+    count: data.length,
+    data,
+  });
+});
+
+app.post("/api/carts", async (req, res) => {
+  const {
+    customerId = null,
+    totalAmount = 0,
+    status = "active",
+  } = req.body;
+
+  try {
+    const cart = createCart({
+      customerId,
+      totalAmount: Number(totalAmount),
+      status,
+      abandonedAt:
+        status === "abandoned"
+          ? new Date().toISOString()
+          : null,
+    });
+
+    if (status === "abandoned") {
+      let customer = null;
+
+      if (customerId) {
+        customer = getCustomerById(customerId);
+      }
+
+      const event = {
+        id: crypto.randomUUID(),
+        type: "cart.abandoned",
+        createdAt: new Date().toISOString(),
+        payload: {
+          customerId,
+          customerName:
+            customer?.name || null,
+          phone:
+            customer?.phone || null,
+          email:
+            customer?.email || null,
+          cartId: cart.id,
+          cartValue: Number(totalAmount),
+        },
+      };
+
+      await processEvent(event);
+    }
+
+    res.status(201).json({
+      ok: true,
+      data: cart,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      ok: false,
+      message: "خطا در ساخت سبد خرید.",
+    });
+  }
 });
 
 /* =========================================================
@@ -556,20 +751,14 @@ app.get("/api/business", (req, res) => {
 ========================================================= */
 
 app.get("/api/automations", (req, res) => {
-  const automations = getAutomations();
+  const data = getAutomations();
 
   res.json({
     ok: true,
-
-    count: automations.length,
-
-    data: automations,
+    count: data.length,
+    data,
   });
 });
-
-/* =========================================================
-   GET ONE AUTOMATION
-========================================================= */
 
 app.get("/api/automations/:id", (req, res) => {
   const automation = getAutomationById(
@@ -589,10 +778,6 @@ app.get("/api/automations/:id", (req, res) => {
   });
 });
 
-/* =========================================================
-   CREATE AUTOMATION
-========================================================= */
-
 app.post("/api/automations", (req, res) => {
   const {
     title,
@@ -611,66 +796,41 @@ app.post("/api/automations", (req, res) => {
     });
   }
 
-  if (!Array.isArray(actions)) {
-    return res.status(400).json({
-      ok: false,
-      message: "actions باید آرایه باشد.",
-    });
-  }
-
   try {
-    const newAutomation =
-      createAutomation({
-        title,
-
-        trigger,
-
-        enabled,
-
-        delayMinutes:
-          Number(delayMinutes) || 0,
-
-        conditions:
-          Array.isArray(conditions)
-            ? conditions
-            : [],
-
-        actions,
-      });
+    const automation = createAutomation({
+      title,
+      trigger,
+      enabled,
+      delayMinutes,
+      conditions,
+      actions,
+    });
 
     res.status(201).json({
       ok: true,
-      data: newAutomation,
+      data: automation,
     });
   } catch (error) {
-    console.error(
-      "Create automation error:",
-      error
-    );
+    console.error(error);
 
     res.status(500).json({
       ok: false,
       message:
-        "خطا در ذخیره اتوماسیون.",
+        "خطا در ساخت اتوماسیون.",
     });
   }
 });
-
-/* =========================================================
-   UPDATE AUTOMATION
-========================================================= */
 
 app.patch(
   "/api/automations/:id",
   (req, res) => {
     try {
-      const updated =
-        updateAutomation(
-          req.params.id,
-          req.body
-        );
+      const automation = updateAutomation(
+        req.params.id,
+        req.body
+      );
 
-      if (!updated) {
+      if (!automation) {
         return res.status(404).json({
           ok: false,
           message:
@@ -680,13 +840,10 @@ app.patch(
 
       res.json({
         ok: true,
-        data: updated,
+        data: automation,
       });
     } catch (error) {
-      console.error(
-        "Update automation error:",
-        error
-      );
+      console.error(error);
 
       res.status(500).json({
         ok: false,
@@ -697,18 +854,13 @@ app.patch(
   }
 );
 
-/* =========================================================
-   DELETE AUTOMATION
-========================================================= */
-
 app.delete(
   "/api/automations/:id",
   (req, res) => {
     try {
-      const deleted =
-        deleteAutomation(
-          req.params.id
-        );
+      const deleted = deleteAutomation(
+        req.params.id
+      );
 
       if (!deleted) {
         return res.status(404).json({
@@ -720,14 +872,9 @@ app.delete(
 
       res.json({
         ok: true,
-        message:
-          "اتوماسیون حذف شد.",
       });
     } catch (error) {
-      console.error(
-        "Delete automation error:",
-        error
-      );
+      console.error(error);
 
       res.status(500).json({
         ok: false,
@@ -739,264 +886,96 @@ app.delete(
 );
 
 /* =========================================================
-   MANUAL WORKFLOW RUN
+   EVENTS
 ========================================================= */
 
-app.post(
-  "/api/automations/:id/run",
-  async (req, res) => {
-    const workflow =
-      getAutomationById(
-        req.params.id
-      );
+app.post("/api/events", async (req, res) => {
+  const {
+    type,
+    payload = {},
+  } = req.body;
 
-    if (!workflow) {
-      return res.status(404).json({
-        ok: false,
-        message:
-          "اتوماسیون پیدا نشد.",
-      });
-    }
-
-    if (!workflow.enabled) {
-      return res.status(400).json({
-        ok: false,
-        message:
-          "این Workflow متوقف است.",
-      });
-    }
-
-    const event = {
-      id: crypto.randomUUID(),
-
-      type: workflow.trigger,
-
-      createdAt:
-        new Date().toISOString(),
-
-      payload:
-        req.body?.payload || {},
-    };
-
-    try {
-      saveEvent(event);
-
-      const result =
-        await runWorkflow(
-          workflow,
-          event
-        );
-
-      res.json({
-        ok: true,
-        event,
-        result,
-      });
-    } catch (error) {
-      console.error(
-        "Workflow execution error:",
-        error
-      );
-
-      res.status(500).json({
-        ok: false,
-        message:
-          "خطا در اجرای Workflow",
-      });
-    }
+  if (!type) {
+    return res.status(400).json({
+      ok: false,
+      message: "نوع Event الزامی است.",
+    });
   }
-);
 
-/* =========================================================
-   EVENT BUS
-========================================================= */
+  const event = {
+    id: crypto.randomUUID(),
+    type,
+    payload,
+    createdAt: new Date().toISOString(),
+  };
 
-app.post(
-  "/api/events",
-  async (req, res) => {
+  try {
     const {
-      type,
-      payload = {},
-    } = req.body;
+      matchedWorkflows,
+      results,
+    } = await processEvent(event);
 
-    if (!type) {
-      return res.status(400).json({
-        ok: false,
-        message:
-          "نوع Event الزامی است.",
-      });
-    }
+    res.json({
+      ok: true,
+      event,
+      matchedWorkflows:
+        matchedWorkflows.length,
+      results,
+    });
+  } catch (error) {
+    console.error(error);
 
-    const event = {
-      id: crypto.randomUUID(),
-
-      type,
-
-      payload,
-
-      createdAt:
-        new Date().toISOString(),
-    };
-
-    try {
-      saveEvent(event);
-
-      const automations =
-        getAutomations();
-
-      const matchedWorkflows =
-        automations.filter(
-          (workflow) =>
-            workflowMatches(
-              workflow,
-              event
-            )
-        );
-
-      const results =
-        await Promise.all(
-          matchedWorkflows.map(
-            (workflow) =>
-              runWorkflow(
-                workflow,
-                event
-              )
-          )
-        );
-
-      res.json({
-        ok: true,
-
-        event,
-
-        matchedWorkflows:
-          matchedWorkflows.length,
-
-        results,
-      });
-    } catch (error) {
-      console.error(
-        "Event execution error:",
-        error
-      );
-
-      res.status(500).json({
-        ok: false,
-        message:
-          "خطا در پردازش Event",
-      });
-    }
+    res.status(500).json({
+      ok: false,
+      message:
+        "خطا در پردازش Event.",
+    });
   }
-);
+});
 
 /* =========================================================
-   EXECUTION HISTORY
+   EXECUTIONS
 ========================================================= */
 
 app.get("/api/executions", (req, res) => {
   const limit =
     Number(req.query.limit) || 100;
 
-  const executions =
-    getExecutions(limit);
+  const data = getExecutions(limit);
 
   res.json({
     ok: true,
+    count: data.length,
+    data,
+  });
+});
 
-    count:
-      executions.length,
+app.delete("/api/executions", (req, res) => {
+  clearExecutions();
 
-    data:
-      executions,
+  res.json({
+    ok: true,
   });
 });
 
 /* =========================================================
-   CLEAR EXECUTION HISTORY
-========================================================= */
-
-app.delete(
-  "/api/executions",
-  (req, res) => {
-    try {
-      clearExecutions();
-
-      res.json({
-        ok: true,
-
-        message:
-          "Execution history cleared.",
-      });
-    } catch (error) {
-      console.error(
-        "Clear executions error:",
-        error
-      );
-
-      res.status(500).json({
-        ok: false,
-
-        message:
-          "خطا در پاک‌کردن تاریخچه.",
-      });
-    }
-  }
-);
-
-/* =========================================================
-   EVENT TYPES
-========================================================= */
-
-app.get(
-  "/api/event-types",
-  (req, res) => {
-    res.json({
-      ok: true,
-
-      data: [
-        "cart.abandoned",
-        "checkout.started",
-        "order.completed",
-        "customer.repeat_purchase",
-        "lead.hot",
-        "customer.churn_risk",
-        "marketing.cac_high",
-        "website.conversion_drop",
-      ],
-    });
-  }
-);
-
-/* =========================================================
-   DATABASE INFO
+   DATABASE STATUS
 ========================================================= */
 
 app.get(
   "/api/database/status",
   (req, res) => {
-    const automations =
-      getAutomations();
-
-    const executions =
-      getExecutions(1000);
+    const crm = getCRMStats();
 
     res.json({
       ok: true,
-
-      database:
-        "SQLite",
-
-      persistent:
-        true,
-
+      database: "SQLite",
+      persistent: true,
+      crm,
       automations:
-        automations.length,
-
+        getAutomations().length,
       executions:
-        executions.length,
-
-      message:
-        "Loadder persistent database is active.",
+        getExecutions(1000).length,
     });
   }
 );
@@ -1008,19 +987,16 @@ app.get(
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
-
-    message:
-      "API route not found",
+    message: "API route not found",
   });
 });
 
 /* =========================================================
-   START SERVER
+   START
 ========================================================= */
 
 app.listen(PORT, () => {
   console.log("");
-
   console.log(
     "=========================================="
   );
@@ -1038,19 +1014,15 @@ app.listen(PORT, () => {
   );
 
   console.log(
-    "Persistence: ENABLED"
+    "CRM Data Layer: READY"
   );
 
   console.log(
-    "Messaging Adapter: READY"
+    "E-commerce Data Layer: READY"
   );
 
   console.log(
-    "SMS Provider: SIMULATOR"
-  );
-
-  console.log(
-    "Email Provider: SIMULATOR"
+    "Workflow Engine: READY"
   );
 
   console.log(

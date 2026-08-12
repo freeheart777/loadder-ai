@@ -14,6 +14,11 @@ const databasePath = path.join(
 const db = new Database(databasePath);
 
 db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
+
+/* =========================================================
+   TABLES
+========================================================= */
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS automations (
@@ -49,7 +54,81 @@ db.exec(`
     result_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT,
+    email TEXT,
+    company TEXT,
+    source TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    total_spent INTEGER NOT NULL DEFAULT 0,
+    orders_count INTEGER NOT NULL DEFAULT 0,
+    last_purchase_at TEXT,
+    lifetime_value INTEGER NOT NULL DEFAULT 0,
+    risk_score REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS leads (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT,
+    email TEXT,
+    company TEXT,
+    source TEXT,
+    score REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'new',
+    opportunity_value INTEGER NOT NULL DEFAULT 0,
+    customer_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS orders (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    total_amount INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    source TEXT,
+    payment_status TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS carts (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT,
+    total_amount INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    abandoned_at TEXT,
+    recovered_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS customer_events (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT,
+    type TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+  );
 `);
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function now() {
+  return new Date().toISOString();
+}
 
 function parseJson(value, fallback) {
   try {
@@ -99,16 +178,94 @@ function mapExecution(row) {
   };
 }
 
+function mapCustomer(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    company: row.company,
+    source: row.source,
+    status: row.status,
+    totalSpent: row.total_spent,
+    ordersCount: row.orders_count,
+    lastPurchaseAt: row.last_purchase_at,
+    lifetimeValue: row.lifetime_value,
+    riskScore: row.risk_score,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapLead(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    company: row.company,
+    source: row.source,
+    score: row.score,
+    status: row.status,
+    opportunityValue: row.opportunity_value,
+    customerId: row.customer_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapOrder(row) {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    totalAmount: row.total_amount,
+    status: row.status,
+    source: row.source,
+    paymentStatus: row.payment_status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCart(row) {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    totalAmount: row.total_amount,
+    status: row.status,
+    abandonedAt: row.abandoned_at,
+    recoveredAt: row.recovered_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCustomerEvent(row) {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    type: row.type,
+    metadata: parseJson(
+      row.metadata_json,
+      {}
+    ),
+    createdAt: row.created_at,
+  };
+}
+
+/* =========================================================
+   AUTOMATIONS
+========================================================= */
+
 export function getAutomations() {
-  const rows = db
+  return db
     .prepare(`
       SELECT *
       FROM automations
       ORDER BY created_at DESC
     `)
-    .all();
-
-  return rows.map(mapAutomation);
+    .all()
+    .map(mapAutomation);
 }
 
 export function getAutomationById(id) {
@@ -132,7 +289,7 @@ export function createAutomation({
   conditions = [],
   actions = [],
 }) {
-  const now = new Date().toISOString();
+  const timestamp = now();
 
   db.prepare(`
     INSERT INTO automations (
@@ -155,8 +312,8 @@ export function createAutomation({
     Number(delayMinutes) || 0,
     JSON.stringify(conditions),
     JSON.stringify(actions),
-    now,
-    now
+    timestamp,
+    timestamp
   );
 
   return getAutomationById(id);
@@ -169,17 +326,12 @@ export function updateAutomation(
   const current =
     getAutomationById(id);
 
-  if (!current) {
-    return null;
-  }
+  if (!current) return null;
 
   const next = {
     ...current,
     ...updates,
   };
-
-  const now =
-    new Date().toISOString();
 
   db.prepare(`
     UPDATE automations
@@ -197,13 +349,9 @@ export function updateAutomation(
     next.trigger,
     next.enabled ? 1 : 0,
     Number(next.delayMinutes) || 0,
-    JSON.stringify(
-      next.conditions ?? []
-    ),
-    JSON.stringify(
-      next.actions ?? []
-    ),
-    now,
+    JSON.stringify(next.conditions ?? []),
+    JSON.stringify(next.actions ?? []),
+    now(),
     id
   );
 
@@ -221,6 +369,31 @@ export function deleteAutomation(id) {
   return result.changes > 0;
 }
 
+export function automationCount() {
+  return db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM automations
+    `)
+    .get().count;
+}
+
+export function seedDefaultAutomations(
+  automations
+) {
+  if (automationCount() > 0) return;
+
+  db.transaction(() => {
+    for (const automation of automations) {
+      createAutomation(automation);
+    }
+  })();
+}
+
+/* =========================================================
+   EVENTS + EXECUTIONS
+========================================================= */
+
 export function saveEvent(event) {
   db.prepare(`
     INSERT INTO events (
@@ -233,29 +406,14 @@ export function saveEvent(event) {
   `).run(
     event.id,
     event.type,
-    JSON.stringify(
-      event.payload ?? {}
-    ),
+    JSON.stringify(event.payload ?? {}),
     event.createdAt
   );
 
   return event;
 }
 
-export function saveExecution({
-  id,
-  eventId,
-  eventType,
-  workflowId,
-  workflowTitle,
-  actionType,
-  channel,
-  template,
-  recipient,
-  status,
-  result,
-  timestamp,
-}) {
+export function saveExecution(execution) {
   db.prepare(`
     INSERT INTO executions (
       id,
@@ -273,34 +431,33 @@ export function saveExecution({
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    id,
-    eventId ?? null,
-    eventType,
-    workflowId ?? null,
-    workflowTitle ?? null,
-    actionType,
-    channel ?? null,
-    template ?? null,
-    recipient ?? null,
-    status,
-    JSON.stringify(result ?? {}),
-    timestamp
+    execution.id,
+    execution.eventId ?? null,
+    execution.eventType,
+    execution.workflowId ?? null,
+    execution.workflowTitle ?? null,
+    execution.actionType,
+    execution.channel ?? null,
+    execution.template ?? null,
+    execution.recipient ?? null,
+    execution.status,
+    JSON.stringify(execution.result ?? {}),
+    execution.timestamp
   );
 }
 
 export function getExecutions(
   limit = 100
 ) {
-  const rows = db
+  return db
     .prepare(`
       SELECT *
       FROM executions
       ORDER BY created_at DESC
       LIMIT ?
     `)
-    .all(limit);
-
-  return rows.map(mapExecution);
+    .all(limit)
+    .map(mapExecution);
 }
 
 export function clearExecutions() {
@@ -309,34 +466,501 @@ export function clearExecutions() {
   `).run();
 }
 
-export function automationCount() {
-  const row = db
-    .prepare(`
-      SELECT COUNT(*) AS count
-      FROM automations
-    `)
-    .get();
+/* =========================================================
+   CUSTOMERS
+========================================================= */
 
-  return row.count;
+export function getCustomers() {
+  return db
+    .prepare(`
+      SELECT *
+      FROM customers
+      ORDER BY created_at DESC
+    `)
+    .all()
+    .map(mapCustomer);
 }
 
-export function seedDefaultAutomations(
-  automations
+export function getCustomerById(id) {
+  const row = db
+    .prepare(`
+      SELECT *
+      FROM customers
+      WHERE id = ?
+    `)
+    .get(id);
+
+  return row ? mapCustomer(row) : null;
+}
+
+export function createCustomer({
+  id = crypto.randomUUID(),
+  name,
+  phone = null,
+  email = null,
+  company = null,
+  source = null,
+  status = "active",
+  totalSpent = 0,
+  ordersCount = 0,
+  lastPurchaseAt = null,
+  lifetimeValue = 0,
+  riskScore = 0,
+}) {
+  const timestamp = now();
+
+  db.prepare(`
+    INSERT INTO customers (
+      id,
+      name,
+      phone,
+      email,
+      company,
+      source,
+      status,
+      total_spent,
+      orders_count,
+      last_purchase_at,
+      lifetime_value,
+      risk_score,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    name,
+    phone,
+    email,
+    company,
+    source,
+    status,
+    totalSpent,
+    ordersCount,
+    lastPurchaseAt,
+    lifetimeValue,
+    riskScore,
+    timestamp,
+    timestamp
+  );
+
+  return getCustomerById(id);
+}
+
+/* =========================================================
+   LEADS
+========================================================= */
+
+export function getLeads() {
+  return db
+    .prepare(`
+      SELECT *
+      FROM leads
+      ORDER BY score DESC, created_at DESC
+    `)
+    .all()
+    .map(mapLead);
+}
+
+export function createLead({
+  id = crypto.randomUUID(),
+  name,
+  phone = null,
+  email = null,
+  company = null,
+  source = null,
+  score = 0,
+  status = "new",
+  opportunityValue = 0,
+  customerId = null,
+}) {
+  const timestamp = now();
+
+  db.prepare(`
+    INSERT INTO leads (
+      id,
+      name,
+      phone,
+      email,
+      company,
+      source,
+      score,
+      status,
+      opportunity_value,
+      customer_id,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    name,
+    phone,
+    email,
+    company,
+    source,
+    score,
+    status,
+    opportunityValue,
+    customerId,
+    timestamp,
+    timestamp
+  );
+
+  return db
+    .prepare(`
+      SELECT *
+      FROM leads
+      WHERE id = ?
+    `)
+    .get(id);
+}
+
+/* =========================================================
+   ORDERS
+========================================================= */
+
+export function getOrders() {
+  return db
+    .prepare(`
+      SELECT *
+      FROM orders
+      ORDER BY created_at DESC
+    `)
+    .all()
+    .map(mapOrder);
+}
+
+export function createOrder({
+  id = crypto.randomUUID(),
+  customerId,
+  totalAmount,
+  status = "completed",
+  source = "website",
+  paymentStatus = "paid",
+}) {
+  const timestamp = now();
+
+  db.prepare(`
+    INSERT INTO orders (
+      id,
+      customer_id,
+      total_amount,
+      status,
+      source,
+      payment_status,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    customerId,
+    totalAmount,
+    status,
+    source,
+    paymentStatus,
+    timestamp,
+    timestamp
+  );
+
+  return db
+    .prepare(`
+      SELECT *
+      FROM orders
+      WHERE id = ?
+    `)
+    .get(id);
+}
+
+/* =========================================================
+   CARTS
+========================================================= */
+
+export function getCarts() {
+  return db
+    .prepare(`
+      SELECT *
+      FROM carts
+      ORDER BY created_at DESC
+    `)
+    .all()
+    .map(mapCart);
+}
+
+export function createCart({
+  id = crypto.randomUUID(),
+  customerId = null,
+  totalAmount = 0,
+  status = "active",
+  abandonedAt = null,
+  recoveredAt = null,
+}) {
+  const timestamp = now();
+
+  db.prepare(`
+    INSERT INTO carts (
+      id,
+      customer_id,
+      total_amount,
+      status,
+      abandoned_at,
+      recovered_at,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    customerId,
+    totalAmount,
+    status,
+    abandonedAt,
+    recoveredAt,
+    timestamp,
+    timestamp
+  );
+
+  return db
+    .prepare(`
+      SELECT *
+      FROM carts
+      WHERE id = ?
+    `)
+    .get(id);
+}
+
+/* =========================================================
+   CUSTOMER EVENTS
+========================================================= */
+
+export function getCustomerEvents(
+  customerId
 ) {
-  if (automationCount() > 0) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM customer_events
+      WHERE customer_id = ?
+      ORDER BY created_at DESC
+    `)
+    .all(customerId)
+    .map(mapCustomerEvent);
+}
+
+export function createCustomerEvent({
+  id = crypto.randomUUID(),
+  customerId = null,
+  type,
+  metadata = {},
+}) {
+  const timestamp = now();
+
+  db.prepare(`
+    INSERT INTO customer_events (
+      id,
+      customer_id,
+      type,
+      metadata_json,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    id,
+    customerId,
+    type,
+    JSON.stringify(metadata),
+    timestamp
+  );
+
+  return {
+    id,
+    customerId,
+    type,
+    metadata,
+    createdAt: timestamp,
+  };
+}
+
+/* =========================================================
+   DASHBOARD STATS
+========================================================= */
+
+export function getCRMStats() {
+  const totalCustomers = db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM customers
+    `)
+    .get().count;
+
+  const totalLeads = db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM leads
+    `)
+    .get().count;
+
+  const hotLeads = db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM leads
+      WHERE score >= 80
+    `)
+    .get().count;
+
+  const completedOrders = db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM orders
+      WHERE status = 'completed'
+    `)
+    .get().count;
+
+  const onlineRevenue = db
+    .prepare(`
+      SELECT COALESCE(SUM(total_amount), 0) AS total
+      FROM orders
+      WHERE status = 'completed'
+    `)
+    .get().total;
+
+  const abandonedCarts = db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM carts
+      WHERE status = 'abandoned'
+    `)
+    .get().count;
+
+  return {
+    totalCustomers,
+    totalLeads,
+    hotLeads,
+    completedOrders,
+    onlineRevenue,
+    abandonedCarts,
+  };
+}
+
+/* =========================================================
+   SEED CRM / ECOMMERCE
+========================================================= */
+
+export function seedCRMData() {
+  const customerCount = db
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM customers
+    `)
+    .get().count;
+
+  if (customerCount > 0) {
     return;
   }
 
-  const transaction =
-    db.transaction(() => {
-      for (const automation of automations) {
-        createAutomation(
-          automation
-        );
-      }
+  db.transaction(() => {
+    createCustomer({
+      id: "customer-001",
+      name: "مریم احمدی",
+      phone: "09121111111",
+      email: "maryam@example.com",
+      company: "کلینیک ویستا",
+      source: "website",
+      totalSpent: 9200000,
+      ordersCount: 3,
+      lifetimeValue: 12500000,
+      riskScore: 12,
+      lastPurchaseAt: now(),
     });
 
-  transaction();
+    createCustomer({
+      id: "customer-002",
+      name: "رضا مرادی",
+      phone: "09122222222",
+      email: "reza@example.com",
+      company: "مدیا پلاس",
+      source: "referral",
+      totalSpent: 23500000,
+      ordersCount: 6,
+      lifetimeValue: 31000000,
+      riskScore: 7,
+      lastPurchaseAt: now(),
+    });
+
+    createLead({
+      id: "lead-001",
+      name: "علی رضایی",
+      phone: "09123333333",
+      company: "فروشگاه آریا",
+      source: "google_ads",
+      score: 92,
+      status: "hot",
+      opportunityValue: 18000000,
+    });
+
+    createLead({
+      id: "lead-002",
+      name: "سارا کریمی",
+      phone: "09124444444",
+      company: "استودیو هشت",
+      source: "instagram",
+      score: 84,
+      status: "qualified",
+      opportunityValue: 12000000,
+    });
+
+    createOrder({
+      id: "order-001",
+      customerId: "customer-001",
+      totalAmount: 3200000,
+      status: "completed",
+      source: "website",
+      paymentStatus: "paid",
+    });
+
+    createOrder({
+      id: "order-002",
+      customerId: "customer-002",
+      totalAmount: 5100000,
+      status: "completed",
+      source: "website",
+      paymentStatus: "paid",
+    });
+
+    createCart({
+      id: "cart-001",
+      customerId: "customer-001",
+      totalAmount: 4500000,
+      status: "abandoned",
+      abandonedAt: now(),
+    });
+
+    createCart({
+      id: "cart-002",
+      customerId: "customer-002",
+      totalAmount: 2800000,
+      status: "active",
+    });
+
+    createCustomerEvent({
+      customerId: "customer-001",
+      type: "order.completed",
+      metadata: {
+        orderId: "order-001",
+        amount: 3200000,
+      },
+    });
+
+    createCustomerEvent({
+      customerId: "customer-001",
+      type: "cart.abandoned",
+      metadata: {
+        cartId: "cart-001",
+        amount: 4500000,
+      },
+    });
+  })();
 }
 
 export default db;
