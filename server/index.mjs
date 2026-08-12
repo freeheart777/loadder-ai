@@ -20,6 +20,7 @@ import {
   getCustomers,
   getCustomerById,
   createCustomer,
+  getCustomer360,
 
   getLeads,
   createLead,
@@ -244,8 +245,13 @@ function evaluateCondition(eventPayload, condition) {
 }
 
 function workflowMatches(workflow, event) {
-  if (!workflow.enabled) return false;
-  if (workflow.trigger !== event.type) return false;
+  if (!workflow.enabled) {
+    return false;
+  }
+
+  if (workflow.trigger !== event.type) {
+    return false;
+  }
 
   return workflow.conditions.every((condition) =>
     evaluateCondition(event.payload, condition)
@@ -419,6 +425,7 @@ app.get("/api/health", (req, res) => {
     service: "Loadder AI Backend",
     database: "SQLite",
     persistence: true,
+    customer360: true,
     timestamp: new Date().toISOString(),
   });
 });
@@ -433,6 +440,73 @@ app.get("/api/crm/stats", (req, res) => {
     data: getCRMStats(),
   });
 });
+
+/* =========================================================
+   CUSTOMER 360
+   مهم: این Route باید قبل از /api/customers/:id باشد
+========================================================= */
+
+app.get("/api/customers/:id/360", (req, res) => {
+  try {
+    const data = getCustomer360(req.params.id);
+
+    if (!data) {
+      return res.status(404).json({
+        ok: false,
+        message: "مشتری پیدا نشد.",
+      });
+    }
+
+    res.json({
+      ok: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Customer 360 error:", error);
+
+    res.status(500).json({
+      ok: false,
+      message:
+        "خطا در دریافت پروفایل کامل مشتری.",
+    });
+  }
+});
+
+/* =========================================================
+   CUSTOMER EVENTS
+========================================================= */
+
+app.get(
+  "/api/customers/:id/events",
+  (req, res) => {
+    try {
+      const customer = getCustomerById(req.params.id);
+
+      if (!customer) {
+        return res.status(404).json({
+          ok: false,
+          message: "مشتری پیدا نشد.",
+        });
+      }
+
+      const data = getCustomerEvents(req.params.id);
+
+      res.json({
+        ok: true,
+        count: data.length,
+        data,
+      });
+    } catch (error) {
+      console.error("Customer events error:", error);
+
+      res.status(500).json({
+        ok: false,
+        message:
+          "خطا در دریافت رویدادهای مشتری.",
+      });
+    }
+  }
+);
 
 /* =========================================================
    CUSTOMERS
@@ -464,19 +538,6 @@ app.get("/api/customers/:id", (req, res) => {
   });
 });
 
-app.get(
-  "/api/customers/:id/events",
-  (req, res) => {
-    const data = getCustomerEvents(req.params.id);
-
-    res.json({
-      ok: true,
-      count: data.length,
-      data,
-    });
-  }
-);
-
 app.post("/api/customers", (req, res) => {
   const {
     name,
@@ -507,7 +568,7 @@ app.post("/api/customers", (req, res) => {
       data: customer,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Create customer error:", error);
 
     res.status(500).json({
       ok: false,
@@ -583,7 +644,7 @@ app.post("/api/leads", async (req, res) => {
       data: lead,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Create lead error:", error);
 
     res.status(500).json({
       ok: false,
@@ -664,7 +725,7 @@ app.post("/api/orders", async (req, res) => {
       data: order,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Create order error:", error);
 
     res.status(500).json({
       ok: false,
@@ -706,11 +767,9 @@ app.post("/api/carts", async (req, res) => {
     });
 
     if (status === "abandoned") {
-      let customer = null;
-
-      if (customerId) {
-        customer = getCustomerById(customerId);
-      }
+      const customer = customerId
+        ? getCustomerById(customerId)
+        : null;
 
       const event = {
         id: crypto.randomUUID(),
@@ -718,12 +777,9 @@ app.post("/api/carts", async (req, res) => {
         createdAt: new Date().toISOString(),
         payload: {
           customerId,
-          customerName:
-            customer?.name || null,
-          phone:
-            customer?.phone || null,
-          email:
-            customer?.email || null,
+          customerName: customer?.name || null,
+          phone: customer?.phone || null,
+          email: customer?.email || null,
           cartId: cart.id,
           cartValue: Number(totalAmount),
         },
@@ -737,7 +793,7 @@ app.post("/api/carts", async (req, res) => {
       data: cart,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Create cart error:", error);
 
     res.status(500).json({
       ok: false,
@@ -761,9 +817,7 @@ app.get("/api/automations", (req, res) => {
 });
 
 app.get("/api/automations/:id", (req, res) => {
-  const automation = getAutomationById(
-    req.params.id
-  );
+  const automation = getAutomationById(req.params.id);
 
   if (!automation) {
     return res.status(404).json({
@@ -811,7 +865,7 @@ app.post("/api/automations", (req, res) => {
       data: automation,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Create automation error:", error);
 
     res.status(500).json({
       ok: false,
@@ -821,65 +875,124 @@ app.post("/api/automations", (req, res) => {
   }
 });
 
-app.patch(
-  "/api/automations/:id",
-  (req, res) => {
-    try {
-      const automation = updateAutomation(
-        req.params.id,
-        req.body
-      );
+app.patch("/api/automations/:id", (req, res) => {
+  try {
+    const automation = updateAutomation(
+      req.params.id,
+      req.body
+    );
 
-      if (!automation) {
-        return res.status(404).json({
-          ok: false,
-          message:
-            "اتوماسیون پیدا نشد.",
-        });
-      }
-
-      res.json({
-        ok: true,
-        data: automation,
-      });
-    } catch (error) {
-      console.error(error);
-
-      res.status(500).json({
+    if (!automation) {
+      return res.status(404).json({
         ok: false,
         message:
-          "خطا در ویرایش اتوماسیون.",
+          "اتوماسیون پیدا نشد.",
       });
     }
-  }
-);
 
-app.delete(
-  "/api/automations/:id",
-  (req, res) => {
+    res.json({
+      ok: true,
+      data: automation,
+    });
+  } catch (error) {
+    console.error("Update automation error:", error);
+
+    res.status(500).json({
+      ok: false,
+      message:
+        "خطا در ویرایش اتوماسیون.",
+    });
+  }
+});
+
+app.delete("/api/automations/:id", (req, res) => {
+  try {
+    const deleted = deleteAutomation(req.params.id);
+
+    if (!deleted) {
+      return res.status(404).json({
+        ok: false,
+        message:
+          "اتوماسیون پیدا نشد.",
+      });
+    }
+
+    res.json({
+      ok: true,
+    });
+  } catch (error) {
+    console.error("Delete automation error:", error);
+
+    res.status(500).json({
+      ok: false,
+      message:
+        "خطا در حذف اتوماسیون.",
+    });
+  }
+});
+
+/* =========================================================
+   MANUAL WORKFLOW RUN
+========================================================= */
+
+app.post(
+  "/api/automations/:id/run",
+  async (req, res) => {
+    const workflow = getAutomationById(req.params.id);
+
+    if (!workflow) {
+      return res.status(404).json({
+        ok: false,
+        message: "اتوماسیون پیدا نشد.",
+      });
+    }
+
+    if (!workflow.enabled) {
+      return res.status(400).json({
+        ok: false,
+        message:
+          "این Workflow متوقف است.",
+      });
+    }
+
+    const event = {
+      id: crypto.randomUUID(),
+      type: workflow.trigger,
+      createdAt: new Date().toISOString(),
+      payload: req.body?.payload || {},
+    };
+
     try {
-      const deleted = deleteAutomation(
-        req.params.id
+      const result = await runWorkflow(
+        workflow,
+        event
       );
 
-      if (!deleted) {
-        return res.status(404).json({
-          ok: false,
-          message:
-            "اتوماسیون پیدا نشد.",
+      saveEvent(event);
+
+      if (event.payload.customerId) {
+        createCustomerEvent({
+          customerId: event.payload.customerId,
+          type: event.type,
+          metadata: event.payload,
         });
       }
 
       res.json({
         ok: true,
+        event,
+        result,
       });
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Manual workflow execution error:",
+        error
+      );
 
       res.status(500).json({
         ok: false,
         message:
-          "خطا در حذف اتوماسیون.",
+          "خطا در اجرای Workflow.",
       });
     }
   }
@@ -923,7 +1036,7 @@ app.post("/api/events", async (req, res) => {
       results,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Process event error:", error);
 
     res.status(500).json({
       ok: false,
@@ -951,11 +1064,21 @@ app.get("/api/executions", (req, res) => {
 });
 
 app.delete("/api/executions", (req, res) => {
-  clearExecutions();
+  try {
+    clearExecutions();
 
-  res.json({
-    ok: true,
-  });
+    res.json({
+      ok: true,
+    });
+  } catch (error) {
+    console.error("Clear executions error:", error);
+
+    res.status(500).json({
+      ok: false,
+      message:
+        "خطا در پاک‌کردن تاریخچه.",
+    });
+  }
 });
 
 /* =========================================================
@@ -971,11 +1094,10 @@ app.get(
       ok: true,
       database: "SQLite",
       persistent: true,
+      customer360: true,
       crm,
-      automations:
-        getAutomations().length,
-      executions:
-        getExecutions(1000).length,
+      automations: getAutomations().length,
+      executions: getExecutions(1000).length,
     });
   }
 );
@@ -1000,34 +1122,17 @@ app.listen(PORT, () => {
   console.log(
     "=========================================="
   );
-
-  console.log(
-    "Loadder AI Backend"
-  );
-
-  console.log(
-    `http://localhost:${PORT}`
-  );
-
-  console.log(
-    "Database: SQLite"
-  );
-
-  console.log(
-    "CRM Data Layer: READY"
-  );
-
-  console.log(
-    "E-commerce Data Layer: READY"
-  );
-
-  console.log(
-    "Workflow Engine: READY"
-  );
-
+  console.log("Loadder AI Backend");
+  console.log(`http://localhost:${PORT}`);
+  console.log("Database: SQLite");
+  console.log("Persistence: ENABLED");
+  console.log("Customer 360: READY");
+  console.log("CRM Data Layer: READY");
+  console.log("E-commerce Data Layer: READY");
+  console.log("Workflow Engine: READY");
+  console.log("Messaging Adapter: READY");
   console.log(
     "=========================================="
   );
-
   console.log("");
 });

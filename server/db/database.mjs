@@ -962,5 +962,78 @@ export function seedCRMData() {
     });
   })();
 }
+/* =========================================================
+   CUSTOMER 360
+========================================================= */
 
+export function getOrdersByCustomerId(customerId) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM orders
+      WHERE customer_id = ?
+      ORDER BY created_at DESC
+    `)
+    .all(customerId)
+    .map(mapOrder);
+}
+
+export function getCartsByCustomerId(customerId) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM carts
+      WHERE customer_id = ?
+      ORDER BY created_at DESC
+    `)
+    .all(customerId)
+    .map(mapCart);
+}
+
+export function getCustomer360(customerId) {
+  const customer = getCustomerById(customerId);
+
+  if (!customer) {
+    return null;
+  }
+
+  const orders = getOrdersByCustomerId(customerId);
+  const carts = getCartsByCustomerId(customerId);
+  const events = getCustomerEvents(customerId);
+
+  const completedOrders = orders.filter(
+    (order) => order.status === "completed"
+  );
+
+  const totalRevenue = completedOrders.reduce(
+    (sum, order) => sum + order.totalAmount,
+    0
+  );
+
+  const abandonedCarts = carts.filter(
+    (cart) => cart.status === "abandoned"
+  );
+
+  const activeCarts = carts.filter(
+    (cart) => cart.status === "active"
+  );
+
+  return {
+    customer,
+
+    summary: {
+      ordersCount: orders.length,
+      completedOrders: completedOrders.length,
+      totalRevenue,
+      abandonedCarts: abandonedCarts.length,
+      activeCarts: activeCarts.length,
+      lifetimeValue: customer.lifetimeValue,
+      riskScore: customer.riskScore,
+    },
+
+    orders,
+    carts,
+    events,
+  };
+}
 export default db;

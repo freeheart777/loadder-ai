@@ -11,7 +11,6 @@ import {
   Sparkle,
   Brain,
   CheckCircle,
-  WarningCircle,
   Lightning,
   ShoppingCart,
   Storefront,
@@ -20,7 +19,6 @@ import {
   Package,
   UserCircle,
   CurrencyCircleDollar,
-  Database,
   ClockCounterClockwise,
   ArrowClockwise,
 } from "@phosphor-icons/react";
@@ -433,15 +431,11 @@ export default function CRMPage() {
             >
               <span
                 className={`h-2 w-2 rounded-full ${
-                  backendOnline
-                    ? "bg-emerald-300"
-                    : "bg-red-300"
+                  backendOnline ? "bg-emerald-300" : "bg-red-300"
                 }`}
               />
 
-              {backendOnline
-                ? "CRM متصل"
-                : "CRM قطع"}
+              {backendOnline ? "CRM متصل" : "CRM قطع"}
             </div>
 
             <button
@@ -469,7 +463,7 @@ export default function CRMPage() {
           <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-2 text-sm text-cyan-200">
-                <Database size={16} weight="duotone" />
+                <DatabaseBadge />
                 CRM + SQLite + E-commerce
               </div>
 
@@ -484,7 +478,6 @@ export default function CRMPage() {
               <p className="mt-4 max-w-3xl text-base leading-9 text-white/50">
                 این صفحه حالا داده مشتری، لید، سفارش و سبد خرید را
                 مستقیم از SQLite و Backend Loadder دریافت می‌کند.
-                اعداد این صفحه دیگر Hard-code نیستند.
               </p>
             </div>
 
@@ -504,7 +497,7 @@ export default function CRMPage() {
               <p className="mt-4 text-sm leading-8 text-white/55">
                 {faNumber(abandonedCarts.length)} سبد خرید رهاشده و{" "}
                 {faNumber(hotLeads.length)} لید داغ در داده فعلی وجود
-                دارد. این دو گروه بالاترین اولویت پیگیری هستند.
+                دارد.
               </p>
 
               <Link
@@ -611,9 +604,7 @@ export default function CRMPage() {
 
               <input
                 value={query}
-                onChange={(event) =>
-                  setQuery(event.target.value)
-                }
+                onChange={(event) => setQuery(event.target.value)}
                 placeholder="جست‌وجوی مشتری، شرکت، شماره یا منبع جذب..."
                 className="w-full rounded-2xl border border-white/[0.08] bg-black/20 py-3.5 pr-11 pl-4 text-sm text-white outline-none placeholder:text-white/25"
               />
@@ -674,7 +665,7 @@ export default function CRMPage() {
                     person={person}
                     onClick={() =>
                       showNotice(
-                        `پروفایل کامل «${person.name}» در مرحله بعد به Timeline مشتری متصل می‌شود.`
+                        `پروفایل کامل «${person.name}» برای لیدها در مرحله بعد ساخته می‌شود.`
                       )
                     }
                   />
@@ -799,21 +790,12 @@ export default function CRMPage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              <OrderRow
-                title="کل سفارش‌ها"
-                value={orders.length}
-              />
-
+              <OrderRow title="کل سفارش‌ها" value={orders.length} />
               <OrderRow
                 title="سفارش موفق"
                 value={completedOrders.length}
               />
-
-              <OrderRow
-                title="کل سبدها"
-                value={carts.length}
-              />
-
+              <OrderRow title="کل سبدها" value={carts.length} />
               <OrderRow
                 title="سبد رهاشده"
                 value={abandonedCarts.length}
@@ -926,30 +908,10 @@ export default function CRMPage() {
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                الان مشتری، لید، سفارش و سبد خرید از دیتابیس واقعی
-                خوانده می‌شوند. وقتی سبدی رها شود یا لید داغی ساخته
-                شود، همین داده می‌تواند Workflow مناسب را نیز فعال کند.
+                حالا مشتری‌های واقعی مستقیم به پروفایل ۳۶۰ خودشان
+                متصل‌اند. روی هر مشتری کلیک کنی، خرید، سبد، رفتار و ارزش
+                طول عمر همان مشتری باز می‌شود.
               </p>
-
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
-                <SmartCard
-                  icon={ShoppingCart}
-                  title="بازیابی فروش"
-                  value={`${faNumber(abandonedCarts.length)} فرصت`}
-                />
-
-                <SmartCard
-                  icon={Target}
-                  title="لید داغ"
-                  value={`${faNumber(hotLeads.length)} مورد`}
-                />
-
-                <SmartCard
-                  icon={CurrencyCircleDollar}
-                  title="فروش واقعی"
-                  value={faMoney(totalRevenue)}
-                />
-              </div>
             </div>
 
             <div className="rounded-[26px] border border-white/[0.08] bg-black/20 p-6">
@@ -992,6 +954,14 @@ export default function CRMPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function DatabaseBadge() {
+  return (
+    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-cyan-300/30">
+      <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+    </span>
   );
 }
 
@@ -1060,76 +1030,95 @@ function PersonRow({
 }) {
   const isLead = person.type === "lead";
 
+  const content = (
+    <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
+      <div className="flex min-w-[220px] items-center gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-500/[0.08]">
+          <UserCircle
+            size={25}
+            weight="duotone"
+            className="text-violet-300"
+          />
+        </div>
+
+        <div>
+          <div className="font-semibold">
+            {person.name}
+          </div>
+
+          <div className="mt-1 text-xs text-white/35">
+            {person.company} • {person.source}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid flex-1 grid-cols-2 gap-4 md:grid-cols-4">
+        <SmallMetric
+          title={isLead ? "امتیاز لید" : "تعداد سفارش"}
+          value={
+            isLead
+              ? faNumber(person.score ?? 0)
+              : faNumber(person.ordersCount)
+          }
+        />
+
+        <SmallMetric
+          title={isLead ? "ارزش فرصت" : "مجموع خرید"}
+          value={
+            isLead
+              ? faMoney(person.lifetimeValue)
+              : faMoney(person.totalSpent)
+          }
+        />
+
+        <SmallMetric
+          title={isLead ? "شماره تماس" : "آخرین خرید"}
+          value={
+            isLead
+              ? person.phone ?? "—"
+              : faDate(person.lastPurchaseAt)
+          }
+        />
+
+        <div>
+          <div className="text-xs text-white/30">
+            وضعیت
+          </div>
+
+          <span
+            className={`mt-1 inline-block rounded-full border px-3 py-1.5 text-xs ${
+              isLead
+                ? "border-cyan-400/15 bg-cyan-500/[0.07] text-cyan-300"
+                : person.riskScore >= 70
+                  ? "border-amber-400/15 bg-amber-500/[0.07] text-amber-300"
+                  : "border-emerald-400/15 bg-emerald-500/[0.07] text-emerald-300"
+            }`}
+          >
+            {person.status}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!isLead) {
+    return (
+      <Link
+        to={`/dashboard/crm/customer/${person.id}`}
+        className="block w-full rounded-[22px] border border-white/[0.07] bg-black/20 p-5 text-right transition hover:border-violet-300/20 hover:bg-white/[0.03]"
+      >
+        {content}
+      </Link>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={onClick}
       className="w-full rounded-[22px] border border-white/[0.07] bg-black/20 p-5 text-right transition hover:border-violet-300/20 hover:bg-white/[0.03]"
     >
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
-        <div className="flex min-w-[220px] items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-500/[0.08]">
-            <UserCircle
-              size={25}
-              weight="duotone"
-              className="text-violet-300"
-            />
-          </div>
-
-          <div>
-            <div className="font-semibold">{person.name}</div>
-
-            <div className="mt-1 text-xs text-white/35">
-              {person.company} • {person.source}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid flex-1 grid-cols-2 gap-4 md:grid-cols-4">
-          <SmallMetric
-            title={isLead ? "امتیاز لید" : "تعداد سفارش"}
-            value={
-              isLead
-                ? faNumber(person.score ?? 0)
-                : faNumber(person.ordersCount)
-            }
-          />
-
-          <SmallMetric
-            title={isLead ? "ارزش فرصت" : "مجموع خرید"}
-            value={
-              isLead
-                ? faMoney(person.lifetimeValue)
-                : faMoney(person.totalSpent)
-            }
-          />
-
-          <SmallMetric
-            title={isLead ? "شماره تماس" : "آخرین خرید"}
-            value={
-              isLead
-                ? person.phone ?? "—"
-                : faDate(person.lastPurchaseAt)
-            }
-          />
-
-          <div>
-            <div className="text-xs text-white/30">وضعیت</div>
-
-            <span
-              className={`mt-1 inline-block rounded-full border px-3 py-1.5 text-xs ${
-                isLead
-                  ? "border-cyan-400/15 bg-cyan-500/[0.07] text-cyan-300"
-                  : person.riskScore >= 70
-                    ? "border-amber-400/15 bg-amber-500/[0.07] text-amber-300"
-                    : "border-emerald-400/15 bg-emerald-500/[0.07] text-emerald-300"
-              }`}
-            >
-              {person.status}
-            </span>
-          </div>
-        </div>
-      </div>
+      {content}
     </button>
   );
 }
@@ -1166,7 +1155,9 @@ function FunnelRow({
       >
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold">{title}</span>
-          <span className="text-lg font-bold">{faNumber(value)}</span>
+          <span className="text-lg font-bold">
+            {faNumber(value)}
+          </span>
         </div>
       </div>
     </div>
@@ -1251,30 +1242,6 @@ function PriorityRow({
       <span className="rounded-full border border-violet-300/10 bg-violet-500/[0.06] px-3 py-1.5 text-xs text-violet-200">
         {value}
       </span>
-    </div>
-  );
-}
-
-function SmartCard({
-  icon: Icon,
-  title,
-  value,
-}: {
-  icon: React.ElementType;
-  title: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-4">
-      <Icon
-        size={20}
-        weight="duotone"
-        className="text-cyan-300"
-      />
-
-      <div className="mt-3 text-xs text-white/35">{title}</div>
-
-      <div className="mt-1 text-sm font-semibold">{value}</div>
     </div>
   );
 }
