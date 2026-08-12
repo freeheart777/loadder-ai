@@ -1,202 +1,383 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
   ArrowRight,
-  Brain,
-  ChartLineUp,
+  Gauge,
   TrendUp,
-  Megaphone,
-  CurrencyCircleDollar,
-  UsersThree,
-  Sparkle,
-  CalendarBlank,
-  Bell,
-  Rocket,
-  Eye,
-  UserPlus,
-  ShoppingBag,
+  TrendDown,
   Target,
-  WarningCircle,
+  UsersThree,
+  CurrencyCircleDollar,
+  ShoppingCart,
+  Megaphone,
+  Globe,
+  Sparkle,
+  Brain,
   CheckCircle,
+  WarningCircle,
+  ChartLineUp,
   Lightning,
+  Eye,
+  Funnel,
 } from "@phosphor-icons/react";
 
-type HealthCard = {
-  title: string;
-  value: number;
-  description: string;
-  icon: React.ElementType;
-};
+import { businessData } from "../data/businessData";
+
+type KpiStatus = "خوب" | "نیاز به توجه" | "بحرانی";
 
 type Metric = {
   title: string;
   value: string;
   change?: string;
+  status?: KpiStatus;
+  icon: React.ElementType;
+  description: string;
 };
 
-type FunnelStep = {
+type EngineItem = {
   title: string;
   value: string;
-  width: string;
-  icon: React.ElementType;
 };
 
 type Engine = {
   title: string;
-  score: string;
+  score: number;
   icon: React.ElementType;
-  items: [string, string][];
+  description: string;
+  items: EngineItem[];
 };
 
-const healthCards: HealthCard[] = [
-  {
-    title: "رشد کسب‌وکار",
-    value: 86,
-    description: "وضعیت کلی رشد فروش، مشتری و بازاریابی",
-    icon: TrendUp,
-  },
-  {
-    title: "سلامت بازاریابی",
-    value: 84,
-    description: "عملکرد تبلیغات، محتوا و جذب مشتری",
-    icon: Megaphone,
-  },
-  {
-    title: "سلامت فروش",
-    value: 78,
-    description: "توانایی تبدیل مشتری بالقوه به خرید",
-    icon: CurrencyCircleDollar,
-  },
-  {
-    title: "سلامت مشتریان",
-    value: 82,
-    description: "وفاداری، بازگشت و ارزش مشتریان",
-    icon: UsersThree,
-  },
-];
+function toFa(value: number) {
+  return value.toLocaleString("fa-IR");
+}
 
-const quickMetrics: Metric[] = [
+function percent(value: number) {
+  return `${value.toLocaleString("fa-IR")}٪`;
+}
+
+const topMetrics: Metric[] = [
   {
-    title: "امتیاز عملکرد",
-    value: "۸۶٪",
-    change: "+۱۲٪",
+    title: "سلامت کلی کسب‌وکار",
+    value: percent(
+      businessData.business.healthScore
+    ),
+    change: "+۶٪",
+    status: "خوب",
+    icon: Gauge,
+    description:
+      "ترکیب فروش، مشتری، بازاریابی و عملکرد کلی",
   },
   {
-    title: "سفارش‌ها",
-    value: "۲۱۰",
-    change: "+۲۲٪",
-  },
-  {
-    title: "درآمد کل",
-    value: "۳۸۴ میلیون",
+    title: "درآمد",
+    value: businessData.sales.revenueLabel,
     change: "+۱۷٪",
+    status: "خوب",
+    icon: CurrencyCircleDollar,
+    description:
+      "درآمد ثبت‌شده در دوره فعلی",
+  },
+  {
+    title: "مشتریان بالقوه",
+    value: toFa(
+      businessData.crm.newLeads
+    ),
+    change: "+۱۲٪",
+    status: "خوب",
+    icon: UsersThree,
+    description:
+      "مشتریان بالقوه جدید در این دوره",
   },
   {
     title: "نرخ تبدیل",
-    value: "۶.۲٪",
-    change: "+۰.۸٪",
-  },
-  {
-    title: "لید جدید",
-    value: "۹۲",
-    change: "+۱۸٪",
-  },
-  {
-    title: "بازدید سایت",
-    value: "۱۷۰ هزار",
-    change: "+۲۱٪",
-  },
-];
-
-const funnelSteps: FunnelStep[] = [
-  {
-    title: "آشنایی با برند",
-    value: "۲۴۸ هزار نفر",
-    width: "100%",
-    icon: Eye,
-  },
-  {
-    title: "بازدید و علاقه‌مندی",
-    value: "۴۸ هزار نفر",
-    width: "82%",
-    icon: Eye,
-  },
-  {
-    title: "مشتری بالقوه",
-    value: "۲۱۳ نفر",
-    width: "65%",
-    icon: UserPlus,
-  },
-  {
-    title: "تصمیم خرید",
-    value: "۱۲۴ نفر",
-    width: "48%",
-    icon: ShoppingBag,
-  },
-  {
-    title: "مشتری خریدار",
-    value: "۸۶ نفر",
-    width: "34%",
-    icon: UsersThree,
+    value: percent(
+      businessData.sales.conversionRate
+    ),
+    change: "+۸٪",
+    status: "نیاز به توجه",
+    icon: Target,
+    description:
+      "تبدیل بازدیدکننده و لید به مشتری",
   },
 ];
 
 const engines: Engine[] = [
   {
-    title: "موتور بازاریابی",
-    score: "۸۴٪",
+    title: "فروش",
+    score: 86,
+    icon: ShoppingCart,
+    description:
+      "عملکرد درآمد، سفارش و تبدیل مشتری",
+    items: [
+      {
+        title: "درآمد",
+        value:
+          businessData.sales.revenueLabel,
+      },
+      {
+        title: "تعداد سفارش",
+        value: toFa(
+          businessData.sales.orders
+        ),
+      },
+      {
+        title: "نرخ تبدیل",
+        value: percent(
+          businessData.sales
+            .conversionRate
+        ),
+      },
+      {
+        title: "ارزش فرصت‌ها",
+        value:
+          businessData.sales
+            .opportunityValueLabel,
+      },
+    ],
+  },
+
+  {
+    title: "بازاریابی",
+    score: 84,
     icon: Megaphone,
+    description:
+      "هزینه، بازده و کیفیت جذب مشتری",
     items: [
-      ["هزینه جذب مشتری", "۴۸۰ هزار تومان"],
-      ["بازده تبلیغات", "۴.۸ برابر"],
-      ["نرخ تعامل", "۶.۲٪"],
-      ["نرخ تبدیل", "۶.۸٪"],
+      {
+        title: "هزینه تبلیغات",
+        value:
+          businessData.marketing
+            .adSpendLabel,
+      },
+      {
+        title: "هزینه جذب مشتری",
+        value:
+          businessData.marketing
+            .cacLabel,
+      },
+      {
+        title: "بازده تبلیغات",
+        value: `${businessData.marketing.roas.toLocaleString(
+          "fa-IR"
+        )} برابر`,
+      },
+      {
+        title: "نرخ تعامل",
+        value: percent(
+          businessData.marketing
+            .engagementRate
+        ),
+      },
     ],
   },
+
   {
-    title: "موتور فروش",
-    score: "۷۸٪",
-    icon: CurrencyCircleDollar,
-    items: [
-      ["درآمد", "۳۸۴ میلیون"],
-      ["ارزش فرصت فروش", "۱.۲ میلیارد"],
-      ["موفقیت فروش", "۴۲٪"],
-      ["زمان فروش", "۱۸ روز"],
-    ],
-  },
-  {
-    title: "موتور مشتری",
-    score: "۸۲٪",
+    title: "مشتریان",
+    score: 81,
     icon: UsersThree,
+    description:
+      "سلامت ارتباط با مشتری و کیفیت لید",
     items: [
-      ["مشتریان فعال", "۱,۲۴۸"],
-      ["بازگشت مشتری", "۷۲٪"],
-      ["ریزش مشتری", "۴.۵٪"],
-      ["سلامت مشتری", "۸۲٪"],
+      {
+        title: "کل مشتریان",
+        value: toFa(
+          businessData.crm.totalCustomers
+        ),
+      },
+      {
+        title: "مشتریان فعال",
+        value: toFa(
+          businessData.crm.activeCustomers
+        ),
+      },
+      {
+        title: "لیدهای داغ",
+        value: toFa(
+          businessData.crm.hotLeads
+        ),
+      },
+      {
+        title: "حفظ مشتری",
+        value: percent(
+          businessData.crm.retentionRate
+        ),
+      },
     ],
   },
+
   {
-    title: "موتور محتوا",
-    score: "۹۱٪",
-    icon: Sparkle,
+    title: "وب‌سایت",
+    score: 78,
+    icon: Globe,
+    description:
+      "رفتار کاربران و تبدیل سایت",
     items: [
-      ["امتیاز تعامل", "۹۱٪"],
-      ["محتوای موفق", "آموزشی"],
-      ["موضوع برتر", "هوش مصنوعی"],
-      ["تبدیل محتوا", "۷.۲٪"],
+      {
+        title: "بازدید",
+        value: toFa(
+          businessData.website.visits
+        ),
+      },
+      {
+        title: "لید",
+        value: toFa(
+          businessData.website.leads
+        ),
+      },
+      {
+        title: "نرخ تبدیل",
+        value: percent(
+          businessData.website
+            .conversionRate
+        ),
+      },
+      {
+        title: "وضعیت",
+        value: "رو به رشد",
+      },
+    ],
+  },
+
+  {
+    title: "محتوا",
+    score:
+      businessData.content
+        .performanceScore,
+    icon: Sparkle,
+    description:
+      "قدرت محتوا در تعامل و تبدیل",
+    items: [
+      {
+        title: "امتیاز عملکرد",
+        value: percent(
+          businessData.content
+            .performanceScore
+        ),
+      },
+      {
+        title: "محتوای موفق",
+        value:
+          businessData.content
+            .bestContentType,
+      },
+      {
+        title: "موضوع برتر",
+        value:
+          businessData.content.topTopic,
+      },
+      {
+        title: "تبدیل محتوا",
+        value: percent(
+          businessData.content
+            .conversionRate
+        ),
+      },
+    ],
+  },
+
+  {
+    title: "آمادگی رشد",
+    score:
+      businessData.business
+        .growthReadiness,
+    icon: TrendUp,
+    description:
+      "توان فعلی کسب‌وکار برای رشد",
+    items: [
+      {
+        title: "آمادگی رشد",
+        value: percent(
+          businessData.business
+            .growthReadiness
+        ),
+      },
+      {
+        title: "کیفیت داده",
+        value: percent(
+          businessData.business
+            .dataQuality
+        ),
+      },
+      {
+        title: "ریسک",
+        value: percent(
+          businessData.business
+            .riskScore
+        ),
+      },
+      {
+        title: "هدف اصلی",
+        value:
+          businessData.goals.primary,
+      },
     ],
   },
 ];
 
-const growthBars = [42, 48, 55, 61, 58, 72, 81, 90];
+const scoreHistory = [
+  63, 67, 69, 72, 75, 79, 82,
+  businessData.business.healthScore,
+];
+
+const funnelItems = [
+  {
+    title: "دیده‌شدن",
+    value: businessData.marketing.reach,
+  },
+  {
+    title: "بازدید سایت",
+    value: businessData.website.visits,
+  },
+  {
+    title: "مشتری بالقوه",
+    value: businessData.crm.newLeads,
+  },
+  {
+    title: "لید داغ",
+    value: businessData.crm.hotLeads,
+  },
+  {
+    title: "سفارش",
+    value: businessData.sales.orders,
+  },
+];
 
 export default function KPIPage() {
+  const [period, setPeriod] =
+    useState("۳۰ روز");
+
+  const [activeEngine, setActiveEngine] =
+    useState("فروش");
+
+  const [notice, setNotice] =
+    useState("");
+
+  const currentEngine = useMemo(
+    () =>
+      engines.find(
+        (item) =>
+          item.title === activeEngine
+      ) ?? engines[0],
+    [activeEngine]
+  );
+
+  const showNotice = (
+    message: string
+  ) => {
+    setNotice(message);
+
+    window.setTimeout(() => {
+      setNotice("");
+    }, 2200);
+  };
+
   return (
     <main
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
       {/* HEADER */}
+
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
@@ -207,211 +388,149 @@ export default function KPIPage() {
               <ArrowRight size={18} />
             </Link>
 
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/20 bg-gradient-to-br from-violet-500/20 to-cyan-500/10">
-              <ChartLineUp
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/20 to-cyan-500/10">
+              <Gauge
                 size={25}
                 weight="duotone"
-                className="text-violet-300"
+                className="text-cyan-300"
               />
             </div>
 
             <div>
               <h1 className="text-2xl font-bold">
-                مرکز هوشمندی عملکرد
+                مرکز سنجش عملکرد
               </h1>
 
               <p className="mt-1 text-sm text-white/45">
-                تصویر کامل عملکرد کسب‌وکار شما
+                وضعیت واقعی کسب‌وکار در یک نگاه
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-3 text-sm text-white/70"
-            >
-              <CalendarBlank size={17} />
-              ۳۰ روز گذشته
-            </button>
-
-            <button
-              type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-white/60"
-            >
-              <Bell size={18} />
-            </button>
+          <div className="flex gap-2">
+            {[
+              "۷ روز",
+              "۳۰ روز",
+              "۹۰ روز",
+            ].map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() =>
+                  setPeriod(item)
+                }
+                className={`rounded-xl border px-4 py-2.5 text-sm transition ${
+                  period === item
+                    ? "border-violet-400/25 bg-violet-500/[0.12] text-violet-200"
+                    : "border-white/[0.07] bg-white/[0.03] text-white/45 hover:bg-white/[0.06]"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
           </div>
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto max-w-[1550px] px-8 py-8">
+      <div className="mx-auto max-w-[1550px] px-8 py-8">
         {/* HERO */}
+
         <section className="relative overflow-hidden rounded-[34px] border border-violet-400/15 bg-[#080d1d]/68 p-8 backdrop-blur-xl">
           <div className="pointer-events-none absolute -right-24 -top-24 h-[360px] w-[360px] rounded-full bg-violet-600/[0.13] blur-[130px]" />
 
           <div className="pointer-events-none absolute -bottom-32 left-[20%] h-[320px] w-[320px] rounded-full bg-cyan-500/[0.08] blur-[120px]" />
 
-          <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_330px]">
+          <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/15 bg-violet-500/[0.08] px-4 py-2 text-sm text-violet-200">
                 <Brain
                   size={16}
                   weight="duotone"
                 />
-                مرکز فرمان رشد
+                تحلیل سلامت کسب‌وکار
               </div>
 
               <h2 className="mt-5 max-w-4xl text-3xl font-bold leading-[1.55]">
-                اتاق فرمان رشد کسب‌وکار
+                فقط عدد نبین؛
+                <span className="bg-gradient-to-l from-cyan-300 via-blue-400 to-violet-400 bg-clip-text text-transparent">
+                  {" "}
+                  بفهم کسب‌وکارت کجا قوی و کجا ضعیف است.
+                </span>
               </h2>
 
               <p className="mt-4 max-w-3xl text-base leading-9 text-white/50">
-                Loadder داده‌های فروش، بازاریابی، مشتری و محتوا را کنار هم
-                تحلیل می‌کند تا وضعیت واقعی رشد کسب‌وکار را به زبان ساده نمایش دهد.
+                شاخص‌های فروش، مشتری،
+                بازاریابی، محتوا و وب‌سایت
+                حالا از یک منبع داده مشترک
+                Loadder تغذیه می‌شوند.
               </p>
-
-              <div className="mt-7 flex flex-wrap gap-3">
-                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/[0.08] px-4 py-3">
-                  <div className="text-xs text-white/40">
-                    وضعیت کلی
-                  </div>
-                  <div className="mt-1 text-sm font-semibold text-emerald-300">
-                    مثبت و رو به رشد
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.08] px-4 py-3">
-                  <div className="text-xs text-white/40">
-                    فرصت اصلی
-                  </div>
-                  <div className="mt-1 text-sm font-semibold text-violet-200">
-                    افزایش نرخ تبدیل
-                  </div>
-                </div>
-              </div>
             </div>
 
-            <div className="relative flex min-h-[220px] items-center justify-center">
-              <div className="absolute h-[190px] w-[190px] rounded-full border border-violet-400/15 bg-violet-500/[0.05]" />
+            <div className="rounded-[28px] border border-cyan-300/15 bg-cyan-500/[0.05] p-6">
+              <div className="text-sm text-white/40">
+                سلامت کلی
+              </div>
 
-              <div className="absolute h-[135px] w-[135px] rounded-full border border-cyan-400/10 bg-cyan-500/[0.04]" />
+              <div className="mt-4 text-6xl font-bold text-cyan-300">
+                {percent(
+                  businessData.business
+                    .healthScore
+                )}
+              </div>
 
-              <div className="relative flex h-24 w-24 items-center justify-center rounded-[28px] border border-violet-300/20 bg-gradient-to-br from-violet-500/20 to-cyan-500/10 shadow-[0_0_50px_rgba(139,92,246,.18)]">
-                <Rocket
-                  size={45}
-                  weight="duotone"
-                  className="text-violet-200"
+              <div className="mt-3 flex items-center gap-2 text-sm text-emerald-300">
+                <TrendUp
+                  size={17}
+                  weight="bold"
+                />
+
+                وضعیت کلی مثبت است
+              </div>
+
+              <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-300"
+                  style={{
+                    width: `${businessData.business.healthScore}%`,
+                  }}
                 />
               </div>
             </div>
           </div>
         </section>
 
-        {/* HEALTH CARDS */}
-        <section className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {healthCards.map((item) => (
-            <HealthCardComponent
-              key={item.title}
-              {...item}
-            />
-          ))}
-        </section>
+        {/* TOP KPI */}
 
-        {/* QUICK METRICS */}
-        <section className="mt-6 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-          {quickMetrics.map((metric) => (
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {topMetrics.map((metric) => (
             <MetricCard
               key={metric.title}
-              {...metric}
+              metric={metric}
             />
           ))}
         </section>
 
-        {/* FUNNEL + CHART */}
-        <section className="mt-8 grid gap-5 xl:grid-cols-[0.95fr_1.35fr]">
-          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
-            <div className="flex items-center gap-3">
-              <Target
-                size={23}
-                weight="duotone"
-                className="text-violet-300"
-              />
+        {/* BUSINESS HEALTH TREND */}
 
-              <div>
-                <h2 className="text-xl font-semibold">
-                  مسیر تبدیل مشتری
-                </h2>
-                <p className="mt-1 text-sm text-white/40">
-                  از دیده‌شدن تا خرید
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-7 space-y-4">
-              {funnelSteps.map((step, index) => {
-                const Icon = step.icon;
-
-                return (
-                  <div
-                    key={step.title}
-                    className="flex justify-center"
-                  >
-                    <div
-                      className="rounded-2xl border border-violet-400/15 bg-gradient-to-l from-violet-500/20 via-blue-500/10 to-cyan-500/10 p-4 transition hover:scale-[1.015]"
-                      style={{
-                        width: step.width,
-                      }}
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/20">
-                            <Icon
-                              size={18}
-                              weight="duotone"
-                              className="text-cyan-300"
-                            />
-                          </div>
-
-                          <div>
-                            <div className="text-xs text-white/35">
-                              مرحله {index + 1}
-                            </div>
-                            <div className="mt-0.5 text-sm font-semibold">
-                              {step.title}
-                            </div>
-                          </div>
-                        </div>
-
-                        <span className="text-sm font-semibold">
-                          {step.value}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
+        <section className="mt-8 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
           <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-semibold">
-                  روند رشد در ۳۰ روز گذشته
+                  روند سلامت کسب‌وکار
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  تغییرات درآمد، مشتری و فروش
+                  تغییر امتیاز کلی در دوره‌های اخیر
                 </p>
               </div>
 
-              <span className="rounded-full border border-emerald-400/10 bg-emerald-500/[0.08] px-3 py-1.5 text-xs text-emerald-300">
-                +۲۱٪ رشد
+              <span className="rounded-full border border-cyan-400/10 bg-cyan-500/[0.07] px-4 py-2 text-xs text-cyan-300">
+                {period}
               </span>
             </div>
 
-            <div className="relative mt-8 h-[300px] overflow-hidden rounded-[24px] border border-white/[0.05] bg-black/20 p-6">
+            <div className="relative mt-8 h-[290px] overflow-hidden rounded-[24px] border border-white/[0.05] bg-black/20 p-6">
               <div className="pointer-events-none absolute inset-0 grid grid-rows-4">
                 <div className="border-b border-white/[0.04]" />
                 <div className="border-b border-white/[0.04]" />
@@ -420,92 +539,304 @@ export default function KPIPage() {
               </div>
 
               <div className="relative flex h-full items-end gap-4">
-                {growthBars.map((height, index) => (
-                  <div
-                    key={index}
-                    className="group flex h-full flex-1 items-end"
-                  >
+                {scoreHistory.map(
+                  (score, index) => (
                     <div
-                      className="w-full rounded-t-xl bg-gradient-to-t from-violet-600/60 via-blue-500/75 to-cyan-300/90 transition duration-300 group-hover:opacity-80"
-                      style={{
-                        height: `${height}%`,
-                      }}
-                    />
-                  </div>
-                ))}
+                      key={index}
+                      className="flex h-full flex-1 items-end"
+                    >
+                      <div
+                        className="w-full rounded-t-xl bg-gradient-to-t from-violet-600/60 via-blue-500/80 to-cyan-300/90"
+                        style={{
+                          height: `${score}%`,
+                        }}
+                      />
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* AI SUMMARY */}
+
+          <aside className="rounded-[30px] border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.08] via-[#080d1d]/70 to-cyan-500/[0.04] p-7 backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <Sparkle
+                size={22}
+                weight="fill"
+                className="text-violet-300"
+              />
+
+              <div>
+                <h2 className="text-xl font-semibold">
+                  تحلیل Loadder
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  خلاصه وضعیت فعلی
+                </p>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-4 text-center text-xs text-white/35">
-              <span>هفته اول</span>
-              <span>هفته دوم</span>
-              <span>هفته سوم</span>
-              <span>هفته چهارم</span>
+            <p className="mt-6 text-sm leading-8 text-white/55">
+              سلامت کلی کسب‌وکار مناسب است.
+              فروش و جذب مشتری روند مثبت
+              دارند اما نرخ تبدیل هنوز
+              ظرفیت بهبود دارد.
+            </p>
+
+            <div className="mt-6 space-y-3">
+              <InsightRow
+                icon={CheckCircle}
+                title="نقطه قوت"
+                value="فروش و بازاریابی"
+                positive
+              />
+
+              <InsightRow
+                icon={WarningCircle}
+                title="نیاز به توجه"
+                value="نرخ تبدیل"
+              />
+
+              <InsightRow
+                icon={Lightning}
+                title="فرصت فوری"
+                value="پیگیری لیدهای داغ"
+                positive
+              />
             </div>
+          </aside>
+        </section>
+
+        {/* ENGINES */}
+
+        <section className="mt-8">
+          <div>
+            <h2 className="text-xl font-semibold">
+              موتورهای کسب‌وکار
+            </h2>
+
+            <p className="mt-1 text-sm text-white/40">
+              هر بخش را برای مشاهده جزئیات انتخاب کن.
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            {engines.map((engine) => {
+              const Icon = engine.icon;
+              const active =
+                activeEngine === engine.title;
+
+              return (
+                <button
+                  key={engine.title}
+                  type="button"
+                  onClick={() =>
+                    setActiveEngine(
+                      engine.title
+                    )
+                  }
+                  className={`rounded-[22px] border p-5 text-right transition ${
+                    active
+                      ? "border-violet-400/30 bg-violet-500/[0.10]"
+                      : "border-white/[0.07] bg-[#080d1d]/55 hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <Icon
+                      size={21}
+                      weight="duotone"
+                      className={
+                        active
+                          ? "text-cyan-300"
+                          : "text-white/35"
+                      }
+                    />
+
+                    <span className="text-lg font-bold">
+                      {percent(
+                        engine.score
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 text-sm font-semibold">
+                    {engine.title}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
 
-        {/* GROWTH ENGINES */}
-        <section className="mt-8">
-          <div className="flex items-end justify-between">
+        {/* ENGINE DETAIL */}
+
+        <section className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_1fr]">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  {currentEngine.title}
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  {currentEngine.description}
+                </p>
+              </div>
+
+              <div className="text-4xl font-bold text-cyan-300">
+                {percent(
+                  currentEngine.score
+                )}
+              </div>
+            </div>
+
+            <div className="mt-7 grid gap-4 md:grid-cols-2">
+              {currentEngine.items.map(
+                (item) => (
+                  <EngineMetric
+                    key={item.title}
+                    title={item.title}
+                    value={item.value}
+                  />
+                )
+              )}
+            </div>
+          </div>
+
+          <aside className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <Target
+                size={22}
+                weight="duotone"
+                className="text-violet-300"
+              />
+
+              <div>
+                <h2 className="text-xl font-semibold">
+                  هدف فعلی
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  اولویت کسب‌وکار
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-violet-300/10 bg-violet-500/[0.06] p-5">
+              <div className="text-xs text-white/35">
+                هدف اصلی
+              </div>
+
+              <div className="mt-2 text-xl font-bold">
+                {businessData.goals.primary}
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {businessData.goals.secondary.map(
+                (goal) => (
+                  <div
+                    key={goal}
+                    className="rounded-xl border border-white/[0.06] bg-black/20 p-4 text-sm text-white/55"
+                  >
+                    {goal}
+                  </div>
+                )
+              )}
+            </div>
+          </aside>
+        </section>
+
+        {/* FUNNEL */}
+
+        <section className="mt-8 rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            <Funnel
+              size={23}
+              weight="duotone"
+              className="text-violet-300"
+            />
+
             <div>
               <h2 className="text-xl font-semibold">
-                موتورهای رشد کسب‌وکار
+                قیف رشد
               </h2>
 
               <p className="mt-1 text-sm text-white/40">
-                بررسی عملکرد بخش‌های اصلی
+                حرکت مخاطب از دیده‌شدن تا خرید
               </p>
             </div>
-
-            <div className="flex items-center gap-2 text-xs text-cyan-300/75">
-              <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,.8)]" />
-              تحلیل هوشمند فعال
-            </div>
           </div>
 
-          <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {engines.map((engine) => (
-              <EngineCard
-                key={engine.title}
-                {...engine}
-              />
-            ))}
+          <div className="mt-7 grid gap-4 md:grid-cols-5">
+            {funnelItems.map(
+              (item, index) => (
+                <FunnelMetric
+                  key={item.title}
+                  index={index + 1}
+                  title={item.title}
+                  value={toFa(
+                    item.value
+                  )}
+                />
+              )
+            )}
           </div>
         </section>
 
-        {/* INSIGHTS */}
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
-          <InsightCard
-            icon={CheckCircle}
-            title="نقطه قوت"
-            text="رشد مشتریان و درآمد در وضعیت خوبی قرار دارد."
-            tone="success"
+        {/* DATA QUALITY */}
+
+        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <HealthBox
+            icon={Eye}
+            title="کیفیت داده"
+            value={
+              businessData.business
+                .dataQuality
+            }
           />
 
-          <InsightCard
+          <HealthBox
+            icon={TrendUp}
+            title="آمادگی رشد"
+            value={
+              businessData.business
+                .growthReadiness
+            }
+          />
+
+          <HealthBox
             icon={WarningCircle}
-            title="نیاز به توجه"
-            text="نرخ تبدیل صفحه فروش پایین‌تر از هدف تعیین‌شده است."
-            tone="warning"
+            title="ریسک"
+            value={
+              businessData.business
+                .riskScore
+            }
+            danger
           />
 
-          <InsightCard
-            icon={Sparkle}
-            title="فرصت رشد"
-            text="محتوای آموزشی بیشترین پتانسیل افزایش تعامل را دارد."
-            tone="ai"
+          <HealthBox
+            icon={ChartLineUp}
+            title="عملکرد محتوا"
+            value={
+              businessData.content
+                .performanceScore
+            }
           />
         </section>
 
-        {/* AI ADVISOR */}
+        {/* AI ACTION */}
+
         <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8 backdrop-blur-xl">
-          <div className="grid gap-8 xl:grid-cols-[1fr_370px]">
+          <div className="grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.08]">
                   <Brain
-                    size={25}
+                    size={26}
                     weight="duotone"
                     className="text-violet-300"
                   />
@@ -513,255 +844,295 @@ export default function KPIPage() {
 
                 <div>
                   <h2 className="text-2xl font-bold">
-                    مشاور هوشمند Loadder
+                    تصمیم بعدی Loadder
                   </h2>
 
                   <p className="mt-1 text-sm text-white/40">
-                    ترجمه داده‌ها به تصمیم قابل اجرا
+                    KPI را به اقدام تبدیل کن
                   </p>
                 </div>
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                روند رشد کسب‌وکار مثبت است، اما نرخ تبدیل بازدیدکننده به
-                مشتری پایین‌تر از ظرفیت فعلی است. پیشنهاد Loadder این است
-                که پیام صفحه فروش بهینه شود، محتوای آموزشی بیشتری تولید شود
-                و بخشی از بودجه تبلیغات به کانال‌های پربازده منتقل شود.
+                با توجه به داده فعلی،
+                مهم‌ترین فرصت رشد افزایش نرخ
+                تبدیل و پیگیری سریع‌تر
+                مشتریان بالقوه است.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
-                <ActionSuggestion
-                  title="بهبود صفحه فروش"
-                  effect="+۱۱٪ تبدیل احتمالی"
+                <ActionMetric
+                  title="اولویت اول"
+                  value="بهبود نرخ تبدیل"
                 />
 
-                <ActionSuggestion
-                  title="پیگیری لیدهای داغ"
-                  effect="+۸ مشتری احتمالی"
+                <ActionMetric
+                  title="اولویت دوم"
+                  value={`${toFa(
+                    businessData.crm
+                      .hotLeads
+                  )} لید داغ`}
                 />
 
-                <ActionSuggestion
-                  title="تقویت محتوای آموزشی"
-                  effect="+۱۲٪ تعامل احتمالی"
+                <ActionMetric
+                  title="اولویت سوم"
+                  value="کاهش هزینه جذب"
                 />
               </div>
             </div>
 
             <div className="rounded-[26px] border border-white/[0.08] bg-black/20 p-6">
-              <div className="flex items-center gap-2">
-                <Lightning
-                  size={20}
-                  weight="duotone"
-                  className="text-cyan-300"
-                />
-
-                <span className="font-semibold">
-                  اقدام بعدی
-                </span>
+              <div className="font-semibold">
+                اقدام پیشنهادی
               </div>
 
               <div className="mt-5 space-y-3">
                 <button
                   type="button"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/60 transition hover:bg-white/[0.06]"
+                  onClick={() =>
+                    showNotice(
+                      "تحلیل جزئی KPI در مرحله بعد فعال می‌شود."
+                    )
+                  }
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/60"
                 >
-                  فقط تحلیل کن
+                  مشاهده تحلیل کامل
                 </button>
 
-                <button
-                  type="button"
-                  className="w-full rounded-xl border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-3 text-sm text-cyan-200 transition hover:bg-cyan-500/[0.12]"
+                <Link
+                  to="/dashboard/predictive"
+                  className="block w-full rounded-xl border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-3 text-center text-sm text-cyan-200"
                 >
-                  پیشنهاد بده
-                </button>
+                  پیش‌بینی نتیجه
+                </Link>
 
-                <button
-                  type="button"
-                  className="w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold shadow-[0_10px_30px_rgba(99,102,241,.2)]"
+                <Link
+                  to="/dashboard/business-brain"
+                  className="block w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-center text-sm font-semibold"
                 >
-                  اجرا با تأیید من
-                </button>
+                  ورود به مغز هوشمند
+                </Link>
               </div>
             </div>
           </div>
         </section>
       </div>
+
+      {notice && (
+        <div className="fixed bottom-7 left-7 z-[100] max-w-md rounded-2xl border border-violet-300/20 bg-[#090e1e]/95 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
+          {notice}
+        </div>
+      )}
     </main>
   );
 }
 
-function HealthCardComponent({
+function MetricCard({
+  metric,
+}: {
+  metric: Metric;
+}) {
+  const Icon = metric.icon;
+
+  const statusClass =
+    metric.status === "خوب"
+      ? "text-emerald-300"
+      : metric.status ===
+          "نیاز به توجه"
+        ? "text-amber-300"
+        : "text-red-300";
+
+  return (
+    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-white/40">
+          {metric.title}
+        </span>
+
+        <Icon
+          size={21}
+          weight="duotone"
+          className="text-cyan-300"
+        />
+      </div>
+
+      <div className="mt-4 text-2xl font-bold">
+        {metric.value}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="text-xs text-emerald-300">
+          {metric.change}
+        </span>
+
+        <span
+          className={`text-xs ${statusClass}`}
+        >
+          {metric.status}
+        </span>
+      </div>
+
+      <p className="mt-4 text-xs leading-6 text-white/35">
+        {metric.description}
+      </p>
+    </div>
+  );
+}
+
+function InsightRow({
+  icon: Icon,
   title,
   value,
-  description,
-  icon: Icon,
-}: HealthCard) {
+  positive = false,
+}: {
+  icon: React.ElementType;
+  title: string;
+  value: string;
+  positive?: boolean;
+}) {
   return (
-    <div className="rounded-[26px] border border-white/[0.08] bg-[#080d1d]/65 p-6 backdrop-blur-xl">
-      <div className="flex items-start justify-between">
+    <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <Icon
+        size={19}
+        weight="duotone"
+        className={
+          positive
+            ? "text-emerald-300"
+            : "text-amber-300"
+        }
+      />
+
+      <div>
+        <div className="text-xs text-white/30">
+          {title}
+        </div>
+
+        <div className="mt-1 text-sm font-semibold">
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EngineMetric({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5">
+      <div className="text-xs text-white/35">
+        {title}
+      </div>
+
+      <div className="mt-2 text-lg font-bold">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function FunnelMetric({
+  index,
+  title,
+  value,
+}: {
+  index: number;
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5 text-center">
+      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/[0.10] text-sm text-violet-300">
+        {index.toLocaleString("fa-IR")}
+      </div>
+
+      <div className="mt-4 text-xs text-white/35">
+        {title}
+      </div>
+
+      <div className="mt-2 text-xl font-bold">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function HealthBox({
+  icon: Icon,
+  title,
+  value,
+  danger = false,
+}: {
+  icon: React.ElementType;
+  title: string;
+  value: number;
+  danger?: boolean;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
+      <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm text-white/45">
+          <div className="text-sm text-white/40">
             {title}
           </div>
 
-          <div className="mt-4 text-4xl font-bold">
-            {value}٪
+          <div
+            className={`mt-3 text-3xl font-bold ${
+              danger
+                ? "text-amber-300"
+                : "text-cyan-300"
+            }`}
+          >
+            {percent(value)}
           </div>
         </div>
 
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-violet-300/10 bg-gradient-to-br from-violet-500/15 to-cyan-500/10">
-          <Icon
-            size={21}
-            weight="duotone"
-            className="text-cyan-300"
-          />
-        </div>
+        <Icon
+          size={22}
+          weight="duotone"
+          className={
+            danger
+              ? "text-amber-300"
+              : "text-violet-300"
+          }
+        />
       </div>
 
-      <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
         <div
-          className="h-full rounded-full bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-300"
+          className={`h-full rounded-full ${
+            danger
+              ? "bg-gradient-to-l from-amber-500 to-red-400"
+              : "bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-300"
+          }`}
           style={{
             width: `${value}%`,
           }}
         />
       </div>
-
-      <p className="mt-4 text-sm leading-7 text-white/40">
-        {description}
-      </p>
     </div>
   );
 }
 
-function MetricCard({
+function ActionMetric({
   title,
   value,
-  change,
-}: Metric) {
-  return (
-    <div className="rounded-[22px] border border-white/[0.08] bg-[#080d1d]/58 p-5 backdrop-blur-xl">
-      <div className="text-sm text-white/40">
-        {title}
-      </div>
-
-      <div className="mt-3 text-2xl font-bold">
-        {value}
-      </div>
-
-      {change && (
-        <div className="mt-2 text-xs text-emerald-300">
-          {change} نسبت به دوره قبل
-        </div>
-      )}
-
-      <div className="mt-4 h-1 rounded-full bg-gradient-to-l from-violet-500 to-cyan-300" />
-    </div>
-  );
-}
-
-function EngineCard({
-  title,
-  score,
-  icon: Icon,
-  items,
-}: Engine) {
-  return (
-    <div className="rounded-[28px] border border-white/[0.08] bg-[#080d1d]/65 p-6 backdrop-blur-xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-violet-300/10 bg-violet-500/[0.08]">
-            <Icon
-              size={21}
-              weight="duotone"
-              className="text-violet-300"
-            />
-          </div>
-
-          <h3 className="font-semibold">
-            {title}
-          </h3>
-        </div>
-
-        <span className="text-xl font-bold text-cyan-300">
-          {score}
-        </span>
-      </div>
-
-      <div className="mt-5 space-y-3">
-        {items.map(([label, value]) => (
-          <div
-            key={label}
-            className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-black/20 p-3"
-          >
-            <span className="text-sm text-white/40">
-              {label}
-            </span>
-
-            <span className="text-sm font-semibold">
-              {value}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function InsightCard({
-  icon: Icon,
-  title,
-  text,
-  tone,
-}: {
-  icon: React.ElementType;
-  title: string;
-  text: string;
-  tone: "success" | "warning" | "ai";
-}) {
-  const className =
-    tone === "success"
-      ? "border-emerald-400/15 bg-emerald-500/[0.05]"
-      : tone === "warning"
-        ? "border-amber-400/15 bg-amber-500/[0.05]"
-        : "border-violet-400/15 bg-violet-500/[0.05]";
-
-  return (
-    <div
-      className={`rounded-[24px] border p-5 backdrop-blur-xl ${className}`}
-    >
-      <Icon
-        size={22}
-        weight="duotone"
-        className="text-cyan-300"
-      />
-
-      <h3 className="mt-4 font-semibold">
-        {title}
-      </h3>
-
-      <p className="mt-2 text-sm leading-7 text-white/45">
-        {text}
-      </p>
-    </div>
-  );
-}
-
-function ActionSuggestion({
-  title,
-  effect,
 }: {
   title: string;
-  effect: string;
+  value: string;
 }) {
   return (
     <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-4">
-      <div className="text-sm font-semibold">
+      <div className="text-xs text-white/35">
         {title}
       </div>
 
-      <div className="mt-2 text-xs text-cyan-300">
-        {effect}
+      <div className="mt-2 text-sm font-semibold">
+        {value}
       </div>
     </div>
   );
