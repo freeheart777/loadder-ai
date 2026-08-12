@@ -44,6 +44,7 @@ type CustomerSummary = {
   activeCarts: number;
   lifetimeValue: number;
   riskScore: number;
+  workflowExecutions: number;
 };
 
 type Order = {
@@ -76,12 +77,28 @@ type CustomerEvent = {
   createdAt: string;
 };
 
+type WorkflowExecution = {
+  id: string;
+  timestamp: string;
+  eventId: string | null;
+  eventType: string;
+  workflowId: string | null;
+  workflowTitle: string | null;
+  actionType: string;
+  channel: string | null;
+  template: string | null;
+  recipient: string | null;
+  status: string;
+  result: Record<string, unknown>;
+};
+
 type Customer360Data = {
   customer: Customer;
   summary: CustomerSummary;
   orders: Order[];
   carts: Cart[];
   events: CustomerEvent[];
+  executions: WorkflowExecution[];
 };
 
 type Customer360Response = {
@@ -326,7 +343,13 @@ export default function CustomerProfilePage() {
     );
   }
 
-  const { customer, summary, orders, carts } = data;
+  const {
+    customer,
+    summary,
+    orders,
+    carts,
+    executions,
+  } = data;
 
   return (
     <main
@@ -357,7 +380,7 @@ export default function CustomerProfilePage() {
               </h1>
 
               <p className="mt-1 text-sm text-white/45">
-                تصویر کامل رفتار، خرید و ارزش مشتری
+                تصویر کامل رفتار، خرید، ارزش و اتوماسیون مشتری
               </p>
             </div>
           </div>
@@ -448,9 +471,11 @@ export default function CustomerProfilePage() {
               </div>
 
               <p className="mt-4 text-sm leading-8 text-white/50">
-                این مشتری {faNumber(summary.completedOrders)} خرید موفق
-                و {faNumber(summary.abandonedCarts)} سبد خرید رهاشده
-                دارد. ارزش طول عمر فعلی او{" "}
+                این مشتری {faNumber(summary.completedOrders)} خرید موفق،
+                {` ${faNumber(summary.abandonedCarts)} `}
+                سبد خرید رهاشده و
+                {` ${faNumber(summary.workflowExecutions)} `}
+                اجرای Workflow دارد. ارزش طول عمر او{" "}
                 {faMoney(summary.lifetimeValue)} و ریسک ریزش{" "}
                 {faNumber(summary.riskScore)} است.
               </p>
@@ -478,9 +503,9 @@ export default function CustomerProfilePage() {
           />
 
           <StatCard
-            title="سبد رهاشده"
-            value={faNumber(summary.abandonedCarts)}
-            icon={ShoppingCart}
+            title="اجرای Workflow"
+            value={faNumber(summary.workflowExecutions)}
+            icon={Lightning}
           />
         </section>
 
@@ -501,22 +526,27 @@ export default function CustomerProfilePage() {
 
               <div className="mt-6 space-y-3">
                 <DetailRow title="نام" value={customer.name} />
+
                 <DetailRow
                   title="شرکت"
                   value={customer.company ?? "—"}
                 />
+
                 <DetailRow
                   title="شماره تماس"
                   value={customer.phone ?? "—"}
                 />
+
                 <DetailRow
                   title="ایمیل"
                   value={customer.email ?? "—"}
                 />
+
                 <DetailRow
                   title="منبع جذب"
                   value={sourceToFa(customer.source)}
                 />
+
                 <DetailRow
                   title="آخرین خرید"
                   value={faDate(customer.lastPurchaseAt)}
@@ -664,6 +694,45 @@ export default function CustomerProfilePage() {
           </div>
         </section>
 
+        <section className="mt-8 rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <Lightning
+                  size={23}
+                  weight="duotone"
+                  className="text-violet-300"
+                />
+
+                <h2 className="text-xl font-semibold">
+                  تاریخچه اتوماسیون مشتری
+                </h2>
+              </div>
+
+              <p className="mt-2 text-sm text-white/40">
+                Workflowها و Actionهایی که Loadder برای این مشتری اجرا کرده
+              </p>
+            </div>
+
+            <div className="rounded-full border border-violet-400/15 bg-violet-500/[0.07] px-4 py-2 text-xs text-violet-200">
+              {faNumber(executions.length)} اجرا
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            {executions.length === 0 ? (
+              <EmptyState text="هنوز هیچ Workflowی برای این مشتری اجرا نشده است." />
+            ) : (
+              executions.map((execution) => (
+                <WorkflowExecutionRow
+                  key={execution.id}
+                  execution={execution}
+                />
+              ))
+            )}
+          </div>
+        </section>
+
         <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8">
           <div className="grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
@@ -682,15 +751,15 @@ export default function CustomerProfilePage() {
                   </h2>
 
                   <p className="mt-1 text-sm text-white/40">
-                    CRM → رفتار → Automation
+                    CRM → رفتار → Workflow → Action
                   </p>
                 </div>
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                Loadder حالا برای هر مشتری یک تصویر واقعی از خرید،
-                سبدهای رهاشده، ارزش طول عمر، ریسک و رفتارهای ثبت‌شده
-                دارد.
+                Loadder حالا علاوه بر خرید و رفتار مشتری، تمام Workflowها
+                و Actionهای اجراشده برای همان مشتری را نیز داخل پروفایل
+                او نمایش می‌دهد.
               </p>
             </div>
 
@@ -711,7 +780,7 @@ export default function CustomerProfilePage() {
                   type="button"
                   onClick={() =>
                     showNotice(
-                      "ارسال پیام مستقیم در مرحله اتصال کانال واقعی فعال می‌شود."
+                      "ارسال پیام مستقیم در مرحله بعد به Messaging Engine وصل می‌شود."
                     )
                   }
                   className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/60"
@@ -911,6 +980,102 @@ function CartRow({
         >
           {isAbandoned ? "رهاشده" : "فعال"}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowExecutionRow({
+  execution,
+}: {
+  execution: WorkflowExecution;
+}) {
+  const actionMap: Record<string, string> = {
+    send_message: "ارسال پیام",
+    send_offer: "ارسال پیشنهاد",
+    create_task: "ساخت وظیفه",
+    create_campaign: "ساخت کمپین",
+    create_alert: "ایجاد هشدار",
+  };
+
+  const channelMap: Record<string, string> = {
+    sms: "پیامک",
+    email: "ایمیل",
+    crm: "CRM",
+    dashboard: "داشبورد",
+  };
+
+  const isSuccess =
+    execution.status === "completed" ||
+    execution.status === "simulated";
+
+  return (
+    <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
+              isSuccess
+                ? "border-emerald-400/15 bg-emerald-500/[0.07]"
+                : "border-amber-400/15 bg-amber-500/[0.07]"
+            }`}
+          >
+            <Lightning
+              size={20}
+              weight="duotone"
+              className={
+                isSuccess
+                  ? "text-emerald-300"
+                  : "text-amber-300"
+              }
+            />
+          </div>
+
+          <div>
+            <div className="font-semibold">
+              {execution.workflowTitle ??
+                "Workflow بدون عنوان"}
+            </div>
+
+            <div className="mt-2 text-xs text-white/35">
+              {actionMap[execution.actionType] ??
+                execution.actionType}
+
+              {execution.channel
+                ? ` • ${
+                    channelMap[execution.channel] ??
+                    execution.channel
+                  }`
+                : ""}
+            </div>
+
+            {execution.recipient && (
+              <div className="mt-1 text-xs text-white/30">
+                مقصد: {execution.recipient}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="text-xs text-white/30">
+            {faDate(execution.timestamp)}
+          </div>
+
+          <span
+            className={`rounded-full border px-3 py-1.5 text-xs ${
+              isSuccess
+                ? "border-emerald-400/15 bg-emerald-500/[0.07] text-emerald-300"
+                : "border-amber-400/15 bg-amber-500/[0.07] text-amber-300"
+            }`}
+          >
+            {execution.status === "simulated"
+              ? "آزمایشی"
+              : execution.status === "completed"
+                ? "انجام‌شده"
+                : execution.status}
+          </span>
+        </div>
       </div>
     </div>
   );

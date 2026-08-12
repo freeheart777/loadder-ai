@@ -6,10 +6,7 @@ import crypto from "crypto";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const databasePath = path.join(
-  __dirname,
-  "loadder.sqlite"
-);
+const databasePath = path.join(__dirname, "loadder.sqlite");
 
 const db = new Database(databasePath);
 
@@ -145,14 +142,8 @@ function mapAutomation(row) {
     trigger: row.trigger,
     enabled: Boolean(row.enabled),
     delayMinutes: row.delay_minutes,
-    conditions: parseJson(
-      row.conditions_json,
-      []
-    ),
-    actions: parseJson(
-      row.actions_json,
-      []
-    ),
+    conditions: parseJson(row.conditions_json, []),
+    actions: parseJson(row.actions_json, []),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -171,10 +162,7 @@ function mapExecution(row) {
     template: row.template,
     recipient: row.recipient,
     status: row.status,
-    result: parseJson(
-      row.result_json,
-      {}
-    ),
+    result: parseJson(row.result_json, {}),
   };
 }
 
@@ -245,10 +233,7 @@ function mapCustomerEvent(row) {
     id: row.id,
     customerId: row.customer_id,
     type: row.type,
-    metadata: parseJson(
-      row.metadata_json,
-      {}
-    ),
+    metadata: parseJson(row.metadata_json, {}),
     createdAt: row.created_at,
   };
 }
@@ -319,14 +304,12 @@ export function createAutomation({
   return getAutomationById(id);
 }
 
-export function updateAutomation(
-  id,
-  updates
-) {
-  const current =
-    getAutomationById(id);
+export function updateAutomation(id, updates) {
+  const current = getAutomationById(id);
 
-  if (!current) return null;
+  if (!current) {
+    return null;
+  }
 
   const next = {
     ...current,
@@ -378,10 +361,10 @@ export function automationCount() {
     .get().count;
 }
 
-export function seedDefaultAutomations(
-  automations
-) {
-  if (automationCount() > 0) return;
+export function seedDefaultAutomations(automations) {
+  if (automationCount() > 0) {
+    return;
+  }
 
   db.transaction(() => {
     for (const automation of automations) {
@@ -446,9 +429,7 @@ export function saveExecution(execution) {
   );
 }
 
-export function getExecutions(
-  limit = 100
-) {
+export function getExecutions(limit = 100) {
   return db
     .prepare(`
       SELECT *
@@ -458,6 +439,44 @@ export function getExecutions(
     `)
     .all(limit)
     .map(mapExecution);
+}
+
+export function getExecutionsByCustomerId(customerId) {
+  const rows = db
+    .prepare(`
+      SELECT
+        executions.*,
+        events.payload_json AS event_payload_json
+      FROM executions
+      LEFT JOIN events
+        ON events.id = executions.event_id
+      ORDER BY executions.created_at DESC
+    `)
+    .all();
+
+  return rows
+    .filter((row) => {
+      const payload = parseJson(
+        row.event_payload_json,
+        {}
+      );
+
+      return payload.customerId === customerId;
+    })
+    .map((row) => ({
+      id: row.id,
+      timestamp: row.created_at,
+      eventId: row.event_id,
+      eventType: row.event_type,
+      workflowId: row.workflow_id,
+      workflowTitle: row.workflow_title,
+      actionType: row.action_type,
+      channel: row.channel,
+      template: row.template,
+      recipient: row.recipient,
+      status: row.status,
+      result: parseJson(row.result_json, {}),
+    }));
 }
 
 export function clearExecutions() {
@@ -607,13 +626,15 @@ export function createLead({
     timestamp
   );
 
-  return db
+  const row = db
     .prepare(`
       SELECT *
       FROM leads
       WHERE id = ?
     `)
     .get(id);
+
+  return row ? mapLead(row) : null;
 }
 
 /* =========================================================
@@ -628,6 +649,18 @@ export function getOrders() {
       ORDER BY created_at DESC
     `)
     .all()
+    .map(mapOrder);
+}
+
+export function getOrdersByCustomerId(customerId) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM orders
+      WHERE customer_id = ?
+      ORDER BY created_at DESC
+    `)
+    .all(customerId)
     .map(mapOrder);
 }
 
@@ -664,13 +697,15 @@ export function createOrder({
     timestamp
   );
 
-  return db
+  const row = db
     .prepare(`
       SELECT *
       FROM orders
       WHERE id = ?
     `)
     .get(id);
+
+  return row ? mapOrder(row) : null;
 }
 
 /* =========================================================
@@ -685,6 +720,18 @@ export function getCarts() {
       ORDER BY created_at DESC
     `)
     .all()
+    .map(mapCart);
+}
+
+export function getCartsByCustomerId(customerId) {
+  return db
+    .prepare(`
+      SELECT *
+      FROM carts
+      WHERE customer_id = ?
+      ORDER BY created_at DESC
+    `)
+    .all(customerId)
     .map(mapCart);
 }
 
@@ -721,22 +768,22 @@ export function createCart({
     timestamp
   );
 
-  return db
+  const row = db
     .prepare(`
       SELECT *
       FROM carts
       WHERE id = ?
     `)
     .get(id);
+
+  return row ? mapCart(row) : null;
 }
 
 /* =========================================================
    CUSTOMER EVENTS
 ========================================================= */
 
-export function getCustomerEvents(
-  customerId
-) {
+export function getCustomerEvents(customerId) {
   return db
     .prepare(`
       SELECT *
@@ -783,7 +830,61 @@ export function createCustomerEvent({
 }
 
 /* =========================================================
-   DASHBOARD STATS
+   CUSTOMER 360
+========================================================= */
+
+export function getCustomer360(customerId) {
+  const customer = getCustomerById(customerId);
+
+  if (!customer) {
+    return null;
+  }
+
+  const orders = getOrdersByCustomerId(customerId);
+  const carts = getCartsByCustomerId(customerId);
+  const events = getCustomerEvents(customerId);
+  const executions = getExecutionsByCustomerId(customerId);
+
+  const completedOrders = orders.filter(
+    (order) => order.status === "completed"
+  );
+
+  const totalRevenue = completedOrders.reduce(
+    (sum, order) => sum + order.totalAmount,
+    0
+  );
+
+  const abandonedCarts = carts.filter(
+    (cart) => cart.status === "abandoned"
+  );
+
+  const activeCarts = carts.filter(
+    (cart) => cart.status === "active"
+  );
+
+  return {
+    customer,
+
+    summary: {
+      ordersCount: orders.length,
+      completedOrders: completedOrders.length,
+      totalRevenue,
+      abandonedCarts: abandonedCarts.length,
+      activeCarts: activeCarts.length,
+      lifetimeValue: customer.lifetimeValue,
+      riskScore: customer.riskScore,
+      workflowExecutions: executions.length,
+    },
+
+    orders,
+    carts,
+    events,
+    executions,
+  };
+}
+
+/* =========================================================
+   CRM STATS
 ========================================================= */
 
 export function getCRMStats() {
@@ -962,78 +1063,5 @@ export function seedCRMData() {
     });
   })();
 }
-/* =========================================================
-   CUSTOMER 360
-========================================================= */
 
-export function getOrdersByCustomerId(customerId) {
-  return db
-    .prepare(`
-      SELECT *
-      FROM orders
-      WHERE customer_id = ?
-      ORDER BY created_at DESC
-    `)
-    .all(customerId)
-    .map(mapOrder);
-}
-
-export function getCartsByCustomerId(customerId) {
-  return db
-    .prepare(`
-      SELECT *
-      FROM carts
-      WHERE customer_id = ?
-      ORDER BY created_at DESC
-    `)
-    .all(customerId)
-    .map(mapCart);
-}
-
-export function getCustomer360(customerId) {
-  const customer = getCustomerById(customerId);
-
-  if (!customer) {
-    return null;
-  }
-
-  const orders = getOrdersByCustomerId(customerId);
-  const carts = getCartsByCustomerId(customerId);
-  const events = getCustomerEvents(customerId);
-
-  const completedOrders = orders.filter(
-    (order) => order.status === "completed"
-  );
-
-  const totalRevenue = completedOrders.reduce(
-    (sum, order) => sum + order.totalAmount,
-    0
-  );
-
-  const abandonedCarts = carts.filter(
-    (cart) => cart.status === "abandoned"
-  );
-
-  const activeCarts = carts.filter(
-    (cart) => cart.status === "active"
-  );
-
-  return {
-    customer,
-
-    summary: {
-      ordersCount: orders.length,
-      completedOrders: completedOrders.length,
-      totalRevenue,
-      abandonedCarts: abandonedCarts.length,
-      activeCarts: activeCarts.length,
-      lifetimeValue: customer.lifetimeValue,
-      riskScore: customer.riskScore,
-    },
-
-    orders,
-    carts,
-    events,
-  };
-}
 export default db;
