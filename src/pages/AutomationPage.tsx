@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -13,7 +13,6 @@ import {
   CheckCircle,
   Megaphone,
   Target,
-  Clock,
   Play,
   Pause,
   Plus,
@@ -21,26 +20,134 @@ import {
   Storefront,
   CurrencyCircleDollar,
   TrendDown,
-  TrendUp,
   ChatCircleText,
   Phone,
   EnvelopeSimple,
+  Database,
+  ClockCounterClockwise,
+  Trash,
+  X,
+  CaretDown,
 } from "@phosphor-icons/react";
 
 import { businessData } from "../data/businessData";
 
-type AutomationStatus = "فعال" | "متوقف" | "پیشنهادی";
+type AutomationStatus = "فعال" | "متوقف";
 
-type AutomationItem = {
+type BackendCondition = {
+  field: string;
+  operator: string;
+  value: string | number;
+};
+
+type BackendAction = {
+  type: string;
+  channel?: string;
+  template?: string;
+  assignee?: string;
+};
+
+type BackendAutomation = {
   id: string;
   title: string;
-  description: string;
   trigger: string;
-  action: string;
-  status: AutomationStatus;
-  icon: React.ElementType;
-  audience: string;
+  enabled: boolean;
+  delayMinutes: number;
+  conditions: BackendCondition[];
+  actions: BackendAction[];
 };
+
+type ExecutionItem = {
+  id: string;
+  timestamp: string;
+  eventType: string;
+  actionType: string;
+  channel: string | null;
+  template: string | null;
+  status: string;
+};
+
+type AutomationResponse = {
+  ok: boolean;
+  count: number;
+  data: BackendAutomation[];
+};
+
+type ExecutionResponse = {
+  ok: boolean;
+  count: number;
+  data: ExecutionItem[];
+};
+
+type TriggerOption = {
+  value: string;
+  title: string;
+};
+
+type ActionOption = {
+  value: string;
+  title: string;
+};
+
+const API_BASE = "http://localhost:3001";
+
+const triggerOptions: TriggerOption[] = [
+  {
+    value: "cart.abandoned",
+    title: "سبد خرید رها شد",
+  },
+  {
+    value: "checkout.started",
+    title: "پرداخت شروع شد",
+  },
+  {
+    value: "order.completed",
+    title: "خرید با موفقیت انجام شد",
+  },
+  {
+    value: "customer.repeat_purchase",
+    title: "مشتری دوباره خرید کرد",
+  },
+  {
+    value: "lead.hot",
+    title: "لید داغ شناسایی شد",
+  },
+  {
+    value: "customer.churn_risk",
+    title: "ریسک ریزش مشتری بالا رفت",
+  },
+  {
+    value: "marketing.cac_high",
+    title: "هزینه جذب مشتری بالا رفت",
+  },
+  {
+    value: "website.conversion_drop",
+    title: "نرخ تبدیل سایت افت کرد",
+  },
+];
+
+const actionOptions: ActionOption[] = [
+  {
+    value: "send_message",
+    title: "پیام ارسال کن",
+  },
+  {
+    value: "create_task",
+    title: "برای تیم فروش وظیفه بساز",
+  },
+  {
+    value: "send_offer",
+    title: "پیشنهاد ویژه ارسال کن",
+  },
+  {
+    value: "create_campaign",
+    title: "کمپین بازگشت بساز",
+  },
+  {
+    value: "create_alert",
+    title: "هشدار داخل داشبورد بساز",
+  },
+];
 
 function faNumber(value: number) {
   return value.toLocaleString("fa-IR");
@@ -50,147 +157,544 @@ function faPercent(value: number) {
   return `${value.toLocaleString("fa-IR")}٪`;
 }
 
-const automationItems: AutomationItem[] = [
-  {
-    id: "abandoned-cart",
-    title: "بازیابی سبد خرید رهاشده",
-    description:
-      "اگر مشتری خرید را کامل نکرد، بعد از ۲ ساعت پیام یادآوری ارسال شود.",
-    trigger: `${faNumber(
-      businessData.ecommerce.abandonedCarts
-    )} سبد رهاشده`,
-    action: "پیام یادآوری خرید",
-    status: "فعال",
-    icon: ShoppingCart,
-    audience: "بازدیدکنندگان فروشگاه",
-  },
-  {
-    id: "hot-lead",
-    title: "پیگیری لیدهای داغ",
-    description:
-      "لیدهایی با امتیاز بالا به تیم فروش اختصاص داده شوند و یادآوری پیگیری ساخته شود.",
-    trigger: `${faNumber(
-      businessData.crm.hotLeads
-    )} لید داغ`,
-    action: "اختصاص به فروش + یادآوری",
-    status: "فعال",
-    icon: Target,
-    audience: "مشتریان بالقوه",
-  },
-  {
-    id: "purchase-followup",
-    title: "پیگیری پس از خرید",
-    description:
-      "بعد از خرید موفق، پیام تشکر و پیشنهاد خرید بعدی برای مشتری ارسال شود.",
-    trigger: `${faNumber(
-      businessData.ecommerce.completedPurchases
-    )} خرید موفق`,
-    action: "تشکر + پیشنهاد بعدی",
-    status: "فعال",
-    icon: CheckCircle,
-    audience: "خریداران آنلاین",
-  },
-  {
-    id: "repeat-buyer",
-    title: "پیشنهاد ویژه مشتری تکرارشونده",
-    description:
-      "مشتریانی که چند بار خرید کرده‌اند پیشنهاد اختصاصی دریافت کنند.",
-    trigger: `${faNumber(
-      businessData.ecommerce.repeatCustomers
-    )} مشتری تکرارشونده`,
-    action: "پیشنهاد ویژه",
-    status: "فعال",
-    icon: Repeat,
-    audience: "مشتریان وفادار",
-  },
-  {
-    id: "churn-risk",
-    title: "بازگشت مشتری در معرض ریزش",
-    description:
-      "اگر مشتری برای مدت مشخصی تعامل یا خرید نداشت، کمپین بازگشت فعال شود.",
-    trigger: `ریزش ${faPercent(
-      businessData.crm.churnRate
-    )}`,
-    action: "کمپین بازگشت مشتری",
-    status: "پیشنهادی",
-    icon: WarningCircle,
-    audience: "مشتریان غیرفعال",
-  },
-  {
-    id: "high-cac",
-    title: "هشدار افزایش هزینه جذب",
-    description:
-      "اگر هزینه جذب مشتری از حد تعیین‌شده عبور کرد، تیم بازاریابی هشدار دریافت کند.",
-    trigger: businessData.marketing.cacLabel,
-    action: "هشدار بازاریابی",
-    status: "پیشنهادی",
-    icon: CurrencyCircleDollar,
-    audience: "تیم بازاریابی",
-  },
-  {
-    id: "conversion-drop",
-    title: "هشدار افت نرخ تبدیل",
-    description:
-      "اگر نرخ تبدیل سایت کاهش پیدا کرد، تحلیل و پیشنهاد بهینه‌سازی ساخته شود.",
-    trigger: faPercent(
-      businessData.website.conversionRate
-    ),
-    action: "تحلیل + پیشنهاد بهینه‌سازی",
-    status: "پیشنهادی",
-    icon: TrendDown,
-    audience: "تیم رشد",
-  },
-];
+function triggerToFa(trigger: string) {
+  return (
+    triggerOptions.find((item) => item.value === trigger)?.title ??
+    trigger
+  );
+}
 
-const triggerFlow = [
-  {
-    number: "۱",
-    title: "رویداد",
-    description: "اتفاقی در سایت، CRM یا تبلیغات رخ می‌دهد",
-  },
-  {
-    number: "۲",
-    title: "شرط",
-    description: "Loadder بررسی می‌کند آیا شرایط اجرا برقرار است",
-  },
-  {
-    number: "۳",
-    title: "تصمیم",
-    description: "قانون یا Business Brain اقدام مناسب را انتخاب می‌کند",
-  },
-  {
-    number: "۴",
-    title: "اجرا",
-    description: "پیام، هشدار یا وظیفه ایجاد می‌شود",
-  },
-  {
-    number: "۵",
-    title: "اندازه‌گیری",
-    description: "نتیجه به KPI و Analytics برمی‌گردد",
-  },
-];
+function actionToFa(action: BackendAction) {
+  const found = actionOptions.find(
+    (item) => item.value === action.type
+  );
+
+  if (action.type === "send_message") {
+    const channel =
+      action.channel === "sms"
+        ? "پیامک"
+        : action.channel === "email"
+          ? "ایمیل"
+          : action.channel ?? "";
+
+    return `${found?.title ?? "ارسال پیام"} ${
+      channel ? `از طریق ${channel}` : ""
+    }`;
+  }
+
+  if (action.type === "create_task") {
+    return "برای تیم فروش وظیفه بساز";
+  }
+
+  return found?.title ?? action.type;
+}
+
+function getAutomationIcon(trigger: string) {
+  switch (trigger) {
+    case "cart.abandoned":
+      return ShoppingCart;
+
+    case "lead.hot":
+      return Target;
+
+    case "order.completed":
+      return CheckCircle;
+
+    case "customer.repeat_purchase":
+      return Repeat;
+
+    case "customer.churn_risk":
+      return WarningCircle;
+
+    case "marketing.cac_high":
+      return CurrencyCircleDollar;
+
+    case "website.conversion_drop":
+      return TrendDown;
+
+    default:
+      return Lightning;
+  }
+}
+
+function getStatus(item: BackendAutomation): AutomationStatus {
+  return item.enabled ? "فعال" : "متوقف";
+}
+
+function getAudience(trigger: string) {
+  switch (trigger) {
+    case "cart.abandoned":
+      return "بازدیدکنندگان فروشگاه";
+
+    case "checkout.started":
+      return "کاربران در حال پرداخت";
+
+    case "lead.hot":
+      return "مشتریان بالقوه";
+
+    case "order.completed":
+      return "خریداران آنلاین";
+
+    case "customer.repeat_purchase":
+      return "مشتریان وفادار";
+
+    case "customer.churn_risk":
+      return "مشتریان در معرض ریزش";
+
+    case "marketing.cac_high":
+      return "تیم بازاریابی";
+
+    case "website.conversion_drop":
+      return "تیم رشد";
+
+    default:
+      return "کسب‌وکار";
+  }
+}
+
+function getSuggestedPayload(trigger: string) {
+  switch (trigger) {
+    case "cart.abandoned":
+      return {
+        customerId: "customer-101",
+        cartValue: 4500000,
+      };
+
+    case "checkout.started":
+      return {
+        customerId: "customer-101",
+        checkoutValue: 4500000,
+      };
+
+    case "lead.hot":
+      return {
+        leadId: "lead-101",
+        score: 92,
+      };
+
+    case "order.completed":
+      return {
+        orderId: "order-101",
+        customerId: "customer-101",
+        amount: 3200000,
+      };
+
+    case "customer.repeat_purchase":
+      return {
+        customerId: "customer-101",
+        orderCount: 4,
+      };
+
+    case "customer.churn_risk":
+      return {
+        customerId: "customer-101",
+        riskScore: 82,
+      };
+
+    case "marketing.cac_high":
+      return {
+        cac: 550000,
+      };
+
+    case "website.conversion_drop":
+      return {
+        conversionRate: 4.9,
+      };
+
+    default:
+      return {};
+  }
+}
 
 export default function AutomationPage() {
-  const [selectedId, setSelectedId] = useState(
-    "abandoned-cart"
-  );
+  const [automations, setAutomations] =
+    useState<BackendAutomation[]>([]);
+
+  const [executions, setExecutions] =
+    useState<ExecutionItem[]>([]);
+
+  const [selectedId, setSelectedId] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const [runningId, setRunningId] =
+    useState<string | null>(null);
+
+  const [backendOnline, setBackendOnline] =
+    useState(false);
+
   const [notice, setNotice] = useState("");
 
-  const selectedAutomation = useMemo(
-    () =>
-      automationItems.find(
-        (item) => item.id === selectedId
-      ) ?? automationItems[0],
-    [selectedId]
-  );
+  const [builderOpen, setBuilderOpen] =
+    useState(false);
+
+  const [creating, setCreating] =
+    useState(false);
+
+  const [builderTitle, setBuilderTitle] =
+    useState("بازیابی فروش");
+
+  const [builderTrigger, setBuilderTrigger] =
+    useState("cart.abandoned");
+
+  const [builderDelay, setBuilderDelay] =
+    useState("120");
+
+  const [builderAction, setBuilderAction] =
+    useState("send_message");
+
+  const [builderChannel, setBuilderChannel] =
+    useState("sms");
+
+  const [builderConditionEnabled, setBuilderConditionEnabled] =
+    useState(true);
+
+  const [builderConditionField, setBuilderConditionField] =
+    useState("cartValue");
+
+  const [builderConditionOperator, setBuilderConditionOperator] =
+    useState("gte");
+
+  const [builderConditionValue, setBuilderConditionValue] =
+    useState("2000000");
+
+  const selectedAutomation = useMemo(() => {
+    return (
+      automations.find((item) => item.id === selectedId) ??
+      automations[0] ??
+      null
+    );
+  }, [automations, selectedId]);
+
+  const activeCount = automations.filter(
+    (item) => item.enabled
+  ).length;
 
   const showNotice = (message: string) => {
     setNotice(message);
 
     window.setTimeout(() => {
       setNotice("");
-    }, 2200);
+    }, 2500);
   };
+
+  async function loadAutomations() {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/automations`
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "خطا در دریافت اتوماسیون‌ها"
+        );
+      }
+
+      const result: AutomationResponse =
+        await response.json();
+
+      setAutomations(result.data);
+
+      if (!selectedId && result.data.length > 0) {
+        setSelectedId(result.data[0].id);
+      }
+
+      setBackendOnline(true);
+    } catch (error) {
+      console.error(error);
+
+      setBackendOnline(false);
+
+      showNotice(
+        "اتصال به Backend برقرار نشد. مطمئن شو سرور روی پورت 3001 فعال است."
+      );
+    }
+  }
+
+  async function loadExecutions() {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/executions`
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "خطا در دریافت اجراها"
+        );
+      }
+
+      const result: ExecutionResponse =
+        await response.json();
+
+      setExecutions(result.data);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  useEffect(() => {
+    async function loadPage() {
+      setLoading(true);
+
+      await Promise.all([
+        loadAutomations(),
+        loadExecutions(),
+      ]);
+
+      setLoading(false);
+    }
+
+    loadPage();
+  }, []);
+
+  async function runAutomation(
+    item: BackendAutomation
+  ) {
+    try {
+      setRunningId(item.id);
+
+      const response = await fetch(
+        `${API_BASE}/api/automations/${item.id}/run`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            payload: getSuggestedPayload(
+              item.trigger
+            ),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(
+          result.message ??
+            "اجرای Workflow ناموفق بود"
+        );
+      }
+
+      showNotice(
+        `جریان «${item.title}» با موفقیت اجرا شد.`
+      );
+
+      await loadExecutions();
+    } catch (error) {
+      console.error(error);
+
+      showNotice(
+        "اجرای Workflow ناموفق بود."
+      );
+    } finally {
+      setRunningId(null);
+    }
+  }
+
+  async function toggleAutomation(
+    item: BackendAutomation
+  ) {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/automations/${item.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            enabled: !item.enabled,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(
+          result.message ??
+            "تغییر وضعیت ناموفق بود"
+        );
+      }
+
+      setAutomations((current) =>
+        current.map((automation) =>
+          automation.id === item.id
+            ? result.data
+            : automation
+        )
+      );
+
+      showNotice(
+        result.data.enabled
+          ? `«${item.title}» فعال شد.`
+          : `«${item.title}» متوقف شد.`
+      );
+    } catch (error) {
+      console.error(error);
+
+      showNotice(
+        "تغییر وضعیت Workflow انجام نشد."
+      );
+    }
+  }
+
+  async function deleteAutomation(
+    item: BackendAutomation
+  ) {
+    const confirmed = window.confirm(
+      `Workflow «${item.title}» حذف شود؟`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/automations/${item.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(
+          result.message ?? "حذف ناموفق بود"
+        );
+      }
+
+      await loadAutomations();
+
+      showNotice(
+        `Workflow «${item.title}» حذف شد.`
+      );
+    } catch (error) {
+      console.error(error);
+
+      showNotice(
+        "حذف Workflow انجام نشد."
+      );
+    }
+  }
+
+  async function createAutomation() {
+    if (!builderTitle.trim()) {
+      showNotice(
+        "برای Workflow یک نام وارد کن."
+      );
+
+      return;
+    }
+
+    try {
+      setCreating(true);
+
+      const conditions: BackendCondition[] =
+        builderConditionEnabled
+          ? [
+              {
+                field:
+                  builderConditionField.trim(),
+                operator:
+                  builderConditionOperator,
+                value:
+                  Number(
+                    builderConditionValue
+                  ) ||
+                  builderConditionValue,
+              },
+            ]
+          : [];
+
+      const action: BackendAction = {
+        type: builderAction,
+      };
+
+      if (
+        builderAction === "send_message" ||
+        builderAction === "send_offer"
+      ) {
+        action.channel = builderChannel;
+
+        action.template =
+          builderAction === "send_message"
+            ? "custom_message"
+            : "custom_offer";
+      }
+
+      if (builderAction === "create_task") {
+        action.assignee = "sales";
+        action.template =
+          "custom_sales_task";
+      }
+
+      if (
+        builderAction === "create_campaign"
+      ) {
+        action.channel = "crm";
+        action.template =
+          "custom_campaign";
+      }
+
+      if (
+        builderAction === "create_alert"
+      ) {
+        action.channel = "dashboard";
+        action.template =
+          "custom_alert";
+      }
+
+      const response = await fetch(
+        `${API_BASE}/api/automations`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            title: builderTitle.trim(),
+            trigger: builderTrigger,
+            enabled: true,
+            delayMinutes:
+              Number(builderDelay) || 0,
+            conditions,
+            actions: [action],
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(
+          result.message ??
+            "ساخت Workflow ناموفق بود"
+        );
+      }
+
+      await loadAutomations();
+
+      setSelectedId(result.data.id);
+      setBuilderOpen(false);
+
+      showNotice(
+        `Workflow «${result.data.title}» ساخته شد.`
+      );
+    } catch (error) {
+      console.error(error);
+
+      showNotice(
+        "ساخت Workflow انجام نشد."
+      );
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
     <main
@@ -221,50 +725,75 @@ export default function AutomationPage() {
               </h1>
 
               <p className="mt-1 text-sm text-white/45">
-                تبدیل رفتار مشتری و فروش به اقدام خودکار
+                Workflowهای واقعی + سازنده بدون کدنویسی
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() =>
-              showNotice(
-                "ساخت اتوماسیون جدید در مرحله اتصال موتور واقعی فعال می‌شود."
-              )
-            }
-            className="flex items-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold"
-          >
-            <Plus size={17} />
-            اتوماسیون جدید
-          </button>
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex items-center gap-2 rounded-full border px-4 py-2 text-xs ${
+                backendOnline
+                  ? "border-emerald-400/15 bg-emerald-500/[0.07] text-emerald-300"
+                  : "border-red-400/15 bg-red-500/[0.07] text-red-300"
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  backendOnline
+                    ? "bg-emerald-300"
+                    : "bg-red-300"
+                }`}
+              />
+
+              {backendOnline
+                ? "Backend متصل"
+                : "Backend قطع"}
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setBuilderOpen(true)
+              }
+              className="flex items-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold"
+            >
+              <Plus size={17} />
+              ساخت اتوماسیون
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-[1550px] px-8 py-8">
-        <section className="relative overflow-hidden rounded-[34px] border border-violet-400/15 bg-[#080d1d]/68 p-8 backdrop-blur-xl">
+        <section className="relative overflow-hidden rounded-[34px] border border-violet-400/15 bg-[#080d1d]/68 p-8">
           <div className="pointer-events-none absolute -right-24 -top-24 h-[360px] w-[360px] rounded-full bg-violet-600/[0.13] blur-[130px]" />
+
           <div className="pointer-events-none absolute -bottom-32 left-[20%] h-[320px] w-[320px] rounded-full bg-cyan-500/[0.08] blur-[120px]" />
 
           <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_380px]">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-2 text-sm text-cyan-200">
-                <Brain size={16} weight="duotone" />
-                Automation + CRM + E-commerce
+                <Brain
+                  size={16}
+                  weight="duotone"
+                />
+                Workflow Builder فارسی
               </div>
 
               <h2 className="mt-5 max-w-4xl text-3xl font-bold leading-[1.55]">
-                وقتی مشتری کاری انجام می‌دهد،
+                قانون کسب‌وکارت را با زبان ساده بساز،
                 <span className="bg-gradient-to-l from-cyan-300 via-blue-400 to-violet-400 bg-clip-text text-transparent">
                   {" "}
-                  Loadder باید بداند قدم بعدی چیست.
+                  Backend آن را اجرا می‌کند.
                 </span>
               </h2>
 
               <p className="mt-4 max-w-3xl text-base leading-9 text-white/50">
-                سبد خرید رهاشده، لید داغ، خرید موفق، خرید مجدد، ریزش
-                مشتری و تغییر شاخص‌های بازاریابی می‌توانند به Trigger
-                تبدیل شوند و اقدام بعدی را خودکار کنند.
+                Trigger، شرط، زمان انتظار و اقدام را انتخاب کن.
+                Workflow ساخته‌شده مستقیماً داخل Backend ثبت می‌شود و
+                بعداً می‌تواند به پیامک، ایمیل، CRM و تبلیغات واقعی
+                متصل شود.
               </p>
             </div>
 
@@ -277,26 +806,31 @@ export default function AutomationPage() {
                 />
 
                 <h3 className="text-lg font-semibold">
-                  فرصت فوری
+                  مثال
                 </h3>
               </div>
 
-              <p className="mt-4 text-sm leading-8 text-white/55">
-                {faNumber(
-                  businessData.ecommerce.abandonedCarts
-                )}{" "}
-                سبد خرید رهاشده آماده ورود به جریان بازیابی فروش هستند.
-              </p>
+              <div className="mt-5 space-y-3 text-sm text-white/55">
+                <BuilderSentence
+                  label="اگر"
+                  value="سبد خرید رها شد"
+                />
 
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedId("abandoned-cart")
-                }
-                className="mt-5 rounded-xl border border-violet-300/15 bg-violet-500/[0.08] px-4 py-3 text-sm text-violet-200"
-              >
-                مشاهده جریان پیشنهادی
-              </button>
+                <BuilderSentence
+                  label="و"
+                  value="ارزش سبد بیشتر از ۲ میلیون بود"
+                />
+
+                <BuilderSentence
+                  label="بعد"
+                  value="۲ ساعت صبر کن"
+                />
+
+                <BuilderSentence
+                  label="سپس"
+                  value="پیامک یادآوری بفرست"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -304,371 +838,588 @@ export default function AutomationPage() {
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title="اتوماسیون‌های فعال"
-            value={faNumber(
-              automationItems.filter(
-                (item) => item.status === "فعال"
-              ).length
-            )}
+            value={faNumber(activeCount)}
             icon={Lightning}
+          />
+
+          <StatCard
+            title="Workflowهای ثبت‌شده"
+            value={faNumber(
+              automations.length
+            )}
+            icon={Database}
+          />
+
+          <StatCard
+            title="اجرای Backend"
+            value={faNumber(
+              executions.length
+            )}
+            icon={ClockCounterClockwise}
           />
 
           <StatCard
             title="سبدهای قابل بازیابی"
             value={faNumber(
-              businessData.ecommerce.abandonedCarts
+              businessData.ecommerce
+                .abandonedCarts
             )}
             icon={ShoppingCart}
-          />
-
-          <StatCard
-            title="لیدهای داغ"
-            value={faNumber(
-              businessData.crm.hotLeads
-            )}
-            icon={Target}
-          />
-
-          <StatCard
-            title="خریدهای موفق"
-            value={faNumber(
-              businessData.ecommerce.completedPurchases
-            )}
-            icon={Storefront}
           />
         </section>
 
         <section className="mt-8 grid gap-5 xl:grid-cols-[1.35fr_1fr]">
           <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
-            <div>
-              <h2 className="text-xl font-semibold">
-                جریان‌های هوشمند
-              </h2>
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  Workflowهای Backend
+                </h2>
 
-              <p className="mt-1 text-sm text-white/40">
-                سناریوهای پیشنهادی بر اساس داده فعلی کسب‌وکار
-              </p>
+                <p className="mt-1 text-sm text-white/40">
+                  اتوماسیون‌های واقعی ثبت‌شده
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  loadAutomations();
+                  loadExecutions();
+                }}
+                className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-xs text-white/55"
+              >
+                بروزرسانی
+              </button>
             </div>
 
-            <div className="mt-6 space-y-3">
-              {automationItems.map((item) => (
-                <AutomationRow
-                  key={item.id}
-                  item={item}
-                  active={selectedId === item.id}
-                  onClick={() =>
-                    setSelectedId(item.id)
-                  }
-                />
-              ))}
-            </div>
+            {loading ? (
+              <div className="mt-8 rounded-2xl border border-white/[0.06] bg-black/20 p-8 text-center text-sm text-white/40">
+                در حال دریافت Workflowها...
+              </div>
+            ) : (
+              <div className="mt-6 space-y-3">
+                {automations.map((item) => (
+                  <AutomationRow
+                    key={item.id}
+                    item={item}
+                    active={
+                      selectedId === item.id
+                    }
+                    running={
+                      runningId === item.id
+                    }
+                    onSelect={() =>
+                      setSelectedId(item.id)
+                    }
+                    onRun={() =>
+                      runAutomation(item)
+                    }
+                    onToggle={() =>
+                      toggleAutomation(item)
+                    }
+                    onDelete={() =>
+                      deleteAutomation(item)
+                    }
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           <aside className="rounded-[30px] border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.07] via-[#080d1d]/70 to-cyan-500/[0.04] p-7">
-            <div className="flex items-center gap-3">
-              <Funnel
-                size={23}
-                weight="duotone"
-                className="text-cyan-300"
-              />
+            {selectedAutomation ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <Funnel
+                    size={23}
+                    weight="duotone"
+                    className="text-cyan-300"
+                  />
 
-              <div>
-                <h2 className="text-xl font-semibold">
-                  جزئیات جریان
-                </h2>
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      جزئیات Workflow
+                    </h2>
 
-                <p className="mt-1 text-sm text-white/40">
-                  {selectedAutomation.title}
-                </p>
+                    <p className="mt-1 text-sm text-white/40">
+                      {selectedAutomation.title}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  <FlowDetail
+                    title="اگر"
+                    value={triggerToFa(
+                      selectedAutomation.trigger
+                    )}
+                  />
+
+                  <FlowDetail
+                    title="مخاطب"
+                    value={getAudience(
+                      selectedAutomation.trigger
+                    )}
+                  />
+
+                  <FlowDetail
+                    title="زمان انتظار"
+                    value={
+                      selectedAutomation.delayMinutes ===
+                      0
+                        ? "بدون انتظار"
+                        : `${faNumber(
+                            selectedAutomation.delayMinutes
+                          )} دقیقه`
+                    }
+                  />
+
+                  <FlowDetail
+                    title="وضعیت"
+                    value={
+                      selectedAutomation.enabled
+                        ? "فعال"
+                        : "متوقف"
+                    }
+                  />
+                </div>
+
+                {selectedAutomation.conditions.length >
+                  0 && (
+                  <div className="mt-6">
+                    <div className="text-sm font-semibold">
+                      شرط‌ها
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {selectedAutomation.conditions.map(
+                        (condition, index) => (
+                          <div
+                            key={`${condition.field}-${index}`}
+                            className="rounded-xl border border-white/[0.06] bg-black/20 p-4 text-sm text-white/55"
+                          >
+                            {condition.field}{" "}
+                            {condition.operator}{" "}
+                            {String(
+                              condition.value
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-6">
+                  <div className="text-sm font-semibold">
+                    اقدام‌ها
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {selectedAutomation.actions.map(
+                      (action, index) => (
+                        <div
+                          key={`${action.type}-${index}`}
+                          className="rounded-xl border border-white/[0.06] bg-black/20 p-4 text-sm text-white/55"
+                        >
+                          {actionToFa(action)}
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    runningId ===
+                    selectedAutomation.id
+                  }
+                  onClick={() =>
+                    runAutomation(
+                      selectedAutomation
+                    )
+                  }
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold disabled:opacity-50"
+                >
+                  <Play size={16} />
+                  اجرای آزمایشی Workflow
+                </button>
+              </>
+            ) : (
+              <div className="flex min-h-[300px] items-center justify-center text-sm text-white/35">
+                یک Workflow انتخاب کن.
               </div>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <FlowDetail
-                title="محرک"
-                value={selectedAutomation.trigger}
-              />
-
-              <FlowDetail
-                title="مخاطب"
-                value={selectedAutomation.audience}
-              />
-
-              <FlowDetail
-                title="اقدام"
-                value={selectedAutomation.action}
-              />
-
-              <FlowDetail
-                title="وضعیت"
-                value={selectedAutomation.status}
-              />
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-white/[0.06] bg-black/20 p-5">
-              <div className="text-xs text-white/35">
-                توضیح
-              </div>
-
-              <p className="mt-2 text-sm leading-8 text-white/50">
-                {selectedAutomation.description}
-              </p>
-            </div>
-
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  showNotice(
-                    "فعال‌سازی واقعی جریان بعد از اتصال Workflow Engine انجام می‌شود."
-                  )
-                }
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold"
-              >
-                <Play size={16} />
-                فعال‌سازی
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  showNotice(
-                    "توقف جریان بعد از اتصال Workflow Engine فعال می‌شود."
-                  )
-                }
-                className="flex items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-white/55"
-              >
-                <Pause size={17} />
-              </button>
-            </div>
+            )}
           </aside>
         </section>
 
-        <section className="mt-8 rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">
-                منطق اتوماسیون Loadder
-              </h2>
-
-              <p className="mt-1 text-sm text-white/40">
-                هر جریان چگونه از داده به اجرا می‌رسد
-              </p>
-            </div>
-
-            <Brain
-              size={24}
-              weight="duotone"
-              className="text-violet-300"
-            />
-          </div>
-
-          <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {triggerFlow.map((step) => (
-              <FlowStep
-                key={step.number}
-                {...step}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-8 grid gap-5 xl:grid-cols-2">
+        <section className="mt-8 grid gap-5 xl:grid-cols-[1.15fr_1fr]">
           <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
-            <div className="flex items-center gap-3">
-              <ShoppingCart
-                size={23}
-                weight="duotone"
-                className="text-cyan-300"
-              />
-
+            <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold">
-                  اتوماسیون فروش آنلاین
+                  تاریخچه اجرای Backend
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  جریان‌های مخصوص رفتار خرید سایت
+                  آخرین Actionهای ثبت‌شده
                 </p>
               </div>
-            </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <AutomationMetric
-                title="سبد رهاشده"
-                value={faNumber(
-                  businessData.ecommerce.abandonedCarts
-                )}
-                description="قابل ورود به جریان بازیابی"
-              />
-
-              <AutomationMetric
-                title="خرید موفق"
-                value={faNumber(
-                  businessData.ecommerce.completedPurchases
-                )}
-                description="آماده پیگیری پس از خرید"
-              />
-
-              <AutomationMetric
-                title="خرید مجدد"
-                value={faPercent(
-                  businessData.ecommerce.repeatCustomerRate
-                )}
-                description="فرصت پیشنهاد شخصی"
-              />
-
-              <AutomationMetric
-                title="نرخ رهاشدن سبد"
-                value={faPercent(
-                  businessData.ecommerce.abandonedCartRate
-                )}
-                description="شاخص مهم برای بهینه‌سازی"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
-            <div className="flex items-center gap-3">
-              <UsersThree
+              <ClockCounterClockwise
                 size={23}
                 weight="duotone"
                 className="text-violet-300"
               />
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {executions.length === 0 ? (
+                <div className="rounded-2xl border border-white/[0.06] bg-black/20 p-6 text-center text-sm text-white/35">
+                  هنوز Workflowی اجرا نشده است.
+                </div>
+              ) : (
+                executions
+                  .slice(0, 8)
+                  .map((item) => (
+                    <ExecutionRow
+                      key={item.id}
+                      item={item}
+                    />
+                  ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center gap-3">
+              <Storefront
+                size={23}
+                weight="duotone"
+                className="text-cyan-300"
+              />
 
               <div>
                 <h2 className="text-xl font-semibold">
-                  اتوماسیون CRM
+                  Triggerهای مهم کسب‌وکار
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  جریان‌های مخصوص مشتری و فروش
+                  اتفاق‌هایی که می‌توانند Workflow بسازند
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <AutomationMetric
-                title="لیدهای داغ"
-                value={faNumber(
+            <div className="mt-6 grid gap-3 md:grid-cols-2">
+              <TriggerCard
+                icon={ShoppingCart}
+                title="سبد خرید رهاشده"
+                value={`${faNumber(
+                  businessData.ecommerce
+                    .abandonedCarts
+                )} مورد`}
+              />
+
+              <TriggerCard
+                icon={Target}
+                title="لید داغ"
+                value={`${faNumber(
                   businessData.crm.hotLeads
-                )}
-                description="نیازمند پیگیری سریع"
+                )} مورد`}
               />
 
-              <AutomationMetric
-                title="مشتریان فعال"
-                value={faNumber(
-                  businessData.crm.activeCustomers
-                )}
-                description="قابل سگمنت‌بندی"
-              />
-
-              <AutomationMetric
-                title="حفظ مشتری"
+              <TriggerCard
+                icon={Repeat}
+                title="خرید مجدد"
                 value={faPercent(
-                  businessData.crm.retentionRate
+                  businessData.ecommerce
+                    .repeatCustomerRate
                 )}
-                description="فرصت توسعه وفاداری"
               />
 
-              <AutomationMetric
+              <TriggerCard
+                icon={WarningCircle}
                 title="ریزش مشتری"
                 value={faPercent(
                   businessData.crm.churnRate
                 )}
-                description="نیازمند کمپین بازگشت"
               />
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8">
-          <div className="grid gap-8 xl:grid-cols-[1fr_390px]">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.08]">
-                  <Brain
-                    size={26}
-                    weight="duotone"
-                    className="text-violet-300"
-                  />
-                </div>
-
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    اتوماسیون پیشنهادی Loadder
-                  </h2>
-
-                  <p className="mt-1 text-sm text-white/40">
-                    سریع‌ترین فرصت اجرایی
-                  </p>
-                </div>
-              </div>
-
-              <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                بیشترین فرصت کوتاه‌مدت در بازیابی سبدهای خرید رهاشده
-                و پیگیری لیدهای داغ قرار دارد. این دو جریان مستقیماً
-                می‌توانند به افزایش فروش منجر شوند.
-              </p>
-
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
-                <DecisionCard
-                  icon={ShoppingCart}
-                  title="اولویت ۱"
-                  value="بازیابی سبد خرید"
-                />
-
-                <DecisionCard
-                  icon={Target}
-                  title="اولویت ۲"
-                  value="پیگیری لید داغ"
-                />
-
-                <DecisionCard
-                  icon={Repeat}
-                  title="اولویت ۳"
-                  value="خرید مجدد"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-[26px] border border-white/[0.08] bg-black/20 p-6">
-              <div className="font-semibold">
-                کانال‌های اجرا
-              </div>
-
-              <div className="mt-5 space-y-3">
-                <ChannelRow
-                  icon={ChatCircleText}
-                  title="پیام‌رسان"
-                  status="آماده اتصال"
-                />
-
-                <ChannelRow
-                  icon={EnvelopeSimple}
-                  title="ایمیل"
-                  status="آماده اتصال"
-                />
-
-                <ChannelRow
-                  icon={Phone}
-                  title="تماس فروش"
-                  status="آماده اتصال"
-                />
-
-                <ChannelRow
-                  icon={Megaphone}
-                  title="تبلیغات مجدد"
-                  status="آماده اتصال"
-                />
-              </div>
             </div>
           </div>
         </section>
       </div>
 
+      {builderOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[30px] border border-violet-400/20 bg-[#080d1d] p-7 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <Lightning
+                    size={23}
+                    weight="duotone"
+                    className="text-cyan-300"
+                  />
+
+                  <h2 className="text-2xl font-bold">
+                    ساخت اتوماسیون
+                  </h2>
+                </div>
+
+                <p className="mt-2 text-sm text-white/40">
+                  قانون کسب‌وکارت را بدون کدنویسی بساز.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setBuilderOpen(false)
+                }
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-7 space-y-5">
+              <BuilderField
+                label="نام اتوماسیون"
+              >
+                <input
+                  value={builderTitle}
+                  onChange={(event) =>
+                    setBuilderTitle(
+                      event.target.value
+                    )
+                  }
+                  className="w-full rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3 text-white outline-none"
+                />
+              </BuilderField>
+
+              <BuilderField label="اگر این اتفاق افتاد">
+                <SelectField
+                  value={builderTrigger}
+                  onChange={
+                    setBuilderTrigger
+                  }
+                  options={triggerOptions}
+                />
+              </BuilderField>
+
+              <div className="rounded-[24px] border border-white/[0.07] bg-black/20 p-5">
+                <label className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold">
+                      شرط اضافه شود
+                    </div>
+
+                    <div className="mt-1 text-xs text-white/35">
+                      فقط وقتی شرط برقرار بود Workflow اجرا شود.
+                    </div>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    checked={
+                      builderConditionEnabled
+                    }
+                    onChange={(event) =>
+                      setBuilderConditionEnabled(
+                        event.target.checked
+                      )
+                    }
+                    className="h-5 w-5"
+                  />
+                </label>
+
+                {builderConditionEnabled && (
+                  <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <input
+                      value={
+                        builderConditionField
+                      }
+                      onChange={(event) =>
+                        setBuilderConditionField(
+                          event.target.value
+                        )
+                      }
+                      placeholder="مثلاً cartValue"
+                      className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm outline-none"
+                    />
+
+                    <select
+                      value={
+                        builderConditionOperator
+                      }
+                      onChange={(event) =>
+                        setBuilderConditionOperator(
+                          event.target.value
+                        )
+                      }
+                      className="rounded-xl border border-white/[0.08] bg-[#0b1020] px-4 py-3 text-sm"
+                    >
+                      <option value="gte">
+                        بیشتر یا مساوی
+                      </option>
+
+                      <option value="gt">
+                        بیشتر از
+                      </option>
+
+                      <option value="lte">
+                        کمتر یا مساوی
+                      </option>
+
+                      <option value="lt">
+                        کمتر از
+                      </option>
+
+                      <option value="eq">
+                        برابر
+                      </option>
+                    </select>
+
+                    <input
+                      value={
+                        builderConditionValue
+                      }
+                      onChange={(event) =>
+                        setBuilderConditionValue(
+                          event.target.value
+                        )
+                      }
+                      placeholder="مقدار"
+                      className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <BuilderField label="چقدر صبر کند؟">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={builderDelay}
+                    onChange={(event) =>
+                      setBuilderDelay(
+                        event.target.value
+                      )
+                    }
+                    className="w-full rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3 pl-20 outline-none"
+                  />
+
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-white/35">
+                    دقیقه
+                  </span>
+                </div>
+              </BuilderField>
+
+              <BuilderField label="بعد چه کاری انجام دهد؟">
+                <SelectField
+                  value={builderAction}
+                  onChange={
+                    setBuilderAction
+                  }
+                  options={actionOptions}
+                />
+              </BuilderField>
+
+              {(builderAction ===
+                "send_message" ||
+                builderAction ===
+                  "send_offer") && (
+                <BuilderField label="کانال اجرا">
+                  <select
+                    value={builderChannel}
+                    onChange={(event) =>
+                      setBuilderChannel(
+                        event.target.value
+                      )
+                    }
+                    className="w-full rounded-2xl border border-white/[0.08] bg-[#0b1020] px-4 py-3"
+                  >
+                    <option value="sms">
+                      پیامک
+                    </option>
+
+                    <option value="email">
+                      ایمیل
+                    </option>
+                  </select>
+                </BuilderField>
+              )}
+
+              <div className="rounded-[24px] border border-cyan-400/10 bg-cyan-500/[0.04] p-5">
+                <div className="text-xs text-cyan-300">
+                  پیش‌نمایش قانون
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <BuilderSentence
+                    label="اگر"
+                    value={triggerToFa(
+                      builderTrigger
+                    )}
+                  />
+
+                  {builderConditionEnabled && (
+                    <BuilderSentence
+                      label="و"
+                      value={`${builderConditionField} ${builderConditionOperator} ${builderConditionValue}`}
+                    />
+                  )}
+
+                  <BuilderSentence
+                    label="بعد"
+                    value={
+                      Number(builderDelay) >
+                      0
+                        ? `${Number(
+                            builderDelay
+                          ).toLocaleString(
+                            "fa-IR"
+                          )} دقیقه صبر کن`
+                        : "بدون انتظار اجرا کن"
+                    }
+                  />
+
+                  <BuilderSentence
+                    label="سپس"
+                    value={
+                      actionOptions.find(
+                        (item) =>
+                          item.value ===
+                          builderAction
+                      )?.title ??
+                      builderAction
+                    }
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={creating}
+                onClick={createAutomation}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-4 font-semibold disabled:opacity-50"
+              >
+                <Plus size={18} />
+
+                {creating
+                  ? "در حال ساخت..."
+                  : "ساخت Workflow"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {notice && (
-        <div className="fixed bottom-7 left-7 z-[100] max-w-md rounded-2xl border border-violet-300/20 bg-[#090e1e]/95 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
+        <div className="fixed bottom-7 left-7 z-[300] max-w-md rounded-2xl border border-violet-300/20 bg-[#090e1e]/95 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
           {notice}
         </div>
       )}
@@ -709,61 +1460,112 @@ function StatCard({
 function AutomationRow({
   item,
   active,
-  onClick,
+  running,
+  onSelect,
+  onRun,
+  onToggle,
+  onDelete,
 }: {
-  item: AutomationItem;
+  item: BackendAutomation;
   active: boolean;
-  onClick: () => void;
+  running: boolean;
+  onSelect: () => void;
+  onRun: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
 }) {
-  const Icon = item.icon;
-
-  const statusClass =
-    item.status === "فعال"
-      ? "border-emerald-400/10 bg-emerald-500/[0.07] text-emerald-300"
-      : item.status === "متوقف"
-        ? "border-red-400/10 bg-red-500/[0.07] text-red-300"
-        : "border-amber-400/10 bg-amber-500/[0.07] text-amber-300";
+  const Icon = getAutomationIcon(
+    item.trigger
+  );
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-[22px] border p-5 text-right transition ${
+    <div
+      className={`rounded-[22px] border p-5 transition ${
         active
           ? "border-violet-400/30 bg-violet-500/[0.08]"
-          : "border-white/[0.07] bg-black/20 hover:border-violet-300/20"
+          : "border-white/[0.07] bg-black/20"
       }`}
     >
-      <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/[0.08]">
-          <Icon
-            size={21}
-            weight="duotone"
-            className="text-cyan-300"
-          />
-        </div>
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full text-right"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/[0.08]">
+            <Icon
+              size={21}
+              weight="duotone"
+              className="text-cyan-300"
+            />
+          </div>
 
-        <div className="flex-1">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="font-semibold">
-                {item.title}
+          <div className="flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold">
+                  {item.title}
+                </div>
+
+                <div className="mt-1 text-xs text-white/35">
+                  {triggerToFa(
+                    item.trigger
+                  )}
+                </div>
               </div>
 
-              <p className="mt-2 text-sm leading-7 text-white/40">
-                {item.description}
-              </p>
+              <span
+                className={`rounded-full border px-3 py-1.5 text-xs ${
+                  item.enabled
+                    ? "border-emerald-400/10 bg-emerald-500/[0.07] text-emerald-300"
+                    : "border-red-400/10 bg-red-500/[0.07] text-red-300"
+                }`}
+              >
+                {getStatus(item)}
+              </span>
             </div>
-
-            <span
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${statusClass}`}
-            >
-              {item.status}
-            </span>
           </div>
         </div>
+      </button>
+
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          disabled={running}
+          onClick={onRun}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-cyan-300/15 bg-cyan-500/[0.07] px-3 py-2.5 text-xs text-cyan-200 disabled:opacity-40"
+        >
+          <Play size={14} />
+          اجرا
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-xs text-white/50"
+        >
+          {item.enabled ? (
+            <>
+              <Pause size={14} />
+              توقف
+            </>
+          ) : (
+            <>
+              <Play size={14} />
+              فعال
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex items-center justify-center rounded-xl border border-red-400/10 bg-red-500/[0.04] px-3 py-2.5 text-red-300/70"
+        >
+          <Trash size={14} />
+        </button>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -787,59 +1589,47 @@ function FlowDetail({
   );
 }
 
-function FlowStep({
-  number,
-  title,
-  description,
+function ExecutionRow({
+  item,
 }: {
-  number: string;
-  title: string;
-  description: string;
+  item: ExecutionItem;
 }) {
+  const time =
+    new Date(
+      item.timestamp
+    ).toLocaleString("fa-IR");
+
   return (
-    <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/[0.10] text-sm font-bold text-violet-300">
-        {number}
+    <div className="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="font-semibold">
+            {triggerToFa(
+              item.eventType
+            )}
+          </div>
+
+          <div className="mt-1 text-xs text-white/35">
+            {item.actionType} •{" "}
+            {item.channel ?? "داخلی"}
+          </div>
+        </div>
+
+        <span className="rounded-full border border-cyan-400/10 bg-cyan-500/[0.06] px-3 py-1 text-xs text-cyan-300">
+          {item.status === "simulated"
+            ? "آزمایشی"
+            : item.status}
+        </span>
       </div>
 
-      <div className="mt-4 font-semibold">
-        {title}
+      <div className="mt-3 text-xs text-white/25">
+        {time}
       </div>
-
-      <p className="mt-2 text-xs leading-6 text-white/35">
-        {description}
-      </p>
     </div>
   );
 }
 
-function AutomationMetric({
-  title,
-  value,
-  description,
-}: {
-  title: string;
-  value: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5">
-      <div className="text-xs text-white/35">
-        {title}
-      </div>
-
-      <div className="mt-2 text-xl font-bold text-cyan-300">
-        {value}
-      </div>
-
-      <p className="mt-2 text-xs leading-6 text-white/35">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function DecisionCard({
+function TriggerCard({
   icon: Icon,
   title,
   value,
@@ -849,7 +1639,7 @@ function DecisionCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-4">
+    <div className="rounded-[20px] border border-white/[0.07] bg-black/20 p-4">
       <Icon
         size={20}
         weight="duotone"
@@ -860,39 +1650,86 @@ function DecisionCard({
         {title}
       </div>
 
-      <div className="mt-1 text-sm font-semibold">
+      <div className="mt-1 font-semibold">
         {value}
       </div>
     </div>
   );
 }
 
-function ChannelRow({
-  icon: Icon,
-  title,
-  status,
+function BuilderSentence({
+  label,
+  value,
 }: {
-  icon: React.ElementType;
-  title: string;
-  status: string;
+  label: string;
+  value: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/20 p-4">
-      <div className="flex items-center gap-3">
-        <Icon
-          size={19}
-          weight="duotone"
-          className="text-violet-300"
-        />
+    <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-black/20 p-3">
+      <span className="rounded-lg bg-violet-500/[0.10] px-3 py-1.5 text-xs text-violet-300">
+        {label}
+      </span>
 
-        <span className="text-sm">
-          {title}
-        </span>
+      <span className="text-sm text-white/60">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function BuilderField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-2 text-sm font-semibold">
+        {label}
       </div>
 
-      <span className="text-xs text-cyan-300/70">
-        {status}
-      </span>
+      {children}
+    </div>
+  );
+}
+
+function SelectField({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: {
+    value: string;
+    title: string;
+  }[];
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+        className="w-full appearance-none rounded-2xl border border-white/[0.08] bg-[#0b1020] px-4 py-3 pl-12 outline-none"
+      >
+        {options.map((item) => (
+          <option
+            key={item.value}
+            value={item.value}
+          >
+            {item.title}
+          </option>
+        ))}
+      </select>
+
+      <CaretDown
+        size={17}
+        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/35"
+      />
     </div>
   );
 }
