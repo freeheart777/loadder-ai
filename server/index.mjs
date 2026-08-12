@@ -302,6 +302,7 @@ async function executeAction(action, event, workflow) {
       channel: action.channel || "sms",
       recipient,
       message: buildMessage(action, event),
+
       metadata: {
         eventId: event.id,
         eventType: event.type,
@@ -344,19 +345,26 @@ async function executeAction(action, event, workflow) {
   const execution = {
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
+
     eventId: event.id,
     eventType: event.type,
+
     workflowId: workflow.id,
     workflowTitle: workflow.title,
+
     actionType: action.type,
     channel: action.channel || null,
     template: action.template || null,
+
     recipient:
       event.payload.phone ||
       event.payload.email ||
       event.payload.recipient ||
       null,
-    status: executionResult.status || "completed",
+
+    status:
+      executionResult.status || "completed",
+
     result: executionResult,
   };
 
@@ -426,6 +434,7 @@ app.get("/api/health", (req, res) => {
     database: "SQLite",
     persistence: true,
     customer360: true,
+    directMessaging: true,
     timestamp: new Date().toISOString(),
   });
 });
@@ -443,7 +452,6 @@ app.get("/api/crm/stats", (req, res) => {
 
 /* =========================================================
    CUSTOMER 360
-   مهم: این Route باید قبل از /api/customers/:id باشد
 ========================================================= */
 
 app.get("/api/customers/:id/360", (req, res) => {
@@ -462,7 +470,10 @@ app.get("/api/customers/:id/360", (req, res) => {
       data,
     });
   } catch (error) {
-    console.error("Customer 360 error:", error);
+    console.error(
+      "Customer 360 error:",
+      error
+    );
 
     res.status(500).json({
       ok: false,
@@ -473,6 +484,207 @@ app.get("/api/customers/:id/360", (req, res) => {
 });
 
 /* =========================================================
+   DIRECT CUSTOMER MESSAGE
+========================================================= */
+
+app.post(
+  "/api/customers/:id/message",
+  async (req, res) => {
+    const customer = getCustomerById(
+      req.params.id
+    );
+
+    if (!customer) {
+      return res.status(404).json({
+        ok: false,
+        message: "مشتری پیدا نشد.",
+      });
+    }
+
+    const {
+      channel = "sms",
+      message,
+    } = req.body;
+
+    if (
+      channel !== "sms" &&
+      channel !== "email"
+    ) {
+      return res.status(400).json({
+        ok: false,
+        message:
+          "کانال پیام باید sms یا email باشد.",
+      });
+    }
+
+    if (
+      !message ||
+      typeof message !== "string" ||
+      !message.trim()
+    ) {
+      return res.status(400).json({
+        ok: false,
+        message: "متن پیام الزامی است.",
+      });
+    }
+
+    const recipient =
+      channel === "email"
+        ? customer.email
+        : customer.phone;
+
+    if (!recipient) {
+      return res.status(400).json({
+        ok: false,
+        message:
+          channel === "email"
+            ? "برای این مشتری ایمیل ثبت نشده است."
+            : "برای این مشتری شماره موبایل ثبت نشده است.",
+      });
+    }
+
+    const event = {
+      id: crypto.randomUUID(),
+
+      type: "customer.direct_message",
+
+      createdAt:
+        new Date().toISOString(),
+
+      payload: {
+        customerId: customer.id,
+        customerName: customer.name,
+
+        phone: customer.phone,
+        email: customer.email,
+
+        channel,
+        recipient,
+
+        message: message.trim(),
+      },
+    };
+
+    try {
+      saveEvent(event);
+
+      createCustomerEvent({
+        customerId: customer.id,
+
+        type:
+          "customer.direct_message",
+
+        metadata: {
+          channel,
+          recipient,
+          message: message.trim(),
+        },
+      });
+
+      const result =
+        await sendMessage({
+          channel,
+          recipient,
+          message: message.trim(),
+
+          metadata: {
+            customerId:
+              customer.id,
+
+            customerName:
+              customer.name,
+
+            eventId:
+              event.id,
+
+            eventType:
+              event.type,
+
+            source:
+              "customer_360",
+          },
+        });
+
+      const execution = {
+        id: crypto.randomUUID(),
+
+        timestamp:
+          new Date().toISOString(),
+
+        eventId:
+          event.id,
+
+        eventType:
+          event.type,
+
+        workflowId:
+          "manual-customer-message",
+
+        workflowTitle:
+          "ارسال مستقیم از CRM",
+
+        actionType:
+          "send_message",
+
+        channel,
+
+        template:
+          "manual_message",
+
+        recipient,
+
+        status:
+          result?.status ||
+          "completed",
+
+        result: {
+          ...result,
+
+          metadata: {
+            customerId:
+              customer.id,
+
+            customerName:
+              customer.name,
+
+            source:
+              "customer_360",
+          },
+        },
+      };
+
+      saveExecution(execution);
+
+      res.json({
+        ok: true,
+
+        data: {
+          customer: {
+            id: customer.id,
+            name: customer.name,
+          },
+
+          channel,
+          recipient,
+          execution,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Direct customer message error:",
+        error
+      );
+
+      res.status(500).json({
+        ok: false,
+        message:
+          "خطا در ارسال پیام به مشتری.",
+      });
+    }
+  }
+);
+
+/* =========================================================
    CUSTOMER EVENTS
 ========================================================= */
 
@@ -480,7 +692,8 @@ app.get(
   "/api/customers/:id/events",
   (req, res) => {
     try {
-      const customer = getCustomerById(req.params.id);
+      const customer =
+        getCustomerById(req.params.id);
 
       if (!customer) {
         return res.status(404).json({
@@ -489,7 +702,10 @@ app.get(
         });
       }
 
-      const data = getCustomerEvents(req.params.id);
+      const data =
+        getCustomerEvents(
+          req.params.id
+        );
 
       res.json({
         ok: true,
@@ -497,7 +713,10 @@ app.get(
         data,
       });
     } catch (error) {
-      console.error("Customer events error:", error);
+      console.error(
+        "Customer events error:",
+        error
+      );
 
       res.status(500).json({
         ok: false,
@@ -523,7 +742,8 @@ app.get("/api/customers", (req, res) => {
 });
 
 app.get("/api/customers/:id", (req, res) => {
-  const customer = getCustomerById(req.params.id);
+  const customer =
+    getCustomerById(req.params.id);
 
   if (!customer) {
     return res.status(404).json({
@@ -568,11 +788,15 @@ app.post("/api/customers", (req, res) => {
       data: customer,
     });
   } catch (error) {
-    console.error("Create customer error:", error);
+    console.error(
+      "Create customer error:",
+      error
+    );
 
     res.status(500).json({
       ok: false,
-      message: "خطا در ساخت مشتری.",
+      message:
+        "خطا در ساخت مشتری.",
     });
   }
 });
@@ -625,8 +849,12 @@ app.post("/api/leads", async (req, res) => {
     if (Number(score) >= 80) {
       const event = {
         id: crypto.randomUUID(),
+
         type: "lead.hot",
-        createdAt: new Date().toISOString(),
+
+        createdAt:
+          new Date().toISOString(),
+
         payload: {
           leadId: lead.id,
           leadName: name,
@@ -644,11 +872,15 @@ app.post("/api/leads", async (req, res) => {
       data: lead,
     });
   } catch (error) {
-    console.error("Create lead error:", error);
+    console.error(
+      "Create lead error:",
+      error
+    );
 
     res.status(500).json({
       ok: false,
-      message: "خطا در ساخت لید.",
+      message:
+        "خطا در ساخت لید.",
     });
   }
 });
@@ -676,7 +908,10 @@ app.post("/api/orders", async (req, res) => {
     paymentStatus = "paid",
   } = req.body;
 
-  if (!customerId || totalAmount === undefined) {
+  if (
+    !customerId ||
+    totalAmount === undefined
+  ) {
     return res.status(400).json({
       ok: false,
       message:
@@ -684,7 +919,8 @@ app.post("/api/orders", async (req, res) => {
     });
   }
 
-  const customer = getCustomerById(customerId);
+  const customer =
+    getCustomerById(customerId);
 
   if (!customer) {
     return res.status(404).json({
@@ -696,7 +932,8 @@ app.post("/api/orders", async (req, res) => {
   try {
     const order = createOrder({
       customerId,
-      totalAmount: Number(totalAmount),
+      totalAmount:
+        Number(totalAmount),
       status,
       source,
       paymentStatus,
@@ -705,15 +942,29 @@ app.post("/api/orders", async (req, res) => {
     if (status === "completed") {
       const event = {
         id: crypto.randomUUID(),
-        type: "order.completed",
-        createdAt: new Date().toISOString(),
+
+        type:
+          "order.completed",
+
+        createdAt:
+          new Date().toISOString(),
+
         payload: {
           customerId,
-          customerName: customer.name,
-          phone: customer.phone,
-          email: customer.email,
-          orderId: order.id,
-          amount: Number(totalAmount),
+          customerName:
+            customer.name,
+
+          phone:
+            customer.phone,
+
+          email:
+            customer.email,
+
+          orderId:
+            order.id,
+
+          amount:
+            Number(totalAmount),
         },
       };
 
@@ -725,11 +976,15 @@ app.post("/api/orders", async (req, res) => {
       data: order,
     });
   } catch (error) {
-    console.error("Create order error:", error);
+    console.error(
+      "Create order error:",
+      error
+    );
 
     res.status(500).json({
       ok: false,
-      message: "خطا در ساخت سفارش.",
+      message:
+        "خطا در ساخت سفارش.",
     });
   }
 });
@@ -758,8 +1013,12 @@ app.post("/api/carts", async (req, res) => {
   try {
     const cart = createCart({
       customerId,
-      totalAmount: Number(totalAmount),
+
+      totalAmount:
+        Number(totalAmount),
+
       status,
+
       abandonedAt:
         status === "abandoned"
           ? new Date().toISOString()
@@ -773,15 +1032,30 @@ app.post("/api/carts", async (req, res) => {
 
       const event = {
         id: crypto.randomUUID(),
-        type: "cart.abandoned",
-        createdAt: new Date().toISOString(),
+
+        type:
+          "cart.abandoned",
+
+        createdAt:
+          new Date().toISOString(),
+
         payload: {
           customerId,
-          customerName: customer?.name || null,
-          phone: customer?.phone || null,
-          email: customer?.email || null,
-          cartId: cart.id,
-          cartValue: Number(totalAmount),
+
+          customerName:
+            customer?.name || null,
+
+          phone:
+            customer?.phone || null,
+
+          email:
+            customer?.email || null,
+
+          cartId:
+            cart.id,
+
+          cartValue:
+            Number(totalAmount),
         },
       };
 
@@ -793,11 +1067,15 @@ app.post("/api/carts", async (req, res) => {
       data: cart,
     });
   } catch (error) {
-    console.error("Create cart error:", error);
+    console.error(
+      "Create cart error:",
+      error
+    );
 
     res.status(500).json({
       ok: false,
-      message: "خطا در ساخت سبد خرید.",
+      message:
+        "خطا در ساخت سبد خرید.",
     });
   }
 });
@@ -806,81 +1084,27 @@ app.post("/api/carts", async (req, res) => {
    AUTOMATIONS
 ========================================================= */
 
-app.get("/api/automations", (req, res) => {
-  const data = getAutomations();
+app.get(
+  "/api/automations",
+  (req, res) => {
+    const data =
+      getAutomations();
 
-  res.json({
-    ok: true,
-    count: data.length,
-    data,
-  });
-});
-
-app.get("/api/automations/:id", (req, res) => {
-  const automation = getAutomationById(req.params.id);
-
-  if (!automation) {
-    return res.status(404).json({
-      ok: false,
-      message: "اتوماسیون پیدا نشد.",
-    });
-  }
-
-  res.json({
-    ok: true,
-    data: automation,
-  });
-});
-
-app.post("/api/automations", (req, res) => {
-  const {
-    title,
-    trigger,
-    enabled = true,
-    delayMinutes = 0,
-    conditions = [],
-    actions = [],
-  } = req.body;
-
-  if (!title || !trigger) {
-    return res.status(400).json({
-      ok: false,
-      message:
-        "title و trigger الزامی هستند.",
-    });
-  }
-
-  try {
-    const automation = createAutomation({
-      title,
-      trigger,
-      enabled,
-      delayMinutes,
-      conditions,
-      actions,
-    });
-
-    res.status(201).json({
+    res.json({
       ok: true,
-      data: automation,
-    });
-  } catch (error) {
-    console.error("Create automation error:", error);
-
-    res.status(500).json({
-      ok: false,
-      message:
-        "خطا در ساخت اتوماسیون.",
+      count: data.length,
+      data,
     });
   }
-});
+);
 
-app.patch("/api/automations/:id", (req, res) => {
-  try {
-    const automation = updateAutomation(
-      req.params.id,
-      req.body
-    );
+app.get(
+  "/api/automations/:id",
+  (req, res) => {
+    const automation =
+      getAutomationById(
+        req.params.id
+      );
 
     if (!automation) {
       return res.status(404).json({
@@ -894,42 +1118,130 @@ app.patch("/api/automations/:id", (req, res) => {
       ok: true,
       data: automation,
     });
-  } catch (error) {
-    console.error("Update automation error:", error);
-
-    res.status(500).json({
-      ok: false,
-      message:
-        "خطا در ویرایش اتوماسیون.",
-    });
   }
-});
+);
 
-app.delete("/api/automations/:id", (req, res) => {
-  try {
-    const deleted = deleteAutomation(req.params.id);
+app.post(
+  "/api/automations",
+  (req, res) => {
+    const {
+      title,
+      trigger,
+      enabled = true,
+      delayMinutes = 0,
+      conditions = [],
+      actions = [],
+    } = req.body;
 
-    if (!deleted) {
-      return res.status(404).json({
+    if (!title || !trigger) {
+      return res.status(400).json({
         ok: false,
         message:
-          "اتوماسیون پیدا نشد.",
+          "title و trigger الزامی هستند.",
       });
     }
 
-    res.json({
-      ok: true,
-    });
-  } catch (error) {
-    console.error("Delete automation error:", error);
+    try {
+      const automation =
+        createAutomation({
+          title,
+          trigger,
+          enabled,
+          delayMinutes,
+          conditions,
+          actions,
+        });
 
-    res.status(500).json({
-      ok: false,
-      message:
-        "خطا در حذف اتوماسیون.",
-    });
+      res.status(201).json({
+        ok: true,
+        data: automation,
+      });
+    } catch (error) {
+      console.error(
+        "Create automation error:",
+        error
+      );
+
+      res.status(500).json({
+        ok: false,
+        message:
+          "خطا در ساخت اتوماسیون.",
+      });
+    }
   }
-});
+);
+
+app.patch(
+  "/api/automations/:id",
+  (req, res) => {
+    try {
+      const automation =
+        updateAutomation(
+          req.params.id,
+          req.body
+        );
+
+      if (!automation) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "اتوماسیون پیدا نشد.",
+        });
+      }
+
+      res.json({
+        ok: true,
+        data: automation,
+      });
+    } catch (error) {
+      console.error(
+        "Update automation error:",
+        error
+      );
+
+      res.status(500).json({
+        ok: false,
+        message:
+          "خطا در ویرایش اتوماسیون.",
+      });
+    }
+  }
+);
+
+app.delete(
+  "/api/automations/:id",
+  (req, res) => {
+    try {
+      const deleted =
+        deleteAutomation(
+          req.params.id
+        );
+
+      if (!deleted) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "اتوماسیون پیدا نشد.",
+        });
+      }
+
+      res.json({
+        ok: true,
+      });
+    } catch (error) {
+      console.error(
+        "Delete automation error:",
+        error
+      );
+
+      res.status(500).json({
+        ok: false,
+        message:
+          "خطا در حذف اتوماسیون.",
+      });
+    }
+  }
+);
 
 /* =========================================================
    MANUAL WORKFLOW RUN
@@ -938,12 +1250,16 @@ app.delete("/api/automations/:id", (req, res) => {
 app.post(
   "/api/automations/:id/run",
   async (req, res) => {
-    const workflow = getAutomationById(req.params.id);
+    const workflow =
+      getAutomationById(
+        req.params.id
+      );
 
     if (!workflow) {
       return res.status(404).json({
         ok: false,
-        message: "اتوماسیون پیدا نشد.",
+        message:
+          "اتوماسیون پیدا نشد.",
       });
     }
 
@@ -957,26 +1273,40 @@ app.post(
 
     const event = {
       id: crypto.randomUUID(),
-      type: workflow.trigger,
-      createdAt: new Date().toISOString(),
-      payload: req.body?.payload || {},
+
+      type:
+        workflow.trigger,
+
+      createdAt:
+        new Date().toISOString(),
+
+      payload:
+        req.body?.payload || {},
     };
 
     try {
-      const result = await runWorkflow(
-        workflow,
-        event
-      );
-
       saveEvent(event);
 
-      if (event.payload.customerId) {
+      if (
+        event.payload.customerId
+      ) {
         createCustomerEvent({
-          customerId: event.payload.customerId,
-          type: event.type,
-          metadata: event.payload,
+          customerId:
+            event.payload.customerId,
+
+          type:
+            event.type,
+
+          metadata:
+            event.payload,
         });
       }
+
+      const result =
+        await runWorkflow(
+          workflow,
+          event
+        );
 
       res.json({
         ok: true,
@@ -1002,84 +1332,112 @@ app.post(
    EVENTS
 ========================================================= */
 
-app.post("/api/events", async (req, res) => {
-  const {
-    type,
-    payload = {},
-  } = req.body;
-
-  if (!type) {
-    return res.status(400).json({
-      ok: false,
-      message: "نوع Event الزامی است.",
-    });
-  }
-
-  const event = {
-    id: crypto.randomUUID(),
-    type,
-    payload,
-    createdAt: new Date().toISOString(),
-  };
-
-  try {
+app.post(
+  "/api/events",
+  async (req, res) => {
     const {
-      matchedWorkflows,
-      results,
-    } = await processEvent(event);
+      type,
+      payload = {},
+    } = req.body;
 
-    res.json({
-      ok: true,
-      event,
-      matchedWorkflows:
-        matchedWorkflows.length,
-      results,
-    });
-  } catch (error) {
-    console.error("Process event error:", error);
+    if (!type) {
+      return res.status(400).json({
+        ok: false,
+        message:
+          "نوع Event الزامی است.",
+      });
+    }
 
-    res.status(500).json({
-      ok: false,
-      message:
-        "خطا در پردازش Event.",
-    });
+    const event = {
+      id:
+        crypto.randomUUID(),
+
+      type,
+
+      payload,
+
+      createdAt:
+        new Date().toISOString(),
+    };
+
+    try {
+      const {
+        matchedWorkflows,
+        results,
+      } =
+        await processEvent(
+          event
+        );
+
+      res.json({
+        ok: true,
+        event,
+
+        matchedWorkflows:
+          matchedWorkflows.length,
+
+        results,
+      });
+    } catch (error) {
+      console.error(
+        "Process event error:",
+        error
+      );
+
+      res.status(500).json({
+        ok: false,
+        message:
+          "خطا در پردازش Event.",
+      });
+    }
   }
-});
+);
 
 /* =========================================================
    EXECUTIONS
 ========================================================= */
 
-app.get("/api/executions", (req, res) => {
-  const limit =
-    Number(req.query.limit) || 100;
+app.get(
+  "/api/executions",
+  (req, res) => {
+    const limit =
+      Number(req.query.limit) ||
+      100;
 
-  const data = getExecutions(limit);
-
-  res.json({
-    ok: true,
-    count: data.length,
-    data,
-  });
-});
-
-app.delete("/api/executions", (req, res) => {
-  try {
-    clearExecutions();
+    const data =
+      getExecutions(limit);
 
     res.json({
       ok: true,
-    });
-  } catch (error) {
-    console.error("Clear executions error:", error);
-
-    res.status(500).json({
-      ok: false,
-      message:
-        "خطا در پاک‌کردن تاریخچه.",
+      count: data.length,
+      data,
     });
   }
-});
+);
+
+app.delete(
+  "/api/executions",
+  (req, res) => {
+    try {
+      clearExecutions();
+
+      res.json({
+        ok: true,
+      });
+    } catch (error) {
+      console.error(
+        "Clear executions error:",
+        error
+      );
+
+      res.status(500).json({
+        ok: false,
+        message:
+          "خطا در پاک‌کردن تاریخچه.",
+      });
+    }
+  }
+);
 
 /* =========================================================
    DATABASE STATUS
@@ -1088,16 +1446,31 @@ app.delete("/api/executions", (req, res) => {
 app.get(
   "/api/database/status",
   (req, res) => {
-    const crm = getCRMStats();
+    const crm =
+      getCRMStats();
 
     res.json({
       ok: true,
-      database: "SQLite",
-      persistent: true,
-      customer360: true,
+
+      database:
+        "SQLite",
+
+      persistent:
+        true,
+
+      customer360:
+        true,
+
+      directMessaging:
+        true,
+
       crm,
-      automations: getAutomations().length,
-      executions: getExecutions(1000).length,
+
+      automations:
+        getAutomations().length,
+
+      executions:
+        getExecutions(1000).length,
     });
   }
 );
@@ -1109,7 +1482,8 @@ app.get(
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
-    message: "API route not found",
+    message:
+      "API route not found",
   });
 });
 
@@ -1122,17 +1496,50 @@ app.listen(PORT, () => {
   console.log(
     "=========================================="
   );
-  console.log("Loadder AI Backend");
-  console.log(`http://localhost:${PORT}`);
-  console.log("Database: SQLite");
-  console.log("Persistence: ENABLED");
-  console.log("Customer 360: READY");
-  console.log("CRM Data Layer: READY");
-  console.log("E-commerce Data Layer: READY");
-  console.log("Workflow Engine: READY");
-  console.log("Messaging Adapter: READY");
+
+  console.log(
+    "Loadder AI Backend"
+  );
+
+  console.log(
+    `http://localhost:${PORT}`
+  );
+
+  console.log(
+    "Database: SQLite"
+  );
+
+  console.log(
+    "Persistence: ENABLED"
+  );
+
+  console.log(
+    "Customer 360: READY"
+  );
+
+  console.log(
+    "Direct Messaging: READY"
+  );
+
+  console.log(
+    "CRM Data Layer: READY"
+  );
+
+  console.log(
+    "E-commerce Data Layer: READY"
+  );
+
+  console.log(
+    "Workflow Engine: READY"
+  );
+
+  console.log(
+    "Messaging Adapter: READY"
+  );
+
   console.log(
     "=========================================="
   );
+
   console.log("");
 });

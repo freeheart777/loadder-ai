@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  Link,
+  useParams,
+} from "react-router-dom";
 
 import {
   ArrowRight,
@@ -17,6 +25,8 @@ import {
   ClockCounterClockwise,
   Lightning,
   Brain,
+  PaperPlaneTilt,
+  X,
 } from "@phosphor-icons/react";
 
 type Customer = {
@@ -73,32 +83,70 @@ type CustomerEvent = {
   id: string;
   customerId: string | null;
   type: string;
-  metadata: Record<string, unknown>;
+  metadata: Record<
+    string,
+    unknown
+  >;
   createdAt: string;
 };
 
 type WorkflowExecution = {
   id: string;
   timestamp: string;
-  eventId: string | null;
+
+  eventId:
+    | string
+    | null;
+
   eventType: string;
-  workflowId: string | null;
-  workflowTitle: string | null;
+
+  workflowId:
+    | string
+    | null;
+
+  workflowTitle:
+    | string
+    | null;
+
   actionType: string;
-  channel: string | null;
-  template: string | null;
-  recipient: string | null;
+
+  channel:
+    | string
+    | null;
+
+  template:
+    | string
+    | null;
+
+  recipient:
+    | string
+    | null;
+
   status: string;
-  result: Record<string, unknown>;
+
+  result: Record<
+    string,
+    unknown
+  >;
 };
 
 type Customer360Data = {
   customer: Customer;
-  summary: CustomerSummary;
-  orders: Order[];
-  carts: Cart[];
-  events: CustomerEvent[];
-  executions: WorkflowExecution[];
+
+  summary:
+    CustomerSummary;
+
+  orders:
+    Order[];
+
+  carts:
+    Cart[];
+
+  events:
+    CustomerEvent[];
+
+  executions:
+    WorkflowExecution[];
 };
 
 type Customer360Response = {
@@ -108,117 +156,302 @@ type Customer360Response = {
 
 type TimelineItem = {
   id: string;
-  type: "order" | "cart" | "event";
+
+  type:
+    | "order"
+    | "cart"
+    | "event";
+
   title: string;
   description: string;
   date: string;
 };
 
-const API_BASE = "http://localhost:3001";
+const API_BASE =
+  "http://localhost:3001";
 
-function faNumber(value: number) {
-  return value.toLocaleString("fa-IR");
+function faNumber(
+  value: number
+) {
+  return value.toLocaleString(
+    "fa-IR"
+  );
 }
 
-function faMoney(value: number) {
-  if (value >= 1_000_000_000) {
-    return `${(value / 1_000_000_000).toLocaleString("fa-IR", {
-      maximumFractionDigits: 1,
-    })} میلیارد تومان`;
+function faMoney(
+  value: number
+) {
+  if (
+    value >=
+    1_000_000_000
+  ) {
+    return `${(
+      value /
+      1_000_000_000
+    ).toLocaleString(
+      "fa-IR",
+      {
+        maximumFractionDigits:
+          1,
+      }
+    )} میلیارد تومان`;
   }
 
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toLocaleString("fa-IR", {
-      maximumFractionDigits: 1,
-    })} میلیون تومان`;
+  if (
+    value >=
+    1_000_000
+  ) {
+    return `${(
+      value /
+      1_000_000
+    ).toLocaleString(
+      "fa-IR",
+      {
+        maximumFractionDigits:
+          1,
+      }
+    )} میلیون تومان`;
   }
 
-  if (value >= 1_000) {
-    return `${(value / 1_000).toLocaleString("fa-IR", {
-      maximumFractionDigits: 0,
-    })} هزار تومان`;
+  if (
+    value >= 1_000
+  ) {
+    return `${(
+      value / 1_000
+    ).toLocaleString(
+      "fa-IR",
+      {
+        maximumFractionDigits:
+          0,
+      }
+    )} هزار تومان`;
   }
 
-  return `${faNumber(value)} تومان`;
+  return `${faNumber(
+    value
+  )} تومان`;
 }
 
-function faDate(value: string | null) {
+function faDate(
+  value: string | null
+) {
   if (!value) {
     return "—";
   }
 
-  return new Date(value).toLocaleString("fa-IR");
+  return new Date(
+    value
+  ).toLocaleString(
+    "fa-IR"
+  );
 }
 
-function sourceToFa(source: string | null) {
-  const map: Record<string, string> = {
-    website: "وب‌سایت",
-    referral: "معرفی مشتری",
-    google_ads: "تبلیغات گوگل",
-    instagram: "اینستاگرام",
+function sourceToFa(
+  source: string | null
+) {
+  const map: Record<
+    string,
+    string
+  > = {
+    website:
+      "وب‌سایت",
+
+    referral:
+      "معرفی مشتری",
+
+    google_ads:
+      "تبلیغات گوگل",
+
+    instagram:
+      "اینستاگرام",
   };
 
   if (!source) {
     return "نامشخص";
   }
 
-  return map[source] ?? source;
+  return (
+    map[source] ??
+    source
+  );
 }
 
-function eventToFa(type: string) {
-  const map: Record<string, string> = {
-    "cart.abandoned": "سبد خرید رها شد",
-    "order.completed": "خرید با موفقیت انجام شد",
-    "customer.repeat_purchase": "خرید مجدد ثبت شد",
-    "customer.churn_risk": "ریسک ریزش افزایش یافت",
-    "lead.hot": "لید داغ شناسایی شد",
+function eventToFa(
+  type: string
+) {
+  const map: Record<
+    string,
+    string
+  > = {
+    "cart.abandoned":
+      "سبد خرید رها شد",
+
+    "order.completed":
+      "خرید با موفقیت انجام شد",
+
+    "customer.repeat_purchase":
+      "خرید مجدد ثبت شد",
+
+    "customer.churn_risk":
+      "ریسک ریزش افزایش یافت",
+
+    "lead.hot":
+      "لید داغ شناسایی شد",
+
+    "customer.direct_message":
+      "پیام مستقیم ارسال شد",
   };
 
-  return map[type] ?? type;
+  return (
+    map[type] ??
+    type
+  );
 }
 
-function eventDescription(event: CustomerEvent) {
-  if (event.type === "cart.abandoned") {
+function eventDescription(
+  event: CustomerEvent
+) {
+  if (
+    event.type ===
+    "cart.abandoned"
+  ) {
     const value =
-      typeof event.metadata.cartValue === "number"
-        ? event.metadata.cartValue
-        : typeof event.metadata.amount === "number"
-          ? event.metadata.amount
+      typeof event
+        .metadata
+        .cartValue ===
+      "number"
+        ? event
+            .metadata
+            .cartValue
+        : typeof event
+              .metadata
+              .amount ===
+            "number"
+          ? event
+              .metadata
+              .amount
           : null;
 
     return value
-      ? `ارزش سبد: ${faMoney(value)}`
+      ? `ارزش سبد: ${faMoney(
+          value
+        )}`
       : "سبد خرید رهاشده ثبت شد";
   }
 
-  if (event.type === "order.completed") {
+  if (
+    event.type ===
+    "order.completed"
+  ) {
     const value =
-      typeof event.metadata.amount === "number"
-        ? event.metadata.amount
+      typeof event
+        .metadata
+        .amount ===
+      "number"
+        ? event
+            .metadata
+            .amount
         : null;
 
     return value
-      ? `مبلغ خرید: ${faMoney(value)}`
+      ? `مبلغ خرید: ${faMoney(
+          value
+        )}`
       : "خرید با موفقیت ثبت شد";
+  }
+
+  if (
+    event.type ===
+    "customer.direct_message"
+  ) {
+    const channel =
+      typeof event
+        .metadata
+        .channel ===
+      "string"
+        ? event
+            .metadata
+            .channel
+        : null;
+
+    return channel ===
+      "email"
+      ? "ایمیل مستقیم از CRM ارسال شد"
+      : "پیامک مستقیم از CRM ارسال شد";
   }
 
   return "رویداد مشتری در CRM ثبت شد";
 }
 
 export default function CustomerProfilePage() {
-  const { id } = useParams();
+  const { id } =
+    useParams();
 
-  const [data, setData] = useState<Customer360Data | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [backendOnline, setBackendOnline] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [
+    data,
+    setData,
+  ] =
+    useState<Customer360Data | null>(
+      null
+    );
 
-  const showNotice = (message: string) => {
-    setNotice(message);
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
 
-    window.setTimeout(() => {
-      setNotice("");
-    }, 2500);
+  const [
+    backendOnline,
+    setBackendOnline,
+  ] =
+    useState(false);
+
+  const [
+    notice,
+    setNotice,
+  ] =
+    useState("");
+
+  const [
+    messageModalOpen,
+    setMessageModalOpen,
+  ] =
+    useState(false);
+
+  const [
+    messageChannel,
+    setMessageChannel,
+  ] =
+    useState<
+      "sms" | "email"
+    >("sms");
+
+  const [
+    messageText,
+    setMessageText,
+  ] =
+    useState("");
+
+  const [
+    sendingMessage,
+    setSendingMessage,
+  ] =
+    useState(false);
+
+  const showNotice = (
+    message: string
+  ) => {
+    setNotice(
+      message
+    );
+
+    window.setTimeout(
+      () => {
+        setNotice("");
+      },
+      2500
+    );
   };
 
   async function loadCustomer() {
@@ -229,27 +462,165 @@ export default function CustomerProfilePage() {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        `${API_BASE}/api/customers/${id}/360`
-      );
+      const response =
+        await fetch(
+          `${API_BASE}/api/customers/${id}/360`
+        );
 
-      const result: Customer360Response = await response.json();
+      const result:
+        Customer360Response =
+        await response.json();
 
-      if (!response.ok || !result.ok) {
-        throw new Error("Customer 360 request failed");
+      if (
+        !response.ok ||
+        !result.ok
+      ) {
+        throw new Error(
+          "Customer 360 request failed"
+        );
       }
 
-      setData(result.data);
-      setBackendOnline(true);
-    } catch (error) {
-      console.error(error);
+      setData(
+        result.data
+      );
 
-      setBackendOnline(false);
+      setBackendOnline(
+        true
+      );
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      setBackendOnline(
+        false
+      );
+
       setData(null);
 
-      showNotice("پروفایل مشتری از Backend دریافت نشد.");
+      showNotice(
+        "پروفایل مشتری از Backend دریافت نشد."
+      );
     } finally {
-      setLoading(false);
+      setLoading(
+        false
+      );
+    }
+  }
+
+  async function sendCustomerMessage() {
+    if (
+      !id ||
+      !data
+    ) {
+      return;
+    }
+
+    if (
+      !messageText.trim()
+    ) {
+      showNotice(
+        "لطفاً متن پیام را وارد کن."
+      );
+
+      return;
+    }
+
+    if (
+      messageChannel ===
+        "sms" &&
+      !data.customer.phone
+    ) {
+      showNotice(
+        "برای این مشتری شماره موبایل ثبت نشده است."
+      );
+
+      return;
+    }
+
+    if (
+      messageChannel ===
+        "email" &&
+      !data.customer.email
+    ) {
+      showNotice(
+        "برای این مشتری ایمیل ثبت نشده است."
+      );
+
+      return;
+    }
+
+    try {
+      setSendingMessage(
+        true
+      );
+
+      const response =
+        await fetch(
+          `${API_BASE}/api/customers/${id}/message`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(
+                {
+                  channel:
+                    messageChannel,
+
+                  message:
+                    messageText.trim(),
+                }
+              ),
+          }
+        );
+
+      const result =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !result.ok
+      ) {
+        throw new Error(
+          result?.message ||
+            "Message request failed"
+        );
+      }
+
+      setMessageText(
+        ""
+      );
+
+      setMessageModalOpen(
+        false
+      );
+
+      showNotice(
+        messageChannel ===
+          "sms"
+          ? "پیامک به Messaging Engine ارسال شد."
+          : "ایمیل به Messaging Engine ارسال شد."
+      );
+
+      await loadCustomer();
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      showNotice(
+        "ارسال پیام انجام نشد."
+      );
+    } finally {
+      setSendingMessage(
+        false
+      );
     }
   }
 
@@ -257,45 +628,101 @@ export default function CustomerProfilePage() {
     loadCustomer();
   }, [id]);
 
-  const timeline = useMemo<TimelineItem[]>(() => {
-    if (!data) {
-      return [];
-    }
+  const timeline =
+    useMemo<
+      TimelineItem[]
+    >(() => {
+      if (!data) {
+        return [];
+      }
 
-    const orderItems: TimelineItem[] = data.orders.map((order) => ({
-      id: `order-${order.id}`,
-      type: "order",
-      title: "خرید موفق",
-      description: `${faMoney(order.totalAmount)} از ${sourceToFa(
-        order.source
-      )}`,
-      date: order.createdAt,
-    }));
+      const orderItems:
+        TimelineItem[] =
+        data.orders.map(
+          (order) => ({
+            id: `order-${order.id}`,
 
-    const cartItems: TimelineItem[] = data.carts.map((cart) => ({
-      id: `cart-${cart.id}`,
-      type: "cart",
-      title:
-        cart.status === "abandoned"
-          ? "سبد خرید رهاشده"
-          : "سبد خرید فعال",
-      description: faMoney(cart.totalAmount),
-      date: cart.createdAt,
-    }));
+            type:
+              "order",
 
-    const eventItems: TimelineItem[] = data.events.map((event) => ({
-      id: `event-${event.id}`,
-      type: "event",
-      title: eventToFa(event.type),
-      description: eventDescription(event),
-      date: event.createdAt,
-    }));
+            title:
+              "خرید موفق",
 
-    return [...orderItems, ...cartItems, ...eventItems].sort(
-      (a, b) =>
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  }, [data]);
+            description:
+              `${faMoney(
+                order.totalAmount
+              )} از ${sourceToFa(
+                order.source
+              )}`,
+
+            date:
+              order.createdAt,
+          })
+        );
+
+      const cartItems:
+        TimelineItem[] =
+        data.carts.map(
+          (cart) => ({
+            id: `cart-${cart.id}`,
+
+            type:
+              "cart",
+
+            title:
+              cart.status ===
+              "abandoned"
+                ? "سبد خرید رهاشده"
+                : "سبد خرید فعال",
+
+            description:
+              faMoney(
+                cart.totalAmount
+              ),
+
+            date:
+              cart.createdAt,
+          })
+        );
+
+      const eventItems:
+        TimelineItem[] =
+        data.events.map(
+          (event) => ({
+            id: `event-${event.id}`,
+
+            type:
+              "event",
+
+            title:
+              eventToFa(
+                event.type
+              ),
+
+            description:
+              eventDescription(
+                event
+              ),
+
+            date:
+              event.createdAt,
+          })
+        );
+
+      return [
+        ...orderItems,
+        ...cartItems,
+        ...eventItems,
+      ].sort(
+        (a, b) =>
+          new Date(
+            b.date
+          ).getTime() -
+          new Date(
+            a.date
+          ).getTime()
+      );
+    }, [data]);
 
   if (loading) {
     return (
@@ -335,7 +762,10 @@ export default function CustomerProfilePage() {
             to="/dashboard/crm"
             className="mt-6 inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm"
           >
-            <ArrowRight size={16} />
+            <ArrowRight
+              size={16}
+            />
+
             بازگشت به CRM
           </Link>
         </div>
@@ -363,7 +793,9 @@ export default function CustomerProfilePage() {
               to="/dashboard/crm"
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
-              <ArrowRight size={18} />
+              <ArrowRight
+                size={18}
+              />
             </Link>
 
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/20 to-cyan-500/10">
@@ -428,30 +860,46 @@ export default function CustomerProfilePage() {
                   </h2>
 
                   <span className="rounded-full border border-emerald-400/15 bg-emerald-500/[0.07] px-3 py-1.5 text-xs text-emerald-300">
-                    {customer.status === "active"
+                    {customer.status ===
+                    "active"
                       ? "مشتری فعال"
                       : customer.status}
                   </span>
                 </div>
 
                 <p className="mt-2 text-sm text-white/45">
-                  {customer.company ?? "بدون شرکت"}
+                  {customer.company ??
+                    "بدون شرکت"}
                 </p>
 
                 <div className="mt-5 flex flex-wrap gap-3">
                   <InfoChip
-                    icon={Phone}
-                    value={customer.phone ?? "شماره ثبت نشده"}
+                    icon={
+                      Phone
+                    }
+                    value={
+                      customer.phone ??
+                      "شماره ثبت نشده"
+                    }
                   />
 
                   <InfoChip
-                    icon={EnvelopeSimple}
-                    value={customer.email ?? "ایمیل ثبت نشده"}
+                    icon={
+                      EnvelopeSimple
+                    }
+                    value={
+                      customer.email ??
+                      "ایمیل ثبت نشده"
+                    }
                   />
 
                   <InfoChip
-                    icon={Globe}
-                    value={sourceToFa(customer.source)}
+                    icon={
+                      Globe
+                    }
+                    value={sourceToFa(
+                      customer.source
+                    )}
                   />
                 </div>
               </div>
@@ -471,13 +919,28 @@ export default function CustomerProfilePage() {
               </div>
 
               <p className="mt-4 text-sm leading-8 text-white/50">
-                این مشتری {faNumber(summary.completedOrders)} خرید موفق،
-                {` ${faNumber(summary.abandonedCarts)} `}
-                سبد خرید رهاشده و
-                {` ${faNumber(summary.workflowExecutions)} `}
-                اجرای Workflow دارد. ارزش طول عمر او{" "}
-                {faMoney(summary.lifetimeValue)} و ریسک ریزش{" "}
-                {faNumber(summary.riskScore)} است.
+                این مشتری{" "}
+                {faNumber(
+                  summary.completedOrders
+                )}{" "}
+                خرید موفق،{" "}
+                {faNumber(
+                  summary.abandonedCarts
+                )}{" "}
+                سبد رهاشده و{" "}
+                {faNumber(
+                  summary.workflowExecutions
+                )}{" "}
+                اجرای Workflow دارد.
+                ارزش طول عمر او{" "}
+                {faMoney(
+                  summary.lifetimeValue
+                )}{" "}
+                و ریسک ریزش{" "}
+                {faNumber(
+                  summary.riskScore
+                )}{" "}
+                است.
               </p>
             </div>
           </div>
@@ -486,26 +949,42 @@ export default function CustomerProfilePage() {
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title="درآمد ثبت‌شده"
-            value={faMoney(summary.totalRevenue)}
-            icon={CurrencyCircleDollar}
+            value={faMoney(
+              summary.totalRevenue
+            )}
+            icon={
+              CurrencyCircleDollar
+            }
           />
 
           <StatCard
             title="ارزش طول عمر"
-            value={faMoney(summary.lifetimeValue)}
-            icon={TrendUp}
+            value={faMoney(
+              summary.lifetimeValue
+            )}
+            icon={
+              TrendUp
+            }
           />
 
           <StatCard
             title="خرید موفق"
-            value={faNumber(summary.completedOrders)}
-            icon={CheckCircle}
+            value={faNumber(
+              summary.completedOrders
+            )}
+            icon={
+              CheckCircle
+            }
           />
 
           <StatCard
             title="اجرای Workflow"
-            value={faNumber(summary.workflowExecutions)}
-            icon={Lightning}
+            value={faNumber(
+              summary.workflowExecutions
+            )}
+            icon={
+              Lightning
+            }
           />
         </section>
 
@@ -525,31 +1004,49 @@ export default function CustomerProfilePage() {
               </div>
 
               <div className="mt-6 space-y-3">
-                <DetailRow title="نام" value={customer.name} />
+                <DetailRow
+                  title="نام"
+                  value={
+                    customer.name
+                  }
+                />
 
                 <DetailRow
                   title="شرکت"
-                  value={customer.company ?? "—"}
+                  value={
+                    customer.company ??
+                    "—"
+                  }
                 />
 
                 <DetailRow
                   title="شماره تماس"
-                  value={customer.phone ?? "—"}
+                  value={
+                    customer.phone ??
+                    "—"
+                  }
                 />
 
                 <DetailRow
                   title="ایمیل"
-                  value={customer.email ?? "—"}
+                  value={
+                    customer.email ??
+                    "—"
+                  }
                 />
 
                 <DetailRow
                   title="منبع جذب"
-                  value={sourceToFa(customer.source)}
+                  value={sourceToFa(
+                    customer.source
+                  )}
                 />
 
                 <DetailRow
                   title="آخرین خرید"
-                  value={faDate(customer.lastPurchaseAt)}
+                  value={faDate(
+                    customer.lastPurchaseAt
+                  )}
                 />
               </div>
             </div>
@@ -560,7 +1057,8 @@ export default function CustomerProfilePage() {
                   size={22}
                   weight="duotone"
                   className={
-                    summary.riskScore >= 70
+                    summary.riskScore >=
+                    70
                       ? "text-amber-300"
                       : "text-emerald-300"
                   }
@@ -577,14 +1075,19 @@ export default function CustomerProfilePage() {
                 </div>
 
                 <div className="mt-2 text-3xl font-bold">
-                  {faNumber(summary.riskScore)}
+                  {faNumber(
+                    summary.riskScore
+                  )}
                 </div>
 
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.05]">
                   <div
                     className="h-full rounded-full bg-gradient-to-l from-violet-500 to-cyan-400"
                     style={{
-                      width: `${Math.min(summary.riskScore, 100)}%`,
+                      width: `${Math.min(
+                        summary.riskScore,
+                        100
+                      )}%`,
                     }}
                   />
                 </div>
@@ -612,15 +1115,22 @@ export default function CustomerProfilePage() {
             </div>
 
             <div className="mt-7 space-y-4">
-              {timeline.length === 0 ? (
+              {timeline.length ===
+              0 ? (
                 <EmptyState text="هنوز رویدادی ثبت نشده است." />
               ) : (
-                timeline.map((item) => (
-                  <TimelineRow
-                    key={item.id}
-                    item={item}
-                  />
-                ))
+                timeline.map(
+                  (item) => (
+                    <TimelineRow
+                      key={
+                        item.id
+                      }
+                      item={
+                        item
+                      }
+                    />
+                  )
+                )
               )}
             </div>
           </div>
@@ -647,15 +1157,22 @@ export default function CustomerProfilePage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              {orders.length === 0 ? (
+              {orders.length ===
+              0 ? (
                 <EmptyState text="هنوز سفارشی ثبت نشده است." />
               ) : (
-                orders.map((order) => (
-                  <OrderRow
-                    key={order.id}
-                    order={order}
-                  />
-                ))
+                orders.map(
+                  (order) => (
+                    <OrderRow
+                      key={
+                        order.id
+                      }
+                      order={
+                        order
+                      }
+                    />
+                  )
+                )
               )}
             </div>
           </div>
@@ -680,15 +1197,22 @@ export default function CustomerProfilePage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              {carts.length === 0 ? (
+              {carts.length ===
+              0 ? (
                 <EmptyState text="سبد خریدی ثبت نشده است." />
               ) : (
-                carts.map((cart) => (
-                  <CartRow
-                    key={cart.id}
-                    cart={cart}
-                  />
-                ))
+                carts.map(
+                  (cart) => (
+                    <CartRow
+                      key={
+                        cart.id
+                      }
+                      cart={
+                        cart
+                      }
+                    />
+                  )
+                )
               )}
             </div>
           </div>
@@ -715,20 +1239,32 @@ export default function CustomerProfilePage() {
             </div>
 
             <div className="rounded-full border border-violet-400/15 bg-violet-500/[0.07] px-4 py-2 text-xs text-violet-200">
-              {faNumber(executions.length)} اجرا
+              {faNumber(
+                executions.length
+              )}{" "}
+              اجرا
             </div>
           </div>
 
           <div className="mt-6 space-y-3">
-            {executions.length === 0 ? (
+            {executions.length ===
+            0 ? (
               <EmptyState text="هنوز هیچ Workflowی برای این مشتری اجرا نشده است." />
             ) : (
-              executions.map((execution) => (
-                <WorkflowExecutionRow
-                  key={execution.id}
-                  execution={execution}
-                />
-              ))
+              executions.map(
+                (
+                  execution
+                ) => (
+                  <WorkflowExecutionRow
+                    key={
+                      execution.id
+                    }
+                    execution={
+                      execution
+                    }
+                  />
+                )
+              )
             )}
           </div>
         </section>
@@ -747,50 +1283,57 @@ export default function CustomerProfilePage() {
 
                 <div>
                   <h2 className="text-2xl font-bold">
-                    Customer 360 آماده تصمیم‌گیری است
+                    Customer 360 آماده اقدام است
                   </h2>
 
                   <p className="mt-1 text-sm text-white/40">
-                    CRM → رفتار → Workflow → Action
+                    CRM → پیام → Messaging Engine → History
                   </p>
                 </div>
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                Loadder حالا علاوه بر خرید و رفتار مشتری، تمام Workflowها
-                و Actionهای اجراشده برای همان مشتری را نیز داخل پروفایل
-                او نمایش می‌دهد.
+                حالا می‌توانی از همین پروفایل مستقیماً برای مشتری
+                پیامک یا ایمیل بسازی و نتیجه آن را داخل تاریخچه
+                همان مشتری ثبت کنی.
               </p>
             </div>
 
             <div className="rounded-[26px] border border-white/[0.08] bg-black/20 p-6">
               <div className="font-semibold">
-                اقدام‌های پیشنهادی
+                اقدام‌های مشتری
               </div>
 
               <div className="mt-5 space-y-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMessageModalOpen(
+                      true
+                    )
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold"
+                >
+                  <PaperPlaneTilt
+                    size={17}
+                    weight="duotone"
+                  />
+
+                  ارسال پیام به مشتری
+                </button>
+
                 <Link
                   to="/dashboard/automation"
-                  className="block rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-center text-sm font-semibold"
+                  className="block rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-center text-sm text-white/60"
                 >
                   مشاهده Workflowها
                 </Link>
 
                 <button
                   type="button"
-                  onClick={() =>
-                    showNotice(
-                      "ارسال پیام مستقیم در مرحله بعد به Messaging Engine وصل می‌شود."
-                    )
+                  onClick={
+                    loadCustomer
                   }
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/60"
-                >
-                  ارسال پیام به مشتری
-                </button>
-
-                <button
-                  type="button"
-                  onClick={loadCustomer}
                   className="w-full rounded-xl border border-cyan-400/10 bg-cyan-500/[0.05] px-4 py-3 text-sm text-cyan-200"
                 >
                   بروزرسانی پروفایل
@@ -800,6 +1343,207 @@ export default function CustomerProfilePage() {
           </div>
         </section>
       </div>
+
+      {messageModalOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
+          <div
+            dir="rtl"
+            className="w-full max-w-[560px] overflow-hidden rounded-[30px] border border-white/[0.10] bg-[#080d1d] shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.08]">
+                  <PaperPlaneTilt
+                    size={22}
+                    weight="duotone"
+                    className="text-violet-300"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="font-semibold">
+                    ارسال پیام به مشتری
+                  </h3>
+
+                  <p className="mt-1 text-xs text-white/35">
+                    {customer.name}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setMessageModalOpen(
+                    false
+                  )
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.03] text-white/40 transition hover:text-white"
+              >
+                <X
+                  size={16}
+                />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div>
+                <div className="mb-3 text-sm font-medium text-white/60">
+                  کانال ارسال
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMessageChannel(
+                        "sms"
+                      )
+                    }
+                    className={`rounded-2xl border p-4 text-right transition ${
+                      messageChannel ===
+                      "sms"
+                        ? "border-violet-400/30 bg-violet-500/[0.10]"
+                        : "border-white/[0.07] bg-black/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Phone
+                        size={18}
+                        weight="duotone"
+                        className="text-violet-300"
+                      />
+
+                      <span className="font-semibold">
+                        پیامک
+                      </span>
+                    </div>
+
+                    <div className="mt-2 text-xs text-white/35">
+                      {customer.phone ??
+                        "شماره ثبت نشده"}
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMessageChannel(
+                        "email"
+                      )
+                    }
+                    className={`rounded-2xl border p-4 text-right transition ${
+                      messageChannel ===
+                      "email"
+                        ? "border-cyan-400/30 bg-cyan-500/[0.08]"
+                        : "border-white/[0.07] bg-black/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <EnvelopeSimple
+                        size={18}
+                        weight="duotone"
+                        className="text-cyan-300"
+                      />
+
+                      <span className="font-semibold">
+                        ایمیل
+                      </span>
+                    </div>
+
+                    <div className="mt-2 truncate text-xs text-white/35">
+                      {customer.email ??
+                        "ایمیل ثبت نشده"}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-white/60">
+                    متن پیام
+                  </span>
+
+                  <span className="text-xs text-white/25">
+                    {faNumber(
+                      messageText.length
+                    )}{" "}
+                    کاراکتر
+                  </span>
+                </div>
+
+                <textarea
+                  value={
+                    messageText
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setMessageText(
+                      event.target
+                        .value
+                    )
+                  }
+                  rows={6}
+                  placeholder={`${customer.name} عزیز، یک پیشنهاد ویژه برای شما داریم...`}
+                  className="w-full resize-none rounded-2xl border border-white/[0.08] bg-black/25 p-4 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-violet-400/25"
+                />
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+                <div className="text-xs text-white/35">
+                  مقصد ارسال
+                </div>
+
+                <div className="mt-2 font-semibold">
+                  {messageChannel ===
+                  "sms"
+                    ? customer.phone ??
+                      "شماره موبایل موجود نیست"
+                    : customer.email ??
+                      "ایمیل موجود نیست"}
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={
+                    sendCustomerMessage
+                  }
+                  disabled={
+                    sendingMessage ||
+                    !messageText.trim()
+                  }
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <PaperPlaneTilt
+                    size={18}
+                    weight="fill"
+                  />
+
+                  {sendingMessage
+                    ? "در حال ارسال..."
+                    : "ارسال پیام"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMessageModalOpen(
+                      false
+                    )
+                  }
+                  className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-3.5 text-sm text-white/55"
+                >
+                  انصراف
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {notice && (
         <div className="fixed bottom-7 left-7 z-[100] max-w-md rounded-2xl border border-violet-300/20 bg-[#090e1e]/95 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
@@ -886,9 +1630,11 @@ function TimelineRow({
   item: TimelineItem;
 }) {
   const Icon =
-    item.type === "order"
+    item.type ===
+    "order"
       ? CheckCircle
-      : item.type === "cart"
+      : item.type ===
+          "cart"
         ? ShoppingCart
         : Lightning;
 
@@ -915,7 +1661,9 @@ function TimelineRow({
           </div>
 
           <div className="shrink-0 text-xs text-white/25">
-            {faDate(item.date)}
+            {faDate(
+              item.date
+            )}
           </div>
         </div>
       </div>
@@ -933,18 +1681,28 @@ function OrderRow({
       <div className="flex items-center justify-between">
         <div>
           <div className="font-semibold">
-            {faMoney(order.totalAmount)}
+            {faMoney(
+              order.totalAmount
+            )}
           </div>
 
           <div className="mt-1 text-xs text-white/35">
-            {sourceToFa(order.source)} • {faDate(order.createdAt)}
+            {sourceToFa(
+              order.source
+            )}{" "}
+            •{" "}
+            {faDate(
+              order.createdAt
+            )}
           </div>
         </div>
 
         <span className="rounded-full border border-emerald-400/15 bg-emerald-500/[0.07] px-3 py-1.5 text-xs text-emerald-300">
-          {order.paymentStatus === "paid"
+          {order.paymentStatus ===
+          "paid"
             ? "پرداخت‌شده"
-            : order.paymentStatus ?? order.status}
+            : order.paymentStatus ??
+              order.status}
         </span>
       </div>
     </div>
@@ -956,18 +1714,24 @@ function CartRow({
 }: {
   cart: Cart;
 }) {
-  const isAbandoned = cart.status === "abandoned";
+  const isAbandoned =
+    cart.status ===
+    "abandoned";
 
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
       <div className="flex items-center justify-between">
         <div>
           <div className="font-semibold">
-            {faMoney(cart.totalAmount)}
+            {faMoney(
+              cart.totalAmount
+            )}
           </div>
 
           <div className="mt-1 text-xs text-white/35">
-            {faDate(cart.createdAt)}
+            {faDate(
+              cart.createdAt
+            )}
           </div>
         </div>
 
@@ -978,7 +1742,9 @@ function CartRow({
               : "border-cyan-400/15 bg-cyan-500/[0.07] text-cyan-300"
           }`}
         >
-          {isAbandoned ? "رهاشده" : "فعال"}
+          {isAbandoned
+            ? "رهاشده"
+            : "فعال"}
         </span>
       </div>
     </div>
@@ -988,26 +1754,51 @@ function CartRow({
 function WorkflowExecutionRow({
   execution,
 }: {
-  execution: WorkflowExecution;
+  execution:
+    WorkflowExecution;
 }) {
-  const actionMap: Record<string, string> = {
-    send_message: "ارسال پیام",
-    send_offer: "ارسال پیشنهاد",
-    create_task: "ساخت وظیفه",
-    create_campaign: "ساخت کمپین",
-    create_alert: "ایجاد هشدار",
+  const actionMap: Record<
+    string,
+    string
+  > = {
+    send_message:
+      "ارسال پیام",
+
+    send_offer:
+      "ارسال پیشنهاد",
+
+    create_task:
+      "ساخت وظیفه",
+
+    create_campaign:
+      "ساخت کمپین",
+
+    create_alert:
+      "ایجاد هشدار",
   };
 
-  const channelMap: Record<string, string> = {
-    sms: "پیامک",
-    email: "ایمیل",
-    crm: "CRM",
-    dashboard: "داشبورد",
+  const channelMap: Record<
+    string,
+    string
+  > = {
+    sms:
+      "پیامک",
+
+    email:
+      "ایمیل",
+
+    crm:
+      "CRM",
+
+    dashboard:
+      "داشبورد",
   };
 
   const isSuccess =
-    execution.status === "completed" ||
-    execution.status === "simulated";
+    execution.status ===
+      "completed" ||
+    execution.status ===
+      "simulated";
 
   return (
     <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5">
@@ -1038,12 +1829,16 @@ function WorkflowExecutionRow({
             </div>
 
             <div className="mt-2 text-xs text-white/35">
-              {actionMap[execution.actionType] ??
+              {actionMap[
+                execution.actionType
+              ] ??
                 execution.actionType}
 
               {execution.channel
                 ? ` • ${
-                    channelMap[execution.channel] ??
+                    channelMap[
+                      execution.channel
+                    ] ??
                     execution.channel
                   }`
                 : ""}
@@ -1051,7 +1846,10 @@ function WorkflowExecutionRow({
 
             {execution.recipient && (
               <div className="mt-1 text-xs text-white/30">
-                مقصد: {execution.recipient}
+                مقصد:{" "}
+                {
+                  execution.recipient
+                }
               </div>
             )}
           </div>
@@ -1059,7 +1857,9 @@ function WorkflowExecutionRow({
 
         <div className="flex items-center gap-4">
           <div className="text-xs text-white/30">
-            {faDate(execution.timestamp)}
+            {faDate(
+              execution.timestamp
+            )}
           </div>
 
           <span
@@ -1069,9 +1869,11 @@ function WorkflowExecutionRow({
                 : "border-amber-400/15 bg-amber-500/[0.07] text-amber-300"
             }`}
           >
-            {execution.status === "simulated"
+            {execution.status ===
+            "simulated"
               ? "آزمایشی"
-              : execution.status === "completed"
+              : execution.status ===
+                  "completed"
                 ? "انجام‌شده"
                 : execution.status}
           </span>
