@@ -11,7 +11,6 @@ import {
   MagnifyingGlass,
   Funnel,
   Phone,
-  EnvelopeSimple,
   ChatCircleText,
   CalendarBlank,
   Sparkle,
@@ -25,6 +24,8 @@ import {
   Star,
   UserCircle,
 } from "@phosphor-icons/react";
+
+import { businessData } from "../data/businessData";
 
 type LeadStatus =
   | "جدید"
@@ -99,25 +100,25 @@ const leads: Lead[] = [
 const stats = [
   {
     title: "کل مشتریان",
-    value: "۱,۲۴۸",
+    value: businessData.crm.totalCustomers.toLocaleString("fa-IR"),
     change: "+۹٪",
     icon: UsersThree,
   },
   {
     title: "مشتریان بالقوه جدید",
-    value: "۲۱۳",
+    value: businessData.crm.newLeads.toLocaleString("fa-IR"),
     change: "+۱۲٪",
     icon: UserPlus,
   },
   {
     title: "لیدهای داغ",
-    value: "۳۲",
+    value: businessData.crm.hotLeads.toLocaleString("fa-IR"),
     change: "+۱۸٪",
     icon: Target,
   },
   {
     title: "ارزش فرصت‌های فروش",
-    value: "۱.۲ میلیارد",
+    value: businessData.sales.opportunityValueLabel,
     change: "+۲۱٪",
     icon: CurrencyCircleDollar,
   },
@@ -126,7 +127,7 @@ const stats = [
 const funnelSteps = [
   {
     title: "ورودی جدید",
-    value: "۲۱۳",
+    value: businessData.crm.newLeads.toLocaleString("fa-IR"),
     width: "100%",
   },
   {
@@ -141,7 +142,7 @@ const funnelSteps = [
   },
   {
     title: "آماده خرید",
-    value: "۴۸",
+    value: businessData.crm.hotLeads.toLocaleString("fa-IR"),
     width: "46%",
   },
   {
@@ -185,6 +186,12 @@ export default function CRMPage() {
 
   const [notice, setNotice] = useState("");
 
+  const activeCustomerPercent = Math.round(
+    (businessData.crm.activeCustomers /
+      businessData.crm.totalCustomers) *
+      100
+  );
+
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       const matchQuery =
@@ -213,7 +220,6 @@ export default function CRMPage() {
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
-      {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
@@ -247,7 +253,7 @@ export default function CRMPage() {
             type="button"
             onClick={() =>
               showNotice(
-                "ساخت مشتری جدید در مرحله بعد فعال می‌شود."
+                "ساخت مشتری جدید در مرحله اتصال CRM واقعی فعال می‌شود."
               )
             }
             className="flex items-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold shadow-[0_10px_30px_rgba(99,102,241,.18)]"
@@ -259,7 +265,6 @@ export default function CRMPage() {
       </header>
 
       <div className="relative z-10 mx-auto max-w-[1550px] px-8 py-8">
-        {/* HERO */}
         <section className="relative overflow-hidden rounded-[34px] border border-violet-400/15 bg-[#080d1d]/68 p-8 backdrop-blur-xl">
           <div className="pointer-events-none absolute -right-24 -top-24 h-[360px] w-[360px] rounded-full bg-violet-600/[0.13] blur-[130px]" />
 
@@ -304,15 +309,16 @@ export default function CRMPage() {
               </div>
 
               <p className="mt-4 text-sm leading-8 text-white/55">
-                ۳۲ مشتری بالقوه با امتیاز بالا آماده پیگیری هستند.
-                اولویت امروز روی لیدهای تبلیغات گوگل و وب‌سایت قرار دارد.
+                {businessData.crm.hotLeads.toLocaleString("fa-IR")} مشتری
+                بالقوه با امتیاز بالا آماده پیگیری هستند. اولویت امروز
+                روی لیدهای داغ و فرصت‌های نزدیک به خرید قرار دارد.
               </p>
 
               <button
                 type="button"
                 onClick={() =>
                   showNotice(
-                    "فهرست لیدهای داغ در مرحله اتصال داده‌ها فعال می‌شود."
+                    "فهرست لیدهای داغ در مرحله اتصال CRM واقعی فعال می‌شود."
                   )
                 }
                 className="mt-5 flex items-center gap-2 rounded-xl border border-violet-300/15 bg-violet-500/[0.08] px-4 py-3 text-sm text-violet-200"
@@ -327,7 +333,6 @@ export default function CRMPage() {
           </div>
         </section>
 
-        {/* STATS */}
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((item) => (
             <StatCard
@@ -337,7 +342,6 @@ export default function CRMPage() {
           ))}
         </section>
 
-        {/* SEARCH + FILTER */}
         <section className="mt-8 rounded-[28px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative w-full max-w-xl">
@@ -385,7 +389,6 @@ export default function CRMPage() {
           </div>
         </section>
 
-        {/* LEADS + FUNNEL */}
         <section className="mt-8 grid gap-5 xl:grid-cols-[1.5fr_0.85fr]">
           <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
             <div className="flex items-end justify-between">
@@ -400,7 +403,7 @@ export default function CRMPage() {
               </div>
 
               <span className="text-xs text-white/35">
-                {filteredLeads.length} مورد
+                {filteredLeads.length.toLocaleString("fa-IR")} مورد
               </span>
             </div>
 
@@ -411,7 +414,7 @@ export default function CRMPage() {
                   lead={lead}
                   onOpen={() =>
                     showNotice(
-                      `پروفایل «${lead.name}» در مرحله بعد باز می‌شود.`
+                      `پروفایل «${lead.name}» در مرحله اتصال CRM واقعی باز می‌شود.`
                     )
                   }
                 />
@@ -453,7 +456,7 @@ export default function CRMPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xs text-white/30">
-                          مرحله {index + 1}
+                          مرحله {(index + 1).toLocaleString("fa-IR")}
                         </div>
 
                         <div className="mt-0.5 text-sm font-semibold">
@@ -472,7 +475,6 @@ export default function CRMPage() {
           </aside>
         </section>
 
-        {/* CUSTOMER HEALTH */}
         <section className="mt-8">
           <div>
             <h2 className="text-xl font-semibold">
@@ -487,21 +489,21 @@ export default function CRMPage() {
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <HealthCard
               title="مشتریان وفادار"
-              value={82}
+              value={businessData.crm.retentionRate}
               text="خرید مجدد و تعامل بالا"
               icon={Star}
             />
 
             <HealthCard
               title="مشتریان فعال"
-              value={76}
-              text="تعامل مناسب در ۳۰ روز اخیر"
+              value={activeCustomerPercent}
+              text="تعامل مناسب در دوره فعلی"
               icon={UsersThree}
             />
 
             <HealthCard
               title="مشتریان در معرض ریزش"
-              value={18}
+              value={businessData.crm.churnRate}
               text="نیازمند ارتباط مجدد"
               icon={WarningCircle}
               danger
@@ -509,14 +511,13 @@ export default function CRMPage() {
 
             <HealthCard
               title="کیفیت داده مشتری"
-              value={91}
+              value={businessData.business.dataQuality}
               text="اطلاعات کامل و قابل اتکا"
               icon={CheckCircle}
             />
           </div>
         </section>
 
-        {/* ACTIVITY + TASKS */}
         <section className="mt-8 grid gap-5 xl:grid-cols-[1.15fr_1fr]">
           <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
             <div className="flex items-center justify-between">
@@ -568,29 +569,32 @@ export default function CRMPage() {
 
             <div className="mt-6 space-y-3">
               <PriorityRow
-                title="تماس با ۱۲ لید داغ"
+                title={`تماس با ${businessData.crm.hotLeads.toLocaleString(
+                  "fa-IR"
+                )} لید داغ`}
                 value="اولویت بالا"
               />
 
               <PriorityRow
-                title="پیگیری ۸ پیشنهاد فروش"
+                title="پیگیری پیشنهادهای فروش"
                 value="امروز"
               />
 
               <PriorityRow
-                title="بازگشت ۱۴ مشتری غیرفعال"
+                title="بازگشت مشتریان غیرفعال"
                 value="پیشنهاد AI"
               />
 
               <PriorityRow
-                title="تکمیل اطلاعات ۲۶ مشتری"
-                value="داده ناقص"
+                title="تکمیل اطلاعات مشتریان"
+                value={`کیفیت داده ${businessData.business.dataQuality.toLocaleString(
+                  "fa-IR"
+                )}٪`}
               />
             </div>
           </div>
         </section>
 
-        {/* CRM INTELLIGENCE */}
         <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8 backdrop-blur-xl">
           <div className="grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
@@ -615,10 +619,9 @@ export default function CRMPage() {
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                در نسخه هوشمند، Loadder رفتار مشتری، تعاملات،
-                سابقه خرید، منبع جذب و نتایج کمپین‌ها را کنار هم
-                قرار می‌دهد تا احتمال خرید، ریزش و ارزش هر مشتری
-                را پیش‌بینی کند.
+                Loadder رفتار مشتری، تعاملات، سابقه خرید، منبع جذب و
+                نتایج کمپین‌ها را کنار هم قرار می‌دهد تا احتمال خرید،
+                ریزش و ارزش هر مشتری را پیش‌بینی کند.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
@@ -657,10 +660,12 @@ export default function CRMPage() {
 
               <div className="mt-5 space-y-3">
                 <ActionButton
-                  text="نمایش لیدهای آماده خرید"
+                  text={`نمایش ${businessData.crm.hotLeads.toLocaleString(
+                    "fa-IR"
+                  )} لید آماده خرید`}
                   onClick={() =>
                     showNotice(
-                      "فهرست لیدهای داغ بعداً از داده واقعی ساخته می‌شود."
+                      "فهرست لیدهای داغ بعداً از داده واقعی CRM ساخته می‌شود."
                     )
                   }
                 />
@@ -678,7 +683,7 @@ export default function CRMPage() {
                   type="button"
                   onClick={() =>
                     showNotice(
-                      "اجرای خودکار پس از اتصال Business Brain فعال می‌شود."
+                      "اجرای هوشمند پس از اتصال Business Brain فعال می‌شود."
                     )
                   }
                   className="w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold"
@@ -784,8 +789,9 @@ function LeadRow({
           <div className="text-xs text-white/30">
             امتیاز
           </div>
+
           <div className="mt-1 text-sm font-bold text-cyan-300">
-            {lead.score}
+            {lead.score.toLocaleString("fa-IR")}
           </div>
         </div>
 
@@ -793,6 +799,7 @@ function LeadRow({
           <div className="text-xs text-white/30">
             ارزش فرصت
           </div>
+
           <div className="mt-1 text-sm font-semibold">
             {lead.value}
           </div>
@@ -802,6 +809,7 @@ function LeadRow({
           <div className="text-xs text-white/30">
             آخرین فعالیت
           </div>
+
           <div className="mt-1 text-sm text-white/55">
             {lead.lastAction}
           </div>
@@ -832,6 +840,8 @@ function HealthCard({
   icon: React.ElementType;
   danger?: boolean;
 }) {
+  const safeValue = Math.max(0, Math.min(100, value));
+
   return (
     <div className="rounded-[26px] border border-white/[0.08] bg-[#080d1d]/62 p-6 backdrop-blur-xl">
       <div className="flex items-start justify-between">
@@ -847,7 +857,7 @@ function HealthCard({
                 : "text-cyan-300"
             }`}
           >
-            {value}٪
+            {safeValue.toLocaleString("fa-IR")}٪
           </div>
         </div>
 
@@ -870,7 +880,7 @@ function HealthCard({
               : "bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-300"
           }`}
           style={{
-            width: `${value}%`,
+            width: `${safeValue}%`,
           }}
         />
       </div>
