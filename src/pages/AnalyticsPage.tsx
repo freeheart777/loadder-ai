@@ -3,237 +3,205 @@ import { Link } from "react-router-dom";
 
 import {
   ArrowRight,
-  Brain,
   ChartLineUp,
-  Sparkle,
-  Globe,
-  InstagramLogo,
+  TrendUp,
+  TrendDown,
+  CurrencyCircleDollar,
   Megaphone,
   UsersThree,
-  CurrencyCircleDollar,
-  ShoppingCart,
-  DeviceMobile,
-  UserPlus,
   Target,
-  TrendUp,
-  ArrowUp,
-  ArrowDown,
+  Globe,
+  ShoppingCart,
+  Sparkle,
+  Brain,
   Eye,
+  Funnel,
   Lightning,
-  CheckCircle,
   WarningCircle,
-  Gauge,
+  CheckCircle,
+  Storefront,
+  UserPlus,
+  Repeat,
+  Package,
 } from "@phosphor-icons/react";
 
-type ServiceId =
-  | "overview"
-  | "website"
-  | "social"
-  | "ads"
-  | "crm"
-  | "sales"
-  | "app";
+import { businessData } from "../data/businessData";
 
-type ChartPoint = {
-  label: string;
-  value: number;
-};
+type Period = "۷ روز" | "۳۰ روز" | "۹۰ روز";
 
-type Service = {
-  id: ServiceId;
+type MetricCardData = {
   title: string;
-  subtitle: string;
-  icon: React.ElementType;
   value: string;
-  change: number;
-  metric: string;
+  change: string;
+  positive: boolean;
+  icon: React.ElementType;
+  description: string;
 };
 
-const services: Service[] = [
+type ChannelPerformance = {
+  title: string;
+  visitors: string;
+  leads: string;
+  sales: string;
+  conversion: string;
+  score: number;
+};
+
+type Insight = {
+  title: string;
+  description: string;
+  type: "positive" | "warning" | "opportunity";
+};
+
+function faNumber(value: number) {
+  return value.toLocaleString("fa-IR");
+}
+
+function faPercent(value: number) {
+  return `${value.toLocaleString("fa-IR")}٪`;
+}
+
+const metrics: MetricCardData[] = [
   {
-    id: "overview",
-    title: "نمای کلی",
-    subtitle: "تصویر یکپارچه کسب‌وکار",
-    icon: Brain,
-    value: "۸۶٪",
-    change: 12,
-    metric: "سلامت کسب‌وکار",
+    title: "درآمد کل",
+    value: businessData.sales.revenueLabel,
+    change: "+۱۷٪",
+    positive: true,
+    icon: CurrencyCircleDollar,
+    description: "مجموع درآمد ثبت‌شده در دوره فعلی",
   },
   {
-    id: "website",
-    title: "وب‌سایت",
-    subtitle: "بازدید و تبدیل",
-    icon: Globe,
-    value: "۴۸.۲K",
-    change: 18,
-    metric: "بازدید",
+    title: "فروش آنلاین سایت",
+    value: businessData.ecommerce.onlineRevenueLabel,
+    change: "+۲۱٪",
+    positive: true,
+    icon: Storefront,
+    description: "درآمد حاصل از سفارش‌های آنلاین",
   },
   {
-    id: "social",
-    title: "شبکه‌های اجتماعی",
-    subtitle: "دیده‌شدن و تعامل",
-    icon: InstagramLogo,
-    value: "۱۱۸K",
-    change: 14,
-    metric: "دسترسی",
-  },
-  {
-    id: "ads",
-    title: "تبلیغات",
-    subtitle: "عملکرد و بازده",
+    title: "بازده تبلیغات",
+    value: `${businessData.marketing.roas.toLocaleString("fa-IR")} برابر`,
+    change: "+۱۲٪",
+    positive: true,
     icon: Megaphone,
-    value: "۴.۸x",
-    change: 21,
-    metric: "بازده تبلیغات",
+    description: "بازده هزینه تبلیغات نسبت به درآمد",
   },
   {
-    id: "crm",
-    title: "ارتباط با مشتری",
-    subtitle: "لید و مشتری",
-    icon: UsersThree,
-    value: "۱,۲۴۸",
-    change: 9,
-    metric: "مشتری",
-  },
-  {
-    id: "sales",
-    title: "فروش",
-    subtitle: "درآمد و خرید",
-    icon: ShoppingCart,
-    value: "۳۸۴M",
-    change: 17,
-    metric: "درآمد",
-  },
-  {
-    id: "app",
-    title: "اپلیکیشن",
-    subtitle: "نصب و بازگشت",
-    icon: DeviceMobile,
-    value: "—",
-    change: 0,
-    metric: "آینده",
+    title: "نرخ تبدیل",
+    value: faPercent(businessData.website.conversionRate),
+    change: "+۸٪",
+    positive: true,
+    icon: Target,
+    description: "تبدیل بازدیدکننده به مشتری یا خرید",
   },
 ];
 
-const chartData: Record<ServiceId, ChartPoint[]> = {
-  overview: [
-    { label: "هفته ۱", value: 54 },
-    { label: "هفته ۲", value: 61 },
-    { label: "هفته ۳", value: 58 },
-    { label: "هفته ۴", value: 68 },
-    { label: "هفته ۵", value: 72 },
-    { label: "هفته ۶", value: 78 },
-    { label: "هفته ۷", value: 82 },
-    { label: "هفته ۸", value: 86 },
-  ],
-  website: [
-    { label: "هفته ۱", value: 28 },
-    { label: "هفته ۲", value: 34 },
-    { label: "هفته ۳", value: 31 },
-    { label: "هفته ۴", value: 39 },
-    { label: "هفته ۵", value: 42 },
-    { label: "هفته ۶", value: 41 },
-    { label: "هفته ۷", value: 46 },
-    { label: "هفته ۸", value: 48 },
-  ],
-  social: [
-    { label: "هفته ۱", value: 62 },
-    { label: "هفته ۲", value: 70 },
-    { label: "هفته ۳", value: 66 },
-    { label: "هفته ۴", value: 81 },
-    { label: "هفته ۵", value: 87 },
-    { label: "هفته ۶", value: 94 },
-    { label: "هفته ۷", value: 105 },
-    { label: "هفته ۸", value: 118 },
-  ],
-  ads: [
-    { label: "هفته ۱", value: 2.4 },
-    { label: "هفته ۲", value: 2.8 },
-    { label: "هفته ۳", value: 3.1 },
-    { label: "هفته ۴", value: 2.9 },
-    { label: "هفته ۵", value: 3.6 },
-    { label: "هفته ۶", value: 4.1 },
-    { label: "هفته ۷", value: 4.3 },
-    { label: "هفته ۸", value: 4.8 },
-  ],
-  crm: [
-    { label: "هفته ۱", value: 720 },
-    { label: "هفته ۲", value: 790 },
-    { label: "هفته ۳", value: 845 },
-    { label: "هفته ۴", value: 910 },
-    { label: "هفته ۵", value: 980 },
-    { label: "هفته ۶", value: 1060 },
-    { label: "هفته ۷", value: 1140 },
-    { label: "هفته ۸", value: 1248 },
-  ],
-  sales: [
-    { label: "هفته ۱", value: 220 },
-    { label: "هفته ۲", value: 246 },
-    { label: "هفته ۳", value: 238 },
-    { label: "هفته ۴", value: 271 },
-    { label: "هفته ۵", value: 294 },
-    { label: "هفته ۶", value: 318 },
-    { label: "هفته ۷", value: 346 },
-    { label: "هفته ۸", value: 384 },
-  ],
-  app: [
-    { label: "هفته ۱", value: 0 },
-    { label: "هفته ۲", value: 0 },
-    { label: "هفته ۳", value: 0 },
-    { label: "هفته ۴", value: 0 },
-    { label: "هفته ۵", value: 0 },
-    { label: "هفته ۶", value: 0 },
-    { label: "هفته ۷", value: 0 },
-    { label: "هفته ۸", value: 0 },
-  ],
-};
+const channelPerformance: ChannelPerformance[] = [
+  {
+    title: "تبلیغات گوگل",
+    visitors: "۱۸,۴۰۰",
+    leads: "۸۶",
+    sales: "۷۸ میلیون",
+    conversion: "۷.۸٪",
+    score: 92,
+  },
+  {
+    title: "اینستاگرام",
+    visitors: "۱۲,۷۰۰",
+    leads: "۵۸",
+    sales: "۵۲ میلیون",
+    conversion: "۶.۴٪",
+    score: 84,
+  },
+  {
+    title: "ورودی مستقیم",
+    visitors: "۹,۳۰۰",
+    leads: "۴۱",
+    sales: "۳۹ میلیون",
+    conversion: "۵.۹٪",
+    score: 78,
+  },
+  {
+    title: "معرفی مشتری",
+    visitors: "۴,۸۰۰",
+    leads: "۲۸",
+    sales: "۲۹ میلیون",
+    conversion: "۸.۲٪",
+    score: 88,
+  },
+];
 
-const funnel = [
+const insights: Insight[] = [
   {
-    title: "افرادی که شما را دیدند",
-    value: "۲۴۸ هزار",
-    width: "100%",
+    title: "فروش آنلاین در حال رشد است",
+    description:
+      "درآمد فروشگاه نسبت به دوره قبل افزایش داشته و سهم بیشتری از درآمد کل گرفته است.",
+    type: "positive",
   },
   {
-    title: "افرادی که وارد سایت شدند",
-    value: "۴۸.۲ هزار",
-    width: "82%",
+    title: "سبد خرید رهاشده فرصت فوری است",
+    description: `${faNumber(
+      businessData.ecommerce.abandonedCarts
+    )} سبد خرید رهاشده شناسایی شده که می‌تواند با اتوماسیون بازیابی شود.`,
+    type: "opportunity",
   },
   {
-    title: "افرادی که علاقه نشان دادند",
-    value: "۲۱۳",
-    width: "64%",
+    title: "هزینه جذب باید کنترل شود",
+    description: `هزینه جذب فعلی ${businessData.marketing.cacLabel} است و کاهش آن می‌تواند سودآوری رشد را بالا ببرد.`,
+    type: "warning",
+  },
+];
+
+const salesTrend = [58, 62, 66, 63, 72, 76, 82, 88];
+
+const ecommerceFunnel = [
+  {
+    title: "بازدید سایت",
+    value: businessData.website.visits,
+    width: 100,
   },
   {
-    title: "افرادی که آماده خرید شدند",
-    value: "۱۲۴",
-    width: "48%",
+    title: "مشاهده محصول",
+    value: businessData.website.productViews,
+    width: 82,
   },
   {
-    title: "مشتریان واقعی",
-    value: "۸۶",
-    width: "34%",
+    title: "افزودن به سبد",
+    value: businessData.website.addToCart,
+    width: 62,
+  },
+  {
+    title: "شروع پرداخت",
+    value: businessData.ecommerce.checkoutStarted,
+    width: 48,
+  },
+  {
+    title: "خرید موفق",
+    value: businessData.ecommerce.completedPurchases,
+    width: 34,
   },
 ];
 
 export default function AnalyticsPage() {
-  const [activeService, setActiveService] =
-    useState<ServiceId>("overview");
+  const [period, setPeriod] = useState<Period>("۳۰ روز");
+  const [activeChannel, setActiveChannel] = useState("تبلیغات گوگل");
+  const [notice, setNotice] = useState("");
 
-  const [period, setPeriod] = useState("۳۰ روز");
+  const currentChannel = useMemo(
+    () =>
+      channelPerformance.find(
+        (channel) => channel.title === activeChannel
+      ) ?? channelPerformance[0],
+    [activeChannel]
+  );
 
-  const currentService =
-    services.find((item) => item.id === activeService) ??
-    services[0];
+  const showNotice = (message: string) => {
+    setNotice(message);
 
-  const currentData = chartData[activeService];
-
-  const maxValue = useMemo(() => {
-    return Math.max(
-      ...currentData.map((item) => item.value),
-      1
-    );
-  }, [currentData]);
+    window.setTimeout(() => {
+      setNotice("");
+    }, 2200);
+  };
 
   return (
     <main
@@ -261,65 +229,59 @@ export default function AnalyticsPage() {
 
             <div>
               <h1 className="text-2xl font-bold">
-                مرکز تحلیل و هوشمندی
+                تحلیل و گزارش
               </h1>
 
               <p className="mt-1 text-sm text-white/45">
-                تصویر کامل داده‌های کسب‌وکار شما
+                فروش، تبلیغات، مشتری و رفتار سایت در یک نمای مشترک
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {["۷ روز", "۳۰ روز", "۹۰ روز"].map(
-              (item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setPeriod(item)}
-                  className={`rounded-xl border px-4 py-2.5 text-sm transition ${
-                    period === item
-                      ? "border-violet-400/25 bg-violet-500/[0.12] text-violet-200"
-                      : "border-white/[0.07] bg-white/[0.03] text-white/45 hover:bg-white/[0.06]"
-                  }`}
-                >
-                  {item}
-                </button>
-              )
-            )}
+          <div className="flex gap-2">
+            {(["۷ روز", "۳۰ روز", "۹۰ روز"] as Period[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setPeriod(item)}
+                className={`rounded-xl border px-4 py-2.5 text-sm transition ${
+                  period === item
+                    ? "border-violet-400/25 bg-violet-500/[0.10] text-violet-200"
+                    : "border-white/[0.07] bg-white/[0.03] text-white/45"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
           </div>
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto max-w-[1550px] px-8 py-8">
+      <div className="mx-auto max-w-[1550px] px-8 py-8">
         {/* HERO */}
         <section className="relative overflow-hidden rounded-[34px] border border-violet-400/15 bg-[#080d1d]/68 p-8 backdrop-blur-xl">
           <div className="pointer-events-none absolute -right-24 -top-24 h-[360px] w-[360px] rounded-full bg-violet-600/[0.13] blur-[130px]" />
+          <div className="pointer-events-none absolute -bottom-32 left-[20%] h-[320px] w-[320px] rounded-full bg-cyan-500/[0.08] blur-[120px]" />
 
-          <div className="pointer-events-none absolute -bottom-32 left-[22%] h-[320px] w-[320px] rounded-full bg-cyan-500/[0.08] blur-[120px]" />
-
-          <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_370px]">
+          <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_380px]">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/15 bg-violet-500/[0.08] px-4 py-2 text-sm text-violet-200">
-                <Brain
-                  size={16}
-                  weight="duotone"
-                />
-                تحلیل هوشمند کسب‌وکار
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-2 text-sm text-cyan-200">
+                <Brain size={16} weight="duotone" />
+                تحلیل یکپارچه Loadder
               </div>
 
               <h2 className="mt-5 max-w-4xl text-3xl font-bold leading-[1.55]">
-                فقط عدد نبین؛
+                بفهم رشد از کجا می‌آید،
                 <span className="bg-gradient-to-l from-cyan-300 via-blue-400 to-violet-400 bg-clip-text text-transparent">
                   {" "}
-                  بفهم چه اتفاقی افتاده و چرا.
+                  کجا پول از دست می‌رود و قدم بعدی چیست.
                 </span>
               </h2>
 
               <p className="mt-4 max-w-3xl text-base leading-9 text-white/50">
-                Loadder داده‌های سایت، شبکه‌های اجتماعی،
-                تبلیغات، مشتریان و فروش را کنار هم تحلیل
-                می‌کند تا روند واقعی رشد کسب‌وکار مشخص شود.
+                Analytics داده‌های سایت، CRM، فروش آنلاین، تبلیغات،
+                محتوا و KPI را کنار هم قرار می‌دهد تا فقط گزارش نبینی؛
+                دلیل اتفاق‌ها را هم بفهمی.
               </p>
             </div>
 
@@ -332,207 +294,56 @@ export default function AnalyticsPage() {
                 />
 
                 <h3 className="text-lg font-semibold">
-                  تحلیل امروز Loadder
+                  خلاصه هوشمند
                 </h3>
               </div>
 
               <p className="mt-4 text-sm leading-8 text-white/55">
-                رشد فروش بیشتر از افزایش کیفیت لیدها و
-                بهبود عملکرد تبلیغات ایجاد شده است.
-                شبکه‌های اجتماعی بیشترین دیده‌شدن را ایجاد
-                می‌کنند اما تبلیغات جست‌وجویی مشتریان
-                باکیفیت‌تری می‌سازد.
+                فروش آنلاین در وضعیت مثبت است، اما سبدهای رهاشده و
+                هزینه جذب مشتری هنوز دو نقطه مهم برای بهینه‌سازی هستند.
               </p>
 
-              <button
-                type="button"
-                className="mt-5 flex items-center gap-2 rounded-xl border border-violet-300/15 bg-violet-500/[0.08] px-4 py-3 text-sm text-violet-200"
-              >
-                <Lightning
-                  size={16}
-                  weight="fill"
-                />
-                مشاهده پیشنهاد اجرایی
-              </button>
+              <div className="mt-5 flex items-center gap-2 text-xs text-cyan-300">
+                <TrendUp size={16} />
+                احتمال رشد فعلی{" "}
+                {faPercent(
+                  businessData.predictive.growthProbability
+                )}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* EXECUTIVE KPI */}
-        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <KPICard
-            title="درآمد"
-            value="۳۸۴ میلیون"
-            change={17}
-            icon={CurrencyCircleDollar}
-          />
-
-          <KPICard
-            title="لید جدید"
-            value="۲۱۳"
-            change={12}
-            icon={UserPlus}
-          />
-
-          <KPICard
-            title="نرخ تبدیل"
-            value="۶.۸٪"
-            change={8}
-            icon={Target}
-          />
-
-          <KPICard
-            title="هزینه جذب مشتری"
-            value="۴۸۰ هزار"
-            change={-9}
-            icon={UsersThree}
-            reversePositive
-          />
-
-          <KPICard
-            title="بازده تبلیغات"
-            value="۴.۸ برابر"
-            change={21}
-            icon={TrendUp}
-          />
+        {/* METRICS */}
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {metrics.map((metric) => (
+            <MetricCard
+              key={metric.title}
+              metric={metric}
+            />
+          ))}
         </section>
 
-        {/* HEALTH */}
-        <section className="mt-8">
-          <div>
-            <h2 className="text-xl font-semibold">
-              سلامت کسب‌وکار
-            </h2>
-
-            <p className="mt-1 text-sm text-white/40">
-              بررسی سریع موتورهای اصلی رشد
-            </p>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <GaugeCard
-              value={86}
-              title="سلامت کلی کسب‌وکار"
-              description="ترکیب فروش، مشتری، بازاریابی و درآمد"
-            />
-
-            <GaugeCard
-              value={78}
-              title="سلامت تبدیل مشتری"
-              description="قدرت تبدیل بازدیدکننده به مشتری"
-            />
-
-            <GaugeCard
-              value={84}
-              title="بازده تبلیغات"
-              description="کیفیت هزینه و خروجی کمپین‌ها"
-            />
-
-            <GaugeCard
-              value={72}
-              title="کیفیت اطلاعات مشتری"
-              description="کامل بودن داده‌ها و کیفیت لیدها"
-            />
-          </div>
-        </section>
-
-        {/* SERVICE SELECTOR */}
-        <section className="mt-8">
-          <div className="flex items-end justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">
-                تحلیل هر بخش
-              </h2>
-
-              <p className="mt-1 text-sm text-white/40">
-                بخش موردنظر را برای مشاهده جزئیات انتخاب کن.
-              </p>
-            </div>
-
-            <span className="text-sm text-white/35">
-              بازه انتخاب‌شده: {period}
-            </span>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-7">
-            {services.map((service) => {
-              const Icon = service.icon;
-              const active =
-                service.id === activeService;
-
-              return (
-                <button
-                  key={service.id}
-                  type="button"
-                  onClick={() =>
-                    setActiveService(service.id)
-                  }
-                  className={`rounded-[22px] border p-4 text-right transition ${
-                    active
-                      ? "border-violet-400/30 bg-violet-500/[0.10]"
-                      : "border-white/[0.07] bg-[#080d1d]/55 hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <Icon
-                      size={21}
-                      weight="duotone"
-                      className={
-                        active
-                          ? "text-cyan-300"
-                          : "text-white/35"
-                      }
-                    />
-
-                    {service.change !== 0 && (
-                      <span className="text-xs text-emerald-300">
-                        +{service.change}٪
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-4 text-sm font-semibold">
-                    {service.title}
-                  </div>
-
-                  <div className="mt-1 text-xs text-white/35">
-                    {service.metric}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* MAIN CHART */}
-        <section className="mt-5 grid gap-5 xl:grid-cols-[1.5fr_1fr]">
+        {/* REVENUE TREND */}
+        <section className="mt-8 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
           <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-semibold">
-                  {currentService.title}
+                  روند درآمد و رشد
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  {currentService.subtitle}
+                  رفتار درآمد در بازه {period}
                 </p>
               </div>
 
-              <div className="text-left">
-                <div className="text-3xl font-bold">
-                  {currentService.value}
-                </div>
-
-                {currentService.change !== 0 && (
-                  <div className="mt-1 flex items-center gap-1 text-sm text-emerald-300">
-                    <ArrowUp size={14} />
-                    {currentService.change}٪
-                  </div>
-                )}
-              </div>
+              <span className="rounded-full border border-cyan-400/10 bg-cyan-500/[0.07] px-4 py-2 text-xs text-cyan-300">
+                رشد مثبت
+              </span>
             </div>
 
-            <div className="relative mt-8 h-[330px] overflow-hidden rounded-[24px] border border-white/[0.05] bg-black/20 p-6">
+            <div className="relative mt-8 h-[300px] overflow-hidden rounded-[24px] border border-white/[0.05] bg-black/20 p-6">
               <div className="pointer-events-none absolute inset-0 grid grid-rows-4">
                 <div className="border-b border-white/[0.04]" />
                 <div className="border-b border-white/[0.04]" />
@@ -540,239 +351,498 @@ export default function AnalyticsPage() {
                 <div />
               </div>
 
-              <div className="relative flex h-full items-end gap-3">
-                {currentData.map(
-                  (point, index) => {
-                    const height =
-                      maxValue === 0
-                        ? 0
-                        : (point.value /
-                            maxValue) *
-                          100;
-
-                    return (
-                      <div
-                        key={`${point.label}-${index}`}
-                        className="group flex h-full flex-1 flex-col justify-end"
-                      >
-                        <div className="relative flex flex-1 items-end justify-center">
-                          <div
-                            className="w-full max-w-[58px] rounded-t-xl bg-gradient-to-t from-violet-600/60 via-blue-500/80 to-cyan-300/90 transition duration-300 group-hover:opacity-75"
-                            style={{
-                              height: `${Math.max(
-                                height,
-                                point.value > 0
-                                  ? 5
-                                  : 0
-                              )}%`,
-                            }}
-                          />
-                        </div>
-
-                        <div className="mt-3 text-center text-xs text-white/30">
-                          {point.label.replace(
-                            "هفته ",
-                            "هـ"
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-                )}
+              <div className="relative flex h-full items-end gap-4">
+                {salesTrend.map((value, index) => (
+                  <div
+                    key={index}
+                    className="flex h-full flex-1 items-end"
+                  >
+                    <div
+                      className="w-full rounded-t-xl bg-gradient-to-t from-violet-600/60 via-blue-500/80 to-cyan-300/90"
+                      style={{
+                        height: `${value}%`,
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          <aside className="space-y-5">
-            <div className="rounded-[28px] border border-white/[0.08] bg-[#080d1d]/65 p-6 backdrop-blur-xl">
-              <h3 className="text-lg font-semibold">
-                وضعیت {currentService.title}
-              </h3>
+          <aside className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <CurrencyCircleDollar
+                size={23}
+                weight="duotone"
+                className="text-cyan-300"
+              />
 
-              <div className="mt-5 space-y-3">
-                <MetricRow
-                  title="رشد این دوره"
-                  value={
-                    currentService.change
-                      ? `+${currentService.change}٪`
-                      : "—"
-                  }
-                />
+              <div>
+                <h2 className="text-xl font-semibold">
+                  اقتصاد رشد
+                </h2>
 
-                <MetricRow
-                  title="وضعیت"
-                  value={
-                    activeService === "app"
-                      ? "در انتظار اتصال"
-                      : "مثبت"
-                  }
-                />
-
-                <MetricRow
-                  title="کیفیت داده"
-                  value={
-                    activeService === "app"
-                      ? "۰٪"
-                      : "۹۲٪"
-                  }
-                />
+                <p className="mt-1 text-sm text-white/40">
+                  هزینه و بازده جذب مشتری
+                </p>
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-cyan-400/10 bg-cyan-500/[0.04] p-6">
-              <div className="flex items-center gap-3">
-                <Sparkle
-                  size={20}
-                  weight="fill"
-                  className="text-cyan-300"
-                />
+            <div className="mt-6 space-y-3">
+              <AnalyticsRow
+                title="هزینه تبلیغات"
+                value={businessData.marketing.adSpendLabel}
+              />
 
-                <h3 className="text-lg font-semibold">
-                  تحلیل هوشمند
-                </h3>
-              </div>
+              <AnalyticsRow
+                title="هزینه جذب مشتری"
+                value={businessData.marketing.cacLabel}
+              />
 
-              <p className="mt-4 text-sm leading-8 text-white/55">
-                {getInsight(activeService)}
-              </p>
+              <AnalyticsRow
+                title="بازده تبلیغات"
+                value={`${businessData.marketing.roas.toLocaleString(
+                  "fa-IR"
+                )} برابر`}
+              />
+
+              <AnalyticsRow
+                title="درآمد سایت از تبلیغات"
+                value={
+                  businessData.marketing.websiteRevenueFromAdsLabel
+                }
+              />
+
+              <AnalyticsRow
+                title="میانگین مبلغ سفارش"
+                value={
+                  businessData.ecommerce.averageOrderValueLabel
+                }
+              />
             </div>
           </aside>
         </section>
 
-        {/* VISUAL INTELLIGENCE */}
-        <section className="mt-8">
-          <div>
-            <h2 className="text-xl font-semibold">
-              نمایش تصویری عملکرد
-            </h2>
+        {/* ECOMMERCE FUNNEL */}
+        <section className="mt-8 grid gap-5 xl:grid-cols-[1fr_1.1fr]">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center gap-3">
+              <Funnel
+                size={23}
+                weight="duotone"
+                className="text-violet-300"
+              />
 
-            <p className="mt-1 text-sm text-white/40">
-              مسیر مشتری و سهم منابع رشد
-            </p>
+              <div>
+                <h2 className="text-xl font-semibold">
+                  قیف فروش آنلاین
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  مسیر کاربر از بازدید تا خرید
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-7 space-y-3">
+              {ecommerceFunnel.map((item, index) => (
+                <div
+                  key={item.title}
+                  className="flex justify-center"
+                >
+                  <div
+                    className="rounded-2xl border border-violet-400/15 bg-gradient-to-l from-violet-500/20 via-blue-500/10 to-cyan-500/10 px-5 py-4"
+                    style={{
+                      width: `${item.width}%`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs text-white/30">
+                          مرحله {(index + 1).toLocaleString("fa-IR")}
+                        </div>
+
+                        <div className="mt-1 text-sm font-semibold">
+                          {item.title}
+                        </div>
+                      </div>
+
+                      <div className="text-lg font-bold">
+                        {faNumber(item.value)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_1fr]">
-            <SalesFunnel />
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  وضعیت فروشگاه
+                </h2>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <DonutCard
-                value={42}
-                title="تبلیغات پولی"
-                description="سهم تبلیغات در ایجاد مشتری بالقوه"
+                <p className="mt-1 text-sm text-white/40">
+                  مهم‌ترین شاخص‌های تجارت الکترونیک
+                </p>
+              </div>
+
+              <Storefront
+                size={23}
+                weight="duotone"
+                className="text-cyan-300"
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <CommerceCard
+                title="خرید موفق"
+                value={faNumber(
+                  businessData.ecommerce.completedPurchases
+                )}
+                icon={CheckCircle}
               />
 
-              <DonutCard
-                value={58}
-                title="ورودی طبیعی"
-                description="شبکه اجتماعی، جست‌وجو و ورود مستقیم"
+              <CommerceCard
+                title="سبد رهاشده"
+                value={faNumber(
+                  businessData.ecommerce.abandonedCarts
+                )}
+                icon={ShoppingCart}
               />
 
-              <DonutCard
-                value={36}
-                title="مشتری بازگشتی"
-                description="سهم مشتریان قبلی از خریدها"
+              <CommerceCard
+                title="مشتری تکرارشونده"
+                value={faNumber(
+                  businessData.ecommerce.repeatCustomers
+                )}
+                icon={Repeat}
               />
 
-              <DonutCard
-                value={64}
-                title="مشتری جدید"
-                description="سهم مشتریان جدید از خریدها"
+              <CommerceCard
+                title="ارزش طول عمر مشتری"
+                value={
+                  businessData.ecommerce.customerLifetimeValueLabel
+                }
+                icon={UsersThree}
               />
             </div>
           </div>
         </section>
 
-        {/* SERVICE SNAPSHOT */}
+        {/* CHANNEL PERFORMANCE */}
         <section className="mt-8">
           <div>
             <h2 className="text-xl font-semibold">
-              تصویر سریع کسب‌وکار
+              عملکرد کانال‌های جذب
             </h2>
 
             <p className="mt-1 text-sm text-white/40">
-              مقایسه منابع اصلی داده
+              کدام کانال واقعاً فروش و مشتری می‌سازد؟
             </p>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <MiniChart
-              title="وب‌سایت"
-              icon={Globe}
-              value="۴۸.۲K"
-              label="بازدید"
-              data={chartData.website}
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {channelPerformance.map((channel) => (
+              <ChannelCard
+                key={channel.title}
+                channel={channel}
+                active={activeChannel === channel.title}
+                onClick={() =>
+                  setActiveChannel(channel.title)
+                }
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* CHANNEL DETAIL */}
+        <section className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_1fr]">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  {currentChannel.title}
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  جزئیات عملکرد این کانال
+                </p>
+              </div>
+
+              <span className="text-3xl font-bold text-cyan-300">
+                {currentChannel.score.toLocaleString("fa-IR")}٪
+              </span>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <ChannelMetric
+                title="بازدید"
+                value={currentChannel.visitors}
+              />
+
+              <ChannelMetric
+                title="لید"
+                value={currentChannel.leads}
+              />
+
+              <ChannelMetric
+                title="فروش"
+                value={currentChannel.sales}
+              />
+
+              <ChannelMetric
+                title="نرخ تبدیل"
+                value={currentChannel.conversion}
+              />
+            </div>
+          </div>
+
+          <aside className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center gap-3">
+              <UsersThree
+                size={23}
+                weight="duotone"
+                className="text-violet-300"
+              />
+
+              <div>
+                <h2 className="text-xl font-semibold">
+                  تحلیل مشتری
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  کیفیت و رفتار مشتریان
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <AnalyticsRow
+                title="کل مشتریان"
+                value={faNumber(
+                  businessData.crm.totalCustomers
+                )}
+              />
+
+              <AnalyticsRow
+                title="لید جدید"
+                value={faNumber(
+                  businessData.crm.newLeads
+                )}
+              />
+
+              <AnalyticsRow
+                title="لید داغ"
+                value={faNumber(
+                  businessData.crm.hotLeads
+                )}
+              />
+
+              <AnalyticsRow
+                title="حفظ مشتری"
+                value={faPercent(
+                  businessData.crm.retentionRate
+                )}
+              />
+
+              <AnalyticsRow
+                title="ریزش"
+                value={faPercent(
+                  businessData.crm.churnRate
+                )}
+              />
+            </div>
+          </aside>
+        </section>
+
+        {/* CONTENT + WEBSITE */}
+        <section className="mt-8 grid gap-5 xl:grid-cols-2">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  تحلیل محتوا
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  اثر محتوا بر تعامل و تبدیل
+                </p>
+              </div>
+
+              <Sparkle
+                size={22}
+                weight="duotone"
+                className="text-violet-300"
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <CommerceCard
+                title="امتیاز محتوا"
+                value={faPercent(
+                  businessData.content.performanceScore
+                )}
+                icon={Sparkle}
+              />
+
+              <CommerceCard
+                title="بهترین نوع محتوا"
+                value={
+                  businessData.content.bestContentType
+                }
+                icon={CheckCircle}
+              />
+
+              <CommerceCard
+                title="موضوع برتر"
+                value={businessData.content.topTopic}
+                icon={Eye}
+              />
+
+              <CommerceCard
+                title="نرخ تبدیل محتوا"
+                value={faPercent(
+                  businessData.content.conversionRate
+                )}
+                icon={Target}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  رفتار سایت
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  عملکرد بازدیدکنندگان و تبدیل
+                </p>
+              </div>
+
+              <Globe
+                size={22}
+                weight="duotone"
+                className="text-cyan-300"
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <CommerceCard
+                title="بازدید"
+                value={faNumber(
+                  businessData.website.visits
+                )}
+                icon={Eye}
+              />
+
+              <CommerceCard
+                title="بازدیدکننده یکتا"
+                value={faNumber(
+                  businessData.website.uniqueVisitors
+                )}
+                icon={UsersThree}
+              />
+
+              <CommerceCard
+                title="مشاهده محصول"
+                value={faNumber(
+                  businessData.website.productViews
+                )}
+                icon={Package}
+              />
+
+              <CommerceCard
+                title="افزودن به سبد"
+                value={faNumber(
+                  businessData.website.addToCart
+                )}
+                icon={ShoppingCart}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* INSIGHTS */}
+        <section className="mt-8">
+          <div>
+            <h2 className="text-xl font-semibold">
+              بینش‌های مهم
+            </h2>
+
+            <p className="mt-1 text-sm text-white/40">
+              اتفاق‌هایی که باید به آن‌ها توجه کنی
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-3">
+            {insights.map((insight) => (
+              <InsightCard
+                key={insight.title}
+                insight={insight}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* PREDICTION */}
+        <section className="mt-8 rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+          <div className="flex items-center gap-3">
+            <TrendUp
+              size={23}
+              weight="duotone"
+              className="text-cyan-300"
             />
 
-            <MiniChart
-              title="شبکه‌های اجتماعی"
-              icon={InstagramLogo}
-              value="۱۱۸K"
-              label="دسترسی"
-              data={chartData.social}
+            <div>
+              <h2 className="text-xl font-semibold">
+                پیش‌بینی رشد
+              </h2>
+
+              <p className="mt-1 text-sm text-white/40">
+                وضعیت احتمالی دوره آینده
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <PredictionCard
+              title="احتمال رشد"
+              value={faPercent(
+                businessData.predictive.growthProbability
+              )}
             />
 
-            <MiniChart
-              title="تبلیغات"
-              icon={Megaphone}
-              value="۴.۸ برابر"
-              label="بازده"
-              data={chartData.ads}
+            <PredictionCard
+              title="درآمد پیش‌بینی‌شده"
+              value={
+                businessData.predictive.predictedRevenueLabel
+              }
             />
 
-            <MiniChart
-              title="مشتریان"
-              icon={UsersThree}
-              value="۱,۲۴۸"
-              label="مشتری"
-              data={chartData.crm}
+            <PredictionCard
+              title="فروش آنلاین پیش‌بینی‌شده"
+              value={
+                businessData.predictive.predictedOnlineRevenueLabel
+              }
             />
 
-            <MiniChart
-              title="فروش"
-              icon={ShoppingCart}
-              value="۳۸۴M"
-              label="درآمد"
-              data={chartData.sales}
-            />
-
-            <MiniChart
-              title="اپلیکیشن"
-              icon={DeviceMobile}
-              value="—"
-              label="آماده اتصال"
-              data={chartData.app}
-              disabled
+            <PredictionCard
+              title="نرخ تبدیل آینده"
+              value={faPercent(
+                businessData.predictive.predictedConversionRate
+              )}
             />
           </div>
         </section>
 
-        {/* ALERTS */}
-        <section className="mt-8 grid gap-4 md:grid-cols-3">
-          <InsightCard
-            icon={CheckCircle}
-            title="نقطه قوت"
-            text="رشد فروش و مشتری در وضعیت مثبت قرار دارد."
-            tone="success"
-          />
-
-          <InsightCard
-            icon={WarningCircle}
-            title="نیاز به توجه"
-            text="نرخ تبدیل سایت هنوز پایین‌تر از ظرفیت فعلی است."
-            tone="warning"
-          />
-
-          <InsightCard
-            icon={Brain}
-            title="فرصت هوشمند"
-            text="جابجایی بخشی از بودجه تبلیغات می‌تواند بازده را افزایش دهد."
-            tone="ai"
-          />
-        </section>
-
-        {/* LOADDER INTELLIGENCE */}
-        <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8 backdrop-blur-xl">
-          <div className="grid gap-8 xl:grid-cols-[1fr_380px]">
+        {/* AI ACTION */}
+        <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8">
+          <div className="grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.08]">
@@ -785,186 +855,142 @@ export default function AnalyticsPage() {
 
                 <div>
                   <h2 className="text-2xl font-bold">
-                    هوشمندی Loadder
+                    تحلیل هوشمند Loadder
                   </h2>
 
                   <p className="mt-1 text-sm text-white/40">
-                    تبدیل تحلیل به اقدام
+                    از گزارش به تصمیم
                   </p>
                 </div>
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                Loadder فقط وضعیت را گزارش نمی‌کند.
-                در آینده، بر اساس داده‌های واقعی تشخیص
-                می‌دهد چه چیزی باید تقویت، اصلاح یا متوقف
-                شود و نتیجه احتمالی هر تصمیم را پیش‌بینی
-                می‌کند.
+                داده فعلی نشان می‌دهد بیشترین فرصت فوری در بازیابی
+                سبدهای خرید رهاشده، کاهش CAC و افزایش نرخ خرید مجدد
+                قرار دارد.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
                 <ActionCard
-                  title="افزایش بودجه"
-                  value="کانال پربازده"
+                  title="فرصت اول"
+                  value="بازیابی سبد خرید"
                 />
 
                 <ActionCard
-                  title="پیگیری فوری"
-                  value="۳۲ لید داغ"
+                  title="فرصت دوم"
+                  value="کاهش هزینه جذب"
                 />
 
                 <ActionCard
-                  title="محتوای پیشنهادی"
-                  value="آموزشی"
+                  title="فرصت سوم"
+                  value="افزایش خرید مجدد"
                 />
               </div>
             </div>
 
             <div className="rounded-[26px] border border-white/[0.08] bg-black/20 p-6">
               <div className="flex items-center gap-2">
-                <Gauge
+                <Lightning
                   size={20}
                   weight="duotone"
                   className="text-cyan-300"
                 />
 
                 <span className="font-semibold">
-                  حالت تصمیم‌گیری
+                  اقدام بعدی
                 </span>
               </div>
 
               <div className="mt-5 space-y-3">
-                <button
-                  type="button"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/60"
+                <Link
+                  to="/dashboard/crm"
+                  className="block w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-center text-sm text-white/60"
                 >
-                  فقط تحلیل کن
-                </button>
+                  مشاهده مشتریان
+                </Link>
+
+                <Link
+                  to="/dashboard/predictive"
+                  className="block w-full rounded-xl border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-3 text-center text-sm text-cyan-200"
+                >
+                  بررسی سناریوی آینده
+                </Link>
 
                 <button
                   type="button"
-                  className="w-full rounded-xl border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-3 text-sm text-cyan-200"
-                >
-                  پیشنهاد بده
-                </button>
-
-                <button
-                  type="button"
+                  onClick={() =>
+                    showNotice(
+                      "اتصال تحلیل به Automation در مرحله بعد فعال می‌شود."
+                    )
+                  }
                   className="w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold"
                 >
-                  اجرا با تأیید من
+                  اجرای پیشنهاد هوشمند
                 </button>
               </div>
             </div>
           </div>
         </section>
       </div>
+
+      {notice && (
+        <div className="fixed bottom-7 left-7 z-[100] max-w-md rounded-2xl border border-violet-300/20 bg-[#090e1e]/95 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
+          {notice}
+        </div>
+      )}
     </main>
   );
 }
 
-function KPICard({
-  title,
-  value,
-  change,
-  icon: Icon,
-  reversePositive = false,
+function MetricCard({
+  metric,
 }: {
-  title: string;
-  value: string;
-  change: number;
-  icon: React.ElementType;
-  reversePositive?: boolean;
+  metric: MetricCardData;
 }) {
-  const positive = reversePositive
-    ? change < 0
-    : change > 0;
+  const Icon = metric.icon;
 
   return (
-    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
+    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5">
       <div className="flex items-center justify-between">
         <span className="text-sm text-white/40">
-          {title}
+          {metric.title}
         </span>
 
         <Icon
           size={21}
           weight="duotone"
-          className="text-violet-300"
+          className="text-cyan-300"
         />
       </div>
 
       <div className="mt-4 text-2xl font-bold">
-        {value}
+        {metric.value}
       </div>
 
       <div
         className={`mt-2 flex items-center gap-1 text-xs ${
-          positive
+          metric.positive
             ? "text-emerald-300"
             : "text-red-300"
         }`}
       >
-        {change >= 0 ? (
-          <ArrowUp size={13} />
+        {metric.positive ? (
+          <TrendUp size={14} />
         ) : (
-          <ArrowDown size={13} />
+          <TrendDown size={14} />
         )}
 
-        {Math.abs(change)}٪ نسبت به دوره قبل
-      </div>
-    </div>
-  );
-}
-
-function GaugeCard({
-  value,
-  title,
-  description,
-}: {
-  value: number;
-  title: string;
-  description: string;
-}) {
-  const safeValue = Math.max(
-    0,
-    Math.min(100, value)
-  );
-
-  const degrees =
-    -90 + (safeValue / 100) * 180;
-
-  return (
-    <div className="rounded-[26px] border border-white/[0.08] bg-[#080d1d]/62 p-6 backdrop-blur-xl">
-      <div className="text-sm font-semibold">
-        {title}
+        {metric.change}
       </div>
 
-      <div className="relative mx-auto mt-5 h-[125px] w-[190px] overflow-hidden">
-        <div className="absolute left-1/2 top-4 h-[150px] w-[150px] -translate-x-1/2 rounded-full border-[15px] border-white/[0.05]" />
-
-        <div
-          className="absolute left-1/2 top-[78px] h-[4px] w-[58px] origin-left rounded-full bg-gradient-to-l from-violet-400 to-cyan-300 shadow-[0_0_12px_rgba(34,211,238,.5)] transition duration-500"
-          style={{
-            transform: `rotate(${degrees}deg)`,
-          }}
-        />
-
-        <div className="absolute inset-x-0 bottom-0 text-center">
-          <div className="text-3xl font-bold">
-            {safeValue}٪
-          </div>
-        </div>
-      </div>
-
-      <p className="mt-3 text-sm leading-7 text-white/40">
-        {description}
+      <p className="mt-4 text-xs leading-6 text-white/35">
+        {metric.description}
       </p>
     </div>
   );
 }
 
-function MetricRow({
+function AnalyticsRow({
   title,
   value,
 }: {
@@ -972,7 +998,7 @@ function MetricRow({
   value: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/[0.05] bg-black/20 p-4">
+    <div className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-black/20 p-4">
       <span className="text-sm text-white/40">
         {title}
       </span>
@@ -984,214 +1010,150 @@ function MetricRow({
   );
 }
 
-function SalesFunnel() {
-  return (
-    <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/62 p-7 backdrop-blur-xl">
-      <h3 className="text-xl font-semibold">
-        قیف تبدیل مشتری
-      </h3>
-
-      <p className="mt-1 text-sm text-white/40">
-        مسیر حرکت مخاطب تا خرید
-      </p>
-
-      <div className="mt-7 space-y-3">
-        {funnel.map((item, index) => (
-          <div
-            key={item.title}
-            className="flex justify-center"
-          >
-            <div
-              className="rounded-2xl border border-violet-400/15 bg-gradient-to-l from-violet-500/20 via-blue-500/10 to-cyan-500/10 px-5 py-4"
-              style={{
-                width: item.width,
-              }}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs text-white/30">
-                    مرحله {index + 1}
-                  </div>
-
-                  <div className="mt-1 text-sm font-semibold">
-                    {item.title}
-                  </div>
-                </div>
-
-                <div className="text-lg font-bold">
-                  {item.value}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DonutCard({
+function CommerceCard({
+  title,
   value,
-  title,
-  description,
-}: {
-  value: number;
-  title: string;
-  description: string;
-}) {
-  const safeValue = Math.max(
-    0,
-    Math.min(100, value)
-  );
-
-  return (
-    <div className="flex items-center gap-5 rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
-      <div
-        className="relative flex h-[105px] w-[105px] shrink-0 items-center justify-center rounded-full"
-        style={{
-          background: `conic-gradient(
-            #22d3ee 0deg,
-            #8b5cf6 ${safeValue * 3.6}deg,
-            rgba(255,255,255,.06) ${
-              safeValue * 3.6
-            }deg
-          )`,
-        }}
-      >
-        <div className="flex h-[74px] w-[74px] items-center justify-center rounded-full bg-[#080d1d]">
-          <span className="text-lg font-bold">
-            {safeValue}٪
-          </span>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="font-semibold">
-          {title}
-        </h3>
-
-        <p className="mt-2 text-sm leading-7 text-white/40">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function MiniChart({
-  title,
   icon: Icon,
-  value,
-  label,
-  data,
-  disabled = false,
 }: {
   title: string;
-  icon: React.ElementType;
   value: string;
-  label: string;
-  data: ChartPoint[];
-  disabled?: boolean;
+  icon: React.ElementType;
 }) {
-  const max = Math.max(
-    ...data.map((item) => item.value),
-    1
-  );
-
   return (
-    <div
-      className={`rounded-[26px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl ${
-        disabled ? "opacity-40" : ""
+    <div className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5">
+      <Icon
+        size={20}
+        weight="duotone"
+        className="text-cyan-300"
+      />
+
+      <div className="mt-4 text-xs text-white/35">
+        {title}
+      </div>
+
+      <div className="mt-2 text-lg font-bold">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ChannelCard({
+  channel,
+  active,
+  onClick,
+}: {
+  channel: ChannelPerformance;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-[24px] border p-5 text-right transition ${
+        active
+          ? "border-violet-400/30 bg-violet-500/[0.09]"
+          : "border-white/[0.08] bg-[#080d1d]/62 hover:border-violet-300/20"
       }`}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Icon
-            size={21}
-            weight="duotone"
-            className="text-cyan-300"
-          />
+        <Megaphone
+          size={20}
+          weight="duotone"
+          className="text-violet-300"
+        />
 
-          <span className="font-semibold">
-            {title}
-          </span>
-        </div>
-
-        <div className="text-left">
-          <div className="font-semibold">
-            {value}
-          </div>
-
-          <div className="text-xs text-white/30">
-            {label}
-          </div>
-        </div>
+        <span className="text-lg font-bold text-cyan-300">
+          {channel.score.toLocaleString("fa-IR")}٪
+        </span>
       </div>
 
-      <div className="mt-5 flex h-[85px] items-end gap-2">
-        {data.map((point, index) => {
-          const height =
-            max > 0
-              ? (point.value / max) * 100
-              : 0;
+      <div className="mt-4 font-semibold">
+        {channel.title}
+      </div>
 
-          return (
-            <div
-              key={index}
-              className="flex h-full flex-1 items-end"
-            >
-              <div
-                className="w-full rounded-t-md bg-gradient-to-t from-violet-500/35 to-cyan-300/80"
-                style={{
-                  height: `${Math.max(
-                    height,
-                    point.value > 0 ? 6 : 0
-                  )}%`,
-                }}
-              />
-            </div>
-          );
-        })}
+      <div className="mt-2 text-xs text-white/35">
+        تبدیل {channel.conversion}
+      </div>
+    </button>
+  );
+}
+
+function ChannelMetric({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-5">
+      <div className="text-xs text-white/35">
+        {title}
+      </div>
+
+      <div className="mt-2 text-lg font-bold">
+        {value}
       </div>
     </div>
   );
 }
 
 function InsightCard({
-  icon: Icon,
-  title,
-  text,
-  tone,
+  insight,
 }: {
-  icon: React.ElementType;
-  title: string;
-  text: string;
-  tone: "success" | "warning" | "ai";
+  insight: Insight;
 }) {
-  const styles =
-    tone === "success"
-      ? "border-emerald-400/15 bg-emerald-500/[0.05]"
-      : tone === "warning"
-        ? "border-amber-400/15 bg-amber-500/[0.05]"
-        : "border-violet-400/15 bg-violet-500/[0.05]";
+  const Icon =
+    insight.type === "positive"
+      ? CheckCircle
+      : insight.type === "warning"
+        ? WarningCircle
+        : Lightning;
+
+  const iconClass =
+    insight.type === "positive"
+      ? "text-emerald-300"
+      : insight.type === "warning"
+        ? "text-amber-300"
+        : "text-cyan-300";
 
   return (
-    <div
-      className={`rounded-[24px] border p-5 ${styles}`}
-    >
+    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-6">
       <Icon
         size={22}
         weight="duotone"
-        className="text-cyan-300"
+        className={iconClass}
       />
 
       <h3 className="mt-4 font-semibold">
-        {title}
+        {insight.title}
       </h3>
 
-      <p className="mt-2 text-sm leading-7 text-white/45">
-        {text}
+      <p className="mt-3 text-sm leading-8 text-white/45">
+        {insight.description}
       </p>
+    </div>
+  );
+}
+
+function PredictionCard({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-violet-400/10 bg-violet-500/[0.05] p-5">
+      <div className="text-xs text-white/35">
+        {title}
+      </div>
+
+      <div className="mt-2 text-xl font-bold text-cyan-300">
+        {value}
+      </div>
     </div>
   );
 }
@@ -1214,29 +1176,4 @@ function ActionCard({
       </div>
     </div>
   );
-}
-
-function getInsight(service: ServiceId) {
-  switch (service) {
-    case "website":
-      return "رشد بازدید مثبت است، اما مهم‌ترین فرصت فعلی افزایش نرخ تبدیل صفحات فروش است.";
-
-    case "social":
-      return "محتوای آموزشی بیشترین دیده‌شدن و تعامل را ایجاد کرده و بهترین گزینه برای توسعه کمپین بعدی است.";
-
-    case "ads":
-      return "بازده تبلیغات در حال افزایش است. جابه‌جایی بخشی از بودجه به کانال‌های پربازده می‌تواند نتیجه را بهتر کند.";
-
-    case "crm":
-      return "تعداد مشتریان افزایش یافته است. مرحله بعد شناسایی مشتریان آماده خرید مجدد است.";
-
-    case "sales":
-      return "درآمد رو به رشد است، اما باید مشخص شود هر کانال بازاریابی چه سهمی در این افزایش داشته است.";
-
-    case "app":
-      return "پس از اتصال اپلیکیشن، نصب، کاربران فعال، بازگشت و عملکرد کمپین‌های نصب در این بخش تحلیل خواهد شد.";
-
-    default:
-      return "وضعیت کلی مثبت است. مهم‌ترین فرصت فعلی اتصال دقیق‌تر داده‌های تبلیغات، مشتری و فروش به یکدیگر است.";
-  }
 }
