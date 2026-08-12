@@ -23,6 +23,11 @@ import {
   Clock,
   Star,
   UserCircle,
+  Storefront,
+  CreditCard,
+  Repeat,
+  Package,
+  Receipt,
 } from "@phosphor-icons/react";
 
 import { businessData } from "../data/businessData";
@@ -31,7 +36,10 @@ type LeadStatus =
   | "جدید"
   | "در حال پیگیری"
   | "آماده خرید"
-  | "مشتری";
+  | "سبد رهاشده"
+  | "در حال پرداخت"
+  | "خریدار"
+  | "مشتری تکرارشونده";
 
 type Lead = {
   id: number;
@@ -42,6 +50,9 @@ type Lead = {
   status: LeadStatus;
   value: string;
   lastAction: string;
+  orders: number;
+  totalSpent: string;
+  lastPurchase: string;
 };
 
 const leads: Lead[] = [
@@ -54,6 +65,9 @@ const leads: Lead[] = [
     status: "آماده خرید",
     value: "۱۸ میلیون",
     lastAction: "۱۰ دقیقه پیش",
+    orders: 0,
+    totalSpent: "۰",
+    lastPurchase: "—",
   },
   {
     id: 2,
@@ -61,9 +75,12 @@ const leads: Lead[] = [
     company: "استودیو هشت",
     source: "اینستاگرام",
     score: 84,
-    status: "در حال پیگیری",
+    status: "سبد رهاشده",
     value: "۱۲ میلیون",
     lastAction: "۴۰ دقیقه پیش",
+    orders: 1,
+    totalSpent: "۲.۴ میلیون",
+    lastPurchase: "۱۸ روز پیش",
   },
   {
     id: 3,
@@ -71,29 +88,38 @@ const leads: Lead[] = [
     company: "پارس تجارت",
     source: "وب‌سایت",
     score: 78,
-    status: "جدید",
+    status: "در حال پرداخت",
     value: "۲۴ میلیون",
     lastAction: "۱ ساعت پیش",
+    orders: 2,
+    totalSpent: "۶.۸ میلیون",
+    lastPurchase: "۹ روز پیش",
   },
   {
     id: 4,
     name: "مریم احمدی",
     company: "کلینیک ویستا",
-    source: "پیامک",
+    source: "وب‌سایت",
     score: 88,
-    status: "آماده خرید",
+    status: "خریدار",
     value: "۱۵ میلیون",
     lastAction: "۲ ساعت پیش",
+    orders: 3,
+    totalSpent: "۹.۲ میلیون",
+    lastPurchase: "۲ روز پیش",
   },
   {
     id: 5,
     name: "رضا مرادی",
     company: "مدیا پلاس",
     source: "معرفی مشتری",
-    score: 70,
-    status: "در حال پیگیری",
-    value: "۹ میلیون",
+    score: 95,
+    status: "مشتری تکرارشونده",
+    value: "۲۸ میلیون",
     lastAction: "۳ ساعت پیش",
+    orders: 6,
+    totalSpent: "۲۳.۵ میلیون",
+    lastPurchase: "امروز",
   },
 ];
 
@@ -124,72 +150,99 @@ const stats = [
   },
 ];
 
+const ecommerceStats = [
+  {
+    title: "فروش آنلاین سایت",
+    value: businessData.ecommerce.onlineRevenueLabel,
+    icon: Storefront,
+    hint: "درآمد ثبت‌شده از خریدهای سایت",
+  },
+  {
+    title: "خرید موفق",
+    value: businessData.ecommerce.completedPurchases.toLocaleString("fa-IR"),
+    icon: CheckCircle,
+    hint: "سفارش‌های تکمیل‌شده",
+  },
+  {
+    title: "سبد خرید رهاشده",
+    value: businessData.ecommerce.abandonedCarts.toLocaleString("fa-IR"),
+    icon: ShoppingCart,
+    hint: `${businessData.ecommerce.abandonedCartRate.toLocaleString(
+      "fa-IR"
+    )}٪ نرخ رهاشدن`,
+  },
+  {
+    title: "مشتری تکرارشونده",
+    value: businessData.ecommerce.repeatCustomers.toLocaleString("fa-IR"),
+    icon: Repeat,
+    hint: `${businessData.ecommerce.repeatCustomerRate.toLocaleString(
+      "fa-IR"
+    )}٪ خرید مجدد`,
+  },
+];
+
 const funnelSteps = [
   {
-    title: "ورودی جدید",
-    value: businessData.crm.newLeads.toLocaleString("fa-IR"),
+    title: "بازدید سایت",
+    value: businessData.website.visits.toLocaleString("fa-IR"),
     width: "100%",
   },
   {
-    title: "واجد شرایط",
-    value: "۱۵۸",
-    width: "82%",
+    title: "مشاهده محصول",
+    value: businessData.website.productViews.toLocaleString("fa-IR"),
+    width: "86%",
   },
   {
-    title: "در حال مذاکره",
-    value: "۹۲",
-    width: "64%",
+    title: "افزودن به سبد",
+    value: businessData.website.addToCart.toLocaleString("fa-IR"),
+    width: "68%",
   },
   {
-    title: "آماده خرید",
-    value: businessData.crm.hotLeads.toLocaleString("fa-IR"),
-    width: "46%",
+    title: "شروع پرداخت",
+    value: businessData.ecommerce.checkoutStarted.toLocaleString("fa-IR"),
+    width: "52%",
   },
   {
-    title: "تبدیل به مشتری",
-    value: "۲۹",
-    width: "32%",
+    title: "خرید موفق",
+    value: businessData.ecommerce.completedPurchases.toLocaleString("fa-IR"),
+    width: "38%",
   },
 ];
 
 const activities = [
   {
-    title: "پیگیری مشتری بالقوه",
-    description: "علی رضایی برای تماس فروش آماده است.",
-    time: "۱۰ دقیقه پیش",
-    icon: Phone,
-  },
-  {
-    title: "پیام جدید",
-    description: "سارا کریمی به پیشنهاد فروش پاسخ داده است.",
+    title: "سبد خرید رهاشده",
+    description: "سارا کریمی فرایند خرید را کامل نکرده است.",
     time: "۴۰ دقیقه پیش",
-    icon: ChatCircleText,
+    icon: ShoppingCart,
   },
   {
-    title: "مشتری جدید",
-    description: "مریم احمدی به مشتری فعال تبدیل شد.",
+    title: "شروع پرداخت",
+    description: "محمد نادری وارد مرحله پرداخت شده است.",
+    time: "۱ ساعت پیش",
+    icon: CreditCard,
+  },
+  {
+    title: "خرید موفق",
+    description: "مریم احمدی سفارش جدید ثبت کرده است.",
     time: "۲ ساعت پیش",
     icon: CheckCircle,
   },
   {
-    title: "یادآوری تماس",
-    description: "تماس پیگیری پارس تجارت امروز انجام شود.",
+    title: "خرید مجدد",
+    description: "رضا مرادی ششمین سفارش خود را ثبت کرده است.",
     time: "۳ ساعت پیش",
-    icon: CalendarBlank,
+    icon: Repeat,
   },
 ];
 
 export default function CRMPage() {
   const [query, setQuery] = useState("");
-  const [activeFilter, setActiveFilter] =
-    useState<"همه" | LeadStatus>("همه");
-
+  const [activeFilter, setActiveFilter] = useState<"همه" | LeadStatus>("همه");
   const [notice, setNotice] = useState("");
 
   const activeCustomerPercent = Math.round(
-    (businessData.crm.activeCustomers /
-      businessData.crm.totalCustomers) *
-      100
+    (businessData.crm.activeCustomers / businessData.crm.totalCustomers) * 100
   );
 
   const filteredLeads = useMemo(() => {
@@ -200,8 +253,7 @@ export default function CRMPage() {
         lead.source.includes(query);
 
       const matchStatus =
-        activeFilter === "همه" ||
-        lead.status === activeFilter;
+        activeFilter === "همه" || lead.status === activeFilter;
 
       return matchQuery && matchStatus;
     });
@@ -244,7 +296,7 @@ export default function CRMPage() {
               </h1>
 
               <p className="mt-1 text-sm text-white/45">
-                مدیریت مشتریان، لیدها و فرصت‌های فروش
+                لید، فروش آنلاین، خرید و ارزش مشتری در یک مرکز
               </p>
             </div>
           </div>
@@ -256,7 +308,7 @@ export default function CRMPage() {
                 "ساخت مشتری جدید در مرحله اتصال CRM واقعی فعال می‌شود."
               )
             }
-            className="flex items-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold shadow-[0_10px_30px_rgba(99,102,241,.18)]"
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold"
           >
             <UserPlus size={17} />
             مشتری جدید
@@ -264,34 +316,30 @@ export default function CRMPage() {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto max-w-[1550px] px-8 py-8">
+      <div className="mx-auto max-w-[1550px] px-8 py-8">
         <section className="relative overflow-hidden rounded-[34px] border border-violet-400/15 bg-[#080d1d]/68 p-8 backdrop-blur-xl">
           <div className="pointer-events-none absolute -right-24 -top-24 h-[360px] w-[360px] rounded-full bg-violet-600/[0.13] blur-[130px]" />
-
           <div className="pointer-events-none absolute -bottom-32 left-[20%] h-[320px] w-[320px] rounded-full bg-cyan-500/[0.08] blur-[120px]" />
 
           <div className="relative z-10 grid gap-8 xl:grid-cols-[1fr_370px]">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-2 text-sm text-cyan-200">
-                <Brain
-                  size={16}
-                  weight="duotone"
-                />
-                مدیریت هوشمند مشتری
+                <Brain size={16} weight="duotone" />
+                CRM + فروش آنلاین
               </div>
 
               <h2 className="mt-5 max-w-4xl text-3xl font-bold leading-[1.55]">
-                هر مشتری فقط یک رکورد نیست؛
+                رفتار مشتری را از اولین کلیک
                 <span className="bg-gradient-to-l from-cyan-300 via-blue-400 to-violet-400 bg-clip-text text-transparent">
                   {" "}
-                  یک فرصت رشد است.
+                  تا خرید و خرید مجدد ببین.
                 </span>
               </h2>
 
               <p className="mt-4 max-w-3xl text-base leading-9 text-white/50">
-                Loadder اطلاعات مشتری، رفتار، تعامل، منبع جذب و سابقه
-                خرید را در یک تصویر واحد جمع می‌کند تا تیم فروش سریع‌تر
-                تصمیم بگیرد و هیچ فرصت مهمی از دست نرود.
+                Loadder مسیر مشتری را از بازدید سایت و مشاهده محصول تا
+                سبد خرید، پرداخت، خرید موفق و خرید مجدد داخل یک CRM
+                واحد نگه می‌دارد.
               </p>
             </div>
 
@@ -309,25 +357,24 @@ export default function CRMPage() {
               </div>
 
               <p className="mt-4 text-sm leading-8 text-white/55">
-                {businessData.crm.hotLeads.toLocaleString("fa-IR")} مشتری
-                بالقوه با امتیاز بالا آماده پیگیری هستند. اولویت امروز
-                روی لیدهای داغ و فرصت‌های نزدیک به خرید قرار دارد.
+                {businessData.ecommerce.abandonedCarts.toLocaleString(
+                  "fa-IR"
+                )}{" "}
+                سبد خرید رهاشده شناسایی شده است. این گروه می‌تواند
+                یکی از سریع‌ترین فرصت‌های بازیابی فروش باشد.
               </p>
 
               <button
                 type="button"
                 onClick={() =>
                   showNotice(
-                    "فهرست لیدهای داغ در مرحله اتصال CRM واقعی فعال می‌شود."
+                    "اتوماسیون بازیابی سبد خرید در مرحله بعد فعال می‌شود."
                   )
                 }
                 className="mt-5 flex items-center gap-2 rounded-xl border border-violet-300/15 bg-violet-500/[0.08] px-4 py-3 text-sm text-violet-200"
               >
-                <Lightning
-                  size={16}
-                  weight="fill"
-                />
-                مشاهده اولویت‌ها
+                <Lightning size={16} weight="fill" />
+                بازیابی فروش
               </button>
             </div>
           </div>
@@ -340,6 +387,27 @@ export default function CRMPage() {
               {...item}
             />
           ))}
+        </section>
+
+        <section className="mt-8">
+          <div>
+            <h2 className="text-xl font-semibold">
+              فروش آنلاین سایت
+            </h2>
+
+            <p className="mt-1 text-sm text-white/40">
+              مهم‌ترین شاخص‌های تجارت الکترونیک
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {ecommerceStats.map((item) => (
+              <EcommerceStatCard
+                key={item.title}
+                {...item}
+              />
+            ))}
+          </div>
         </section>
 
         <section className="mt-8 rounded-[28px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
@@ -355,8 +423,8 @@ export default function CRMPage() {
                 onChange={(event) =>
                   setQuery(event.target.value)
                 }
-                placeholder="جست‌وجوی نام، شرکت یا منبع جذب..."
-                className="w-full rounded-2xl border border-white/[0.08] bg-black/20 py-3.5 pr-11 pl-4 text-sm text-white outline-none placeholder:text-white/25 focus:border-violet-400/30"
+                placeholder="جست‌وجوی مشتری، شرکت یا منبع جذب..."
+                className="w-full rounded-2xl border border-white/[0.08] bg-black/20 py-3.5 pr-11 pl-4 text-sm text-white outline-none"
               />
             </div>
 
@@ -366,7 +434,10 @@ export default function CRMPage() {
                 "جدید",
                 "در حال پیگیری",
                 "آماده خرید",
-                "مشتری",
+                "سبد رهاشده",
+                "در حال پرداخت",
+                "خریدار",
+                "مشتری تکرارشونده",
               ].map((item) => (
                 <button
                   key={item}
@@ -394,11 +465,11 @@ export default function CRMPage() {
             <div className="flex items-end justify-between">
               <div>
                 <h2 className="text-xl font-semibold">
-                  مشتریان بالقوه
+                  مشتریان و خریداران
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  اولویت‌بندی بر اساس احتمال خرید
+                  لید، رفتار خرید و سابقه سفارش در یک نما
                 </p>
               </div>
 
@@ -414,7 +485,7 @@ export default function CRMPage() {
                   lead={lead}
                   onOpen={() =>
                     showNotice(
-                      `پروفایل «${lead.name}» در مرحله اتصال CRM واقعی باز می‌شود.`
+                      `پروفایل خرید «${lead.name}» در نسخه بعد باز می‌شود.`
                     )
                   }
                 />
@@ -432,11 +503,11 @@ export default function CRMPage() {
 
               <div>
                 <h2 className="text-xl font-semibold">
-                  قیف فروش
+                  قیف خرید سایت
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  از مشتری بالقوه تا خرید
+                  از بازدید تا خرید موفق
                 </p>
               </div>
             </div>
@@ -475,59 +546,106 @@ export default function CRMPage() {
           </aside>
         </section>
 
-        <section className="mt-8">
-          <div>
-            <h2 className="text-xl font-semibold">
-              سلامت مشتریان
-            </h2>
+        <section className="mt-8 grid gap-5 xl:grid-cols-[1fr_1fr]">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center gap-3">
+              <Receipt
+                size={22}
+                weight="duotone"
+                className="text-cyan-300"
+              />
 
-            <p className="mt-1 text-sm text-white/40">
-              وضعیت ارتباط و احتمال خرید یا ریزش
-            </p>
+              <div>
+                <h2 className="text-xl font-semibold">
+                  اقتصاد مشتری
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  ارزش خرید و سودآوری مشتری
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <CommerceMetric
+                title="میانگین مبلغ سفارش"
+                value={businessData.ecommerce.averageOrderValueLabel}
+              />
+
+              <CommerceMetric
+                title="ارزش طول عمر مشتری"
+                value={businessData.ecommerce.customerLifetimeValueLabel}
+              />
+
+              <CommerceMetric
+                title="نرخ خرید مجدد"
+                value={`${businessData.ecommerce.repeatCustomerRate.toLocaleString(
+                  "fa-IR"
+                )}٪`}
+              />
+
+              <CommerceMetric
+                title="نرخ بازگشت وجه"
+                value={`${businessData.ecommerce.refundRate.toLocaleString(
+                  "fa-IR"
+                )}٪`}
+              />
+            </div>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <HealthCard
-              title="مشتریان وفادار"
-              value={businessData.crm.retentionRate}
-              text="خرید مجدد و تعامل بالا"
-              icon={Star}
-            />
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
+            <div className="flex items-center gap-3">
+              <Package
+                size={22}
+                weight="duotone"
+                className="text-violet-300"
+              />
 
-            <HealthCard
-              title="مشتریان فعال"
-              value={activeCustomerPercent}
-              text="تعامل مناسب در دوره فعلی"
-              icon={UsersThree}
-            />
+              <div>
+                <h2 className="text-xl font-semibold">
+                  وضعیت سفارش‌ها
+                </h2>
 
-            <HealthCard
-              title="مشتریان در معرض ریزش"
-              value={businessData.crm.churnRate}
-              text="نیازمند ارتباط مجدد"
-              icon={WarningCircle}
-              danger
-            />
+                <p className="mt-1 text-sm text-white/40">
+                  سفارش موفق، لغو و بازگشت
+                </p>
+              </div>
+            </div>
 
-            <HealthCard
-              title="کیفیت داده مشتری"
-              value={businessData.business.dataQuality}
-              text="اطلاعات کامل و قابل اتکا"
-              icon={CheckCircle}
-            />
+            <div className="mt-6 space-y-3">
+              <OrderRow
+                title="کل سفارش‌ها"
+                value={businessData.ecommerce.totalOrders}
+              />
+
+              <OrderRow
+                title="سفارش موفق"
+                value={businessData.ecommerce.completedOrders}
+              />
+
+              <OrderRow
+                title="سفارش لغوشده"
+                value={businessData.ecommerce.cancelledOrders}
+              />
+
+              <OrderRow
+                title="بازگشت وجه"
+                value={businessData.ecommerce.refundedOrders}
+              />
+            </div>
           </div>
         </section>
 
         <section className="mt-8 grid gap-5 xl:grid-cols-[1.15fr_1fr]">
-          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7 backdrop-blur-xl">
+          <div className="rounded-[30px] border border-white/[0.08] bg-[#080d1d]/65 p-7">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold">
-                  فعالیت‌های اخیر
+                  فعالیت‌های خرید اخیر
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  آخرین تعامل‌های مهم
+                  رفتارهای مهم مشتری در فروشگاه
                 </p>
               </div>
 
@@ -548,7 +666,7 @@ export default function CRMPage() {
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.07] via-[#080d1d]/70 to-cyan-500/[0.04] p-7 backdrop-blur-xl">
+          <div className="rounded-[30px] border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.07] via-[#080d1d]/70 to-cyan-500/[0.04] p-7">
             <div className="flex items-center gap-3">
               <Target
                 size={23}
@@ -558,44 +676,48 @@ export default function CRMPage() {
 
               <div>
                 <h2 className="text-xl font-semibold">
-                  اولویت‌های امروز
+                  فرصت‌های فوری فروش
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  کارهایی که بیشترین احتمال اثرگذاری دارند
+                  اقدام‌هایی با بیشترین احتمال درآمد
                 </p>
               </div>
             </div>
 
             <div className="mt-6 space-y-3">
               <PriorityRow
-                title={`تماس با ${businessData.crm.hotLeads.toLocaleString(
+                title={`${businessData.ecommerce.abandonedCarts.toLocaleString(
+                  "fa-IR"
+                )} سبد خرید رهاشده`}
+                value="بازیابی"
+              />
+
+              <PriorityRow
+                title={`${businessData.crm.hotLeads.toLocaleString(
                   "fa-IR"
                 )} لید داغ`}
-                value="اولویت بالا"
+                value="تماس فوری"
               />
 
               <PriorityRow
-                title="پیگیری پیشنهادهای فروش"
-                value="امروز"
-              />
-
-              <PriorityRow
-                title="بازگشت مشتریان غیرفعال"
-                value="پیشنهاد AI"
-              />
-
-              <PriorityRow
-                title="تکمیل اطلاعات مشتریان"
-                value={`کیفیت داده ${businessData.business.dataQuality.toLocaleString(
+                title={`${businessData.ecommerce.repeatCustomers.toLocaleString(
                   "fa-IR"
-                )}٪`}
+                )} مشتری تکرارشونده`}
+                value="بیش‌فروشی"
+              />
+
+              <PriorityRow
+                title={`${businessData.ecommerce.newCustomers.toLocaleString(
+                  "fa-IR"
+                )} مشتری جدید`}
+                value="وفادارسازی"
               />
             </div>
           </div>
         </section>
 
-        <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8 backdrop-blur-xl">
+        <section className="mt-8 overflow-hidden rounded-[32px] border border-violet-400/15 bg-gradient-to-l from-violet-500/[0.10] via-[#080d1d]/70 to-cyan-500/[0.05] p-8">
           <div className="grid gap-8 xl:grid-cols-[1fr_390px]">
             <div>
               <div className="flex items-center gap-3">
@@ -609,38 +731,38 @@ export default function CRMPage() {
 
                 <div>
                   <h2 className="text-2xl font-bold">
-                    هوشمندی مشتری Loadder
+                    هوشمندی فروش و مشتری
                   </h2>
 
                   <p className="mt-1 text-sm text-white/40">
-                    شناخت مشتری و پیشنهاد اقدام بعدی
+                    اتصال CRM، سایت و اتوماسیون
                   </p>
                 </div>
               </div>
 
               <p className="mt-5 max-w-4xl text-base leading-9 text-white/55">
-                Loadder رفتار مشتری، تعاملات، سابقه خرید، منبع جذب و
-                نتایج کمپین‌ها را کنار هم قرار می‌دهد تا احتمال خرید،
-                ریزش و ارزش هر مشتری را پیش‌بینی کند.
+                Loadder می‌تواند تشخیص دهد چه کسی فقط لید است، چه کسی
+                سبد خرید را رها کرده، چه کسی آماده پرداخت است و چه
+                مشتریانی بیشترین ارزش طول عمر را دارند.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
                 <SmartCard
-                  icon={Target}
-                  title="امتیاز مشتری"
-                  value="احتمال خرید"
-                />
-
-                <SmartCard
                   icon={ShoppingCart}
-                  title="خرید بعدی"
-                  value="پیش‌بینی زمان"
+                  title="سبد رهاشده"
+                  value="بازیابی خودکار"
                 />
 
                 <SmartCard
-                  icon={TrendUp}
+                  icon={Repeat}
+                  title="خرید مجدد"
+                  value="پیشنهاد شخصی"
+                />
+
+                <SmartCard
+                  icon={CurrencyCircleDollar}
                   title="ارزش مشتری"
-                  value="ارزش طول عمر"
+                  value="CLV هوشمند"
                 />
               </div>
             </div>
@@ -654,27 +776,25 @@ export default function CRMPage() {
                 />
 
                 <span className="font-semibold">
-                  پیشنهاد بعدی
+                  اقدام هوشمند
                 </span>
               </div>
 
               <div className="mt-5 space-y-3">
                 <ActionButton
-                  text={`نمایش ${businessData.crm.hotLeads.toLocaleString(
-                    "fa-IR"
-                  )} لید آماده خرید`}
+                  text="بازیابی سبدهای رهاشده"
                   onClick={() =>
                     showNotice(
-                      "فهرست لیدهای داغ بعداً از داده واقعی CRM ساخته می‌شود."
+                      "این اقدام در Automation به جریان بازیابی فروش وصل می‌شود."
                     )
                   }
                 />
 
                 <ActionButton
-                  text="ساخت کمپین بازگشت مشتری"
+                  text="کمپین خرید مجدد"
                   onClick={() =>
                     showNotice(
-                      "کمپین بازگشت بعداً به Ads و Automation متصل می‌شود."
+                      "کمپین خرید مجدد در Ads و Automation ساخته می‌شود."
                     )
                   }
                 />
@@ -683,7 +803,7 @@ export default function CRMPage() {
                   type="button"
                   onClick={() =>
                     showNotice(
-                      "اجرای هوشمند پس از اتصال Business Brain فعال می‌شود."
+                      "اجرای خودکار بعد از اتصال Business Brain فعال می‌شود."
                     )
                   }
                   className="w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold"
@@ -717,7 +837,7 @@ function StatCard({
   icon: React.ElementType;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5 backdrop-blur-xl">
+    <div className="rounded-[24px] border border-white/[0.08] bg-[#080d1d]/62 p-5">
       <div className="flex items-center justify-between">
         <span className="text-sm text-white/40">
           {title}
@@ -736,7 +856,47 @@ function StatCard({
 
       <div className="mt-2 flex items-center gap-1 text-xs text-emerald-300">
         <ArrowUp size={13} />
-        {change} نسبت به دوره قبل
+        {change}
+      </div>
+    </div>
+  );
+}
+
+function EcommerceStatCard({
+  title,
+  value,
+  hint,
+  icon: Icon,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div className="rounded-[24px] border border-cyan-400/10 bg-cyan-500/[0.04] p-5">
+      <div className="flex items-center justify-between">
+        <Icon
+          size={22}
+          weight="duotone"
+          className="text-cyan-300"
+        />
+
+        <span className="text-xs text-white/30">
+          فروشگاه
+        </span>
+      </div>
+
+      <div className="mt-4 text-sm text-white/40">
+        {title}
+      </div>
+
+      <div className="mt-2 text-2xl font-bold">
+        {value}
+      </div>
+
+      <div className="mt-3 text-xs text-white/35">
+        {hint}
       </div>
     </div>
   );
@@ -750,144 +910,124 @@ function LeadRow({
   onOpen: () => void;
 }) {
   const statusStyle =
-    lead.status === "آماده خرید"
-      ? "border-emerald-400/15 bg-emerald-500/[0.07] text-emerald-300"
-      : lead.status === "در حال پیگیری"
-        ? "border-blue-400/15 bg-blue-500/[0.07] text-blue-300"
-        : lead.status === "مشتری"
-          ? "border-violet-400/15 bg-violet-500/[0.07] text-violet-300"
-          : "border-white/[0.07] bg-white/[0.03] text-white/45";
+    lead.status === "مشتری تکرارشونده"
+      ? "border-violet-400/15 bg-violet-500/[0.07] text-violet-300"
+      : lead.status === "خریدار"
+        ? "border-emerald-400/15 bg-emerald-500/[0.07] text-emerald-300"
+        : lead.status === "در حال پرداخت"
+          ? "border-cyan-400/15 bg-cyan-500/[0.07] text-cyan-300"
+          : lead.status === "سبد رهاشده"
+            ? "border-amber-400/15 bg-amber-500/[0.07] text-amber-300"
+            : lead.status === "آماده خرید"
+              ? "border-blue-400/15 bg-blue-500/[0.07] text-blue-300"
+              : "border-white/[0.07] bg-white/[0.03] text-white/45";
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full flex-col gap-4 rounded-[22px] border border-white/[0.07] bg-black/20 p-5 text-right transition hover:border-violet-300/20 hover:bg-white/[0.04] xl:flex-row xl:items-center"
+      className="w-full rounded-[22px] border border-white/[0.07] bg-black/20 p-5 text-right"
     >
-      <div className="flex flex-1 items-center gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-300/10 bg-violet-500/[0.08]">
-          <UserCircle
-            size={25}
-            weight="duotone"
-            className="text-violet-300"
-          />
-        </div>
-
-        <div>
-          <div className="font-semibold">
-            {lead.name}
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
+        <div className="flex min-w-[220px] items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/[0.08]">
+            <UserCircle
+              size={25}
+              weight="duotone"
+              className="text-violet-300"
+            />
           </div>
 
-          <div className="mt-1 text-xs text-white/35">
-            {lead.company} • {lead.source}
-          </div>
-        </div>
-      </div>
+          <div>
+            <div className="font-semibold">
+              {lead.name}
+            </div>
 
-      <div className="grid flex-1 grid-cols-2 gap-4 md:grid-cols-4">
-        <div>
-          <div className="text-xs text-white/30">
-            امتیاز
-          </div>
-
-          <div className="mt-1 text-sm font-bold text-cyan-300">
-            {lead.score.toLocaleString("fa-IR")}
+            <div className="mt-1 text-xs text-white/35">
+              {lead.company} • {lead.source}
+            </div>
           </div>
         </div>
 
-        <div>
-          <div className="text-xs text-white/30">
-            ارزش فرصت
-          </div>
+        <div className="grid flex-1 grid-cols-2 gap-4 md:grid-cols-5">
+          <MiniData title="امتیاز" value={lead.score.toLocaleString("fa-IR")} />
+          <MiniData title="تعداد سفارش" value={lead.orders.toLocaleString("fa-IR")} />
+          <MiniData title="مجموع خرید" value={lead.totalSpent} />
+          <MiniData title="آخرین خرید" value={lead.lastPurchase} />
 
-          <div className="mt-1 text-sm font-semibold">
-            {lead.value}
-          </div>
-        </div>
+          <div>
+            <div className="text-xs text-white/30">
+              وضعیت
+            </div>
 
-        <div>
-          <div className="text-xs text-white/30">
-            آخرین فعالیت
+            <span
+              className={`mt-1 inline-block rounded-full border px-3 py-1.5 text-xs ${statusStyle}`}
+            >
+              {lead.status}
+            </span>
           </div>
-
-          <div className="mt-1 text-sm text-white/55">
-            {lead.lastAction}
-          </div>
-        </div>
-
-        <div className="flex items-end">
-          <span
-            className={`rounded-full border px-3 py-1.5 text-xs ${statusStyle}`}
-          >
-            {lead.status}
-          </span>
         </div>
       </div>
     </button>
   );
 }
 
-function HealthCard({
+function MiniData({
   title,
   value,
-  text,
-  icon: Icon,
-  danger = false,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <div className="text-xs text-white/30">
+        {title}
+      </div>
+
+      <div className="mt-1 text-sm font-semibold">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function CommerceMetric({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-5">
+      <div className="text-xs text-white/35">
+        {title}
+      </div>
+
+      <div className="mt-2 text-lg font-bold text-cyan-300">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function OrderRow({
+  title,
+  value,
 }: {
   title: string;
   value: number;
-  text: string;
-  icon: React.ElementType;
-  danger?: boolean;
 }) {
-  const safeValue = Math.max(0, Math.min(100, value));
-
   return (
-    <div className="rounded-[26px] border border-white/[0.08] bg-[#080d1d]/62 p-6 backdrop-blur-xl">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-sm text-white/40">
-            {title}
-          </div>
+    <div className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+      <span className="text-sm text-white/45">
+        {title}
+      </span>
 
-          <div
-            className={`mt-4 text-4xl font-bold ${
-              danger
-                ? "text-amber-300"
-                : "text-cyan-300"
-            }`}
-          >
-            {safeValue.toLocaleString("fa-IR")}٪
-          </div>
-        </div>
-
-        <Icon
-          size={22}
-          weight="duotone"
-          className={
-            danger
-              ? "text-amber-300"
-              : "text-violet-300"
-          }
-        />
-      </div>
-
-      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-        <div
-          className={`h-full rounded-full ${
-            danger
-              ? "bg-gradient-to-l from-amber-500 to-red-400"
-              : "bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-300"
-          }`}
-          style={{
-            width: `${safeValue}%`,
-          }}
-        />
-      </div>
-
-      <p className="mt-4 text-sm leading-7 text-white/40">
-        {text}
-      </p>
+      <span className="font-semibold">
+        {value.toLocaleString("fa-IR")}
+      </span>
     </div>
   );
 }
@@ -905,7 +1045,7 @@ function ActivityRow({
 }) {
   return (
     <div className="flex items-start gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/[0.08]">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/[0.08]">
         <Icon
           size={19}
           weight="duotone"
