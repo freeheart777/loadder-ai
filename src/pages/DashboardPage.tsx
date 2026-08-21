@@ -1,68 +1,30 @@
 import { Link, useLocation } from "react-router-dom";
 import type { ElementType } from "react";
-import BusinessBrainMotion from "../components/BusinessBrainMotion";
 import WorkspaceSelector from "../components/WorkspaceSelector";
 
 import {
   House,
   FolderOpen,
   Sparkle,
-  ChartLineUp,
-  Gear,
-  Plus,
   BookOpenText,
-  FileText,
-  Globe,
-  Gauge,
-  InstagramLogo,
-  Megaphone,
-  UsersThree,
-  Lightning,
-  ArrowSquareOut,
   Brain,} from "@phosphor-icons/react";
 
 import { useStagger } from "../lib/animations/useStagger";
 import { demoBusiness } from "../data/demoBusiness";
-import { withDemo } from "../lib/demoMode";
 
 type Tool = {
   title: string;
   icon: ElementType;
   status: string;
   route?: string;
-  externalUrl?: string;
 };
 
 const tools: Tool[] = [
   {
-    title: "Business Brain",
+    title: "برند و کسب‌وکار",
     icon: Brain,
     status: "آماده",
     route: "/dashboard/business-brain",
-  },
-  {
-    title: "برند بوک",
-    icon: BookOpenText,
-    status: "آماده",
-    route: "/dashboard/brand-book",
-  },
-  {
-    title: "بیزنس پروپوزال",
-    icon: FileText,
-    status: "آماده",
-    route: "/dashboard/business-proposal",
-  },
-  {
-    title: "سایت‌ساز هوشمند",
-    icon: Globe,
-    status: "آماده",
-    externalUrl: "https://iportals.ir/",
-  },
-  {
-    title: "KPI",
-    icon: Gauge,
-    status: "آماده",
-    route: "/dashboard/kpi",
   },
   {
     title: "تولید محتوا",
@@ -70,36 +32,7 @@ const tools: Tool[] = [
     status: "آماده",
     route: "/dashboard/content",
   },
-  {
-    title: "مدیر سوشال",
-    icon: InstagramLogo,
-    status: "آماده",
-    route: "/dashboard/social",
-  },
-  {
-    title: "تبلیغات هوشمند",
-    icon: Megaphone,
-    status: "آماده",
-    route: "/dashboard/ads",
-  },
-  {
-    title: "CRM",
-    icon: UsersThree,
-    status: "آماده",
-    route: "/dashboard/crm",
-  },
-  {
-    title: "تحلیل و گزارش",
-    icon: ChartLineUp,
-    status: "آماده",
-    route: "/dashboard/analytics",
-  },
-  {
-    title: "اتوماسیون",
-    icon: Lightning,
-    status: "آماده",
-    route: "/dashboard/automation",
-  },
+  { title: "برند بوک", icon: BookOpenText, status: "آماده", route: "/dashboard/brand-book" },
 ];
 
 function ToolCard({
@@ -110,7 +43,7 @@ function ToolCard({
   const Icon = tool.icon;
 
   const active = Boolean(
-    tool.route || tool.externalUrl
+    tool.route
   );
 
   const className = `
@@ -147,12 +80,6 @@ function ToolCard({
           </div>
 
           <div className="flex items-center gap-2">
-            {tool.externalUrl && (
-              <ArrowSquareOut
-                size={15}
-                className="text-white/35"
-              />
-            )}
 
             <span
               className={`rounded-full px-3 py-1.5 text-sm ${
@@ -177,9 +104,7 @@ function ToolCard({
         </h3>
 
         <p className="mt-2 text-sm leading-7 text-white/45">
-          {tool.externalUrl
-            ? "ورود به سرویس"
-            : tool.route
+          {tool.route
               ? "برای شروع کلیک کن"
               : "این متخصص در مرحله بعد فعال می‌شود"}
         </p>
@@ -193,20 +118,6 @@ function ToolCard({
       </div>
     </>
   );
-
-  if (tool.externalUrl) {
-    return (
-      <a
-        data-stagger
-        href={tool.externalUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-      >
-        {content}
-      </a>
-    );
-  }
 
   if (tool.route) {
     return (
@@ -269,37 +180,20 @@ export default function DashboardPage() {
             صفحه اصلی
           </div>
 
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
-          >
-            <FolderOpen size={20} />
-            پروژه‌ها
-          </button>
-
-          <button
-            type="button"
+          <Link
+            to="/dashboard/content"
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
           >
             <Sparkle size={20} />
-            متخصص‌های هوش مصنوعی
-          </button>
-
-          <Link
-            to={withDemo("/dashboard/analytics")}
-            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
-          >
-            <ChartLineUp size={20} />
-            تحلیل و گزارش‌ها
+            استودیوی محتوا
           </Link>
-
-          <button
-            type="button"
+          <Link
+            to="/dashboard/business-brain"
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
           >
-            <Gear size={20} />
-            تنظیمات
-          </button>
+            <Brain size={20} />
+            برند و کسب‌وکار
+          </Link>
         </nav>
 
         <div className="mt-auto rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
@@ -343,16 +237,13 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <button
-            type="button"
+          <Link
+            to="/dashboard/content"
             className="flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-gradient-to-l from-violet-500/20 to-fuchsia-500/15 px-5 py-3 text-sm"
           >
-            <Plus
-              size={16}
-              weight="bold"
-            />
-            پروژه جدید
-          </button>
+            <Sparkle size={16} weight="bold" />
+            تولید محتوا
+          </Link>
         </header>
 
         <div className="p-8">
@@ -365,23 +256,18 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-4 max-w-3xl text-base leading-8 text-white/55">
-                از ساخت برند و محتوا تا تبلیغات، CRM، Analytics و
-                Automation؛ همه به‌تدریج به Business Brain مشترک
-                Loadder متصل می‌شوند.
+                اطلاعات کسب‌وکار و برندت را ثبت کن و با استفاده از آن
+                پیش‌نویس محتوای بازاریابی آماده کن.
               </p>
             </div>
           </section>
 
 
-          <section className="mt-8">
-            <BusinessBrainMotion />
-          </section>
-
           <section className="mt-10">
             <div className="mb-5 flex items-end justify-between">
               <div>
                 <h2 className="text-xl font-semibold">
-                  متخصص‌های هوش مصنوعی
+                  ابزارهای Loadder
                 </h2>
 
                 <p className="mt-1 text-sm text-white/45">
@@ -390,7 +276,7 @@ export default function DashboardPage() {
               </div>
 
               <span className="text-sm text-violet-300/70">
-                ۹ متخصص فعال
+                ۳ ابزار آماده
               </span>
             </div>
 

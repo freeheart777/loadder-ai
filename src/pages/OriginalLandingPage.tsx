@@ -4,12 +4,6 @@ import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   Sparkle,
-  Globe,
-  InstagramLogo,
-  Megaphone,
-  UsersThree,
-  ChartLineUp,
-  Lightning,
   Article,
   Brain,
   Target,
@@ -22,43 +16,15 @@ import {
 
 const features = [
   {
-    title: "سایت‌ساز هوشمند",
-    icon: Globe,
+    title: "شناخت کسب‌وکار",
+    icon: Brain,
   },
   {
     title: "تولید محتوا",
     icon: Article,
   },
   {
-    title: "مدیریت شبکه‌های اجتماعی",
-    icon: InstagramLogo,
-  },
-  {
-    title: "تبلیغات هوشمند",
-    icon: Megaphone,
-  },
-  {
-    title: "CRM",
-    icon: UsersThree,
-  },
-  {
-    title: "تحلیل و گزارش",
-    icon: ChartLineUp,
-  },
-  {
-    title: "اتوماسیون",
-    icon: Lightning,
-  },
-  {
-    title: "Business Brain",
-    icon: Brain,
-  },
-  {
-    title: "Digital Marketing",
-    icon: Megaphone,
-  },
-  {
-    title: "Advertising",
+    title: "لحن یکپارچه برند",
     icon: Target,
   },
 ];
@@ -299,18 +265,6 @@ export default function OriginalLandingPage() {
             />
           </Link>
 
-          <Link
-            to="/dashboard?demo=1"
-            className="flex items-center gap-2 rounded-[18px] border border-violet-400/30 bg-violet-500/[0.07] px-6 py-3.5 text-[15px] text-white backdrop-blur-xl transition hover:border-cyan-300/30 hover:bg-violet-500/[0.12]"
-          >
-            نسخه تست دمو
-
-            <Sparkle
-              size={17}
-              weight="fill"
-              className="text-cyan-300"
-            />
-          </Link>
         </div>
       </header>
 
@@ -338,7 +292,7 @@ export default function OriginalLandingPage() {
               data-title-line
               className="hero-headline text-[46px] font-bold leading-[1.38] tracking-[-0.04em] text-white lg:text-[58px] xl:text-[66px]"
             >
-              یک پلتفرم.
+              محتوای هوشمند.
             </h1>
           </div>
 
@@ -347,7 +301,7 @@ export default function OriginalLandingPage() {
               data-title-line
               className="hero-headline bg-gradient-to-l from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-[46px] font-bold leading-[1.38] tracking-[-0.045em] text-transparent lg:text-[58px] xl:text-[66px]"
             >
-              تمام ابزارهای رشد.
+              هماهنگ با برند شما.
             </h2>
           </div>
 
@@ -355,19 +309,18 @@ export default function OriginalLandingPage() {
             data-description
             className="mt-7 max-w-[585px] text-[16px] leading-[2.15] text-white/60 lg:text-[17px]"
           >
-            Loadder ساخت برند، تولید محتوا، شبکه‌های اجتماعی،
-            تبلیغات، CRM، تحلیل داده و اتوماسیون را در یک
-            پلتفرم هوشمند کنار هم قرار می‌دهد تا کسب‌وکارت
-            سریع‌تر و دقیق‌تر رشد کند.
+            Loadder اطلاعات کسب‌وکار و هویت برند شما را به
+            پیش‌نویس‌های بازاریابی منسجم تبدیل می‌کند تا سریع‌تر
+            محتوای مناسب برندتان را آماده کنید.
           </p>
 
           <div
             data-description
             className="mt-7 flex flex-wrap gap-2.5"
           >
-            <MiniTag title="Business Brain" />
-            <MiniTag title="AI Native" />
-            <MiniTag title="Growth Intelligence" />
+            <MiniTag title="Business Context" />
+            <MiniTag title="Brand Aware" />
+            <MiniTag title="Content Studio" />
           </div>
         </div>
 

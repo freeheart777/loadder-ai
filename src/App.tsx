@@ -11,23 +11,14 @@ import {
 
 import DemoModePreserver from "./components/DemoModePreserver";
 import { AuthProvider, RequireAuth } from "./lib/auth";
+import { internalToolsEnabled } from "./lib/productPolicy";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const BrandBookPage = lazy(() => import("./pages/BrandBookPage"));
-const BusinessProposalPage = lazy(() => import("./pages/BusinessProposalPage"));
 const ContentStudioPage = lazy(() => import("./pages/ContentStudioPage"));
-const SocialManagerPage = lazy(() => import("./pages/SocialManagerPage"));
-const AdsCenterPage = lazy(() => import("./pages/AdsCenterPage"));
-const MarketingPage = lazy(() => import("./pages/MarketingPage"));
-const CRMPage = lazy(() => import("./pages/CRMPage"));
-const CustomerProfilePage = lazy(() => import("./pages/CustomerProfilePage"));
-const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
-const KPIPage = lazy(() => import("./pages/KPIPage"));
-const PredictivePage = lazy(() => import("./pages/PredictivePage"));
-const AutomationPage = lazy(() => import("./pages/AutomationPage"));
 const BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage"));
 const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
 const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
@@ -60,7 +51,7 @@ export default function App() {
         {/* داشبورد قدیمی - فقط برای بکاپ */}
         <Route
           path="/legacy-dashboard"
-          element={<HomePage />}
+          element={internalToolsEnabled ? <HomePage /> : <Navigate to="/dashboard" replace />}
         />
 
         {/* برند بوک */}
@@ -72,7 +63,7 @@ export default function App() {
         {/* بیزنس پروپوزال */}
         <Route
           path="/dashboard/business-proposal"
-          element={<BusinessProposalPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* استودیوی تولید محتوا */}
@@ -84,55 +75,55 @@ export default function App() {
         {/* مدیریت شبکه‌های اجتماعی */}
         <Route
           path="/dashboard/social"
-          element={<SocialManagerPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* مرکز تبلیغات */}
         <Route
           path="/dashboard/ads"
-          element={<AdsCenterPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* مرکز فرماندهی مارکتینگ */}
         <Route
           path="/dashboard/marketing"
-          element={<MarketingPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* ارتباط با مشتری */}
         <Route
           path="/dashboard/crm"
-          element={<CRMPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* پروفایل 360 مشتری */}
         <Route
           path="/dashboard/crm/customer/:id"
-          element={<CustomerProfilePage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* تحلیل و گزارش */}
         <Route
           path="/dashboard/analytics"
-          element={<AnalyticsPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* مرکز سنجش عملکرد */}
         <Route
           path="/dashboard/kpi"
-          element={<KPIPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* پیش‌بینی آینده */}
         <Route
           path="/dashboard/predictive"
-          element={<PredictivePage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* اتوماسیون */}
         <Route
           path="/dashboard/automation"
-          element={<AutomationPage />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* مغز هوشمند کسب‌وکار */}
@@ -145,11 +136,11 @@ export default function App() {
 
             <Route
               path="/click-test"
-              element={<ClickTestPage />}
+              element={internalToolsEnabled ? <ClickTestPage /> : <Navigate to="/dashboard" replace />}
             />
             <Route
               path="/intelligence"
-              element={<IntelligencePreviewPage />}
+              element={internalToolsEnabled ? <IntelligencePreviewPage /> : <Navigate to="/dashboard" replace />}
             />
           </Route>
 

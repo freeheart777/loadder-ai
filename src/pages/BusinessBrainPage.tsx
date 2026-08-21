@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { withDemo } from "../lib/demoMode";
+import { internalToolsEnabled } from "../lib/productPolicy";
 
 import {
   ArrowRight,
@@ -871,14 +872,12 @@ export default function BusinessBrainPage() {
               </h2>
 
               <p className="mt-4 max-w-4xl text-base leading-9 text-white/55">
-                Business Brain اطلاعات برند، وب‌سایت، محصولات،
-                CRM، Social، Ads، فروش و اسناد را به یک Business
-                DNA واحد تبدیل می‌کند. تمام متخصص‌های AI در آینده
-                از همین مغز مشترک تغذیه می‌شوند.
+                اطلاعات واقعی کسب‌وکار و برندت را ثبت کن تا Loadder
+                شناخت منسجمی برای آماده‌سازی محتوای بازاریابی داشته باشد.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <button
+                {internalToolsEnabled && <button
                   type="button"
                   onClick={() =>
                     showNotice(
@@ -889,9 +888,9 @@ export default function BusinessBrainPage() {
                 >
                   <LinkSimple size={17} />
                   تحلیل وب‌سایت
-                </button>
+                </button>}
 
-                <button
+                {internalToolsEnabled && <button
                   type="button"
                   onClick={() =>
                     showNotice(
@@ -902,7 +901,7 @@ export default function BusinessBrainPage() {
                 >
                   <UploadSimple size={17} />
                   آپلود اطلاعات برند
-                </button>
+                </button>}
 
                 <button
                   type="button"
@@ -917,11 +916,11 @@ export default function BusinessBrainPage() {
               </div>
             </div>
 
-            <DNAVisual
+            {internalToolsEnabled && <DNAVisual
               score={dnaScore}
               connected={connectedCount}
               total={sources.length}
-            />
+            />}
           </div>
         </section>
 
@@ -935,52 +934,52 @@ export default function BusinessBrainPage() {
             icon={Brain}
           />
 
-          <StatusCard
+          {internalToolsEnabled && <StatusCard
             title="منابع متصل"
             value={`${connectedCount}/${sources.length}`}
             subtitle="منبع داده"
             icon={LinkSimple}
-          />
+          />}
 
-          <StatusCard
+          {internalToolsEnabled && <StatusCard
             title="فرصت‌های رشد"
             value="۳"
             subtitle="فرصت شناسایی‌شده"
             icon={Lightbulb}
-          />
+          />}
 
-          <StatusCard
+          {internalToolsEnabled && <StatusCard
             title="ریسک‌های مهم"
             value="۳"
             subtitle="نیازمند توجه"
             icon={ShieldWarning}
-          />
+          />}
         </section>
 
         {/* TABS */}
 
         <section className="mt-8">
           <div className="grid gap-3 md:grid-cols-4">
-            <TabButton
+            {internalToolsEnabled && <TabButton
               active={activeTab === "dna"}
               onClick={() => setActiveTab("dna")}
               icon={Brain}
               title="Business DNA"
-            />
+            />}
 
-            <TabButton
+            {internalToolsEnabled && <TabButton
               active={activeTab === "sources"}
               onClick={() => setActiveTab("sources")}
               icon={LinkSimple}
               title="منابع داده"
-            />
+            />}
 
-            <TabButton
+            {internalToolsEnabled && <TabButton
               active={activeTab === "opportunities"}
               onClick={() => setActiveTab("opportunities")}
               icon={TrendUp}
               title="فرصت‌های رشد"
-            />
+            />}
 
             <TabButton
               active={activeTab === "risks"}
@@ -1175,7 +1174,7 @@ export default function BusinessBrainPage() {
                 </div>
               </div>
 
-              <div className="rounded-[30px] border border-violet-400/15 bg-violet-500/[0.05] p-7">
+              {internalToolsEnabled && <div className="rounded-[30px] border border-violet-400/15 bg-violet-500/[0.05] p-7">
                 <div className="flex items-center gap-3">
                   <Sparkle
                     size={22}
@@ -1203,14 +1202,14 @@ export default function BusinessBrainPage() {
                   <Plus size={16} />
                   تکمیل منابع داده
                 </button>
-              </div>
+              </div>}
             </div>
           </section>
         )}
 
         {/* SOURCES */}
 
-        {activeTab === "sources" && (
+        {internalToolsEnabled && activeTab === "sources" && (
           <section className="mt-5 rounded-[30px] border border-white/[0.08] bg-[#0a0d13] p-7">
             <div>
               <h2 className="text-xl font-semibold">
@@ -1313,7 +1312,7 @@ export default function BusinessBrainPage() {
 
         {/* OPPORTUNITIES */}
 
-        {activeTab === "opportunities" && (
+        {internalToolsEnabled && activeTab === "opportunities" && (
           <section className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_1fr]">
             <div className="rounded-[30px] border border-white/[0.08] bg-[#0a0d13] p-7">
               <div className="flex items-center gap-3">
@@ -1407,7 +1406,7 @@ export default function BusinessBrainPage() {
 
         {/* RISKS */}
 
-        {activeTab === "risks" && (
+        {internalToolsEnabled && activeTab === "risks" && (
           <section className="mt-5 grid gap-4 md:grid-cols-3">
             {risks.map((risk) => (
               <div

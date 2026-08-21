@@ -32,6 +32,17 @@ function parseOrigins(value) {
     .filter(Boolean);
 }
 
+function parseFeatureOverrides(value) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+    return parsed;
+  } catch {
+    throw new Error("PRODUCT_FEATURE_OVERRIDES must be a valid JSON object.");
+  }
+}
+
 const nodeEnv = process.env.NODE_ENV || "development";
 const authHashSecret =
   process.env.AUTH_HASH_SECRET ||
@@ -41,6 +52,21 @@ const authHashSecret =
 
 if (!authHashSecret) {
   throw new Error("AUTH_HASH_SECRET is required in production.");
+}
+
+if (nodeEnv === "production" && process.env.AUTH_EXPOSE_DEV_OTP === "true") {
+  throw new Error("AUTH_EXPOSE_DEV_OTP must be disabled in production.");
+}
+
+if (nodeEnv === "production" && process.env.LOADDER_SEED_DEMO_DATA === "true") {
+  throw new Error("LOADDER_SEED_DEMO_DATA must be disabled in production.");
+}
+
+if (nodeEnv === "production") {
+  const origins = String(process.env.CLIENT_ORIGINS || "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (!origins.length || origins.some((origin) => origin === "*" || !/^https:\/\//.test(origin))) {
+    throw new Error("CLIENT_ORIGINS must contain explicit HTTPS origins in production.");
+  }
 }
 
 export const environment = Object.freeze({
@@ -60,4 +86,8 @@ export const environment = Object.freeze({
   exposeDevelopmentOtp:
     nodeEnv !== "production" &&
     process.env.AUTH_EXPOSE_DEV_OTP === "true",
+  seedDemoData:
+    nodeEnv !== "production" && process.env.LOADDER_SEED_DEMO_DATA !== "false",
+  internalAccessToken: process.env.LOADDER_INTERNAL_ACCESS_TOKEN || "",
+  productFeatureOverrides: parseFeatureOverrides(process.env.PRODUCT_FEATURE_OVERRIDES),
 });

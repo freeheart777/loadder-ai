@@ -394,6 +394,12 @@ export async function sendMessage({
   subject = null,
   metadata = {},
 }) {
+  if (process.env.NODE_ENV === "production") {
+    const error = new Error("This operation is not available.");
+    error.code = "FEATURE_DISABLED";
+    error.feature = "legacy_messaging";
+    throw error;
+  }
   if (!channel) {
     throw new Error(
       "Messaging channel is required."

@@ -3,6 +3,13 @@ import cors from "cors";
 import crypto from "crypto";
 
 import { environment } from "./app/config/environment.mjs";
+import { createProductPolicy } from "./app/product-policy.mjs";
+import {
+  assertLegacyOperationEnabled,
+  createApiProductGate,
+  createInternalAccessMiddleware,
+  createProductionOriginGuard,
+} from "./app/middleware/product-gating.mjs";
 import aiRouter from "./app/routes/ai.mjs";
 import { createAuthRouter } from "./app/routes/auth.mjs";
 import { createWorkspaceRouter } from "./app/routes/workspaces.mjs";
@@ -126,7 +133,7 @@ import {
 import { createWorkspaceRuntimeStore } from "./app/services/workspace-runtime-store.mjs";
 
 import {
-  sendMessage,
+  sendMessage as sendLegacyMessage,
   getMessagingStatus,
 } from "./services/messaging.mjs";
 
@@ -218,6 +225,10 @@ import {
 } from "./db/workspace-database.mjs";
 
 const app = express();
+const productPolicy = createProductPolicy({
+  nodeEnv: environment.nodeEnv,
+  overrides: environment.productFeatureOverrides,
+});
 
 app.use(
   cors({
@@ -236,6 +247,10 @@ app.use(
     limit: "2mb",
   })
 );
+app.use(createProductionOriginGuard({
+  nodeEnv: environment.nodeEnv,
+  clientOrigins: environment.clientOrigins,
+}));
 
 const PORT = environment.apiPort;
 
@@ -399,6 +414,11 @@ app.use(createRequireWorkspace(identityRepository));
 app.use((req, res, next) =>
   runWithWorkspace(req.workspace.id, next)
 );
+app.use(createInternalAccessMiddleware({
+  token: environment.internalAccessToken,
+  nodeEnv: environment.nodeEnv,
+}));
+app.use(createApiProductGate(productPolicy));
 app.use(
   "/api/business-profile",
   createBusinessProfileRouter({ businessProfileService })
@@ -817,12 +837,11 @@ const defaultAutomations = [
    SEED
 ========================================================= */
 
-seedDefaultAutomations(
-  defaultAutomations
-);
-
-seedCRMData();
-seedMarketingData();
+if (environment.seedDemoData) {
+  seedDefaultAutomations(defaultAutomations);
+  seedCRMData();
+  seedMarketingData();
+}
 
 /* =========================================================
    WORKFLOW HELPERS
@@ -958,6 +977,7 @@ async function executeAction(
   event,
   workflow
 ) {
+  assertLegacyOperationEnabled(productPolicy, "legacy_automation");
   let executionResult = {
     ok: true,
 
@@ -984,7 +1004,8 @@ async function executeAction(
             .recipient;
 
     executionResult =
-      await sendMessage({
+      assertLegacyOperationEnabled(productPolicy, "legacy_messaging");
+      await sendLegacyMessage({
         channel:
           action.channel ||
           "sms",
@@ -1146,6 +1167,7 @@ async function runWorkflow(
   workflow,
   event
 ) {
+  assertLegacyOperationEnabled(productPolicy, "legacy_automation");
   const executions = [];
 
   for (
@@ -1181,6 +1203,7 @@ async function runWorkflow(
 async function processEvent(
   event
 ) {
+  assertLegacyOperationEnabled(productPolicy, "legacy_automation");
   saveEvent(event);
 
   if (
@@ -1566,7 +1589,8 @@ app.post(
       });
 
       const result =
-        await sendMessage({
+        assertLegacyOperationEnabled(productPolicy, "legacy_messaging");
+        await sendLegacyMessage({
           channel,
 
           recipient,
