@@ -50,6 +50,11 @@ export function createOperationMetrics({ limit = DEFAULT_LIMIT, sink = null } = 
       riskClass: input.riskClass || null,
       policyVersion: input.policyVersion || null,
       requestPolicyVersion: input.requestPolicyVersion || null,
+      actionType: input.actionType || null,
+      actionVersion: input.actionVersion || null,
+      schemaVersion: input.schemaVersion || null,
+      sensitivityClass: input.sensitivityClass || null,
+      sizeBucket: input.sizeBucket || null,
     });
     measurements.push(measurement);
     if (measurements.length > limit) measurements.splice(0, measurements.length - limit);

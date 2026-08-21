@@ -62,6 +62,9 @@ function inspect(target) {
     || target.endsWith(`${path.sep}execution-ledger-service.mjs`)
     || target.endsWith(`${path.sep}execution-ledger-repository.mjs`)
     || target.endsWith(`${path.sep}execution-ledger.mjs`)
+    || target.includes(`${path.sep}app${path.sep}action-inputs${path.sep}`)
+    || target.endsWith(`${path.sep}execution-action-input-service.mjs`)
+    || target.endsWith(`${path.sep}execution-action-input-repository.mjs`)
   ) {
     const forbidden = [
       /from\s+["'][^"']*(business-profile|business-dna|brand-book)-(repository|service)\.mjs["']/,
@@ -167,6 +170,13 @@ function inspect(target) {
         /from\s+["'][^"']*(provider-adapter|connector-adapter|provider-sdk|credential-resolver|messaging|automation|legacy|campaign|customer|lead|order|cart|optimizer|openai|model|agent|embedding|queue|worker|redis|bullmq|sqs|retry-runtime|reconciliation-runtime|resend|kavenegar)[^"']*["']/i,
         /\b(customers|leads|orders|carts|marketing_campaigns|automations|job_queue)\b/i,
         /process\.env\.(?:KAVENEGAR|RESEND|[^\s;]*(?:TOKEN|API_KEY|SECRET))/i
+      );
+    }
+    if (target.includes("action-input")) {
+      forbidden.push(
+        /from\s+["'][^"']*(provider-adapter|credential-resolver|messaging|automation|optimizer|worker|queue|reconciliation)[^"']*["']/i,
+        /from\s+["'](?:openai|[^"']*(agent|embedding|kms|vault|cloud)[^"']*)["']/i,
+        /\b(provider_reference_records|secure_execution_artifacts|execution_result_provider_references|customers|leads|orders|carts|marketing_campaigns)\b/i
       );
     }
     if (/from\s+["'][^"']*(integrations\/providers|connector-adapters|provider-adapters)[^"']*["']/.test(source) &&
