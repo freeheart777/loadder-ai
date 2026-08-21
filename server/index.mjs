@@ -21,6 +21,7 @@ import { createKnowledgeExtractionRouter } from "./app/routes/knowledge-extracti
 import { createImportedFactMappingRouter } from "./app/routes/imported-fact-mapping.mjs";
 import { createListeningRouter } from "./app/routes/listening.mjs";
 import { createListeningIntelligenceRouter } from "./app/routes/listening-intelligence.mjs";
+import { createSemanticIntelligenceRouter } from "./app/routes/semantic-intelligence.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -44,6 +45,7 @@ import { createKnowledgeExtractionRepository } from "./app/repositories/knowledg
 import { createImportedFactEventLinkRepository } from "./app/repositories/imported-fact-event-link-repository.mjs";
 import { createListeningRepository } from "./app/repositories/listening-repository.mjs";
 import { createListeningIntelligenceRepository } from "./app/repositories/listening-intelligence-repository.mjs";
+import { createSemanticFindingRepository } from "./app/repositories/semantic-finding-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -79,6 +81,8 @@ import { listeningEventMapperRegistry } from "./app/listening/listening-event-ma
 import { createListeningService } from "./app/services/listening-service.mjs";
 import { createListeningEventMapperService } from "./app/services/listening-event-mapper-service.mjs";
 import { createListeningIntelligenceService } from "./app/services/listening-intelligence-service.mjs";
+import { createSemanticIntelligenceService } from "./app/services/semantic-intelligence-service.mjs";
+import { semanticContractRegistry } from "./app/semantic/semantic-contract-registry.mjs";
 import {
   createRequireAuth,
   createRequireWorkspace,
@@ -223,6 +227,7 @@ const knowledgeExtractionRepository = createKnowledgeExtractionRepository(db);
 const importedFactEventLinkRepository = createImportedFactEventLinkRepository(db);
 const listeningRepository = createListeningRepository(db);
 const listeningIntelligenceRepository = createListeningIntelligenceRepository(db);
+const semanticFindingRepository = createSemanticFindingRepository(db);
 const authService = createAuthService({
   repository: identityRepository,
   otpHashSecret: environment.authHashSecret,
@@ -300,6 +305,7 @@ const importedFactEventMapperService = createImportedFactEventMapperService({ re
 const listeningService = createListeningService({ sourceRegistry: listeningSourceRegistry, repository: listeningRepository, auditRepository: identityRepository });
 const listeningEventMapperService = createListeningEventMapperService({ registry: listeningEventMapperRegistry, repository: listeningRepository, businessEventService });
 const listeningIntelligenceService = createListeningIntelligenceService({ repository:listeningIntelligenceRepository, contextGateway:businessContextConsumerGateway, intelligenceRepository:intelligenceRecordRepository, featureRepository:featureValueRepository });
+const semanticIntelligenceService = createSemanticIntelligenceService({ repository: semanticFindingRepository, registry: semanticContractRegistry, contextGateway: businessContextConsumerGateway });
 
 app.use(
   "/api/auth",
@@ -384,6 +390,7 @@ app.use("/api", createKnowledgeExtractionRouter({ service: knowledgeExtractionSe
 app.use("/api", createImportedFactMappingRouter({ service: importedFactEventMapperService }));
 app.use("/api", createListeningRouter({ service: listeningService, mapper: listeningEventMapperService }));
 app.use("/api", createListeningIntelligenceRouter({ service: listeningIntelligenceService }));
+app.use("/api", createSemanticIntelligenceRouter({ service: semanticIntelligenceService }));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));

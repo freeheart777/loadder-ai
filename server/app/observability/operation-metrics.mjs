@@ -25,6 +25,9 @@ export function createOperationMetrics({ limit = DEFAULT_LIMIT, sink = null } = 
       topicMatchesGenerated: numeric(input.topicMatchesGenerated),
       aggregatesGenerated: numeric(input.aggregatesGenerated),
       featureCount: numeric(input.featureCount),
+      evidenceCount: numeric(input.evidenceCount),
+      findingCount: numeric(input.findingCount),
+      insufficientEvidenceCount: numeric(input.insufficientEvidenceCount),
     });
     measurements.push(measurement);
     if (measurements.length > limit) measurements.splice(0, measurements.length - limit);
