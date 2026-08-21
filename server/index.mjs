@@ -24,6 +24,7 @@ import { createListeningIntelligenceRouter } from "./app/routes/listening-intell
 import { createSemanticIntelligenceRouter } from "./app/routes/semantic-intelligence.mjs";
 import { createRecommendationIntelligenceRouter } from "./app/routes/recommendation-intelligence.mjs";
 import { createHumanGovernanceRouter } from "./app/routes/human-governance.mjs";
+import { createActionProposalRouter } from "./app/routes/action-proposals.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -50,6 +51,7 @@ import { createListeningIntelligenceRepository } from "./app/repositories/listen
 import { createSemanticFindingRepository } from "./app/repositories/semantic-finding-repository.mjs";
 import { createIntelligenceRecommendationRepository } from "./app/repositories/intelligence-recommendation-repository.mjs";
 import { createHumanGovernanceRepository } from "./app/repositories/human-governance-repository.mjs";
+import { createActionProposalRepository } from "./app/repositories/action-proposal-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -89,7 +91,9 @@ import { createSemanticIntelligenceService } from "./app/services/semantic-intel
 import { semanticContractRegistry } from "./app/semantic/semantic-contract-registry.mjs";
 import { createRecommendationIntelligenceService } from "./app/services/recommendation-intelligence-service.mjs";
 import { createHumanGovernanceService } from "./app/services/human-governance-service.mjs";
+import { createActionProposalService } from "./app/services/action-proposal-service.mjs";
 import { createRecommendationFreshnessQuery } from "./app/recommendations/recommendation-freshness-query.mjs";
+import { actionProposalContractRegistry } from "./app/action-proposals/action-proposal-contract-registry.mjs";
 import { recommendationContractRegistry } from "./app/recommendations/recommendation-contract-registry.mjs";
 import {
   createRequireAuth,
@@ -319,6 +323,8 @@ const recommendationIntelligenceService = createRecommendationIntelligenceServic
 const humanGovernanceRepository = createHumanGovernanceRepository(db);
 const recommendationFreshnessQuery = createRecommendationFreshnessQuery({ recommendationRepository: intelligenceRecommendationRepository, currentContextState: () => { const current = businessContextService.getCurrent(); return { contextVersionId: current.activeContext?.id || null, isStale: current.isStale }; } });
 const humanGovernanceService = createHumanGovernanceService({ repository: humanGovernanceRepository, recommendationRepository: intelligenceRecommendationRepository, freshnessQuery: recommendationFreshnessQuery });
+const actionProposalRepository = createActionProposalRepository(db);
+const actionProposalService = createActionProposalService({ repository: actionProposalRepository, registry: actionProposalContractRegistry, decisionQuery: humanGovernanceRepository, recommendationRepository: intelligenceRecommendationRepository });
 
 app.use(
   "/api/auth",
@@ -406,6 +412,7 @@ app.use("/api", createListeningIntelligenceRouter({ service: listeningIntelligen
 app.use("/api", createSemanticIntelligenceRouter({ service: semanticIntelligenceService }));
 app.use("/api", createRecommendationIntelligenceRouter({ service: recommendationIntelligenceService }));
 app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService }));
+app.use("/api", createActionProposalRouter({ service: actionProposalService }));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));

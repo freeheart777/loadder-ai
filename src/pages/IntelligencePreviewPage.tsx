@@ -45,6 +45,14 @@ type Governance = { reviews: Review[]; decisions: Decision[]; error?: string };
 type PendingDecision = {
   recommendationId: string; decisionType: string; supersedesDecisionId: string | null; idempotencyKey: string;
 };
+type ActionProposal = {
+  id: string; decisionId: string; recommendationId: string; actionType: string;
+  actionVersion: number; schemaVersion: number; subjectType: string; subjectId: string | null;
+  subjectKey: string; targetType: string; targetKey: string; contextVersionId: string;
+  pointInTimeCutoff: string; riskClass: string; executionEligible: boolean; executable: boolean;
+  requiresAuthorization: boolean; producer: string; producerVersion: string;
+  createdByRole: string; inputManifestHash: string; proposalHash: string; createdAt: string;
+};
 
 class ApiRequestError extends Error {
   status: number;
@@ -155,6 +163,7 @@ export default function IntelligencePreviewPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [authError, setAuthError] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [actionProposals, setActionProposals] = useState<ActionProposal[]>([]);
   const [governance, setGovernance] = useState<Record<string, Governance>>({});
   const [recommendationError, setRecommendationError] = useState(false);
   const [governanceError, setGovernanceError] = useState(false);
@@ -212,13 +221,20 @@ export default function IntelligencePreviewPage() {
       return [];
     }
   }, [handleFailure, loadGovernance]);
+  const loadActionProposals = useCallback(async () => {
+    try {
+      const data = await jsonRequest<{ proposals: ActionProposal[] }>("/api/execution/action-proposals?limit=100");
+      setActionProposals(data.proposals || []);
+      return data.proposals || [];
+    } catch (error) { handleFailure(error); return []; }
+  }, [handleFailure]);
 
   const loadPreview = useCallback(async () => {
     setErrors([]); setAuthError(false);
     setGovernanceError(false);
-    const results = await Promise.allSettled([loadContext(), loadListening(), loadFindings(), loadRecommendations()]);
+    const results = await Promise.allSettled([loadContext(), loadListening(), loadFindings(), loadRecommendations(), loadActionProposals()]);
     for (const result of results) if (result.status === "rejected") handleFailure(result.reason);
-  }, [handleFailure, loadContext, loadFindings, loadListening, loadRecommendations]);
+  }, [handleFailure, loadActionProposals, loadContext, loadFindings, loadListening, loadRecommendations]);
 
   useEffect(() => { void loadPreview().finally(() => setLoading(false)); }, [loadPreview]);
 
@@ -263,6 +279,7 @@ export default function IntelligencePreviewPage() {
     }
     try { await loadFindings(); } catch (error) { handleFailure(error); }
     await loadRecommendations();
+    await loadActionProposals();
     setRefreshing(false);
   };
 
@@ -403,6 +420,33 @@ export default function IntelligencePreviewPage() {
               onReview={(reviewType) => void createReview(recommendation.id, reviewType)}
               onDecision={(decisionType, head) => requestDecision(recommendation.id, decisionType, head)}
             />
+          ))}</div>}
+        </section>
+
+        <section>
+          <div className="mb-5">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-200/60">Action Proposal</div>
+            <h2 className="mt-2 text-lg font-semibold">Controlled Action Proposals</h2>
+            <p className="mt-1 max-w-3xl text-sm text-white/40">Immutable previews only. Authorization is required by design, but authorization and execution are not available in Phase 4I v1.</p>
+          </div>
+          {!actionProposals.length ? (
+            <div className="rounded-[24px] border border-dashed border-violet-300/15 bg-violet-500/[0.035] p-7">
+              <div className="flex flex-wrap gap-2"><StatusPill status="NON-EXECUTING" /><StatusPill status="EXECUTION ELIGIBLE: NO" /><StatusPill status="AUTHORIZATION REQUIRED" /></div>
+              <h3 className="mt-5 font-semibold text-white/70">NO ACTION PROPOSAL CONTRACT IS CURRENTLY APPROVED</h3>
+              <p className="mt-2 text-sm text-white/40">The current evidence-review recommendations do not justify a specific external mutation. No external action will occur.</p>
+            </div>
+          ) : <div className="space-y-4">{actionProposals.map((proposal) => (
+            <article key={proposal.id} className="rounded-[24px] border border-violet-300/15 bg-violet-500/[0.035] p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4"><div><div className="text-xs uppercase tracking-[0.18em] text-violet-200/60">Action Proposal</div><h3 className="mt-2 text-xl font-semibold">{displayState(proposal.actionType)}</h3></div><div className="flex flex-wrap gap-2"><StatusPill status="NON-EXECUTING" /><StatusPill status="EXECUTION ELIGIBLE: NO" /><StatusPill status="AUTHORIZATION REQUIRED" /></div></div>
+              <p className="mt-4 text-sm text-white/45">No external action will occur.</p>
+              <dl className="mt-5 grid gap-4 border-t border-white/[0.07] pt-5 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                <Meta label="Proposal ID" value={proposal.id} mono /><Meta label="Decision ID" value={proposal.decisionId} mono />
+                <Meta label="Recommendation ID" value={proposal.recommendationId} mono /><Meta label="Version / schema" value={`${proposal.actionVersion} / ${proposal.schemaVersion}`} />
+                <Meta label="Subject" value={`${proposal.subjectType} · ${proposal.subjectKey}`} /><Meta label="Target" value={`${proposal.targetType} · ${proposal.targetKey}`} />
+                <Meta label="Risk class" value={proposal.riskClass} /><Meta label="Created by" value={`${proposal.createdByRole} · ${formatDate(proposal.createdAt)}`} />
+                <div className="sm:col-span-2"><Meta label="Input manifest hash" value={proposal.inputManifestHash} mono /></div><div className="sm:col-span-2"><Meta label="Proposal hash" value={proposal.proposalHash} mono /></div>
+              </dl>
+            </article>
           ))}</div>}
         </section>
 

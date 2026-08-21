@@ -8,7 +8,7 @@ import express from "express";
 import crypto from "node:crypto";
 
 import { runMigrations } from "../db/migrate.mjs";
-import { migrations } from "../db/migrations/index.mjs";
+import { migration036IntelligenceRecommendations } from "../db/migrations/036_intelligence_recommendations.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { recommendationContractRegistry } from "../app/recommendations/recommendation-contract-registry.mjs";
 import { produceAttentionEvidenceReview, produceCompetitiveVisibilityEvidenceReview } from "../app/recommendations/recommendation-producers.mjs";
@@ -30,15 +30,36 @@ test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "loadder-recommendation-")), path = join(dir, "recommendation.sqlite");
   copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
   const db = new Database(path); db.pragma("foreign_keys=ON");
-  if (db.prepare("SELECT 1 FROM schema_migrations WHERE version=37").get()) {
-    db.exec("DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard; DROP TRIGGER IF EXISTS trg_recommendation_reviews_update; DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete; DROP TRIGGER IF EXISTS trg_decision_records_insert_guard; DROP TRIGGER IF EXISTS trg_decision_records_update; DROP TRIGGER IF EXISTS trg_decision_records_delete; DROP TABLE IF EXISTS decision_records; DROP TABLE IF EXISTS recommendation_reviews; DELETE FROM schema_migrations WHERE version=37;");
-  }
-  if (db.prepare("SELECT 1 FROM schema_migrations WHERE version=36").get()) {
-    db.exec("DROP TRIGGER IF EXISTS trg_intelligence_recommendations_insert_guard; DROP TRIGGER IF EXISTS trg_intelligence_recommendations_update; DROP TRIGGER IF EXISTS trg_intelligence_recommendations_delete; DROP TABLE IF EXISTS intelligence_recommendations; DELETE FROM schema_migrations WHERE version=36;");
-  }
-  const tableCountBefore = db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c;
-  runMigrations(db, migrations.filter((migration) => migration.version <= 36));
-  runMigrations(db, migrations.filter((migration) => migration.version <= 36));
+  db.exec(`
+    DROP TRIGGER IF EXISTS trg_action_proposals_update;
+    DROP TRIGGER IF EXISTS trg_action_proposals_delete;
+    DROP TRIGGER IF EXISTS trg_action_proposals_insert_guard;
+    DROP INDEX IF EXISTS idx_action_proposals_page;
+    DROP TABLE IF EXISTS action_proposals;
+    DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard;
+    DROP TRIGGER IF EXISTS trg_recommendation_reviews_update;
+    DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete;
+    DROP TRIGGER IF EXISTS trg_decision_records_insert_guard;
+    DROP TRIGGER IF EXISTS trg_decision_records_update;
+    DROP TRIGGER IF EXISTS trg_decision_records_delete;
+    DROP INDEX IF EXISTS idx_recommendation_reviews_page;
+    DROP INDEX IF EXISTS idx_recommendation_reviews_actor;
+    DROP INDEX IF EXISTS idx_decision_records_page;
+    DROP INDEX IF EXISTS idx_decision_records_actor;
+    DROP INDEX IF EXISTS idx_decision_records_one_successor;
+    DROP TABLE IF EXISTS decision_records;
+    DROP TABLE IF EXISTS recommendation_reviews;
+    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_insert_guard;
+    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_update;
+    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_delete;
+    DROP INDEX IF EXISTS idx_intelligence_recommendations_page;
+    DROP TABLE IF EXISTS intelligence_recommendations;
+    DELETE FROM schema_migrations WHERE version IN(36,37,38);
+  `);
+  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(), { c: 35, m: 35 });
+  const beforeTables = db.prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
+  runMigrations(db, [migration036IntelligenceRecommendations]);
+  runMigrations(db, [migration036IntelligenceRecommendations]);
   for (const workspace of ["recommendation-a", "recommendation-b"]) {
     db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at) VALUES(?,?,?,?,?)").run(workspace, workspace, workspace, AT, AT);
     db.prepare("INSERT INTO business_profiles(id,workspace_id,name,status,created_at,updated_at) VALUES(?,?,?,?,?,?)").run(`p-${workspace}`, workspace, workspace, "active", AT, AT);
@@ -66,7 +87,8 @@ test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
   await t.test("migration 036 is idempotent and creates exactly one table", () => {
     assert.equal(db.prepare("SELECT COUNT(*) c FROM schema_migrations").get().c, 36);
     assert.equal(db.prepare("SELECT MAX(version) v FROM schema_migrations").get().v, 36);
-    assert.equal(db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c, tableCountBefore + 1);
+    const after = db.prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name!='intelligence_recommendations' ORDER BY name").all();
+    assert.deepEqual(after, beforeTables);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='intelligence_recommendations'").get().c, 1);
   });
   await t.test("registry contains exactly two bounded contracts", () => {

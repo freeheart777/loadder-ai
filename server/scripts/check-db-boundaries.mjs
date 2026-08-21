@@ -41,6 +41,10 @@ function inspect(target) {
     || target.endsWith(`${path.sep}human-governance.mjs`)
     || target.endsWith(`${path.sep}human-governance-repository.mjs`)
     || target.endsWith(`${path.sep}recommendation-freshness-query.mjs`)
+    || target.includes(`${path.sep}app${path.sep}action-proposals${path.sep}`)
+    || target.endsWith(`${path.sep}action-proposal-service.mjs`)
+    || target.endsWith(`${path.sep}action-proposal-repository.mjs`)
+    || target.endsWith(`${path.sep}action-proposals.mjs`)
   ) {
     const forbidden = [
       /from\s+["'][^"']*(business-profile|business-dna|brand-book)-(repository|service)\.mjs["']/,
@@ -99,6 +103,12 @@ function inspect(target) {
       forbidden.push(
         /from\s+["'][^"']*(semantic|listening|customer|lead|order|cart|campaign|attribution|forecast|automation|execution|messaging|optimizer|provider|openai|model|agent|embedding|recommendation-producers)[^"']*["']/i,
         /\b(semantic_findings|canonical_listening_records|customers|leads|orders|carts|marketing_campaigns|campaign_metrics|attribution_touchpoints|forecast_records|automations|executions)\b/i
+      );
+    }
+    if (target.includes("action-proposal")) {
+      forbidden.push(
+        /from\s+["'][^"']*(semantic|listening|customer|lead|order|cart|campaign|attribution|business-event|automation|execution|messaging|optimizer|provider|connector|openai|model|agent|embedding)[^"']*["']/i,
+        /\b(semantic_findings|canonical_listening_records|customers|leads|orders|carts|marketing_campaigns|campaign_metrics|attribution_touchpoints|business_events|automations|executions|connector_connections)\b/i
       );
     }
     if (/from\s+["'][^"']*(integrations\/providers|connector-adapters|provider-adapters)[^"']*["']/.test(source) &&
