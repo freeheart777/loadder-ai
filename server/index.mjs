@@ -38,6 +38,7 @@ import { createExecutionRequestRouter } from "./app/routes/execution-requests.mj
 import { createProviderAccountIdentityRouter } from "./app/routes/provider-account-identities.mjs";
 import { createExecutionLedgerRouter } from "./app/routes/execution-ledger.mjs";
 import { createContentGenerationRouter } from "./app/routes/content-generation.mjs";
+import { createContentItemRouter } from "./app/routes/content-items.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -71,6 +72,7 @@ import { createProviderAccountIdentityRepository } from "./app/repositories/prov
 import { createExecutionLedgerRepository } from "./app/repositories/execution-ledger-repository.mjs";
 import { createExecutionDispatchJobRepository } from "./app/repositories/execution-dispatch-job-repository.mjs";
 import { createContentGenerationRepository } from "./app/repositories/content-generation-repository.mjs";
+import { createContentItemRepository } from "./app/repositories/content-item-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -79,6 +81,7 @@ import { createBusinessContextService } from "./app/services/business-context-se
 import { createOnboardingService } from "./app/services/onboarding-service.mjs";
 import { createOperationMetrics } from "./app/observability/operation-metrics.mjs";
 import { createContentGenerationService } from "./app/services/content-generation-service.mjs";
+import { createContentItemService } from "./app/services/content-item-service.mjs";
 import { createContentGenerationRateLimiter } from "./app/content-generation/content-generation-rate-limiter.mjs";
 import { generationContractRegistry } from "./app/content-generation/contract-registry.mjs";
 import { contentPlacementRegistry } from "./app/content-generation/placement-registry.mjs";
@@ -273,6 +276,7 @@ const brandBookRepository = createBrandBookRepository(db);
 const businessContextRepository = createBusinessContextRepository(db);
 const businessContextUsageRepository = createBusinessContextUsageRepository(db);
 const contentGenerationRepository = createContentGenerationRepository(db);
+const contentItemRepository = createContentItemRepository(db);
 const businessEventRepository = createBusinessEventRepository(db);
 const intelligenceRecordRepository = createIntelligenceRecordRepository(db);
 const featureValueRepository = createFeatureValueRepository(db);
@@ -330,6 +334,12 @@ const contentGenerationService = createContentGenerationService({
   contextGateway: businessContextConsumerGateway,
   provider: createOpenAITextGenerationProvider(),
   rateLimiter: createContentGenerationRateLimiter(),
+  operationMetrics: createOperationMetrics(),
+});
+const contentItemService = createContentItemService({
+  repository: contentItemRepository,
+  generationRepository: contentGenerationRepository,
+  contractRegistry: generationContractRegistry,
   operationMetrics: createOperationMetrics(),
 });
 const cartFeatureProducer = createCartFeatureProducer({
@@ -474,6 +484,7 @@ app.use(
   createTextAiContextRouter({ textAiContextConsumer })
 );
 app.use("/api", createContentGenerationRouter({ service: contentGenerationService }));
+app.use("/api", createContentItemRouter({ service: contentItemService }));
 app.use(
   "/api",
   createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })

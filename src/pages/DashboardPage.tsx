@@ -4,6 +4,7 @@ import WorkspaceSelector from "../components/WorkspaceSelector";
 import type { OnboardingStatus } from "../components/onboarding/types";
 import { useAuth } from "../lib/auth";
 import { fetchOnboardingStatus } from "../lib/onboarding";
+import { apiFetch } from "../lib/api";
 
 import {
   House,
@@ -148,6 +149,7 @@ export default function DashboardPage() {
   const location = useLocation();
   const { activeWorkspace } = useAuth();
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+  const [recentContent, setRecentContent] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -155,6 +157,7 @@ export default function DashboardPage() {
     void fetchOnboardingStatus(controller.signal).then(setOnboarding).catch(() => setOnboarding(null));
     return () => controller.abort();
   }, [activeWorkspace?.id]);
+  useEffect(() => { const controller = new AbortController(); void apiFetch("/api/content/items?limit=3", { signal: controller.signal }).then(async (response) => { if (!response.ok) return; const data = await response.json(); setRecentContent(data.items || []); }).catch(() => undefined); return () => controller.abort(); }, [activeWorkspace?.id]);
 
   const isDemo =
     new URLSearchParams(location.search).get("demo") === "1";
@@ -199,6 +202,7 @@ export default function DashboardPage() {
             <Sparkle size={20} />
             استودیوی محتوا
           </Link>
+          <Link to="/dashboard/library" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><FolderOpen size={20}/>کتابخانه محتوا</Link>
           <Link
             to="/dashboard/business-brain"
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
@@ -300,22 +304,14 @@ export default function DashboardPage() {
 
           <section className="mt-10">
             <h2 className="text-xl font-semibold">
-              پروژه‌های اخیر
+              محتوای اخیر
             </h2>
 
             <div
               data-stagger
               className="mt-5 rounded-[26px] border border-white/[0.07] bg-white/[0.025] p-10 text-center"
             >
-              <FolderOpen
-                size={30}
-                weight="duotone"
-                className="mx-auto text-white/30"
-              />
-
-              <p className="mt-4 text-base text-white/50">
-                هنوز پروژه‌ای ساخته نشده
-              </p>
+              {recentContent.length ? <div className="grid gap-3 text-right md:grid-cols-3">{recentContent.map((item) => <Link key={item.id} to={`/dashboard/library/${item.id}`} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><div className="font-medium">{item.title}</div><div className="mt-2 text-xs text-white/35">{new Date(item.updatedAt).toLocaleString("fa-IR")}</div><div className="mt-3 text-sm text-violet-300">ادامه ویرایش</div></Link>)}</div> : <><FolderOpen size={30} weight="duotone" className="mx-auto text-white/30"/><p className="mt-4 text-base text-white/50">هنوز محتوایی ذخیره نشده</p><Link to="/dashboard/content" className="mt-4 inline-block rounded-xl bg-violet-500/20 px-4 py-2 text-sm text-violet-200">ساخت محتوا</Link></>}
             </div>
           </section>
         </div>

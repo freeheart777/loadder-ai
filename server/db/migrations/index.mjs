@@ -44,6 +44,7 @@ import { migration043ExecutionDispatchJobs } from "./043_execution_dispatch_jobs
 import { migration044ExecutionActionInputs } from "./044_execution_action_inputs.mjs";
 import { migration045ContentGenerations } from "./045_content_generations.mjs";
 import { migration046ExecutionDispatchJobTenantPollIndexes } from "./046_execution_dispatch_job_tenant_poll_indexes.mjs";
+import { migration047ContentItems } from "./047_content_items.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -92,4 +93,5 @@ export const migrations = [
   migration044ExecutionActionInputs,
   migration045ContentGenerations,
   migration046ExecutionDispatchJobTenantPollIndexes,
+  migration047ContentItems,
 ];

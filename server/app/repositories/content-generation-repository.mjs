@@ -32,6 +32,7 @@ const map = (row) => row && Object.freeze({
 
 export function createContentGenerationRepository(db) {
   const workspace = () => requireWorkspaceId();
+  const findById = (id) => map(db.prepare("SELECT * FROM content_generations WHERE id=? AND workspace_id=?").get(id, workspace()));
   const findByIdempotency = (userId, key) => map(db.prepare(`SELECT * FROM content_generations
     WHERE workspace_id=? AND user_id=? AND operation_kind='content.generate' AND idempotency_key=?`).get(workspace(), userId, key));
   function create(input) {
@@ -66,5 +67,5 @@ export function createContentGenerationRepository(db) {
     const rows = db.prepare(`SELECT * FROM content_generations WHERE ${where} ORDER BY created_at DESC,id DESC LIMIT ?`).all(...values).map(map);
     return pageResult(rows, limit, "content_generations", (item) => ({ createdAt: item.createdAt, id: item.generationId }));
   }
-  return Object.freeze({ findByIdempotency, create, listPage });
+  return Object.freeze({ findById, findByIdempotency, create, listPage });
 }
