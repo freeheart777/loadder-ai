@@ -53,6 +53,12 @@ type ActionProposal = {
   requiresAuthorization: boolean; producer: string; producerVersion: string;
   createdByRole: string; inputManifestHash: string; proposalHash: string; createdAt: string;
 };
+type ExecutionAuthorization = {
+  id: string; actionProposalId: string; proposalHash: string; authorizationPolicy: string;
+  authorizationPolicyVersion: number; authorizerRole: string; acknowledgementCode: string;
+  confirmationHash: string; executionAuthorizing: boolean; authorizedAt: string;
+  expiresAt: string; createdAt: string;
+};
 
 class ApiRequestError extends Error {
   status: number;
@@ -164,6 +170,7 @@ export default function IntelligencePreviewPage() {
   const [authError, setAuthError] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [actionProposals, setActionProposals] = useState<ActionProposal[]>([]);
+  const [authorizations, setAuthorizations] = useState<ExecutionAuthorization[]>([]);
   const [governance, setGovernance] = useState<Record<string, Governance>>({});
   const [recommendationError, setRecommendationError] = useState(false);
   const [governanceError, setGovernanceError] = useState(false);
@@ -224,8 +231,10 @@ export default function IntelligencePreviewPage() {
   const loadActionProposals = useCallback(async () => {
     try {
       const data = await jsonRequest<{ proposals: ActionProposal[] }>("/api/execution/action-proposals?limit=100");
-      setActionProposals(data.proposals || []);
-      return data.proposals || [];
+      const proposals = data.proposals || []; setActionProposals(proposals);
+      const histories = await Promise.all(proposals.map((proposal) => jsonRequest<{ authorizations: ExecutionAuthorization[] }>(`/api/execution/action-proposals/${proposal.id}/authorizations?limit=100`)));
+      setAuthorizations(histories.flatMap((history) => history.authorizations || []));
+      return proposals;
     } catch (error) { handleFailure(error); return []; }
   }, [handleFailure]);
 
@@ -447,6 +456,23 @@ export default function IntelligencePreviewPage() {
                 <div className="sm:col-span-2"><Meta label="Input manifest hash" value={proposal.inputManifestHash} mono /></div><div className="sm:col-span-2"><Meta label="Proposal hash" value={proposal.proposalHash} mono /></div>
               </dl>
             </article>
+          ))}</div>}
+        </section>
+
+        <section>
+          <div className="mb-5">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/60">Authorization</div>
+            <h2 className="mt-2 text-lg font-semibold">Authorization History</h2>
+            <p className="mt-1 max-w-3xl text-sm text-white/40">Authorization records permission only. It does not perform an action.</p>
+          </div>
+          {!authorizations.length ? (
+            <div className="rounded-[24px] border border-dashed border-sky-300/15 bg-sky-500/[0.035] p-7">
+              <div className="flex flex-wrap gap-2"><StatusPill status="AUTHORIZATION — NOT AVAILABLE" /><StatusPill status="NON-EXECUTING" /></div>
+              <h3 className="mt-5 font-semibold text-white/70">Current proposals are non-executable.</h3>
+              <p className="mt-2 text-sm text-white/40">No authorization policy is currently approved. Authorization records permission only. It does not perform an action.</p>
+            </div>
+          ) : <div className="space-y-4">{authorizations.map((authorization) => (
+            <History key={authorization.id} title={authorization.authorizationPolicy} meta={`owner · ${formatDate(authorization.authorizedAt)}`} id={authorization.id} details={[`Proposal: ${authorization.actionProposalId}`, `Policy version: ${authorization.authorizationPolicyVersion}`, `Expires: ${formatDate(authorization.expiresAt)}`, `Confirmation: ${authorization.confirmationHash}`]} badges={["AUTHORIZED", "EXECUTION NOT STARTED"]} />
           ))}</div>}
         </section>
 

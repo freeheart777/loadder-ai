@@ -6,6 +6,7 @@ import {tmpdir} from "node:os";
 import Database from "better-sqlite3";
 import express from "express";
 import {runMigrations} from "../db/migrate.mjs";
+import {migrations} from "../db/migrations/index.mjs";
 import {runWithWorkspace} from "../app/tenant-context.mjs";
 import {createActionProposalContractRegistry,actionProposalContractRegistry} from "../app/action-proposals/action-proposal-contract-registry.mjs";
 import {createActionProposalRepository} from "../app/repositories/action-proposal-repository.mjs";
@@ -22,6 +23,12 @@ const contract=(type="test_review_followup")=>({actionType:type,actionVersion:1,
 test("Phase 4I v1 Controlled Action Proposal foundation",async t=>{
  const dir=mkdtempSync(join(tmpdir(),"loadder-action-proposal-")),path=join(dir,"proposal.sqlite");copyFileSync(new URL("../db/loadder.sqlite",import.meta.url),path);const db=new Database(path);db.pragma("foreign_keys=ON");
  db.exec(`
+   DROP TRIGGER IF EXISTS trg_execution_authorizations_update;
+   DROP TRIGGER IF EXISTS trg_execution_authorizations_delete;
+   DROP TRIGGER IF EXISTS trg_execution_authorizations_insert_guard;
+   DROP INDEX IF EXISTS idx_execution_authorizations_page;
+   DROP TABLE IF EXISTS execution_authorizations;
+   DELETE FROM schema_migrations WHERE version=39;
    DROP TRIGGER IF EXISTS trg_action_proposals_update;
    DROP TRIGGER IF EXISTS trg_action_proposals_delete;
    DROP TRIGGER IF EXISTS trg_action_proposals_insert_guard;
@@ -31,7 +38,7 @@ test("Phase 4I v1 Controlled Action Proposal foundation",async t=>{
  `);
  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(),{c:37,m:37});
  const beforeTables=db.prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
- runMigrations(db);runMigrations(db);
+ runMigrations(db,migrations.filter(x=>x.version<=38));runMigrations(db,migrations.filter(x=>x.version<=38));
  const setup=(wid)=>{db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at)VALUES(?,?,?,?,?)").run(wid,wid,wid,AT,AT);db.prepare("INSERT INTO business_profiles(id,workspace_id,name,status,created_at,updated_at)VALUES(?,?,?,?,?,?)").run(`p-${wid}`,wid,wid,"active",AT,AT);db.prepare("INSERT INTO business_dna_versions(id,workspace_id,business_profile_id,version_number,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(`dna-${wid}`,wid,`p-${wid}`,1,"active",AT,AT);db.prepare("INSERT INTO brand_book_versions(id,workspace_id,business_profile_id,version_number,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(`book-${wid}`,wid,`p-${wid}`,1,"active",AT,AT);db.prepare("INSERT INTO business_context_versions(id,workspace_id,business_profile_id,business_dna_version_id,brand_book_version_id,version_number,status,context_schema_version,snapshot_json,source_manifest_json,created_at,activated_at)VALUES(?,?,?,?,?,1,'active','1.0','{}','{}',?,?)").run(`ctx-${wid}`,wid,`p-${wid}`,`dna-${wid}`,`book-${wid}`,AT,AT);};setup("pa");setup("pb");
  let actorNumber=0;const actor=(id,role,wid="pa")=>{actorNumber++;db.prepare("INSERT INTO users(id,mobile,name,status,created_at,updated_at)VALUES(?,?,?,?,?,?)").run(id,`0912000000${actorNumber}`,id,"active",AT,AT);const membershipId=`m-${id}`;db.prepare("INSERT INTO workspace_memberships(id,workspace_id,user_id,role,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(membershipId,wid,id,role,"active",AT,AT);return{userId:id,membershipId,role};};const owner=actor("proposal-owner","owner"),member=actor("proposal-member","member"),foreign=actor("proposal-foreign","owner","pb");
  const rec=(id,wid="pa")=>db.prepare("INSERT INTO intelligence_recommendations(id,workspace_id,recommendation_type,recommendation_version,schema_version,subject_type,subject_id,subject_key,consideration_code,rationale_code,review_priority,semantic_manifest_json,semantic_manifest_hash,semantic_finding_count,context_version_id,point_in_time_cutoff,producer,producer_version,producer_key,confidence,confidence_reason,provenance_json,calculated_at,created_at)VALUES(?,?,'attention_evidence_review',1,1,'listening_scope',NULL,'scope','REVIEW_ATTENTION_INCREASE','ATTENTION_RISING','MEDIUM','[]',?,0,?,?,'test','1',?,NULL,'DETERMINISTIC','{}',?,?)").run(id,wid,sha,`ctx-${wid}`,AT,id,AT,AT);rec("r-pa");rec("r-pa-2");rec("r-pb","pb");

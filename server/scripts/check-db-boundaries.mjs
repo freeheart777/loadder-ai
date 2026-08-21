@@ -45,6 +45,10 @@ function inspect(target) {
     || target.endsWith(`${path.sep}action-proposal-service.mjs`)
     || target.endsWith(`${path.sep}action-proposal-repository.mjs`)
     || target.endsWith(`${path.sep}action-proposals.mjs`)
+    || target.includes(`${path.sep}app${path.sep}execution-authorizations${path.sep}`)
+    || target.endsWith(`${path.sep}execution-authorization-service.mjs`)
+    || target.endsWith(`${path.sep}execution-authorization-repository.mjs`)
+    || target.endsWith(`${path.sep}execution-authorizations.mjs`)
   ) {
     const forbidden = [
       /from\s+["'][^"']*(business-profile|business-dna|brand-book)-(repository|service)\.mjs["']/,
@@ -109,6 +113,12 @@ function inspect(target) {
       forbidden.push(
         /from\s+["'][^"']*(semantic|listening|customer|lead|order|cart|campaign|attribution|business-event|automation|execution|messaging|optimizer|provider|connector|openai|model|agent|embedding)[^"']*["']/i,
         /\b(semantic_findings|canonical_listening_records|customers|leads|orders|carts|marketing_campaigns|campaign_metrics|attribution_touchpoints|business_events|automations|executions|connector_connections)\b/i
+      );
+    }
+    if (target.includes("execution-authorization")) {
+      forbidden.push(
+        /from\s+["'][^"']*(semantic|listening|recommendation-producers|provider|connector|credential|messaging|automation|legacy|campaign|customer|lead|order|cart|optimizer|openai|model|agent|embedding)[^"']*["']/i,
+        /\b(semantic_findings|canonical_listening_records|connector_connections|customers|leads|orders|carts|marketing_campaigns|campaign_metrics|automations|executions)\b/i
       );
     }
     if (/from\s+["'][^"']*(integrations\/providers|connector-adapters|provider-adapters)[^"']*["']/.test(source) &&

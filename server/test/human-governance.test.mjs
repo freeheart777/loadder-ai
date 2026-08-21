@@ -20,6 +20,12 @@ const AT="2026-08-21T12:00:00.000Z",LATER="2026-08-21T13:00:00.000Z",sha="a".rep
 test("Phase 4G v1 Human Governance",async t=>{
  const dir=mkdtempSync(join(tmpdir(),"loadder-governance-")),path=join(dir,"governance.sqlite");copyFileSync(new URL("../db/loadder.sqlite",import.meta.url),path);const db=new Database(path);db.pragma("foreign_keys=ON");
  db.exec(`
+   DROP TRIGGER IF EXISTS trg_execution_authorizations_update;
+   DROP TRIGGER IF EXISTS trg_execution_authorizations_delete;
+   DROP TRIGGER IF EXISTS trg_execution_authorizations_insert_guard;
+   DROP INDEX IF EXISTS idx_execution_authorizations_page;
+   DROP TABLE IF EXISTS execution_authorizations;
+   DELETE FROM schema_migrations WHERE version=39;
    DROP TRIGGER IF EXISTS trg_action_proposals_update;
    DROP TRIGGER IF EXISTS trg_action_proposals_delete;
    DROP TRIGGER IF EXISTS trg_action_proposals_insert_guard;
