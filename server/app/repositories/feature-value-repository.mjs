@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { pageResult } from "../query/cursor-pagination.mjs";
 
 function parseJson(value, fallback) { try { return JSON.parse(value); } catch { return fallback; } }
 function mapFeature(row) {
@@ -30,6 +31,16 @@ export function createFeatureValueRepository(db) {
     return mapFeature(db.prepare(`SELECT * FROM feature_values
       WHERE workspace_id=? AND producer=? AND producer_version=? AND producer_key=?`)
       .get(requireWorkspaceId(), producer, producerVersion, producerKey));
+  }
+  function getByProducerKeys(producer, producerVersion, producerKeys) {
+    if (!producerKeys.length) return [];
+    const rows = db.prepare(`SELECT * FROM feature_values
+      WHERE workspace_id=? AND producer=? AND producer_version=?
+      AND producer_key IN (SELECT value FROM json_each(?))`).all(
+      requireWorkspaceId(), producer, producerVersion, JSON.stringify(producerKeys)
+    );
+    const byKey = new Map(rows.map((row) => [row.producer_key, mapFeature(row)]));
+    return producerKeys.map((key) => byKey.get(key)).filter(Boolean);
   }
   function create(input) {
     const existing = getByProducerKey(input.producer, input.producerVersion, input.producerKey);
@@ -61,7 +72,7 @@ export function createFeatureValueRepository(db) {
       throw error;
     }
   }
-  function list(filters) {
+  function listPage(filters) {
     const clauses = ["workspace_id=?"];
     const values = [requireWorkspaceId()];
     for (const [column, value] of [
@@ -71,10 +82,16 @@ export function createFeatureValueRepository(db) {
     if (filters.freshOnly) {
       clauses.push("(valid_until IS NULL OR valid_until > ?)"); values.push(filters.now);
     }
-    values.push(filters.limit);
-    return db.prepare(`SELECT * FROM feature_values WHERE ${clauses.join(" AND ")}
-      ORDER BY calculated_at DESC, feature_name ASC LIMIT ?`).all(...values).map(mapFeature);
+    if (filters.cursor) {
+      clauses.push("(calculated_at < ? OR (calculated_at = ? AND id < ?))");
+      values.push(filters.cursor.calculatedAt, filters.cursor.calculatedAt, filters.cursor.id);
+    }
+    values.push(filters.limit + 1);
+    const rows = db.prepare(`SELECT * FROM feature_values WHERE ${clauses.join(" AND ")}
+      ORDER BY calculated_at DESC, id DESC LIMIT ?`).all(...values).map(mapFeature);
+    return pageResult(rows, filters.limit, "feature_values", (item) => ({ calculatedAt: item.calculatedAt, id: item.id }));
   }
+  function list(filters) { return listPage(filters).items; }
   function listSubject(subjectType, subjectId) {
     const rows = db.prepare(`SELECT * FROM feature_values
       WHERE workspace_id=? AND subject_type=? AND subject_id=?
@@ -94,5 +111,5 @@ export function createFeatureValueRepository(db) {
       requireWorkspaceId(), subjectType, subjectId, asOf
     ).map(mapFeature);
   }
-  return { create, getById, list, listSubject, listPointInTime };
+  return { create, getById, getByProducerKey, getByProducerKeys, list, listPage, listSubject, listPointInTime };
 }

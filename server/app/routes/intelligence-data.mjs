@@ -18,7 +18,7 @@ export function createIntelligenceDataRouter({ businessEventService, intelligenc
     } catch (error) { return handle(error, res); }
   });
   router.get("/events", (req, res) => {
-    try { return res.json({ success: true, events: businessEventService.list(req.query) }); }
+    try { const page = businessEventService.listPage(req.query); return res.json({ success: true, events: page.items, nextCursor: page.nextCursor }); }
     catch (error) { return handle(error, res); }
   });
   router.get("/events/:id", (req, res) => {
@@ -26,7 +26,10 @@ export function createIntelligenceDataRouter({ businessEventService, intelligenc
     catch (error) { return handle(error, res); }
   });
   router.get("/observations", (req, res) => {
-    try { return res.json({ success: true, observations: intelligenceQueryService.listObservations(req.query) }); }
+    try {
+      const page = intelligenceQueryService.listObservationPage(req.query);
+      return res.json({ success: true, observations: page.items, nextCursor: page.nextCursor });
+    }
     catch (error) { return handle(error, res); }
   });
   router.get("/signals", (req, res) => {

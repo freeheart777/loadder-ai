@@ -1,0 +1,6 @@
+export const LISTENING_WINDOWS = Object.freeze({ "1h": 3600000, "24h": 86400000, "7d": 604800000, "30d": 2592000000 });
+const metrics = ["mention_count","unique_source_count","engagement_total","engagement_rate","source_distribution","language_distribution","channel_distribution","mention_velocity","mention_growth_rate","share_of_voice","topic_frequency","topic_velocity","competitor_mention_count","brand_vs_competitor_ratio"];
+export const listeningMetricRegistry = Object.freeze({ get: (name) => metrics.includes(name) ? Object.freeze({ metricType:name, version:1, producer:"listening_intelligence", producerVersion:"1.0" }) : null, list: () => metrics.map(metricType => ({ metricType, version:1 })) });
+export const LISTENING_TREND_POLICY = Object.freeze({ version:1, risingRelativeDelta:0.25, fallingRelativeDelta:-0.25, severityHighRelativeDelta:1, comparison:"previous_equal_window", confidence:null, confidenceReason:"DETERMINISTIC_THRESHOLD_NO_STATISTICAL_CONFIDENCE" });
+export const LISTENING_ANOMALY_POLICY = Object.freeze({ method:"median_mad", version:1, minimumSamples:4, elevatedScore:2, anomalousScore:3 });
+export function normalizeTopicText(value) { return String(value || "").normalize("NFKC").toLocaleLowerCase().replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/gu, "").replace(/\u064a/gu,"ی").replace(/\u0643/gu,"ک").replace(/\s+/gu," ").trim(); }

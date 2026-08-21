@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { pageResult } from "../query/cursor-pagination.mjs";
 
 function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
@@ -57,7 +58,7 @@ export function createBusinessEventRepository(db) {
       throw error;
     }
   }
-  function list(filters) {
+  function listPage(filters) {
     const clauses = ["workspace_id = ?"];
     const values = [requireWorkspaceId()];
     for (const [column, value] of [
@@ -66,9 +67,15 @@ export function createBusinessEventRepository(db) {
     ]) if (value) { clauses.push(`${column} = ?`); values.push(value); }
     if (filters.from) { clauses.push("occurred_at >= ?"); values.push(filters.from); }
     if (filters.to) { clauses.push("occurred_at <= ?"); values.push(filters.to); }
-    values.push(filters.limit);
-    return db.prepare(`SELECT * FROM business_events WHERE ${clauses.join(" AND ")}
-      ORDER BY occurred_at DESC, ingested_at DESC LIMIT ?`).all(...values).map(mapEvent);
+    if (filters.cursor) {
+      clauses.push("(occurred_at<? OR(occurred_at=? AND(ingested_at<? OR(ingested_at=? AND id<?))))");
+      values.push(filters.cursor.occurredAt, filters.cursor.occurredAt, filters.cursor.ingestedAt, filters.cursor.ingestedAt, filters.cursor.id);
+    }
+    values.push(filters.limit + 1);
+    const rows = db.prepare(`SELECT * FROM business_events WHERE ${clauses.join(" AND ")}
+      ORDER BY occurred_at DESC, ingested_at DESC, id DESC LIMIT ?`).all(...values).map(mapEvent);
+    return pageResult(rows, filters.limit, "business_events", (event) => ({ occurredAt: event.occurredAt, ingestedAt: event.ingestedAt, id: event.id }));
   }
-  return { getById, findIdempotent, create, list };
+  const list = filters => listPage(filters).items;
+  return { getById, findIdempotent, create, list, listPage };
 }

@@ -48,6 +48,14 @@ const definitions = [
       crossCurrencyComparable: false,
     },
   },
+  ...[
+    ["brand_mentions_24h","numeric","Factual configured-brand mentions in the exact 24-hour window."],
+    ["brand_mentions_growth_24h","numeric","Relative change against the previous equal 24-hour window."],
+    ["brand_share_of_voice_7d","numeric","Configured brand mentions divided by tracked brand and competitor mentions in seven days."],
+    ["competitor_mentions_24h","numeric","Factual configured-competitor mentions in the exact 24-hour window."],
+    ["engagement_total_24h","numeric","Sum of explicitly available engagement counters in the exact 24-hour window."],
+    ["listening_anomaly_active","boolean","Whether the transparent listening anomaly baseline is elevated or anomalous."],
+  ].map(([featureName,valueType,description])=>({featureName,featureVersion:1,description,subjectType:"workspace",valueType,unit:valueType==="boolean"?"boolean":"count_or_ratio",requiredObservationTypes:["listening.aggregate_set"],requiredSignalTypes:[],supportedContextSchemaVersions:["1.0"],freshnessPolicy:{mode:"source_valid_until"},calculationWindowPolicy:{mode:"observation_window"},missingDataBehavior:"omit",producer:"listening_feature_set",producerVersion:"1.0",calculationPolicy:{policy:"canonical_listening_aggregate",policyVersion:"1.0"}})),
 ];
 
 function stringArray(value, field) {

@@ -1,3 +1,7 @@
+import { decodeCursor, CursorPaginationError } from "../query/cursor-pagination.mjs";
+import { createOperationMetrics } from "../observability/operation-metrics.mjs";
+import { requireWorkspaceId } from "../tenant-context.mjs";
+
 const ALLOWED_INPUT_FIELDS = new Set([
   "eventType", "eventVersion", "occurredAt", "actorType", "actorId",
   "subjectType", "subjectId", "sourceType", "sourceId", "channel",
@@ -40,10 +44,12 @@ function filters(query) {
   const limit = Number(query.limit || 50);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new BusinessEventError("limit must be between 1 and 100.");
   result.limit = limit;
+  try { result.cursor = decodeCursor(query.cursor, "business_events", ["occurredAt", "ingestedAt", "id"]); }
+  catch (error) { if (error instanceof CursorPaginationError) throw new BusinessEventError("cursor is invalid.", 400, "INVALID_CURSOR"); throw error; }
   return result;
 }
 
-export function createBusinessEventService({ repository, eventRegistry, contextGateway, signalProducer, now = () => new Date() }) {
+export function createBusinessEventService({ repository, eventRegistry, contextGateway, signalProducer, now = () => new Date(), operationMetrics = createOperationMetrics() }) {
   return Object.freeze({
     ingest(payload, userId) {
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new BusinessEventError("Event payload must be an object.");
@@ -108,6 +114,8 @@ export function createBusinessEventService({ repository, eventRegistry, contextG
       }
     },
     list: (query) => repository.list(filters(query)),
+    listPage(query) { const started=performance.now();try{const page=repository.listPage(filters(query));operationMetrics.record({operation:"business_events.list",workspaceId:requireWorkspaceId(),durationMs:performance.now()-started,rowsRead:page.items.length+(page.nextCursor?1:0),rowsWritten:0,resultCount:page.items.length,reusedResult:false});return page;}catch(error){operationMetrics.record({operation:"business_events.list",workspaceId:requireWorkspaceId(),durationMs:performance.now()-started,rowsRead:0,rowsWritten:0,resultCount:0,reusedResult:false,errorCode:error.code||"UNEXPECTED_ERROR"});throw error;}},
+    operationMeasurements: operationMetrics.recent,
     get(id) {
       const event = repository.getById(identifier(id, "eventId", { required: true }));
       if (!event) throw new BusinessEventError("Business Event not found.", 404, "EVENT_NOT_FOUND");

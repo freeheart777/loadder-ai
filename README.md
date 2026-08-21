@@ -223,5 +223,202 @@ boundary. The repository/service interfaces can later move collection work to
 PostgreSQL, object storage, Redis, queues/streams, search indexes, and an
 analytics warehouse without changing the canonical record or event contracts.
 
+## Listening intelligence foundation
+
+Phase 4D adds deterministic descriptive/diagnostic intelligence to the same
+canonical pipeline:
+
+`Listening Record → Topic Match / Aggregate → Normalized Observation → Derived Signal → Feature Value`
+
+Metric contracts are code-versioned at version 1 for mention count, unique
+source count, engagement total/rate, source/language/channel distributions,
+mention velocity/growth, share of voice, topic frequency/velocity, competitor
+mentions, and brand-versus-competitor ratio. Window policies are versioned for
+1 hour, 24 hours, 7 days, and 30 days. Windows use `[windowStart, windowEnd)`;
+the point-in-time cutoff additionally excludes records collected later, while
+the original publication timestamp remains unchanged. Missing denominators,
+entity sets, engagement counters, or baselines produce `unavailable` or
+`insufficient_data`, never an invented zero.
+
+Topics use configured monitor keywords, brand names, competitor names, product
+names, and exact phrases. Matching is Unicode NFKC normalization, case folding,
+safe Arabic/Persian character normalization, and deterministic substring or
+exact-phrase matching. It preserves the configured text, matched text,
+normalized form, language, method, rule version, and source-record ID. It does
+not claim semantic understanding and performs no destructive transliteration.
+
+Share of voice is `brand mentions / (tracked brand mentions + tracked
+competitor mentions)` for the exact entity, source, language, time, and Context
+scope recorded in provenance. The Business Context business name is used only
+through the Consumer Gateway; monitor-configured entities remain explicit.
+Absent competitors or a zero denominator are unavailable.
+
+Trends compare the current window with the previous equal-size window.
+Relative delta is `(current - baseline) / baseline`; ±25% is rising/falling and
+an absolute relative delta of at least 100% is high severity. These are
+versioned deterministic baseline thresholds, not learned or “optimal.”
+Confidence is null with an explicit reason. Anomalies use prior windows only
+and the robust score `0.6745 × |current - median| / MAD`, requiring four prior
+observations. Zero dispersion never produces a fake probability or infinite
+score.
+
+Derived rows are immutable and idempotent at a workspace-scoped producer-key
+uniqueness boundary. Provenance pins metric/window/producer versions, Context,
+cutoff, entity/source/language scope, exact aggregate/observation IDs, and a
+compact source-record manifest. Read APIs under `/api/listening/` are
+authenticated, workspace-derived, filter validated, and capped at 100 rows.
+The summary is factual JSON and contains no generated advice.
+
+Storage remains bounded: derived tables reference record IDs and hashes rather
+than copying bodies; media stays external-reference-only; duplicate records
+converge at canonical identity. A future plan-aware retention worker may keep
+raw records hot for 30–90 days and aggregates longer, but Phase 4D deletes
+nothing automatically and preserves all historical data.
+
+Phase 4D is not semantic sentiment understanding, causal inference,
+recommendation, decisioning, optimization, action, provider write-back, or
+autonomous agent behavior. Sparse-history anomaly interpretation, cross-monitor
+entity resolution, multilingual semantics, and warehouse-scale rollups remain
+known future limitations.
+
+## Architecture hardening and lean evolution
+
+Phase H1 keeps the application a modular monolith. Legacy CRM statistics and
+core customer routes are mounted through a dedicated router while retaining
+their original paths and response contracts. Further legacy marketing,
+automation, messaging, and optimizer extraction remains incremental so route
+movement does not become a behavior-changing rewrite.
+
+Listening intelligence calculations first probe SQLite for an exact immutable
+result set. The reuse identity pins the window policy/version, start/end,
+point-in-time cutoff, Context version/state, metric and producer versions, and
+workspace-wide source scope. A compact source snapshot (run/accepted/record
+counts plus latest run and collection timestamps) invalidates reuse after new ingestion.
+On a hit, raw listening records are not scanned and topic, aggregate, trend,
+anomaly, observation, and feature rows are not recreated. SQLite is therefore
+the durable deterministic cache; no external cache is required.
+
+Critical listening calculations emit bounded, content-free in-process
+measurements: operation, workspace ID, duration, rows read/written, reuse state,
+error code, and timestamp. The default buffer retains only the latest 200
+entries. It never records source text, business payloads, credentials, tokens,
+or personal content and can later be connected to an operational sink without
+changing calculation code.
+
+### Future hourly listening buckets
+
+Hourly buckets are intentionally not persisted yet: current production-like
+tables are empty and no measured volume justifies their permanent write cost.
+The forward design is an immutable `listening_hourly_buckets` row keyed by
+workspace, UTC hour, monitor/topic/entity scope, metric contract version,
+Context version, producer version, and source-manifest hash. Each row would
+store additive counters, explicit missing-value counts, distinct-source hashes
+or a bounded exact manifest, and source count—not copied text. A unique
+producer key would converge concurrent writes. The 24-hour, 7-day, and 30-day
+calculators would combine complete buckets and scan only the two partial edge
+hours, preserving `[start,end)` semantics and point-in-time provenance. This
+should be implemented only after scan telemetry proves that saved reads exceed
+bucket write amplification.
+
+### Future compact Business Context
+
+Business Context remains backward-compatible `business-context/v1`; H1 adds no
+schema or migration. Its lean evolution path is a compact immutable core plus a
+versioned section manifest and lazy Consumer Gateway hydration. A section
+reference has `sectionName`, `sectionVersion`, `sourceId`, `contentHash`, and
+`schemaVersion`. Competitors, markets, pricing, funnels, sales structure,
+budgets, KPIs, catalog references, channel/integration capabilities, policies,
+and constraints can then evolve independently without copying operational
+state into every Context snapshot. Migration should be additive: introduce
+immutable section resources, allow a v2 manifest beside existing snapshots,
+teach the Gateway to hydrate only consumer-declared sections, then retain v1
+read support indefinitely. Live balances, campaign metrics, customer records,
+and other operational state must never become Context sections.
+
+## H2 modular runtime and growth controls
+
+H2 adds optional keyset cursors to `GET /api/listening-records` and
+`GET /api/events`. Existing `records` and `events` arrays and the `limit <= 100`
+contract remain unchanged; responses additionally include nullable
+`nextCursor`. Cursors are opaque base64url JSON envelopes with a version,
+endpoint kind, and timestamp/ID position. They contain no workspace ID. Every
+query still derives ownership from the authenticated active workspace, and
+malformed or cross-endpoint cursors fail with `INVALID_CURSOR`.
+
+Listening records use `(collected_at DESC, id DESC)`. Business Events use
+`(occurred_at DESC, ingested_at DESC, id DESC)`. Repositories read one bounded
+look-ahead row to determine whether another page exists; OFFSET is not used.
+Current tenant-leading indexes constrain both paths. Empty tracked tables do
+not justify wider indexes solely to remove tie-column temporary sorting.
+
+Exact listening reuse batch-loads pilot Feature Values in one query instead of
+one lookup per feature. Invalidation is verified for new collection data and a
+Context-version change. Metric/window and producer versions remain part of the
+request fingerprint and producer identity. Hourly buckets remain deferred
+until operational measurements demonstrate sustained tail-latency, records per
+window, or repeated cache-miss pressure. H2 asserts no numeric production
+threshold without production telemetry.
+
+### Retention tiers
+
+- **HOT:** active configuration, recent operational events, normalized
+  listening excerpts required by active windows, current features, and recent
+  audits remain fully queryable in the primary database.
+- **WARM:** older immutable events, aggregates, topic matches, features,
+  evaluations, forecasts, and compact provenance remain online with less
+  frequent access. Raw bodies are not duplicated.
+- **ARCHIVED:** expired raw listening/document detail and older audit history
+  may later move to compliant archive storage. The primary database retains
+  immutable IDs, hashes, references, schema/producer versions, timestamps,
+  tenant ownership, and manifests sufficient to verify and locate evidence.
+
+Tier movement must be explicit, workspace-policy driven, audited, and
+reversible at the reference level. H2 performs no deletion or automatic
+archival.
+
+## H3 lean read paths and runtime decoupling
+
+H3 keeps public list contracts intact while adding optional keyset cursors to
+`GET /api/features` and `GET /api/observations`. Feature Values order by
+`(calculated_at DESC, id DESC)` and Observations use the same stable ordering.
+The existing arrays, filters, authentication, active-workspace resolution, and
+100-row maximum remain unchanged; `nextCursor` is an additive nullable field.
+The versioned cursor contains only its endpoint kind and ordering position, so
+it cannot select a tenant and cannot be replayed across endpoints.
+
+Legacy Marketing catalog reads (`channels`, `platforms`, `services`,
+`structure`) and the campaign list now live in an injected router. Optimizer,
+attribution, campaign mutation, and runtime-control routes remain in the
+composition root because moving them safely requires separating their current
+cross-domain orchestration first. The extraction changes no route paths or
+response shapes.
+
+The bounded in-process operation buffer can summarize each operation's count,
+errors, reuse, average/p50/p95/max duration, and average rows read, rows written,
+and result count. Listening calculation entries additionally count current and
+previous source-window rows, generated topic matches and aggregates, Feature
+count, and cache reuse. Measurements contain identifiers and numeric metadata
+only—not record text, business payloads, credentials, or personal content—and
+are not exposed through a public endpoint.
+
+Hourly listening buckets remain intentionally deferred. Operational evidence
+should first show a combination of repeated cache misses, large source-row
+windows, rising p95 calculation duration, or a poor raw-scan-to-derived-write
+ratio. No absolute threshold is asserted without production telemetry. When
+those categories persist, the immutable hourly-bucket design above can be
+evaluated against measured scan savings and write amplification.
+
+`server/db/database.mjs` remains a legacy persistence boundary containing
+bootstrap/schema setup, mapping helpers, automation/execution persistence, CRM
+and commerce persistence, Marketing/attribution persistence, derived KPI
+queries, and seed data. Its next safe split is mechanical domain repositories
+behind the existing `workspace-database.mjs` facade; H3 does not risk a broad
+rewrite or schema change. `server/services/optimizer.mjs` remains a deterministic
+and heuristic calculation module spanning catalog/control definitions,
+planning/scenarios, KPI analysis, problem detection, optimization/simulation,
+and budget reallocation. Future decomposition should separate pure numeric
+primitives, planning, diagnosis, and simulation while retaining the current
+public facade and formulas.
+
 Legacy standalone server files remain in `server/` for reference during the
 incremental migration, but development scripts do not start them.

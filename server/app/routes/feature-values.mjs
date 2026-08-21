@@ -12,7 +12,10 @@ export function createFeatureValueRouter({ featureQueryService }) {
     return res.status(500).json({ success: false, message: "Unable to query Feature Values." });
   }
   router.get("/features", (req, res) => {
-    try { return res.json({ success: true, features: featureQueryService.list(req.query) }); }
+    try {
+      const page = featureQueryService.listPage(req.query);
+      return res.json({ success: true, features: page.items, nextCursor: page.nextCursor });
+    }
     catch (error) { return handle(error, res); }
   });
   router.get("/features/:id", (req, res) => {

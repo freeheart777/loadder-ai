@@ -1,4 +1,5 @@
 import { BusinessEventError } from "./business-event-service.mjs";
+import { decodeCursor, CursorPaginationError } from "../query/cursor-pagination.mjs";
 
 function filters(query, signals = false) {
   const limit = Number(query.limit || 50);
@@ -18,8 +19,18 @@ function filters(query, signals = false) {
 }
 
 export function createIntelligenceQueryService({ repository }) {
+  function observationPage(query) {
+    const parsed = filters(query);
+    try { parsed.cursor = decodeCursor(query.cursor, "normalized_observations", ["calculatedAt", "id"]); }
+    catch (error) {
+      if (error instanceof CursorPaginationError) throw new BusinessEventError(error.message, 400, error.code);
+      throw error;
+    }
+    return repository.listObservationPage(parsed);
+  }
   return Object.freeze({
-    listObservations: (query) => repository.listObservations(filters(query)),
+    listObservationPage: observationPage,
+    listObservations: (query) => observationPage(query).items,
     listSignals: (query) => repository.listSignals(filters(query, true)),
   });
 }

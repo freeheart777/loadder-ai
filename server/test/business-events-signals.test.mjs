@@ -51,6 +51,8 @@ import { migration012BusinessContextLifecycleGuards } from "../db/migrations/012
 import { migration013BusinessContextUsage } from "../db/migrations/013_business_context_usage.mjs";
 import { migration014BusinessEventsObservationsSignals } from "../db/migrations/014_business_events_observations_signals.mjs";
 import { migration015IntelligenceDataGuards } from "../db/migrations/015_intelligence_data_guards.mjs";
+import { createOperationMetrics } from "../app/observability/operation-metrics.mjs";
+import { encodeCursor } from "../app/query/cursor-pagination.mjs";
 
 test("Phase 3B unified Business Events, Observations, and Signals", async (t) => {
   const directory = mkdtempSync(join(tmpdir(), "loadder-events-signals-"));
@@ -88,9 +90,10 @@ test("Phase 3B unified Business Events, Observations, and Signals", async (t) =>
   const eventRepository = createBusinessEventRepository(db);
   const intelligenceRepository = createIntelligenceRecordRepository(db);
   const signalProducer = createCartAbandonmentSignalProducer({ contextGateway: gateway, repository: intelligenceRepository, now });
+  const operationMetrics = createOperationMetrics();
   const eventService = createBusinessEventService({
     repository: eventRepository, eventRegistry: eventTypeRegistry,
-    contextGateway: gateway, signalProducer, now,
+    contextGateway: gateway, signalProducer, now, operationMetrics,
   });
   const queryService = createIntelligenceQueryService({ repository: intelligenceRepository });
 
@@ -201,6 +204,13 @@ test("Phase 3B unified Business Events, Observations, and Signals", async (t) =>
     assert.deepEqual(signal.sourceObservationIds, [observation.id]);
     assert.deepEqual(signal.provenance.sourceEventIds, [produced.event.id]);
     assert.equal(signal.contextVersionId, contextA.id);
+    for (const suffix of ["two", "three"]) {
+      const extra = await post("/api/events/ingest", headersA, cartPayload({
+        subjectId: `cart-${suffix}`, idempotencyKey: `shopify-event-${suffix}`,
+        properties: { cartId: `cart-${suffix}`, totalAmount: 4500000, currency: "IRR" },
+      }));
+      assert.equal(extra.status, 201);
+    }
   });
 
   await t.test("idempotent ingestion and producer reproduction return original records", async () => {
@@ -281,10 +291,38 @@ test("Phase 3B unified Business Events, Observations, and Signals", async (t) =>
   await t.test("query APIs expose factual provenance without recommendations", async () => {
     const observations = await (await request("/api/observations?type=cart.abandoned_value", { headers: headersA })).json();
     const signals = await (await request("/api/signals?type=cart_recovery_opportunity", { headers: headersA })).json();
-    assert.equal(observations.observations.length, 1);
-    assert.equal(signals.signals.length, 1);
+    assert.equal(observations.observations.length, 3);
+    assert.equal(signals.signals.length, 3);
     assert.equal(Object.hasOwn(signals.signals[0], "recommendation"), false);
     assert.equal(Object.hasOwn(signals.signals[0], "action"), false);
+  });
+
+  await t.test("Observation cursor pagination is stable with filters and tenant isolation", async () => {
+    const complete = await (await request("/api/observations?type=cart.abandoned_value&limit=100", { headers: headersA })).json();
+    const first = await (await request("/api/observations?type=cart.abandoned_value&limit=1", { headers: headersA })).json();
+    assert.equal(first.observations.length, 1); assert.ok(first.nextCursor);
+    const second = await (await request(`/api/observations?type=cart.abandoned_value&limit=1&cursor=${encodeURIComponent(first.nextCursor)}`, { headers: headersA })).json();
+    assert.equal(new Set([...first.observations, ...second.observations].map((item) => item.id)).size, 2);
+    assert.deepEqual([...first.observations, ...second.observations].map((item) => item.id), complete.observations.slice(0, 2).map((item) => item.id));
+    assert.ok(second.observations.every((item) => item.observationType === "cart.abandoned_value"));
+    assert.equal((await request("/api/observations?cursor=malformed", { headers: headersA })).status, 400);
+    const wrongKind = encodeCursor("feature_values", { calculatedAt: first.observations[0].calculatedAt, id: first.observations[0].id });
+    assert.equal((await request(`/api/observations?cursor=${encodeURIComponent(wrongKind)}`, { headers: headersA })).status, 400);
+    const cross = await (await request(`/api/observations?limit=1&cursor=${encodeURIComponent(first.nextCursor)}`, { headers: headersB })).json();
+    assert.deepEqual(cross.observations, []);
+  });
+
+  await t.test("event cursor pagination is stable, bounded, tenant-safe, and observable", async () => {
+    const complete = await (await request("/api/events?limit=100", { headers: headersA })).json();
+    const first = await (await request("/api/events?limit=2", { headers: headersA })).json();
+    assert.equal(first.events.length, 2); assert.ok(first.nextCursor);
+    const second = await (await request(`/api/events?limit=2&cursor=${encodeURIComponent(first.nextCursor)}`, { headers: headersA })).json();
+    assert.equal(new Set([...first.events,...second.events].map(x=>x.id)).size, first.events.length+second.events.length);
+    assert.deepEqual([...first.events,...second.events].map(x=>x.id), complete.events.slice(0,4).map(x=>x.id));
+    assert.equal((await request("/api/events?cursor=not-a-valid-cursor", { headers: headersA })).status, 400);
+    const cross = await (await request(`/api/events?limit=2&cursor=${encodeURIComponent(first.nextCursor)}`, { headers: headersB })).json();
+    assert.equal(cross.events.length, 0);
+    const measurement=operationMetrics.recent().at(-2);assert.equal(measurement.operation,"business_events.list");assert.equal(measurement.rowsWritten,0);assert.ok(measurement.durationMs>=0);
   });
 
   await t.test("signal producers obey the Business Context architecture boundary", () => {

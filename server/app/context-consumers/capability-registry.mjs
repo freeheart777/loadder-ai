@@ -18,6 +18,7 @@ const DEFAULT_CAPABILITIES = [
   ["growth_signals", ["identity", "strategy", "metadata"], ["audiences", "offerings", "brand", "visual"]],
   ["feature_engine", ["identity", "strategy", "metadata"], ["audiences", "offerings", "brand", "visual"]],
   ["model_inputs", ["identity", "strategy", "metadata"], ["audiences", "offerings", "brand", "visual"]],
+  ["listening_intelligence", ["identity", "metadata"], ["strategy", "audiences", "offerings", "brand", "visual"]],
 ].map(([consumer, requiredContextSections, optionalContextSections]) => ({
   consumer,
   supportedContextSchemaVersions: ["1.0"],

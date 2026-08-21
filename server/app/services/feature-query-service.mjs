@@ -1,3 +1,5 @@
+import { decodeCursor, CursorPaginationError } from "../query/cursor-pagination.mjs";
+
 export class FeatureQueryError extends Error {
   constructor(message, status = 400, code = "INVALID_FEATURE_QUERY") {
     super(message); this.name = "FeatureQueryError"; this.status = status; this.code = code;
@@ -15,20 +17,27 @@ function freshness(feature, now) {
 }
 
 export function createFeatureQueryService({ repository, now = () => new Date() }) {
-  return Object.freeze({
-    list(query) {
+  const service = {
+    listPage(query) {
       const limit = Number(query.limit || 50);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new FeatureQueryError("limit must be between 1 and 100.");
       const current = now().toISOString();
-      const features = repository.list({
+      let cursor;
+      try { cursor = decodeCursor(query.cursor, "feature_values", ["calculatedAt", "id"]); }
+      catch (error) {
+        if (error instanceof CursorPaginationError) throw new FeatureQueryError(error.message, 400, error.code);
+        throw error;
+      }
+      const page = repository.listPage({
         featureName: identifier(query.featureName, "featureName"),
         subjectType: identifier(query.subjectType, "subjectType"),
         subjectId: identifier(query.subjectId, "subjectId"),
         contextVersionId: identifier(query.contextVersionId, "contextVersionId"),
-        freshOnly: query.freshOnly === "true", now: current, limit,
+        freshOnly: query.freshOnly === "true", now: current, limit, cursor,
       });
-      return features.map((feature) => ({ ...feature, freshness: freshness(feature, current) }));
+      return { ...page, items: page.items.map((feature) => ({ ...feature, freshness: freshness(feature, current) })) };
     },
+    list(query) { return service.listPage(query).items; },
     get(id) {
       const feature = repository.getById(identifier(id, "featureId", true));
       if (!feature) throw new FeatureQueryError("Feature Value not found.", 404, "FEATURE_NOT_FOUND");
@@ -53,5 +62,6 @@ export function createFeatureQueryService({ repository, now = () => new Date() }
         calculatedAt: values.map((value) => value.calculatedAt).sort().at(-1), features,
       };
     },
-  });
+  };
+  return Object.freeze(service);
 }

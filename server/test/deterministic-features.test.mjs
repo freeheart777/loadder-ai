@@ -13,6 +13,7 @@ import { contextCapabilityRegistry } from "../app/context-consumers/capability-r
 import { createBusinessContextConsumerGateway } from "../app/context-consumers/business-context-consumer-gateway.mjs";
 import { createCartFeatureProducer } from "../app/feature-producers/cart-feature-producer.mjs";
 import { createFeatureRegistry, featureRegistry } from "../app/features/feature-registry.mjs";
+import { encodeCursor } from "../app/query/cursor-pagination.mjs";
 import { eventTypeRegistry } from "../app/events/event-type-registry.mjs";
 import { createRequireAuth, createRequireWorkspace } from "../app/middleware/auth.mjs";
 import { createBrandBookRepository } from "../app/repositories/brand-book-repository.mjs";
@@ -224,6 +225,24 @@ test("Phase 3C deterministic Feature foundation", async (t) => {
     assert.equal(response.status, 404);
     const listB = await (await request("/api/features", { headers: headersB })).json();
     assert.equal(listB.features.length, 0);
+  });
+
+  await t.test("Feature cursor pagination is stable, opaque, bounded, and tenant-safe", async () => {
+    const complete = await (await request("/api/features?limit=100", { headers: headersA })).json();
+    const first = await (await request("/api/features?limit=1", { headers: headersA })).json();
+    assert.equal(first.features.length, 1); assert.ok(first.nextCursor);
+    assert.equal(Buffer.from(first.nextCursor, "base64url").toString("utf8").includes(userA.data.activeWorkspace.id), false);
+    const second = await (await request(`/api/features?limit=1&cursor=${encodeURIComponent(first.nextCursor)}`, { headers: headersA })).json();
+    assert.equal(new Set([...first.features, ...second.features].map((item) => item.id)).size, 2);
+    assert.deepEqual([...first.features, ...second.features].map((item) => item.id), complete.features.slice(0, 2).map((item) => item.id));
+    assert.equal((await request("/api/features?cursor=malformed", { headers: headersA })).status, 400);
+    const wrongKind = encodeCursor("normalized_observations", { calculatedAt: first.features[0].calculatedAt, id: first.features[0].id });
+    assert.equal((await request(`/api/features?cursor=${encodeURIComponent(wrongKind)}`, { headers: headersA })).status, 400);
+    const cross = await (await request(`/api/features?limit=1&cursor=${encodeURIComponent(first.nextCursor)}`, { headers: headersB })).json();
+    assert.deepEqual(cross.features, []);
+    const filtered = await (await request(`/api/features?limit=1&featureName=${first.features[0].featureName}`, { headers: headersA })).json();
+    assert.ok(filtered.features.every((item) => item.featureName === first.features[0].featureName));
+    assert.equal((await request("/api/features?limit=101", { headers: headersA })).status, 400);
   });
 
   await t.test("freshness is derived without mutating historical Features", async () => {

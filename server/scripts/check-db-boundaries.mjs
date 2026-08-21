@@ -29,6 +29,7 @@ function inspect(target) {
     target.includes(`${path.sep}app${path.sep}listening${path.sep}`) ||
     target.endsWith(`${path.sep}listening-service.mjs`) ||
     target.endsWith(`${path.sep}listening-event-mapper-service.mjs`)
+    || target.endsWith(`${path.sep}listening-intelligence-service.mjs`)
   ) {
     const forbidden = [
       /from\s+["'][^"']*(business-profile|business-dna|brand-book)-(repository|service)\.mjs["']/,
@@ -68,6 +69,7 @@ function inspect(target) {
     if (target.endsWith(`${path.sep}listening-event-mapper-service.mjs`)) {
       forbidden.push(/from\s+["'][^"']*(feature-value|model-input|forecast|recommendation|automation)-(repository|service)[^"']*["']/);
     }
+    if (target.includes(`${path.sep}app${path.sep}feature-producers${path.sep}`)) forbidden.push(/listening-(repository|intelligence-repository)/);
     if (/from\s+["'][^"']*(integrations\/providers|connector-adapters|provider-adapters)[^"']*["']/.test(source) &&
       !target.includes(`${path.sep}app${path.sep}integrations${path.sep}`)) {
       consumerBoundaryViolations.push(path.relative(serverRoot, target));

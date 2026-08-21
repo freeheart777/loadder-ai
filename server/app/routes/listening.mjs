@@ -10,7 +10,7 @@ export function createListeningRouter({service,mapper}){const r=express.Router()
   r.post("/listening-collections",(q,s)=>{try{return s.status(201).json({success:true,...service.collect(q.body||{},q.user.id)});}catch(e){return handle(e,s);}});
   r.get("/listening-collections",(q,s)=>{try{return s.json({success:true,runs:service.runs(q.query)});}catch(e){return handle(e,s);}});
   r.get("/listening-collections/:id",(q,s)=>{try{return s.json({success:true,run:service.run(q.params.id)});}catch(e){return handle(e,s);}});
-  r.get("/listening-records",(q,s)=>{try{return s.json({success:true,records:service.records(q.query)});}catch(e){return handle(e,s);}});
+  r.get("/listening-records",(q,s)=>{try{const page=service.recordPage(q.query);return s.json({success:true,records:page.items,nextCursor:page.nextCursor});}catch(e){return handle(e,s);}});
   r.get("/listening-records/aggregates",(q,s)=>s.json({success:true,aggregates:service.aggregates()}));
   r.get("/listening-records/:id",(q,s)=>{try{return s.json({success:true,record:service.record(q.params.id)});}catch(e){return handle(e,s);}});
   r.get("/listening-event-mappings",(q,s)=>s.json({success:true,mappings:mapper.definitions()}));

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { pageResult } from "../query/cursor-pagination.mjs";
 
 function parseJson(value, fallback) { try { return JSON.parse(value); } catch { return fallback; } }
 function observation(row) {
@@ -95,10 +96,26 @@ export function createIntelligenceRecordRepository(db) {
     return db.prepare(`SELECT * FROM ${table} WHERE ${clauses.join(" AND ")}
       ORDER BY ${timeColumn} DESC LIMIT ?`).all(...values).map(mapper);
   }
+  function listObservationPage(filters) {
+    const clauses = ["workspace_id=?"];
+    const values = [requireWorkspaceId()];
+    if (filters.type) { clauses.push("observation_type=?"); values.push(filters.type); }
+    if (filters.subjectType) { clauses.push("subject_type=?"); values.push(filters.subjectType); }
+    if (filters.subjectId) { clauses.push("subject_id=?"); values.push(filters.subjectId); }
+    if (filters.cursor) {
+      clauses.push("(calculated_at < ? OR (calculated_at = ? AND id < ?))");
+      values.push(filters.cursor.calculatedAt, filters.cursor.calculatedAt, filters.cursor.id);
+    }
+    values.push(filters.limit + 1);
+    const rows = db.prepare(`SELECT * FROM normalized_observations WHERE ${clauses.join(" AND ")}
+      ORDER BY calculated_at DESC, id DESC LIMIT ?`).all(...values).map(observation);
+    return pageResult(rows, filters.limit, "normalized_observations", (item) => ({ calculatedAt: item.calculatedAt, id: item.id }));
+  }
   return {
     transaction: (work) => db.transaction(work)(),
-    createObservation, createSignal,
-    listObservations: (filters) => list("normalized_observations", observation, filters),
+    createObservation, createSignal, getObservationByProducerKey,
+    listObservationPage,
+    listObservations: (filters) => listObservationPage(filters).items,
     listSignals: (filters) => list("derived_signals", signal, filters),
   };
 }

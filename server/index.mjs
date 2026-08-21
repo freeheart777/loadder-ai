@@ -20,6 +20,10 @@ import { createKnowledgeKpiRouter } from "./app/routes/knowledge-kpis.mjs";
 import { createKnowledgeExtractionRouter } from "./app/routes/knowledge-extraction.mjs";
 import { createImportedFactMappingRouter } from "./app/routes/imported-fact-mapping.mjs";
 import { createListeningRouter } from "./app/routes/listening.mjs";
+import { createListeningIntelligenceRouter } from "./app/routes/listening-intelligence.mjs";
+import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
+import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
+import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
 import { createIdentityRepository } from "./app/repositories/identity-repository.mjs";
 import { createBusinessProfileRepository } from "./app/repositories/business-profile-repository.mjs";
 import { createBusinessDnaRepository } from "./app/repositories/business-dna-repository.mjs";
@@ -37,6 +41,7 @@ import { createKnowledgeKpiRepository } from "./app/repositories/knowledge-kpi-r
 import { createKnowledgeExtractionRepository } from "./app/repositories/knowledge-extraction-repository.mjs";
 import { createImportedFactEventLinkRepository } from "./app/repositories/imported-fact-event-link-repository.mjs";
 import { createListeningRepository } from "./app/repositories/listening-repository.mjs";
+import { createListeningIntelligenceRepository } from "./app/repositories/listening-intelligence-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -71,6 +76,7 @@ import { listeningSourceRegistry } from "./app/listening/listening-source-regist
 import { listeningEventMapperRegistry } from "./app/listening/listening-event-mapper-registry.mjs";
 import { createListeningService } from "./app/services/listening-service.mjs";
 import { createListeningEventMapperService } from "./app/services/listening-event-mapper-service.mjs";
+import { createListeningIntelligenceService } from "./app/services/listening-intelligence-service.mjs";
 import {
   createRequireAuth,
   createRequireWorkspace,
@@ -214,6 +220,7 @@ const knowledgeKpiRepository = createKnowledgeKpiRepository(db);
 const knowledgeExtractionRepository = createKnowledgeExtractionRepository(db);
 const importedFactEventLinkRepository = createImportedFactEventLinkRepository(db);
 const listeningRepository = createListeningRepository(db);
+const listeningIntelligenceRepository = createListeningIntelligenceRepository(db);
 const authService = createAuthService({
   repository: identityRepository,
   otpHashSecret: environment.authHashSecret,
@@ -290,6 +297,7 @@ const knowledgeExtractionService = createKnowledgeExtractionService({ parserRegi
 const importedFactEventMapperService = createImportedFactEventMapperService({ registry: importedFactMapperRegistry, linkRepository: importedFactEventLinkRepository, businessEventService });
 const listeningService = createListeningService({ sourceRegistry: listeningSourceRegistry, repository: listeningRepository, auditRepository: identityRepository });
 const listeningEventMapperService = createListeningEventMapperService({ registry: listeningEventMapperRegistry, repository: listeningRepository, businessEventService });
+const listeningIntelligenceService = createListeningIntelligenceService({ repository:listeningIntelligenceRepository, contextGateway:businessContextConsumerGateway, intelligenceRepository:intelligenceRecordRepository, featureRepository:featureValueRepository });
 
 app.use(
   "/api/auth",
@@ -373,6 +381,10 @@ app.use("/api", createKnowledgeKpiRouter({ service: knowledgeKpiService }));
 app.use("/api", createKnowledgeExtractionRouter({ service: knowledgeExtractionService }));
 app.use("/api", createImportedFactMappingRouter({ service: importedFactEventMapperService }));
 app.use("/api", createListeningRouter({ service: listeningService, mapper: listeningEventMapperService }));
+app.use("/api", createListeningIntelligenceRouter({ service: listeningIntelligenceService }));
+app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
+app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
+app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));
 app.use("/api", aiRouter);
 
 /* =========================================================
@@ -1348,68 +1360,6 @@ app.post(
 );
 
 /* =========================================================
-   CRM STATS
-========================================================= */
-
-app.get(
-  "/api/crm/stats",
-  (req, res) => {
-    res.json({
-      ok: true,
-
-      data:
-        getCRMStats(),
-    });
-  }
-);
-
-/* =========================================================
-   CUSTOMER 360
-========================================================= */
-
-app.get(
-  "/api/customers/:id/360",
-  (req, res) => {
-    try {
-      const data =
-        getCustomer360(
-          req.params.id
-        );
-
-      if (!data) {
-        return res
-          .status(404)
-          .json({
-            ok: false,
-
-            message:
-              "مشتری پیدا نشد.",
-          });
-      }
-
-      res.json({
-        ok: true,
-        data,
-      });
-    } catch (error) {
-      console.error(
-        "Customer 360 error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در دریافت پروفایل کامل مشتری.",
-        });
-    }
-  }
-);
-
-/* =========================================================
    DIRECT CUSTOMER MESSAGE
 ========================================================= */
 
@@ -1641,113 +1591,6 @@ app.post(
 
           message:
             "خطا در ارسال پیام به مشتری.",
-        });
-    }
-  }
-);
-
-/* =========================================================
-   CUSTOMERS
-========================================================= */
-
-app.get(
-  "/api/customers",
-  (req, res) => {
-    const data =
-      getCustomers();
-
-    res.json({
-      ok: true,
-
-      count:
-        data.length,
-
-      data,
-    });
-  }
-);
-
-app.get(
-  "/api/customers/:id",
-  (req, res) => {
-    const customer =
-      getCustomerById(
-        req.params.id
-      );
-
-    if (!customer) {
-      return res
-        .status(404)
-        .json({
-          ok: false,
-
-          message:
-            "مشتری پیدا نشد.",
-        });
-    }
-
-    res.json({
-      ok: true,
-
-      data:
-        customer,
-    });
-  }
-);
-
-app.post(
-  "/api/customers",
-  (req, res) => {
-    const {
-      name,
-      phone,
-      email,
-      company,
-      source,
-    } = req.body;
-
-    if (!name) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-
-          message:
-            "نام مشتری الزامی است.",
-        });
-    }
-
-    try {
-      const customer =
-        createCustomer({
-          name,
-          phone,
-          email,
-          company,
-          source,
-        });
-
-      res
-        .status(201)
-        .json({
-          ok: true,
-
-          data:
-            customer,
-        });
-    } catch (error) {
-      console.error(
-        "Create customer error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در ساخت مشتری.",
         });
     }
   }
@@ -2567,212 +2410,6 @@ app.post(
 );
 
 /* =========================================================
-   AUTOMATIONS
-========================================================= */
-
-app.get(
-  "/api/automations",
-  (req, res) => {
-    const data =
-      getAutomations();
-
-    res.json({
-      ok: true,
-
-      count:
-        data.length,
-
-      data,
-    });
-  }
-);
-
-app.get(
-  "/api/automations/:id",
-  (req, res) => {
-    const automation =
-      getAutomationById(
-        req.params.id
-      );
-
-    if (!automation) {
-      return res
-        .status(404)
-        .json({
-          ok: false,
-
-          message:
-            "اتوماسیون پیدا نشد.",
-        });
-    }
-
-    res.json({
-      ok: true,
-
-      data:
-        automation,
-    });
-  }
-);
-
-app.post(
-  "/api/automations",
-  (req, res) => {
-    const {
-      title,
-      trigger,
-
-      enabled =
-        true,
-
-      delayMinutes =
-        0,
-
-      conditions =
-        [],
-
-      actions =
-        [],
-    } = req.body;
-
-    if (
-      !title ||
-      !trigger
-    ) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-
-          message:
-            "title و trigger الزامی هستند.",
-        });
-    }
-
-    try {
-      const automation =
-        createAutomation({
-          title,
-          trigger,
-          enabled,
-          delayMinutes,
-          conditions,
-          actions,
-        });
-
-      res
-        .status(201)
-        .json({
-          ok: true,
-
-          data:
-            automation,
-        });
-    } catch (error) {
-      console.error(
-        "Create automation error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در ساخت اتوماسیون.",
-        });
-    }
-  }
-);
-
-app.patch(
-  "/api/automations/:id",
-  (req, res) => {
-    try {
-      const automation =
-        updateAutomation(
-          req.params.id,
-          req.body
-        );
-
-      if (!automation) {
-        return res
-          .status(404)
-          .json({
-            ok: false,
-
-            message:
-              "اتوماسیون پیدا نشد.",
-          });
-      }
-
-      res.json({
-        ok: true,
-
-        data:
-          automation,
-      });
-    } catch (error) {
-      console.error(
-        "Update automation error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در ویرایش اتوماسیون.",
-        });
-    }
-  }
-);
-
-app.delete(
-  "/api/automations/:id",
-  (req, res) => {
-    try {
-      const deleted =
-        deleteAutomation(
-          req.params.id
-        );
-
-      if (!deleted) {
-        return res
-          .status(404)
-          .json({
-            ok: false,
-
-            message:
-              "اتوماسیون پیدا نشد.",
-          });
-      }
-
-      res.json({
-        ok: true,
-      });
-    } catch (error) {
-      console.error(
-        "Delete automation error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در حذف اتوماسیون.",
-        });
-    }
-  }
-);
-
-/* =========================================================
    MANUAL WORKFLOW
 ========================================================= */
 
@@ -2979,240 +2616,6 @@ app.delete(
 
           message:
             "خطا در پاک‌کردن تاریخچه.",
-        });
-    }
-  }
-);
-
-/* =========================================================
-   MARKETING CHANNELS
-========================================================= */
-
-app.get(
-  "/api/marketing/channels",
-  (req, res) => {
-    try {
-      const data =
-        getMarketingChannels();
-
-      res.json({
-        ok: true,
-
-        count:
-          data.length,
-
-        data,
-      });
-    } catch (error) {
-      console.error(
-        "Marketing channels error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در دریافت کانال‌های مارکتینگ.",
-        });
-    }
-  }
-);
-
-/* =========================================================
-   MARKETING PLATFORMS
-========================================================= */
-
-app.get(
-  "/api/marketing/platforms",
-  (req, res) => {
-    try {
-      const channelId =
-        req.query
-          .channelId ||
-        null;
-
-      const data =
-        getMarketingPlatforms(
-          channelId
-        );
-
-      res.json({
-        ok: true,
-
-        count:
-          data.length,
-
-        data,
-      });
-    } catch (error) {
-      console.error(
-        "Marketing platforms error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در دریافت پلتفرم‌های تبلیغاتی.",
-        });
-    }
-  }
-);
-
-/* =========================================================
-   AD SERVICES
-========================================================= */
-
-app.get(
-  "/api/marketing/services",
-  (req, res) => {
-    try {
-      const platformId =
-        req.query
-          .platformId ||
-        null;
-
-      const data =
-        getAdvertisingServices(
-          platformId
-        );
-
-      res.json({
-        ok: true,
-
-        count:
-          data.length,
-
-        data,
-      });
-    } catch (error) {
-      console.error(
-        "Advertising services error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در دریافت سرویس‌های تبلیغاتی.",
-        });
-    }
-  }
-);
-
-/* =========================================================
-   MARKETING STRUCTURE
-========================================================= */
-
-app.get(
-  "/api/marketing/structure",
-  (req, res) => {
-    try {
-      const channels =
-        getMarketingChannels();
-
-      const platforms =
-        getMarketingPlatforms();
-
-      const services =
-        getAdvertisingServices();
-
-      const data =
-        channels.map(
-          (channel) => ({
-            ...channel,
-
-            platforms:
-              platforms
-                .filter(
-                  (platform) =>
-                    platform
-                      .channelId ===
-                    channel.id
-                )
-                .map(
-                  (platform) => ({
-                    ...platform,
-
-                    services:
-                      services.filter(
-                        (service) =>
-                          service
-                            .platformId ===
-                          platform.id
-                      ),
-                  })
-                ),
-          })
-        );
-
-      res.json({
-        ok: true,
-
-        count:
-          data.length,
-
-        data,
-      });
-    } catch (error) {
-      console.error(
-        "Marketing structure error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در دریافت ساختار تبلیغات.",
-        });
-    }
-  }
-);
-
-/* =========================================================
-   CAMPAIGNS
-========================================================= */
-
-app.get(
-  "/api/marketing/campaigns",
-  (req, res) => {
-    try {
-      const data =
-        getMarketingCampaigns();
-
-      res.json({
-        ok: true,
-
-        count:
-          data.length,
-
-        data,
-      });
-    } catch (error) {
-      console.error(
-        "Marketing campaigns error:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          ok: false,
-
-          message:
-            "خطا در دریافت کمپین‌ها.",
         });
     }
   }

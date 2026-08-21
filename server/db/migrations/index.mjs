@@ -31,6 +31,7 @@ import { migration030ListeningMonitors } from "./030_listening_monitors.mjs";
 import { migration031ListeningCollectionRecords } from "./031_listening_collection_records.mjs";
 import { migration032ListeningEventLinks } from "./032_listening_event_links.mjs";
 import { migration033ListeningGuards } from "./033_listening_guards.mjs";
+import { migration034ListeningIntelligence } from "./034_listening_intelligence.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -66,4 +67,5 @@ export const migrations = [
   migration031ListeningCollectionRecords,
   migration032ListeningEventLinks,
   migration033ListeningGuards,
+  migration034ListeningIntelligence,
 ];
