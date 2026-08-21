@@ -22,6 +22,7 @@ const ContentStudioPage = lazy(() => import("./pages/ContentStudioPage"));
 const BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage"));
 const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
 const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 
 export default function App() {
   return (
@@ -46,6 +47,10 @@ export default function App() {
             <Route
               path="/dashboard"
               element={<DashboardPage />}
+            />
+            <Route
+              path="/dashboard/onboarding"
+              element={<OnboardingPage />}
             />
 
         {/* داشبورد قدیمی - فقط برای بکاپ */}

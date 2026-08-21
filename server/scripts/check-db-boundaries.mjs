@@ -5,6 +5,7 @@ const serverRoot = path.resolve(import.meta.dirname, "..");
 const targets = [path.join(serverRoot, "index.mjs"), path.join(serverRoot, "app")];
 const violations = [];
 const consumerBoundaryViolations = [];
+const onboardingBoundaryViolations = [];
 
 function inspect(target) {
   const stat = statSync(target);
@@ -14,6 +15,16 @@ function inspect(target) {
   }
   if (!target.endsWith(".mjs")) return;
   const source = readFileSync(target, "utf8");
+  if (target.includes(`${path.sep}onboarding${path.sep}`) || target.endsWith(`${path.sep}onboarding-service.mjs`) || target.endsWith(`${path.sep}onboarding.mjs`)) {
+    const forbidden = [
+      /from\s+["'][^"']*(openai|cloudflare|agent|embedding|model|messaging|automation|execution|provider|worker|queue)[^"']*["']/i,
+      /\b(action_proposals|execution_authorizations|execution_requests|execution_attempts|execution_results|execution_dispatch_jobs|provider_account_identities|automations|executions)\b/i,
+      /from\s+["'][^"']*db\/database\.mjs["']/,
+    ];
+    if (forbidden.some((pattern) => pattern.test(source))) {
+      onboardingBoundaryViolations.push(path.relative(serverRoot, target));
+    }
+  }
   if (/from\s+["'][^"']*db\/database\.mjs["']/.test(source)) {
     violations.push(path.relative(serverRoot, target));
   }
@@ -203,7 +214,12 @@ if (consumerBoundaryViolations.length) {
   );
   process.exitCode = 1;
 }
-if (!violations.length && !consumerBoundaryViolations.length) {
+if (onboardingBoundaryViolations.length) {
+  console.error(`Onboarding accesses forbidden AI, execution, provider, worker, queue, or raw database dependencies: ${onboardingBoundaryViolations.join(", ")}`);
+  process.exitCode = 1;
+}
+if (!violations.length && !consumerBoundaryViolations.length && !onboardingBoundaryViolations.length) {
   console.log("Database import boundary is valid.");
   console.log("Business Context consumer boundary is valid.");
+  console.log("Onboarding dependency boundary is valid.");
 }

@@ -1,6 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
-import type { ElementType } from "react";
+import { useEffect, useState, type ElementType } from "react";
 import WorkspaceSelector from "../components/WorkspaceSelector";
+import type { OnboardingStatus } from "../components/onboarding/types";
+import { useAuth } from "../lib/auth";
+import { fetchOnboardingStatus } from "../lib/onboarding";
 
 import {
   House,
@@ -143,6 +146,15 @@ function ToolCard({
 
 export default function DashboardPage() {
   const location = useLocation();
+  const { activeWorkspace } = useAuth();
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setOnboarding(null);
+    void fetchOnboardingStatus(controller.signal).then(setOnboarding).catch(() => setOnboarding(null));
+    return () => controller.abort();
+  }, [activeWorkspace?.id]);
 
   const isDemo =
     new URLSearchParams(location.search).get("demo") === "1";
@@ -205,12 +217,8 @@ export default function DashboardPage() {
             <WorkspaceSelector />
           </div>
 
-          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
-            <div className="h-full w-[35%] rounded-full bg-gradient-to-l from-violet-500 via-fuchsia-500 to-cyan-400" />
-          </div>
-
-          <div className="mt-2 text-sm text-white/40">
-            تکمیل پروفایل ۳۵٪
+          <div className="mt-4 text-sm text-white/40">
+            {!onboarding ? "در حال بررسی راه‌اندازی…" : onboarding.complete ? "راه‌اندازی کامل" : onboarding.contextStale ? "شناخت کسب‌وکار نیازمند به‌روزرسانی" : "راه‌اندازی تکمیل نشده"}
           </div>
         </div>
       </aside>
@@ -238,11 +246,11 @@ export default function DashboardPage() {
           </div>
 
           <Link
-            to="/dashboard/content"
+            to={!onboarding || onboarding.complete ? "/dashboard/content" : "/dashboard/onboarding"}
             className="flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-gradient-to-l from-violet-500/20 to-fuchsia-500/15 px-5 py-3 text-sm"
           >
             <Sparkle size={16} weight="bold" />
-            تولید محتوا
+            {!onboarding || onboarding.complete ? "تولید محتوا" : onboarding.contextStale ? "به‌روزرسانی شناخت کسب‌وکار" : "ادامه راه‌اندازی"}
           </Link>
         </header>
 

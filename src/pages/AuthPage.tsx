@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { destinationForOnboarding, fetchOnboardingStatus } from "../lib/onboarding";
 
 import {
   ArrowLeft,
@@ -27,7 +28,9 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (!sessionLoading && user) {
-      navigate("/dashboard", { replace: true });
+      void fetchOnboardingStatus().then((status) => {
+        navigate(destinationForOnboarding(status), { replace: true });
+      }).catch(() => navigate("/dashboard", { replace: true }));
     }
   }, [navigate, sessionLoading, user]);
 
@@ -106,7 +109,7 @@ export default function AuthPage() {
       const requestedPath =
         typeof location.state?.from === "string"
           ? location.state.from
-          : "/dashboard";
+          : destinationForOnboarding(await fetchOnboardingStatus());
       navigate(requestedPath, { replace: true });
     } catch (requestError) {
       setError(

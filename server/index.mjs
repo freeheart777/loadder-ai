@@ -17,6 +17,7 @@ import { createBusinessProfileRouter } from "./app/routes/business-profile.mjs";
 import { createBusinessDnaRouter } from "./app/routes/business-dna.mjs";
 import { createBrandBookRouter } from "./app/routes/brand-book.mjs";
 import { createBusinessContextRouter } from "./app/routes/business-context.mjs";
+import { createOnboardingRouter } from "./app/routes/onboarding.mjs";
 import { createTextAiContextRouter } from "./app/routes/text-ai-context.mjs";
 import { createIntelligenceDataRouter } from "./app/routes/intelligence-data.mjs";
 import { createFeatureValueRouter } from "./app/routes/feature-values.mjs";
@@ -73,6 +74,8 @@ import { createBusinessProfileService } from "./app/services/business-profile-se
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
 import { createBrandBookService } from "./app/services/brand-book-service.mjs";
 import { createBusinessContextService } from "./app/services/business-context-service.mjs";
+import { createOnboardingService } from "./app/services/onboarding-service.mjs";
+import { createOperationMetrics } from "./app/observability/operation-metrics.mjs";
 import { contextCapabilityRegistry } from "./app/context-consumers/capability-registry.mjs";
 import { createBusinessContextConsumerGateway } from "./app/context-consumers/business-context-consumer-gateway.mjs";
 import { createTextAiContextConsumer } from "./app/context-consumers/text-ai-consumer.mjs";
@@ -295,6 +298,13 @@ const businessContextService = createBusinessContextService({
   repository: businessContextRepository,
   auditRepository: identityRepository,
 });
+const onboardingService = createOnboardingService({
+  businessProfileService,
+  businessDnaService,
+  brandBookService,
+  businessContextService,
+  operationMetrics: createOperationMetrics(),
+});
 const businessContextConsumerGateway = createBusinessContextConsumerGateway({
   businessContextService,
   usageRepository: businessContextUsageRepository,
@@ -434,6 +444,10 @@ app.use(
 app.use(
   "/api/business-context",
   createBusinessContextRouter({ businessContextService })
+);
+app.use(
+  "/api/onboarding",
+  createOnboardingRouter({ onboardingService })
 );
 app.use(
   "/api/text-ai/context",

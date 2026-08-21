@@ -162,7 +162,7 @@ test("auth production response invariant remains code-free and health remains no
 
 test("frontend route policy exposes exactly the approved customer allowlist", () => {
   const source = readFileSync(new URL("../../src/lib/productPolicy.ts", import.meta.url), "utf8");
-  for (const path of ["/", "/signup", "/dashboard", "/dashboard/content", "/dashboard/brand-book", "/dashboard/business-brain"]) assert.match(source, new RegExp(`"${path.replaceAll("/", "\\/")}"`));
+  for (const path of ["/", "/signup", "/dashboard", "/dashboard/content", "/dashboard/brand-book", "/dashboard/business-brain", "/dashboard/onboarding"]) assert.match(source, new RegExp(`"${path.replaceAll("/", "\\/")}"`));
   for (const path of ["/dashboard/social", "/dashboard/automation", "/dashboard/analytics"]) assert.doesNotMatch(source, new RegExp(path));
 });
 
@@ -176,5 +176,7 @@ test("production navigation contains only truthful customer tools", () => {
 
 test("route classifier is deterministic and does not accept client feature keys", () => {
   assert.deepEqual(classifyApiRequest("POST", "/api/agent/run"), { feature: "content_studio", internal: false });
+  assert.deepEqual(classifyApiRequest("GET", "/api/onboarding/status"), { feature: "business_setup", internal: false });
+  assert.deepEqual(classifyApiRequest("POST", "/api/onboarding/finalize"), { feature: "business_setup", internal: false });
   assert.equal(classifyApiRequest("POST", "/api/client-selected-feature"), null);
 });

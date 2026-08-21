@@ -5,6 +5,7 @@ export const CUSTOMER_ROUTE_ALLOWLIST = Object.freeze([
   "/dashboard/content",
   "/dashboard/brand-book",
   "/dashboard/business-brain",
+  "/dashboard/onboarding",
 ]);
 
 export const INTERNAL_ROUTE_ALLOWLIST = Object.freeze([
