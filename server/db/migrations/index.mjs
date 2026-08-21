@@ -42,6 +42,7 @@ import { providerAccountIdentitiesMigration } from "./041_provider_account_ident
 import { migration042ExecutionAttemptResultLedger } from "./042_execution_attempt_result_ledger.mjs";
 import { migration043ExecutionDispatchJobs } from "./043_execution_dispatch_jobs.mjs";
 import { migration044ExecutionActionInputs } from "./044_execution_action_inputs.mjs";
+import { migration046ExecutionDispatchJobTenantPollIndexes } from "./046_execution_dispatch_job_tenant_poll_indexes.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -88,4 +89,5 @@ export const migrations = [
   migration042ExecutionAttemptResultLedger,
   migration043ExecutionDispatchJobs,
   migration044ExecutionActionInputs,
+  migration046ExecutionDispatchJobTenantPollIndexes,
 ];
