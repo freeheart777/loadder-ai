@@ -28,6 +28,8 @@ export function createOperationMetrics({ limit = DEFAULT_LIMIT, sink = null } = 
       evidenceCount: numeric(input.evidenceCount),
       findingCount: numeric(input.findingCount),
       insufficientEvidenceCount: numeric(input.insufficientEvidenceCount),
+      semanticFindingCount: numeric(input.semanticFindingCount),
+      recommendationCount: numeric(input.recommendationCount),
     });
     measurements.push(measurement);
     if (measurements.length > limit) measurements.splice(0, measurements.length - limit);

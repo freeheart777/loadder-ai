@@ -28,11 +28,15 @@ function inspect(target) {
     target.includes(`${path.sep}app${path.sep}import-mappers${path.sep}`) ||
     target.includes(`${path.sep}app${path.sep}listening${path.sep}`) ||
     target.includes(`${path.sep}app${path.sep}semantic${path.sep}`) ||
+    target.includes(`${path.sep}app${path.sep}recommendations${path.sep}`) ||
     target.endsWith(`${path.sep}listening-service.mjs`) ||
     target.endsWith(`${path.sep}listening-event-mapper-service.mjs`)
     || target.endsWith(`${path.sep}listening-intelligence-service.mjs`)
     || target.endsWith(`${path.sep}semantic-intelligence-service.mjs`)
     || target.endsWith(`${path.sep}semantic-finding-repository.mjs`)
+    || target.endsWith(`${path.sep}recommendation-intelligence-service.mjs`)
+    || target.endsWith(`${path.sep}recommendation-intelligence.mjs`)
+    || target.endsWith(`${path.sep}intelligence-recommendation-repository.mjs`)
   ) {
     const forbidden = [
       /from\s+["'][^"']*(business-profile|business-dna|brand-book)-(repository|service)\.mjs["']/,
@@ -77,6 +81,13 @@ function inspect(target) {
       forbidden.push(
         /from\s+["'][^"']*(database|business-event|forecast|listening-repository|automation|campaign|customer|lead|order|cart|attribution)[^"']*["']/i,
         /from\s+["'](?:openai|[^"']*(agent|embedding|recommendation|decision)[^"']*)["']/i,
+        /\b(customers|leads|orders|carts|marketing_campaigns|campaign_metrics|attribution_touchpoints|business_events|canonical_listening_records|forecast_records|automations|executions)\b/i
+      );
+    }
+    if (target.includes(`${path.sep}app${path.sep}recommendations${path.sep}`) || target.includes("recommendation-intelligence-service.mjs") || target.includes("recommendation-intelligence.mjs") || target.includes("intelligence-recommendation-repository.mjs")) {
+      forbidden.push(
+        /from\s+["'][^"']*(database|business-event|forecast|listening-repository|automation|execution|messaging|optimizer|campaign|customer|lead|order|cart|attribution|provider)[^"']*["']/i,
+        /from\s+["'](?:openai|[^"']*(agent|embedding|decision)[^"']*)["']/i,
         /\b(customers|leads|orders|carts|marketing_campaigns|campaign_metrics|attribution_touchpoints|business_events|canonical_listening_records|forecast_records|automations|executions)\b/i
       );
     }

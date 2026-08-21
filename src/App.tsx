@@ -30,6 +30,7 @@ const PredictivePage = lazy(() => import("./pages/PredictivePage"));
 const AutomationPage = lazy(() => import("./pages/AutomationPage"));
 const BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage"));
 const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
+const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
 
 export default function App() {
   return (
@@ -145,6 +146,10 @@ export default function App() {
             <Route
               path="/click-test"
               element={<ClickTestPage />}
+            />
+            <Route
+              path="/intelligence"
+              element={<IntelligencePreviewPage />}
             />
           </Route>
 

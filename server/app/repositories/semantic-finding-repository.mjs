@@ -65,5 +65,14 @@ export function createSemanticFindingRepository(db) {
     const rows = db.prepare(`SELECT * FROM semantic_findings WHERE ${clauses.join(" AND ")} ORDER BY calculated_at DESC,id DESC LIMIT ?`).all(...values).map(finding);
     return pageResult(rows, filters.limit, "semantic_findings", (item) => ({ calculatedAt: item.calculatedAt, id: item.id }));
   }
-  return Object.freeze({ transaction: (work) => db.transaction(work)(), listeningEvidence, findByProducerKey: byKey, create, listPage, getById: (id) => finding(db.prepare("SELECT * FROM semantic_findings WHERE id=? AND workspace_id=?").get(id, workspace())) });
+  function findLatestForRecommendation({ semanticType, subjectType, subjectId, subjectKey, cutoff, window }) {
+    return finding(db.prepare(`SELECT * FROM semantic_findings
+      WHERE workspace_id=? AND semantic_type=? AND subject_type=? AND subject_id IS ? AND subject_key=?
+        AND point_in_time_cutoff<=?
+        AND json_extract(provenance_json,'$.scope.window')=?
+      ORDER BY point_in_time_cutoff DESC,calculated_at DESC,id DESC LIMIT 1`).get(
+      workspace(), semanticType, subjectType, subjectId, subjectKey, cutoff, window
+    ));
+  }
+  return Object.freeze({ transaction: (work) => db.transaction(work)(), listeningEvidence, findByProducerKey: byKey, findLatestForRecommendation, create, listPage, getById: (id) => finding(db.prepare("SELECT * FROM semantic_findings WHERE id=? AND workspace_id=?").get(id, workspace())) });
 }

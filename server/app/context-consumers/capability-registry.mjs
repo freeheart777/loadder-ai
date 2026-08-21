@@ -20,6 +20,7 @@ const DEFAULT_CAPABILITIES = [
   ["model_inputs", ["identity", "strategy", "metadata"], ["audiences", "offerings", "brand", "visual"]],
   ["listening_intelligence", ["identity", "metadata"], ["strategy", "audiences", "offerings", "brand", "visual"]],
   ["semantic_intelligence", ["identity", "metadata"], ["strategy", "audiences", "offerings", "brand", "visual"]],
+  ["recommendation_intelligence", ["identity", "metadata"], ["strategy", "audiences", "offerings", "brand", "visual"]],
 ].map(([consumer, requiredContextSections, optionalContextSections]) => ({
   consumer,
   supportedContextSchemaVersions: ["1.0"],

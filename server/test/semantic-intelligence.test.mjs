@@ -47,7 +47,7 @@ test("Phase 4E v1 Semantic Intelligence foundation", async (t) => {
   const within = (workspace, work) => { activeWorkspace = workspace; return runWithWorkspace(workspace, work); };
 
   await t.test("migration 035 is idempotent and minimal", () => {
-    assert.equal(db.prepare("SELECT COUNT(*) c FROM schema_migrations").get().c, 35);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM schema_migrations WHERE version=35 AND name='semantic_findings'").get().c, 1);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='semantic_findings'").get().c, 1);
   });
   await t.test("registry contains exactly the approved contracts", () => {
