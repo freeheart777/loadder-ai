@@ -19,7 +19,7 @@ import { createRecommendationIntelligenceRouter } from "../app/routes/recommenda
 import { createOperationMetrics } from "../app/observability/operation-metrics.mjs";
 import { encodeCursor } from "../app/query/cursor-pagination.mjs";
 
-function copyPhaseBaseline(source,target){copyFileSync(source,target);const db=new Database(target);db.exec("DROP TRIGGER IF EXISTS trg_execution_requests_update;DROP TRIGGER IF EXISTS trg_execution_requests_delete;DROP TRIGGER IF EXISTS trg_execution_requests_insert_guard;DROP INDEX IF EXISTS idx_execution_requests_page;DROP TABLE IF EXISTS execution_requests;DELETE FROM schema_migrations WHERE version=40;");db.close();}
+function copyPhaseBaseline(source,target){copyFileSync(source,target);const db=new Database(target);db.exec("DROP TABLE IF EXISTS provider_account_identities;DELETE FROM schema_migrations WHERE version=41;DROP TRIGGER IF EXISTS trg_execution_requests_update;DROP TRIGGER IF EXISTS trg_execution_requests_delete;DROP TRIGGER IF EXISTS trg_execution_requests_insert_guard;DROP INDEX IF EXISTS idx_execution_requests_page;DROP TABLE IF EXISTS execution_requests;DELETE FROM schema_migrations WHERE version=40;");db.close();}
 const AT = "2026-08-21T12:00:00.000Z";
 const BEFORE = "2026-08-21T11:00:00.000Z";
 const AFTER = "2026-08-21T13:00:00.000Z";
