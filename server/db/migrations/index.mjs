@@ -37,6 +37,7 @@ import { migration036IntelligenceRecommendations } from "./036_intelligence_reco
 import { migration037HumanGovernance } from "./037_human_governance.mjs";
 import { migration038ActionProposals } from "./038_action_proposals.mjs";
 import { migration039ExecutionAuthorizations } from "./039_execution_authorizations.mjs";
+import { migration040ExecutionRequests } from "./040_execution_requests.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -78,4 +79,5 @@ export const migrations = [
   migration037HumanGovernance,
   migration038ActionProposals,
   migration039ExecutionAuthorizations,
+  migration040ExecutionRequests,
 ];

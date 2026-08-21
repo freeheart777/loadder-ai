@@ -34,8 +34,10 @@ export function createOperationMetrics({ limit = DEFAULT_LIMIT, sink = null } = 
       decisionCount: numeric(input.decisionCount),
       proposalCount: numeric(input.proposalCount),
       authorizationCount: numeric(input.authorizationCount),
+      requestCount: numeric(input.requestCount),
       riskClass: input.riskClass || null,
       policyVersion: input.policyVersion || null,
+      requestPolicyVersion: input.requestPolicyVersion || null,
     });
     measurements.push(measurement);
     if (measurements.length > limit) measurements.splice(0, measurements.length - limit);

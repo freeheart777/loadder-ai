@@ -17,11 +17,12 @@ import {createActionProposalRouter} from "../app/routes/action-proposals.mjs";
 import {createOperationMetrics} from "../app/observability/operation-metrics.mjs";
 import {encodeCursor} from "../app/query/cursor-pagination.mjs";
 
+function copyPhaseBaseline(source,target){copyFileSync(source,target);const db=new Database(target);db.exec("DROP TRIGGER IF EXISTS trg_execution_requests_update;DROP TRIGGER IF EXISTS trg_execution_requests_delete;DROP TRIGGER IF EXISTS trg_execution_requests_insert_guard;DROP INDEX IF EXISTS idx_execution_requests_page;DROP TABLE IF EXISTS execution_requests;DELETE FROM schema_migrations WHERE version=40;");db.close();}
 const AT="2026-08-21T12:00:00.000Z",sha="a".repeat(64);
 const contract=(type="test_review_followup")=>({actionType:type,actionVersion:1,schemaVersion:1,supportedRecommendationTypes:["attention_evidence_review"],supportedDecisionTypes:["ADOPT"],supportedTargetTypes:["recommendation_subject"],riskClass:"NON_EXECUTING",executionEligible:false,executable:false,requiresAuthorization:true,producer:"test_human_action_proposal",producerVersion:"1.0",policyVersion:"1.0"});
 
 test("Phase 4I v1 Controlled Action Proposal foundation",async t=>{
- const dir=mkdtempSync(join(tmpdir(),"loadder-action-proposal-")),path=join(dir,"proposal.sqlite");copyFileSync(new URL("../db/loadder.sqlite",import.meta.url),path);const db=new Database(path);db.pragma("foreign_keys=ON");
+ const dir=mkdtempSync(join(tmpdir(),"loadder-action-proposal-")),path=join(dir,"proposal.sqlite");copyPhaseBaseline(new URL("../db/loadder.sqlite",import.meta.url),path);const db=new Database(path);db.pragma("foreign_keys=ON");
  db.exec(`
    DROP TRIGGER IF EXISTS trg_execution_authorizations_update;
    DROP TRIGGER IF EXISTS trg_execution_authorizations_delete;

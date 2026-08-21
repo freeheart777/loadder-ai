@@ -59,6 +59,11 @@ type ExecutionAuthorization = {
   confirmationHash: string; executionAuthorizing: boolean; authorizedAt: string;
   expiresAt: string; createdAt: string;
 };
+type ExecutionRequest = {
+  id: string; executionAuthorizationId: string; actionProposalId: string; actionType: string;
+  actionVersion: number; requestPolicy: string; requestPolicyVersion: number; requestFingerprint: string;
+  riskClass: string; requestedByRole: string; requestedAt: string; requestExpiresAt: string;
+};
 
 class ApiRequestError extends Error {
   status: number;
@@ -171,6 +176,7 @@ export default function IntelligencePreviewPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [actionProposals, setActionProposals] = useState<ActionProposal[]>([]);
   const [authorizations, setAuthorizations] = useState<ExecutionAuthorization[]>([]);
+  const [executionRequests, setExecutionRequests] = useState<ExecutionRequest[]>([]);
   const [governance, setGovernance] = useState<Record<string, Governance>>({});
   const [recommendationError, setRecommendationError] = useState(false);
   const [governanceError, setGovernanceError] = useState(false);
@@ -237,13 +243,19 @@ export default function IntelligencePreviewPage() {
       return proposals;
     } catch (error) { handleFailure(error); return []; }
   }, [handleFailure]);
+  const loadExecutionRequests = useCallback(async () => {
+    try {
+      const data = await jsonRequest<{ requests: ExecutionRequest[] }>("/api/execution/requests?limit=100");
+      const requests = data.requests || []; setExecutionRequests(requests); return requests;
+    } catch (error) { handleFailure(error); return []; }
+  }, [handleFailure]);
 
   const loadPreview = useCallback(async () => {
     setErrors([]); setAuthError(false);
     setGovernanceError(false);
-    const results = await Promise.allSettled([loadContext(), loadListening(), loadFindings(), loadRecommendations(), loadActionProposals()]);
+    const results = await Promise.allSettled([loadContext(), loadListening(), loadFindings(), loadRecommendations(), loadActionProposals(), loadExecutionRequests()]);
     for (const result of results) if (result.status === "rejected") handleFailure(result.reason);
-  }, [handleFailure, loadActionProposals, loadContext, loadFindings, loadListening, loadRecommendations]);
+  }, [handleFailure, loadActionProposals, loadContext, loadExecutionRequests, loadFindings, loadListening, loadRecommendations]);
 
   useEffect(() => { void loadPreview().finally(() => setLoading(false)); }, [loadPreview]);
 
@@ -473,6 +485,23 @@ export default function IntelligencePreviewPage() {
             </div>
           ) : <div className="space-y-4">{authorizations.map((authorization) => (
             <History key={authorization.id} title={authorization.authorizationPolicy} meta={`owner · ${formatDate(authorization.authorizedAt)}`} id={authorization.id} details={[`Proposal: ${authorization.actionProposalId}`, `Policy version: ${authorization.authorizationPolicyVersion}`, `Expires: ${formatDate(authorization.expiresAt)}`, `Confirmation: ${authorization.confirmationHash}`]} badges={["AUTHORIZED", "EXECUTION NOT STARTED"]} />
+          ))}</div>}
+        </section>
+
+        <section>
+          <div className="mb-5">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-200/60">Execution Request</div>
+            <h2 className="mt-2 text-lg font-semibold">Execution Request History</h2>
+            <p className="mt-1 max-w-3xl text-sm text-white/40">Immutable logical intent only. Request persistence does not call a provider, enqueue work, or perform an action.</p>
+          </div>
+          {!executionRequests.length ? (
+            <div className="rounded-[24px] border border-dashed border-fuchsia-300/15 bg-fuchsia-500/[0.035] p-7">
+              <div className="flex flex-wrap gap-2"><StatusPill status="EXECUTION REQUEST — NOT AVAILABLE" /><StatusPill status="NON-EXECUTING" /></div>
+              <h3 className="mt-5 font-semibold text-white/70">No execution-capable requests available.</h3>
+              <p className="mt-2 text-sm text-white/40">No request policy is currently approved. No provider call, job, attempt, result, or external mutation can begin here.</p>
+            </div>
+          ) : <div className="space-y-4">{executionRequests.map((request) => (
+            <History key={request.id} title={request.actionType} meta={`${request.requestedByRole} · ${formatDate(request.requestedAt)}`} id={request.id} details={[`Authorization: ${request.executionAuthorizationId}`, `Proposal: ${request.actionProposalId}`, `Policy: ${request.requestPolicy}@${request.requestPolicyVersion}`, `Expires: ${formatDate(request.requestExpiresAt)}`, `Fingerprint: ${request.requestFingerprint}`]} badges={["REQUEST RECORDED", "EXECUTION NOT STARTED"]} />
           ))}</div>}
         </section>
 

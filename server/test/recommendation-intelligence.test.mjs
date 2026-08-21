@@ -19,6 +19,7 @@ import { createRecommendationIntelligenceRouter } from "../app/routes/recommenda
 import { createOperationMetrics } from "../app/observability/operation-metrics.mjs";
 import { encodeCursor } from "../app/query/cursor-pagination.mjs";
 
+function copyPhaseBaseline(source,target){copyFileSync(source,target);const db=new Database(target);db.exec("DROP TRIGGER IF EXISTS trg_execution_requests_update;DROP TRIGGER IF EXISTS trg_execution_requests_delete;DROP TRIGGER IF EXISTS trg_execution_requests_insert_guard;DROP INDEX IF EXISTS idx_execution_requests_page;DROP TABLE IF EXISTS execution_requests;DELETE FROM schema_migrations WHERE version=40;");db.close();}
 const AT = "2026-08-21T12:00:00.000Z";
 const BEFORE = "2026-08-21T11:00:00.000Z";
 const AFTER = "2026-08-21T13:00:00.000Z";
@@ -28,7 +29,7 @@ const canonical = (value) => value === null || typeof value !== "object" ? JSON.
 
 test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "loadder-recommendation-")), path = join(dir, "recommendation.sqlite");
-  copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
+  copyPhaseBaseline(new URL("../db/loadder.sqlite", import.meta.url), path);
   const db = new Database(path); db.pragma("foreign_keys=ON");
   db.exec(`
     DROP TRIGGER IF EXISTS trg_execution_authorizations_update;

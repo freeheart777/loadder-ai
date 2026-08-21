@@ -26,6 +26,7 @@ import { createRecommendationIntelligenceRouter } from "./app/routes/recommendat
 import { createHumanGovernanceRouter } from "./app/routes/human-governance.mjs";
 import { createActionProposalRouter } from "./app/routes/action-proposals.mjs";
 import { createExecutionAuthorizationRouter } from "./app/routes/execution-authorizations.mjs";
+import { createExecutionRequestRouter } from "./app/routes/execution-requests.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -54,6 +55,7 @@ import { createIntelligenceRecommendationRepository } from "./app/repositories/i
 import { createHumanGovernanceRepository } from "./app/repositories/human-governance-repository.mjs";
 import { createActionProposalRepository } from "./app/repositories/action-proposal-repository.mjs";
 import { createExecutionAuthorizationRepository } from "./app/repositories/execution-authorization-repository.mjs";
+import { createExecutionRequestRepository } from "./app/repositories/execution-request-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -95,9 +97,11 @@ import { createRecommendationIntelligenceService } from "./app/services/recommen
 import { createHumanGovernanceService } from "./app/services/human-governance-service.mjs";
 import { createActionProposalService } from "./app/services/action-proposal-service.mjs";
 import { createExecutionAuthorizationService } from "./app/services/execution-authorization-service.mjs";
+import { createExecutionRequestService } from "./app/services/execution-request-service.mjs";
 import { createRecommendationFreshnessQuery } from "./app/recommendations/recommendation-freshness-query.mjs";
 import { actionProposalContractRegistry } from "./app/action-proposals/action-proposal-contract-registry.mjs";
 import { authorizationPolicyRegistry } from "./app/execution-authorizations/authorization-policy-registry.mjs";
+import { executionRequestPolicyRegistry } from "./app/execution-requests/request-policy-registry.mjs";
 import { recommendationContractRegistry } from "./app/recommendations/recommendation-contract-registry.mjs";
 import {
   createRequireAuth,
@@ -331,6 +335,8 @@ const actionProposalRepository = createActionProposalRepository(db);
 const actionProposalService = createActionProposalService({ repository: actionProposalRepository, registry: actionProposalContractRegistry, decisionQuery: humanGovernanceRepository, recommendationRepository: intelligenceRecommendationRepository });
 const executionAuthorizationRepository = createExecutionAuthorizationRepository(db);
 const executionAuthorizationService = createExecutionAuthorizationService({ repository: executionAuthorizationRepository, proposalQuery: actionProposalRepository, policyRegistry: authorizationPolicyRegistry });
+const executionRequestRepository = createExecutionRequestRepository(db);
+const executionRequestService = createExecutionRequestService({ repository: executionRequestRepository, authorizationQuery: executionAuthorizationRepository, proposalQuery: actionProposalRepository, currentnessQuery: { isCurrent: () => false }, policyRegistry: executionRequestPolicyRegistry, providerIdentityQuery: { resolve: () => null } });
 
 app.use(
   "/api/auth",
@@ -420,6 +426,7 @@ app.use("/api", createRecommendationIntelligenceRouter({ service: recommendation
 app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService }));
 app.use("/api", createActionProposalRouter({ service: actionProposalService }));
 app.use("/api", createExecutionAuthorizationRouter({ service: executionAuthorizationService }));
+app.use("/api", createExecutionRequestRouter({ service: executionRequestService }));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));
