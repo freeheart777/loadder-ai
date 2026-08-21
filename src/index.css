@@ -212,3 +212,87 @@ textarea::placeholder {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.22);
 }
+
+/* LOADDER PRESENTATION CLICK SAFETY */
+
+.presentation-page a,
+.presentation-page button {
+  position: relative;
+  z-index: 70;
+  pointer-events: auto !important;
+}
+
+.presentation-page [data-orbit],
+.presentation-page [data-hero-card] {
+  pointer-events: none !important;
+}
+
+.presentation-page header {
+  pointer-events: auto;
+}
+
+.presentation-page header a,
+.presentation-page header button {
+  pointer-events: auto !important;
+}
+
+
+
+/* =========================================================
+   LOADDER — TRUE INFINITE MARQUEE
+========================================================= */
+
+.loadder-marquee {
+  display: flex;
+  width: max-content;
+  flex-wrap: nowrap;
+  will-change: transform;
+  animation: loadder-marquee-loop 60s linear infinite;
+}
+
+.loadder-marquee-group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-around;
+  min-width: max-content;
+}
+
+.loadder-marquee-item {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  white-space: nowrap;
+
+  padding-inline: 22px;
+
+  font-family: "Vazirmatn", sans-serif;
+  font-size: 15px;
+
+  color: rgba(255, 255, 255, 0.72);
+}
+
+@keyframes loadder-marquee-loop {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.loadder-marquee:hover {
+  animation-play-state: running;
+}
+
+@media (max-width: 768px) {
+  .loadder-marquee {
+    animation-duration: 45s;
+  }
+
+  .loadder-marquee-item {
+    padding-inline: 16px;
+    font-size: 14px;
+  }
+}

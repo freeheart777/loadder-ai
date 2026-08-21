@@ -1,0 +1,63 @@
+import { useEffect } from "react";
+import {
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
+export default function DemoModePreserver() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(
+      location.search
+    );
+
+    const hasDemo =
+      params.get("demo") === "1";
+
+    if (hasDemo) {
+      sessionStorage.setItem(
+        "loadder-demo-mode",
+        "1"
+      );
+
+      return;
+    }
+
+    const demoMode =
+      sessionStorage.getItem(
+        "loadder-demo-mode"
+      );
+
+    const isDashboardRoute =
+      location.pathname.startsWith(
+        "/dashboard"
+      );
+
+    if (
+      demoMode === "1" &&
+      isDashboardRoute
+    ) {
+      params.set("demo", "1");
+
+      navigate(
+        {
+          pathname: location.pathname,
+          search: `?${params.toString()}`,
+          hash: location.hash,
+        },
+        {
+          replace: true,
+        }
+      );
+    }
+  }, [
+    location.pathname,
+    location.search,
+    location.hash,
+    navigate,
+  ]);
+
+  return null;
+}

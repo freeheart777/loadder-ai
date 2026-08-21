@@ -1,0 +1,204 @@
+import { Link } from "react-router-dom";
+
+import {
+  ArrowLeft,
+  Sparkle,
+  Globe,
+  Megaphone,
+  InstagramLogo,
+  UsersThree,
+  ChartLineUp,
+  Lightning,
+} from "@phosphor-icons/react";
+
+export default function OriginalLandingPage() {
+  return (
+    <main
+      dir="rtl"
+      className="relative min-h-screen overflow-hidden bg-black text-white"
+    >
+      {/* VIDEO BACKGROUND */}
+
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute inset-0 h-full w-full object-cover brightness-[0.92] contrast-[1.03] saturate-[1.04]"
+      >
+        <source
+          src="/header-optimized.webm"
+          type="video/webm"
+        />
+      </video>
+
+      {/* DARK OVERLAY */}
+
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent" />
+
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
+
+      {/* HEADER */}
+
+      <header className="relative z-30 flex items-center justify-between px-8 py-6 lg:px-14">
+        <div
+          dir="ltr"
+          className="flex items-center gap-3"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/25 backdrop-blur-xl">
+            <img
+              src="/src/assets/logo.png"
+              alt="Loadder AI"
+              className="h-8 w-8 object-contain"
+            />
+          </div>
+
+          <div>
+            <div className="text-xl font-semibold">
+              Loadder AI
+            </div>
+
+            <div className="mt-1 text-xs text-white/40">
+              AI Business Growth Platform
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            to="/dashboard"
+            className="rounded-full border border-white/10 bg-black/20 px-5 py-3 text-sm text-white/70 backdrop-blur-xl transition hover:bg-white/10 hover:text-white"
+          >
+            ورود
+          </Link>
+
+          <Link
+            to="/dashboard?demo=1"
+            className="flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-500/15 px-5 py-3 text-sm font-medium backdrop-blur-xl transition hover:bg-violet-500/25"
+          >
+            تجربه نسخه دمو
+            <ArrowLeft size={15} />
+          </Link>
+        </div>
+      </header>
+
+      {/* HERO CONTENT */}
+
+      <section className="relative z-20 mx-auto flex min-h-[calc(100vh-96px)] max-w-[1500px] items-center justify-start px-8 py-16 lg:px-14">
+        <div dir="rtl" className="ml-auto max-w-[680px] text-left">
+          <div className="liquid-glass inline-flex items-center gap-2 rounded-full px-4 py-2">
+            <Sparkle
+              size={15}
+              weight="fill"
+              className="text-violet-300"
+            />
+
+            <span className="text-sm text-white/70">
+              آینده کسب‌وکارت را با هوش مصنوعی بساز
+            </span>
+          </div>
+
+          <h1 className="mt-6 text-5xl font-semibold leading-[1.28] tracking-[-0.035em] lg:text-[64px]">
+            یک پلتفرم.
+            <br />
+
+            <span className="bg-gradient-to-l from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+              تمام ابزارهای رشد.
+            </span>
+          </h1>
+
+          <p className="mt-5 max-w-[620px] text-base leading-9 text-white/70 lg:text-lg">
+            از ساخت برند و محتوا تا تبلیغات، CRM، تحلیل و اتوماسیون؛
+            Loadder همه ابزارهای رشد کسب‌وکار را در یک پلتفرم هوشمند
+            کنار هم قرار می‌دهد.
+          </p>
+
+          <div className="mt-8 flex flex-wrap justify-start gap-3">
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-3 rounded-full bg-white px-7 py-4 text-base font-medium text-black transition hover:scale-[1.02]"
+            >
+              ورود به پلتفرم
+              <ArrowLeft size={18} />
+            </Link>
+
+            <Link
+              to="/dashboard?demo=1"
+              className="liquid-glass flex items-center gap-3 rounded-full px-7 py-4 text-base text-white/85 transition hover:bg-white/10"
+            >
+              <Sparkle
+                size={18}
+                weight="fill"
+                className="text-violet-300"
+              />
+              نسخه دمو
+            </Link>
+          </div>
+
+          {/* FLOATING TOOL PILLS */}
+
+          <div className="mt-9 flex max-w-[650px] flex-wrap justify-start gap-2.5">
+            <ToolPill
+              icon={Globe}
+              title="سایت‌ساز"
+            />
+
+            <ToolPill
+              icon={Sparkle}
+              title="تولید محتوا"
+            />
+
+            <ToolPill
+              icon={InstagramLogo}
+              title="شبکه‌های اجتماعی"
+            />
+
+            <ToolPill
+              icon={Megaphone}
+              title="تبلیغات"
+            />
+
+            <ToolPill
+              icon={UsersThree}
+              title="CRM"
+            />
+
+            <ToolPill
+              icon={ChartLineUp}
+              title="تحلیل"
+            />
+
+            <ToolPill
+              icon={Lightning}
+              title="اتوماسیون"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* BOTTOM FADE */}
+
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black to-transparent" />
+    </main>
+  );
+}
+
+function ToolPill({
+  icon: Icon,
+  title,
+}: {
+  icon: React.ElementType;
+  title: string;
+}) {
+  return (
+    <div className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2.5 text-sm text-white/80">
+      <Icon
+        size={16}
+        weight="duotone"
+        className="text-cyan-300"
+      />
+
+      {title}
+    </div>
+  );
+}

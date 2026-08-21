@@ -5,8 +5,14 @@ import {
   Navigate,
 } from "react-router-dom";
 
+import DemoModePreserver from "./components/DemoModePreserver";
+import { AuthProvider, RequireAuth } from "./lib/auth";
+
 import HomePage from "./pages/HomePage";
+import PresentationHomePage from "./pages/PresentationHomePage";
+import OriginalLandingPage from "./pages/OriginalLandingPage";
 import DashboardPage from "./pages/DashboardPage";
+import AuthPage from "./pages/AuthPage";
 
 import BrandBookPage from "./pages/BrandBookPage";
 import BusinessProposalPage from "./pages/BusinessProposalPage";
@@ -28,20 +34,36 @@ import AutomationPage from "./pages/AutomationPage";
 
 import BusinessBrainPage from "./pages/BusinessBrainPage";
 
+import ClickTestPage from "./pages/ClickTestPage";
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* صفحه اصلی سایت */}
+      <AuthProvider>
+        <DemoModePreserver />
+        <Routes>
+        {/* صفحه اصلی Loadder */}
         <Route
           path="/"
-          element={<HomePage />}
+          element={<OriginalLandingPage />}
         />
 
-        {/* داشبورد اصلی */}
         <Route
-          path="/dashboard"
-          element={<DashboardPage />}
+          path="/signup"
+          element={<AuthPage />}
+        />
+
+          <Route element={<RequireAuth />}>
+            {/* داشبورد جدید */}
+            <Route
+              path="/dashboard"
+              element={<DashboardPage />}
+            />
+
+        {/* داشبورد قدیمی - فقط برای بکاپ */}
+        <Route
+          path="/legacy-dashboard"
+          element={<HomePage />}
         />
 
         {/* برند بوک */}
@@ -123,6 +145,13 @@ export default function App() {
         />
 
         {/* هر مسیر اشتباه برگردد به داشبورد */}
+
+            <Route
+              path="/click-test"
+              element={<ClickTestPage />}
+            />
+          </Route>
+
         <Route
           path="*"
           element={
@@ -132,7 +161,8 @@ export default function App() {
             />
           }
         />
-      </Routes>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

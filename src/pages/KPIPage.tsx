@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { withDemo } from "../lib/demoMode";
 
 import {
   ArrowRight,
@@ -19,6 +20,7 @@ import {
   ArrowDown,
   Lightning,
 } from "@phosphor-icons/react";
+import { demoBusiness } from "../data/demoBusiness";
 
 type Department =
   | "growth"
@@ -85,6 +87,12 @@ const departmentData = {
 };
 
 export default function KPIPage() {
+  const isDemo =
+    new URLSearchParams(window.location.search).get("demo") === "1";
+
+  const demoKPI =
+    isDemo ? demoBusiness.demoKPI : null;
+
   const [department, setDepartment] =
     useState<Department>("growth");
 
@@ -98,13 +106,136 @@ export default function KPIPage() {
       dir="rtl"
       className="min-h-screen bg-[#05070a] text-white"
     >
+      {isDemo && demoKPI && (
+        <section className="mx-auto max-w-[1550px] px-8 pt-6">
+          <div className="rounded-[28px] border border-violet-300/15 bg-violet-500/[0.045] p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-violet-200">
+                  KPI کسب‌وکار — نسخه دمو
+                </div>
+
+                <h2 className="mt-1 text-xl font-semibold">
+                  {demoBusiness.name}
+                </h2>
+              </div>
+
+              <div className="text-left">
+                <div className="text-4xl font-bold">
+                  {demoKPI.growthScore}٪
+                </div>
+
+                <div className="text-sm text-white/35">
+                  امتیاز رشد
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <DemoKPIBox
+                title="درآمد"
+                target={demoKPI.targetRevenue}
+                current={demoKPI.currentRevenue}
+                progress={demoKPI.revenueProgress}
+              />
+
+              <DemoKPIBox
+                title="مشتری جدید"
+                target={`${demoKPI.customerTarget}`}
+                current={`${demoKPI.currentCustomers}`}
+                progress={demoKPI.customerProgress}
+              />
+
+              <DemoKPIBox
+                title="نرخ تبدیل"
+                target={demoKPI.conversionTarget}
+                current={demoKPI.currentConversion}
+                progress={demoKPI.conversionProgress}
+              />
+
+              <DemoKPIBox
+                title="رشد"
+                target={demoKPI.growthTarget}
+                current={demoKPI.currentGrowth}
+                progress={demoKPI.growthProgress}
+              />
+            </div>
+
+            <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_1.3fr]">
+              <div className="rounded-[24px] border border-white/[0.07] bg-black/20 p-6 text-center">
+                <div className="text-sm text-white/40">
+                  احتمال تحقق اهداف این دوره
+                </div>
+
+                <div className="mt-5 text-6xl font-bold text-violet-200">
+                  {demoKPI.goalProbability}٪
+                </div>
+
+                <div className="mx-auto mt-5 h-2 max-w-[280px] overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-l from-violet-500 to-cyan-300"
+                    style={{
+                      width: `${demoKPI.goalProbability}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-white/[0.07] bg-black/20 p-6">
+                <div className="text-sm font-semibold">
+                  اهداف و نتایج کلیدی
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {demoKPI.objectives.map((item) => (
+                    <div
+                      key={item.title}
+                      className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold">
+                          {item.title}
+                        </span>
+
+                        <span className="text-sm text-violet-300">
+                          {item.progress}٪
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between text-xs text-white/40">
+                        <span>
+                          فعلی: {item.current}
+                        </span>
+
+                        <span>
+                          هدف: {item.target}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-l from-violet-500 to-cyan-300"
+                          style={{
+                            width: `${item.progress}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* HEADER */}
 
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#05070a]/90 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.03] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={19} />
@@ -871,6 +1002,50 @@ function AdviceCard({
             className="text-amber-300"
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+
+function DemoKPIBox({
+  title,
+  target,
+  current,
+  progress,
+}: {
+  title: string;
+  target: string;
+  current: string;
+  progress: number;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-5">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-white/45">
+          {title}
+        </div>
+
+        <div className="text-sm text-violet-300">
+          {progress}٪
+        </div>
+      </div>
+
+      <div className="mt-4 text-2xl font-bold">
+        {current}
+      </div>
+
+      <div className="mt-1 text-xs text-white/35">
+        هدف: {target}
+      </div>
+
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+        <div
+          className="h-full rounded-full bg-gradient-to-l from-violet-500 to-cyan-300"
+          style={{
+            width: `${progress}%`,
+          }}
+        />
       </div>
     </div>
   );

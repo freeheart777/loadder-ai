@@ -1,7 +1,86 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import crypto from "crypto";
+
+import { environment } from "./app/config/environment.mjs";
+import aiRouter from "./app/routes/ai.mjs";
+import { createAuthRouter } from "./app/routes/auth.mjs";
+import { createWorkspaceRouter } from "./app/routes/workspaces.mjs";
+import { createBusinessProfileRouter } from "./app/routes/business-profile.mjs";
+import { createBusinessDnaRouter } from "./app/routes/business-dna.mjs";
+import { createBrandBookRouter } from "./app/routes/brand-book.mjs";
+import { createBusinessContextRouter } from "./app/routes/business-context.mjs";
+import { createTextAiContextRouter } from "./app/routes/text-ai-context.mjs";
+import { createIntelligenceDataRouter } from "./app/routes/intelligence-data.mjs";
+import { createFeatureValueRouter } from "./app/routes/feature-values.mjs";
+import { createModelEvaluationRouter } from "./app/routes/model-evaluations.mjs";
+import { createForecastRouter } from "./app/routes/forecasts.mjs";
+import { createIntegrationRouter } from "./app/routes/integrations.mjs";
+import { createKnowledgeKpiRouter } from "./app/routes/knowledge-kpis.mjs";
+import { createKnowledgeExtractionRouter } from "./app/routes/knowledge-extraction.mjs";
+import { createImportedFactMappingRouter } from "./app/routes/imported-fact-mapping.mjs";
+import { createListeningRouter } from "./app/routes/listening.mjs";
+import { createIdentityRepository } from "./app/repositories/identity-repository.mjs";
+import { createBusinessProfileRepository } from "./app/repositories/business-profile-repository.mjs";
+import { createBusinessDnaRepository } from "./app/repositories/business-dna-repository.mjs";
+import { createBrandBookRepository } from "./app/repositories/brand-book-repository.mjs";
+import { createBusinessContextRepository } from "./app/repositories/business-context-repository.mjs";
+import { createBusinessContextUsageRepository } from "./app/repositories/business-context-usage-repository.mjs";
+import { createBusinessEventRepository } from "./app/repositories/business-event-repository.mjs";
+import { createIntelligenceRecordRepository } from "./app/repositories/intelligence-record-repository.mjs";
+import { createFeatureValueRepository } from "./app/repositories/feature-value-repository.mjs";
+import { createModelInputRepository } from "./app/repositories/model-input-repository.mjs";
+import { createEvaluationRepository } from "./app/repositories/evaluation-repository.mjs";
+import { createForecastRepository } from "./app/repositories/forecast-repository.mjs";
+import { createIntegrationRepository } from "./app/repositories/integration-repository.mjs";
+import { createKnowledgeKpiRepository } from "./app/repositories/knowledge-kpi-repository.mjs";
+import { createKnowledgeExtractionRepository } from "./app/repositories/knowledge-extraction-repository.mjs";
+import { createImportedFactEventLinkRepository } from "./app/repositories/imported-fact-event-link-repository.mjs";
+import { createListeningRepository } from "./app/repositories/listening-repository.mjs";
+import { createAuthService } from "./app/services/auth-service.mjs";
+import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
+import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
+import { createBrandBookService } from "./app/services/brand-book-service.mjs";
+import { createBusinessContextService } from "./app/services/business-context-service.mjs";
+import { contextCapabilityRegistry } from "./app/context-consumers/capability-registry.mjs";
+import { createBusinessContextConsumerGateway } from "./app/context-consumers/business-context-consumer-gateway.mjs";
+import { createTextAiContextConsumer } from "./app/context-consumers/text-ai-consumer.mjs";
+import { eventTypeRegistry } from "./app/events/event-type-registry.mjs";
+import { createCartAbandonmentSignalProducer } from "./app/signal-producers/cart-abandonment-signal-producer.mjs";
+import { createListeningFactualSignalProducer } from "./app/signal-producers/listening-factual-signal-producer.mjs";
+import { createCompositeSignalProducer } from "./app/signal-producers/composite-signal-producer.mjs";
+import { createBusinessEventService } from "./app/services/business-event-service.mjs";
+import { createIntelligenceQueryService } from "./app/services/intelligence-query-service.mjs";
+import { createFeatureQueryService } from "./app/services/feature-query-service.mjs";
+import { featureRegistry } from "./app/features/feature-registry.mjs";
+import { createCartFeatureProducer } from "./app/feature-producers/cart-feature-producer.mjs";
+import { modelSpecificationRegistry } from "./app/model-specifications/model-specification-registry.mjs";
+import { createDeterministicModelInputBuilder } from "./app/model-input-builders/deterministic-model-input-builder.mjs";
+import { createModelEvaluationService } from "./app/services/model-evaluation-service.mjs";
+import { forecastSpecificationRegistry } from "./app/forecasts/forecast-specification-registry.mjs";
+import { createForecastService } from "./app/services/forecast-service.mjs";
+import { connectorRegistry } from "./app/integrations/connector-registry.mjs";
+import { createIntegrationService } from "./app/services/integration-service.mjs";
+import { createKnowledgeKpiService } from "./app/services/knowledge-kpi-service.mjs";
+import { parserRegistry } from "./app/knowledge-parsers/parser-registry.mjs";
+import { parseDeterministically } from "./app/knowledge-parsers/deterministic-parsers.mjs";
+import { createKnowledgeExtractionService } from "./app/services/knowledge-extraction-service.mjs";
+import { importedFactMapperRegistry } from "./app/import-mappers/imported-fact-mapper-registry.mjs";
+import { createImportedFactEventMapperService } from "./app/services/imported-fact-event-mapper-service.mjs";
+import { listeningSourceRegistry } from "./app/listening/listening-source-registry.mjs";
+import { listeningEventMapperRegistry } from "./app/listening/listening-event-mapper-registry.mjs";
+import { createListeningService } from "./app/services/listening-service.mjs";
+import { createListeningEventMapperService } from "./app/services/listening-event-mapper-service.mjs";
+import {
+  createRequireAuth,
+  createRequireWorkspace,
+} from "./app/middleware/auth.mjs";
+import { runMigrations } from "./db/migrate.mjs";
+import {
+  requireWorkspaceId,
+  runWithWorkspace,
+} from "./app/tenant-context.mjs";
+import { createWorkspaceRuntimeStore } from "./app/services/workspace-runtime-store.mjs";
 
 import {
   sendMessage,
@@ -25,6 +104,7 @@ import {
 } from "./services/optimizer.mjs";
 
 import {
+  db,
   /* =========================
      AUTOMATION
   ========================= */
@@ -92,21 +172,208 @@ import {
   getCampaignAttributedPerformance,
 
   seedMarketingData,
-} from "./db/database.mjs";
-
-dotenv.config();
+} from "./db/workspace-database.mjs";
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || environment.clientOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin is not allowed by CORS."));
+    },
+    credentials: true,
+  })
+);
 app.use(
   express.json({
     limit: "2mb",
   })
 );
 
-const PORT =
-  process.env.PORT || 3001;
+const PORT = environment.apiPort;
+
+const appliedMigrations = runMigrations(db);
+const identityRepository = createIdentityRepository(db);
+const businessProfileRepository = createBusinessProfileRepository(db);
+const businessDnaRepository = createBusinessDnaRepository(db);
+const brandBookRepository = createBrandBookRepository(db);
+const businessContextRepository = createBusinessContextRepository(db);
+const businessContextUsageRepository = createBusinessContextUsageRepository(db);
+const businessEventRepository = createBusinessEventRepository(db);
+const intelligenceRecordRepository = createIntelligenceRecordRepository(db);
+const featureValueRepository = createFeatureValueRepository(db);
+const modelInputRepository = createModelInputRepository(db);
+const evaluationRepository = createEvaluationRepository(db);
+const forecastRepository = createForecastRepository(db);
+const integrationRepository = createIntegrationRepository(db);
+const knowledgeKpiRepository = createKnowledgeKpiRepository(db);
+const knowledgeExtractionRepository = createKnowledgeExtractionRepository(db);
+const importedFactEventLinkRepository = createImportedFactEventLinkRepository(db);
+const listeningRepository = createListeningRepository(db);
+const authService = createAuthService({
+  repository: identityRepository,
+  otpHashSecret: environment.authHashSecret,
+});
+const businessProfileService = createBusinessProfileService({
+  repository: businessProfileRepository,
+  auditRepository: identityRepository,
+});
+const businessDnaService = createBusinessDnaService({
+  repository: businessDnaRepository,
+  auditRepository: identityRepository,
+});
+const brandBookService = createBrandBookService({
+  repository: brandBookRepository,
+  auditRepository: identityRepository,
+});
+const businessContextService = createBusinessContextService({
+  repository: businessContextRepository,
+  auditRepository: identityRepository,
+});
+const businessContextConsumerGateway = createBusinessContextConsumerGateway({
+  businessContextService,
+  usageRepository: businessContextUsageRepository,
+  capabilityRegistry: contextCapabilityRegistry,
+});
+const textAiContextConsumer = createTextAiContextConsumer({
+  contextGateway: businessContextConsumerGateway,
+});
+const cartFeatureProducer = createCartFeatureProducer({
+  contextGateway: businessContextConsumerGateway,
+  featureRegistry,
+  repository: featureValueRepository,
+});
+const cartAbandonmentSignalProducer = createCartAbandonmentSignalProducer({
+  contextGateway: businessContextConsumerGateway,
+  repository: intelligenceRecordRepository,
+  featureProducer: cartFeatureProducer,
+});
+const listeningFactualSignalProducer = createListeningFactualSignalProducer({
+  contextGateway: businessContextConsumerGateway,
+  repository: intelligenceRecordRepository,
+});
+const compositeSignalProducer = createCompositeSignalProducer([
+  cartAbandonmentSignalProducer,
+  listeningFactualSignalProducer,
+]);
+const businessEventService = createBusinessEventService({
+  repository: businessEventRepository,
+  eventRegistry: eventTypeRegistry,
+  contextGateway: businessContextConsumerGateway,
+  signalProducer: compositeSignalProducer,
+});
+const intelligenceQueryService = createIntelligenceQueryService({
+  repository: intelligenceRecordRepository,
+});
+const featureQueryService = createFeatureQueryService({
+  repository: featureValueRepository,
+});
+const modelInputBuilder = createDeterministicModelInputBuilder({
+  contextGateway: businessContextConsumerGateway,
+  featureRepository: featureValueRepository,
+  specificationRegistry: modelSpecificationRegistry,
+});
+const modelEvaluationService = createModelEvaluationService({
+  specificationRegistry: modelSpecificationRegistry,
+  modelInputRepository,
+  evaluationRepository,
+  modelInputBuilder,
+});
+const forecastService = createForecastService({ registry: forecastSpecificationRegistry, modelInputRepository, repository: forecastRepository });
+const integrationService = createIntegrationService({ registry: connectorRegistry, repository: integrationRepository, auditRepository: identityRepository });
+const knowledgeKpiService = createKnowledgeKpiService({ repository: knowledgeKpiRepository, auditRepository: identityRepository });
+const knowledgeExtractionService = createKnowledgeExtractionService({ parserRegistry, parse: parseDeterministically, repository: knowledgeExtractionRepository, auditRepository: identityRepository });
+const importedFactEventMapperService = createImportedFactEventMapperService({ registry: importedFactMapperRegistry, linkRepository: importedFactEventLinkRepository, businessEventService });
+const listeningService = createListeningService({ sourceRegistry: listeningSourceRegistry, repository: listeningRepository, auditRepository: identityRepository });
+const listeningEventMapperService = createListeningEventMapperService({ registry: listeningEventMapperRegistry, repository: listeningRepository, businessEventService });
+
+app.use(
+  "/api/auth",
+  createAuthRouter({
+    authService,
+    nodeEnv: environment.nodeEnv,
+    exposeDevelopmentOtp: environment.exposeDevelopmentOtp,
+  })
+);
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    service: "Loadder API",
+    environment: environment.nodeEnv,
+    database: {
+      status: "ready",
+      engine: "SQLite",
+      migrations: appliedMigrations.map(({ version, name }) => ({
+        version,
+        name,
+      })),
+    },
+    ai: {
+      openaiConfigured: environment.openAIConfigured,
+      cloudflareConfigured: environment.cloudflareAIConfigured,
+    },
+    auth: {
+      mode: "persistent-session",
+      productionReady: false,
+      otpDelivery: "not-connected",
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.use(createRequireAuth(authService));
+app.use(
+  "/api/workspaces",
+  createWorkspaceRouter({ authService })
+);
+app.use(createRequireWorkspace(identityRepository));
+app.use((req, res, next) =>
+  runWithWorkspace(req.workspace.id, next)
+);
+app.use(
+  "/api/business-profile",
+  createBusinessProfileRouter({ businessProfileService })
+);
+app.use(
+  "/api/business-dna",
+  createBusinessDnaRouter({ businessDnaService })
+);
+app.use(
+  "/api/brand-book",
+  createBrandBookRouter({ brandBookService })
+);
+app.use(
+  "/api/business-context",
+  createBusinessContextRouter({ businessContextService })
+);
+app.use(
+  "/api/text-ai/context",
+  createTextAiContextRouter({ textAiContextConsumer })
+);
+app.use(
+  "/api",
+  createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })
+);
+app.use(
+  "/api",
+  createFeatureValueRouter({ featureQueryService })
+);
+app.use(
+  "/api",
+  createModelEvaluationRouter({ service: modelEvaluationService })
+);
+app.use("/api", createForecastRouter({ service: forecastService }));
+app.use("/api", createIntegrationRouter({ service: integrationService }));
+app.use("/api", createKnowledgeKpiRouter({ service: knowledgeKpiService }));
+app.use("/api", createKnowledgeExtractionRouter({ service: knowledgeExtractionService }));
+app.use("/api", createImportedFactMappingRouter({ service: importedFactEventMapperService }));
+app.use("/api", createListeningRouter({ service: listeningService, mapper: listeningEventMapperService }));
+app.use("/api", aiRouter);
 
 /* =========================================================
    CAMPAIGN RUNTIME CONFIG
@@ -120,48 +387,28 @@ const PORT =
   و داخل SQLite ذخیره می‌کنیم.
 */
 
-const campaignRuntimeConfigs =
-  new Map();
+const campaignRuntimeConfigs = createWorkspaceRuntimeStore(() => ({
+  controlMode: CONTROL_MODES.COPILOT,
+  guardrails: buildDefaultGuardrails(),
+  targets: {
+    roasMin: 2,
+    cpcMax: null,
+    cpsMax: null,
+    cplMax: null,
+    cpoMax: null,
+    cacMax: null,
+    ctrMin: null,
+    sessionRateMin: null,
+  },
+  trackingHealthy: true,
+  updatedAt: new Date().toISOString(),
+}));
 
 function getCampaignRuntimeConfig(
   campaignId
 ) {
-  if (
-    !campaignRuntimeConfigs.has(
-      campaignId
-    )
-  ) {
-    campaignRuntimeConfigs.set(
-      campaignId,
-      {
-        controlMode:
-          CONTROL_MODES.COPILOT,
-
-        guardrails:
-          buildDefaultGuardrails(),
-
-        targets: {
-          roasMin: 2,
-
-          cpcMax: null,
-          cpsMax: null,
-          cplMax: null,
-          cpoMax: null,
-          cacMax: null,
-
-          ctrMin: null,
-          sessionRateMin: null,
-        },
-
-        trackingHealthy: true,
-
-        updatedAt:
-          new Date().toISOString(),
-      }
-    );
-  }
-
   return campaignRuntimeConfigs.get(
+    requireWorkspaceId(),
     campaignId
   );
 }
@@ -196,6 +443,7 @@ function updateCampaignRuntimeConfig(
   };
 
   campaignRuntimeConfigs.set(
+    requireWorkspaceId(),
     campaignId,
     next
   );
@@ -894,65 +1142,6 @@ async function processEvent(
     results,
   };
 }
-
-/* =========================================================
-   HEALTH
-========================================================= */
-
-app.get(
-  "/api/health",
-  (req, res) => {
-    res.json({
-      ok: true,
-
-      service:
-        "Loadder AI Backend",
-
-      database:
-        "SQLite",
-
-      persistence:
-        true,
-
-      customer360:
-        true,
-
-      directMessaging:
-        true,
-
-      marketing:
-        true,
-
-      attribution:
-        true,
-
-      leadConversion:
-        true,
-
-      revenueAttribution:
-        true,
-
-      campaignPlanner:
-        true,
-
-      optimizer:
-        true,
-
-      optimizationSimulation:
-        true,
-
-      campaignControlModes:
-        true,
-
-      guardrails:
-        true,
-
-      timestamp:
-        new Date()
-          .toISOString(),
-    });
-  }
-);
 
 /* =========================================================
    OPTIMIZER CAPABILITIES
@@ -4457,6 +4646,7 @@ app.use(
 
 app.listen(
   PORT,
+  environment.apiHost,
   () => {
     console.log("");
 
@@ -4465,11 +4655,11 @@ app.listen(
     );
 
     console.log(
-      "Loadder AI Backend"
+      "Loadder API (canonical backend)"
     );
 
     console.log(
-      `http://localhost:${PORT}`
+      `http://${environment.apiHost}:${PORT}`
     );
 
     console.log(

@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { ElementType } from "react";
 import BusinessBrainMotion from "../components/BusinessBrainMotion";
+import WorkspaceSelector from "../components/WorkspaceSelector";
 
 import {
   House,
@@ -21,6 +22,8 @@ import {
   Brain,} from "@phosphor-icons/react";
 
 import { useStagger } from "../lib/animations/useStagger";
+import { demoBusiness } from "../data/demoBusiness";
+import { withDemo } from "../lib/demoMode";
 
 type Tool = {
   title: string;
@@ -228,6 +231,13 @@ function ToolCard({
 }
 
 export default function DashboardPage() {
+  const location = useLocation();
+
+  const isDemo =
+    new URLSearchParams(location.search).get("demo") === "1";
+
+  const business = isDemo ? demoBusiness : null;
+
   const dashboardRef = useStagger();
 
   return (
@@ -276,7 +286,7 @@ export default function DashboardPage() {
           </button>
 
           <Link
-            to="/dashboard/analytics"
+            to={withDemo("/dashboard/analytics")}
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
           >
             <ChartLineUp size={20} />
@@ -297,8 +307,8 @@ export default function DashboardPage() {
             فضای کاری
           </div>
 
-          <div className="mt-1 text-base font-medium">
-            کسب‌وکار من
+          <div className="mt-2">
+            <WorkspaceSelector />
           </div>
 
           <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
@@ -314,12 +324,22 @@ export default function DashboardPage() {
       <section className="mr-[260px] min-h-screen">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.06] bg-[#050507]/85 px-8 py-5 backdrop-blur-2xl">
           <div>
-            <h1 className="text-2xl font-semibold">
-              داشبورد
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold">
+                داشبورد
+              </h1>
+
+              {isDemo && (
+                <span className="rounded-full border border-cyan-300/15 bg-cyan-500/[0.08] px-3 py-1 text-xs text-cyan-200">
+                  نسخه دمو
+                </span>
+              )}
+            </div>
 
             <p className="mt-1 text-sm text-white/45">
-              همه ابزارهای هوش مصنوعی کسب‌وکارت در یک جا
+              {isDemo
+                ? `${business?.name} — نمای یکپارچه کسب‌وکار`
+                : "همه ابزارهای هوش مصنوعی کسب‌وکارت در یک جا"}
             </p>
           </div>
 
@@ -407,5 +427,31 @@ export default function DashboardPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function DemoMetric({
+  title,
+  value,
+  change,
+}: {
+  title: string;
+  value: string;
+  change: number;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/[0.08] bg-white/[0.03] p-5">
+      <div className="text-sm text-white/45">
+        {title}
+      </div>
+
+      <div className="mt-4 text-3xl font-semibold">
+        {value}
+      </div>
+
+      <div className="mt-2 text-sm text-emerald-300">
+        +{change}٪
+      </div>
+    </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { apiFetch } from "../lib/api";
 
 /* =========================================================
    TYPES
@@ -177,10 +178,6 @@ type StructureResponse = {
 /* =========================================================
    CONFIG
 ========================================================= */
-
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:3001";
 
 /* =========================================================
    HELPERS
@@ -506,17 +503,11 @@ export default function MarketingPage() {
             overviewResponse,
           ] =
             await Promise.all([
-              fetch(
-                `${API_BASE}/api/marketing/channels`
-              ),
+              apiFetch("/api/marketing/channels"),
 
-              fetch(
-                `${API_BASE}/api/marketing/structure`
-              ),
+              apiFetch("/api/marketing/structure"),
 
-              fetch(
-                `${API_BASE}/api/marketing/overview`
-              ),
+              apiFetch("/api/marketing/overview"),
             ]);
 
           if (

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { withDemo } from "../lib/demoMode";
+import { apiFetch } from "../lib/api";
+import { demoBusiness } from "../data/demoBusiness";
 
 import {
   ArrowRight,
@@ -113,8 +116,6 @@ type CustomerView = {
   lastPurchaseAt: string | null;
 };
 
-const API_BASE = "http://localhost:3001";
-
 function faNumber(value: number) {
   return value.toLocaleString("fa-IR");
 }
@@ -189,6 +190,14 @@ function customerStatusToFa(status: string) {
 }
 
 export default function CRMPage() {
+
+  const isDemo =
+    new URLSearchParams(window.location.search).get("demo") === "1";
+
+  const demoCustomers =
+    isDemo ? demoBusiness.demoCustomers : [];
+
+
   const [stats, setStats] = useState<CRMStats | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -223,11 +232,11 @@ export default function CRMPage() {
         ordersResponse,
         cartsResponse,
       ] = await Promise.all([
-        fetch(`${API_BASE}/api/crm/stats`),
-        fetch(`${API_BASE}/api/customers`),
-        fetch(`${API_BASE}/api/leads`),
-        fetch(`${API_BASE}/api/orders`),
-        fetch(`${API_BASE}/api/carts`),
+        apiFetch("/api/crm/stats"),
+        apiFetch("/api/customers"),
+        apiFetch("/api/leads"),
+        apiFetch("/api/orders"),
+        apiFetch("/api/carts"),
       ]);
 
       if (
@@ -392,11 +401,61 @@ export default function CRMPage() {
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
+      {isDemo && (
+        <section className="mx-auto max-w-[1500px] px-8 pt-6">
+          <div className="rounded-[24px] border border-cyan-300/15 bg-cyan-500/[0.05] p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm text-cyan-200">
+                  کسب‌وکار دمو
+                </div>
+
+                <div className="mt-1 text-lg font-semibold">
+                  {demoBusiness.name}
+                </div>
+              </div>
+
+              <div className="text-sm text-white/45">
+                {demoBusiness.crm.hotLeads} لید داغ
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              {demoCustomers.map((customer) => (
+                <div
+                  key={customer.id}
+                  className="rounded-2xl border border-white/[0.07] bg-black/20 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">
+                      {customer.name}
+                    </div>
+
+                    <div className="text-xs text-violet-300">
+                      امتیاز {customer.score}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-sm text-white/45">
+                    {customer.status}
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between text-xs text-white/35">
+                    <span>{customer.source}</span>
+                    <span>{customer.value}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={18} />
@@ -501,7 +560,7 @@ export default function CRMPage() {
               </p>
 
               <Link
-                to="/dashboard/automation"
+                to={withDemo("/dashboard/automation")}
                 className="mt-5 inline-flex items-center gap-2 rounded-xl border border-violet-300/15 bg-violet-500/[0.08] px-4 py-3 text-sm text-violet-200"
               >
                 <Lightning size={16} weight="fill" />
@@ -929,7 +988,7 @@ export default function CRMPage() {
 
               <div className="mt-5 space-y-3">
                 <Link
-                  to="/dashboard/automation"
+                  to={withDemo("/dashboard/automation")}
                   className="block w-full rounded-xl bg-gradient-to-l from-violet-600 via-blue-600 to-cyan-500 px-4 py-3 text-center text-sm font-semibold"
                 >
                   مدیریت اتوماسیون‌ها

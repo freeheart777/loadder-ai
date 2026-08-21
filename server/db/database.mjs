@@ -2,16 +2,16 @@ import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
+import { LEGACY_WORKSPACE_ID } from "./migrations/002_tenant_domain_data.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const databasePath = path.join(
-  __dirname,
-  "loadder.sqlite"
-);
+const databasePath = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.join(__dirname, "loadder.sqlite");
 
-const db = new Database(databasePath);
+export const db = new Database(databasePath);
 
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
@@ -479,6 +479,7 @@ export function getAutomationById(id) {
 }
 
 export function createAutomation({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   title,
   trigger,
@@ -492,6 +493,7 @@ export function createAutomation({
   db.prepare(`
     INSERT INTO automations (
       id,
+      workspace_id,
       title,
       trigger,
       enabled,
@@ -501,9 +503,10 @@ export function createAutomation({
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     title,
     trigger,
     enabled ? 1 : 0,
@@ -589,13 +592,15 @@ export function saveEvent(event) {
   db.prepare(`
     INSERT INTO events (
       id,
+      workspace_id,
       type,
       payload_json,
       created_at
     )
-    VALUES (?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?)
   `).run(
     event.id,
+    event.workspaceId || LEGACY_WORKSPACE_ID,
     event.type,
     JSON.stringify(event.payload ?? {}),
     event.createdAt
@@ -608,6 +613,7 @@ export function saveExecution(execution) {
   db.prepare(`
     INSERT INTO executions (
       id,
+      workspace_id,
       event_id,
       event_type,
       workflow_id,
@@ -620,9 +626,10 @@ export function saveExecution(execution) {
       result_json,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     execution.id,
+    execution.workspaceId || LEGACY_WORKSPACE_ID,
     execution.eventId ?? null,
     execution.eventType,
     execution.workflowId ?? null,
@@ -719,6 +726,7 @@ export function getCustomerById(id) {
 }
 
 export function createCustomer({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   name,
   phone = null,
@@ -737,6 +745,7 @@ export function createCustomer({
   db.prepare(`
     INSERT INTO customers (
       id,
+      workspace_id,
       name,
       phone,
       email,
@@ -751,9 +760,10 @@ export function createCustomer({
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     name,
     phone,
     email,
@@ -800,6 +810,7 @@ export function getLeadById(id) {
 }
 
 export function createLead({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   name,
   phone = null,
@@ -816,6 +827,7 @@ export function createLead({
   db.prepare(`
     INSERT INTO leads (
       id,
+      workspace_id,
       name,
       phone,
       email,
@@ -828,9 +840,10 @@ export function createLead({
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     name,
     phone,
     email,
@@ -889,7 +902,8 @@ export function updateLead(id, updates = {}) {
 
 export function convertLeadToCustomer(
   leadId,
-  overrides = {}
+  overrides = {},
+  workspaceId = LEGACY_WORKSPACE_ID
 ) {
   const lead = getLeadById(leadId);
 
@@ -904,6 +918,7 @@ export function convertLeadToCustomer(
   }
 
   const customer = createCustomer({
+    workspaceId,
     name: overrides.name ?? lead.name,
     phone: overrides.phone ?? lead.phone,
     email: overrides.email ?? lead.email,
@@ -954,6 +969,7 @@ export function getOrdersByCustomerId(customerId) {
 }
 
 export function createOrder({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   customerId,
   totalAmount,
@@ -966,6 +982,7 @@ export function createOrder({
   db.prepare(`
     INSERT INTO orders (
       id,
+      workspace_id,
       customer_id,
       total_amount,
       status,
@@ -974,9 +991,10 @@ export function createOrder({
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     customerId,
     Number(totalAmount) || 0,
     status,
@@ -1025,6 +1043,7 @@ export function getCartsByCustomerId(customerId) {
 }
 
 export function createCart({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   customerId = null,
   totalAmount = 0,
@@ -1037,6 +1056,7 @@ export function createCart({
   db.prepare(`
     INSERT INTO carts (
       id,
+      workspace_id,
       customer_id,
       total_amount,
       status,
@@ -1045,9 +1065,10 @@ export function createCart({
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     customerId,
     Number(totalAmount) || 0,
     status,
@@ -1085,6 +1106,7 @@ export function getCustomerEvents(customerId) {
 }
 
 export function createCustomerEvent({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   customerId = null,
   type,
@@ -1095,14 +1117,16 @@ export function createCustomerEvent({
   db.prepare(`
     INSERT INTO customer_events (
       id,
+      workspace_id,
       customer_id,
       type,
       metadata_json,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     customerId,
     type,
     JSON.stringify(metadata),
@@ -1374,6 +1398,7 @@ export function getAttributionTouchpoints({
 ========================================================= */
 
 export function createMarketingCampaign({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   channelId,
   platformId,
@@ -1393,6 +1418,7 @@ export function createMarketingCampaign({
   db.prepare(`
     INSERT INTO marketing_campaigns (
       id,
+      workspace_id,
       channel_id,
       platform_id,
       service_id,
@@ -1408,9 +1434,10 @@ export function createMarketingCampaign({
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     channelId,
     platformId,
     serviceId,
@@ -1431,6 +1458,7 @@ export function createMarketingCampaign({
 }
 
 export function saveCampaignMetric({
+  workspaceId = LEGACY_WORKSPACE_ID,
   id = crypto.randomUUID(),
   campaignId,
   metricDate = new Date().toISOString().slice(0, 10),
@@ -1450,6 +1478,7 @@ export function saveCampaignMetric({
   db.prepare(`
     INSERT INTO campaign_metrics (
       id,
+      workspace_id,
       campaign_id,
       metric_date,
       spend,
@@ -1465,9 +1494,10 @@ export function saveCampaignMetric({
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     campaignId,
     metricDate,
     Number(spend) || 0,
@@ -1497,6 +1527,7 @@ export function saveCampaignMetric({
 
 export function createAttributionTouchpoint({
   id = crypto.randomUUID(),
+  workspaceId = LEGACY_WORKSPACE_ID,
 
   customerId = null,
   leadId = null,
@@ -1520,6 +1551,7 @@ export function createAttributionTouchpoint({
   db.prepare(`
     INSERT INTO attribution_touchpoints (
       id,
+      workspace_id,
       customer_id,
       lead_id,
       campaign_id,
@@ -1533,9 +1565,10 @@ export function createAttributionTouchpoint({
       occurred_at,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
+    workspaceId,
     customerId,
     leadId,
     campaignId,
@@ -1563,7 +1596,8 @@ export function createAttributionTouchpoint({
 
 export function transferLeadAttributionToCustomer(
   leadId,
-  customerId
+  customerId,
+  workspaceId = LEGACY_WORKSPACE_ID
 ) {
   const touchpoints = getAttributionTouchpoints({
     leadId,
@@ -1577,6 +1611,7 @@ export function transferLeadAttributionToCustomer(
     }
 
     const cloned = createAttributionTouchpoint({
+      workspaceId,
       customerId,
       leadId,
 
@@ -2333,6 +2368,7 @@ export function seedMarketingData() {
 ========================================================= */
 
 export function attributeOrderToCustomerCampaign({
+  workspaceId = LEGACY_WORKSPACE_ID,
   customerId,
   orderId,
   revenue = 0,
@@ -2383,6 +2419,7 @@ export function attributeOrderToCustomerCampaign({
 
   const touchpoint =
     createAttributionTouchpoint({
+      workspaceId,
       customerId,
 
       leadId:

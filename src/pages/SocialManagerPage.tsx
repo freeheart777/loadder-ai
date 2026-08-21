@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { withDemo } from "../lib/demoMode";
 
 import {
   ArrowRight,
@@ -31,6 +32,7 @@ import {
   Funnel,
   ChartLineUp,
 } from "@phosphor-icons/react";
+import { demoBusiness } from "../data/demoBusiness";
 
 type SocialPlatform = {
   id: string;
@@ -230,6 +232,15 @@ const contentPerformance = [
 ];
 
 export default function SocialManagerPage() {
+  const isDemo =
+    new URLSearchParams(window.location.search).get("demo") === "1";
+
+  const demoPosts =
+    isDemo ? demoBusiness.demoSocialPosts : [];
+
+  const demoInbox =
+    isDemo ? demoBusiness.demoSocialInbox : [];
+
   const [activePlatform, setActivePlatform] =
     useState("instagram");
 
@@ -256,12 +267,142 @@ export default function SocialManagerPage() {
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
+      {isDemo && (
+        <section className="mx-auto max-w-[1450px] px-8 pt-6">
+          <div className="rounded-[28px] border border-fuchsia-300/15 bg-fuchsia-500/[0.045] p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm text-fuchsia-200">
+                  عملکرد شبکه‌های اجتماعی — نسخه دمو
+                </div>
+
+                <h2 className="mt-1 text-xl font-semibold">
+                  {demoBusiness.name}
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-3 gap-5 text-left">
+                <div>
+                  <div className="text-xl font-bold">
+                    {demoBusiness.social.reach}
+                  </div>
+                  <div className="text-xs text-white/35">
+                    دسترسی
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xl font-bold">
+                    {demoBusiness.social.engagement}
+                  </div>
+                  <div className="text-xs text-white/35">
+                    تعامل
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xl font-bold text-emerald-300">
+                    {demoBusiness.social.hotLeads}
+                  </div>
+                  <div className="text-xs text-white/35">
+                    لید داغ
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+              <div>
+                <div className="mb-3 text-sm text-white/45">
+                  محتوای برتر
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  {demoPosts.map((post) => (
+                    <div
+                      key={post.id}
+                      className="rounded-2xl border border-white/[0.07] bg-black/20 p-4"
+                    >
+                      <div className="text-sm font-semibold">
+                        {post.title}
+                      </div>
+
+                      <div className="mt-2 text-xs text-violet-300">
+                        {post.type}
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <div className="text-sm font-semibold">
+                            {post.reach}
+                          </div>
+                          <div className="text-[11px] text-white/30">
+                            دسترسی
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-sm font-semibold">
+                            {post.engagement}
+                          </div>
+                          <div className="text-[11px] text-white/30">
+                            تعامل
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-sm font-semibold text-emerald-300">
+                            {post.leads}
+                          </div>
+                          <div className="text-[11px] text-white/30">
+                            لید
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3 text-sm text-white/45">
+                  تعامل‌های با پتانسیل فروش
+                </div>
+
+                <div className="space-y-2">
+                  {demoInbox.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-white/[0.07] bg-black/20 p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold">
+                          {item.name}
+                        </div>
+
+                        <div className="text-xs text-emerald-300">
+                          امتیاز {item.score}
+                        </div>
+                      </div>
+
+                      <p className="mt-2 text-sm leading-7 text-white/45">
+                        {item.message}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={18} />

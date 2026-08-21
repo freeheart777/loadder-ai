@@ -8,6 +8,7 @@ import {
   Link,
   useParams,
 } from "react-router-dom";
+import { apiFetch } from "../lib/api";
 
 import {
   ArrowRight,
@@ -166,9 +167,6 @@ type TimelineItem = {
   description: string;
   date: string;
 };
-
-const API_BASE =
-  "http://localhost:3001";
 
 function faNumber(
   value: number
@@ -462,10 +460,7 @@ export default function CustomerProfilePage() {
     try {
       setLoading(true);
 
-      const response =
-        await fetch(
-          `${API_BASE}/api/customers/${id}/360`
-        );
+      const response = await apiFetch(`/api/customers/${id}/360`);
 
       const result:
         Customer360Response =
@@ -555,9 +550,8 @@ export default function CustomerProfilePage() {
         true
       );
 
-      const response =
-        await fetch(
-          `${API_BASE}/api/customers/${id}/message`,
+      const response = await apiFetch(
+          `/api/customers/${id}/message`,
           {
             method:
               "POST",

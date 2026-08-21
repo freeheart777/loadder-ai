@@ -26,6 +26,8 @@ import {
 } from "@phosphor-icons/react";
 
 import { businessData } from "../data/businessData";
+import { withDemo } from "../lib/demoMode";
+import { demoBusiness } from "../data/demoBusiness";
 
 type Period = "۷ روز" | "۳۰ روز" | "۹۰ روز";
 
@@ -183,6 +185,12 @@ const ecommerceFunnel = [
 ];
 
 export default function AnalyticsPage() {
+  const isDemo =
+    new URLSearchParams(window.location.search).get("demo") === "1";
+
+  const demoAnalytics =
+    isDemo ? demoBusiness.demoAnalytics : null;
+
   const [period, setPeriod] = useState<Period>("۳۰ روز");
   const [activeChannel, setActiveChannel] = useState("تبلیغات گوگل");
   const [notice, setNotice] = useState("");
@@ -208,12 +216,128 @@ export default function AnalyticsPage() {
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
+      {isDemo && demoAnalytics && (
+        <section className="mx-auto max-w-[1550px] px-8 pt-6">
+          <div className="rounded-[28px] border border-cyan-300/15 bg-cyan-500/[0.04] p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-cyan-200">
+                  مرکز تحلیل — نسخه دمو
+                </div>
+
+                <h2 className="mt-1 text-xl font-semibold">
+                  {demoBusiness.name}
+                </h2>
+              </div>
+
+              <div className="text-left">
+                <div className="text-3xl font-bold">
+                  {demoAnalytics.businessHealth}٪
+                </div>
+                <div className="text-sm text-white/35">
+                  سلامت کسب‌وکار
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-4">
+              <DemoHealth
+                title="سلامت تبدیل"
+                value={demoAnalytics.conversionHealth}
+              />
+
+              <DemoHealth
+                title="کارایی تبلیغات"
+                value={demoAnalytics.adsEfficiency}
+              />
+
+              <DemoHealth
+                title="کیفیت CRM"
+                value={demoAnalytics.crmQuality}
+              />
+
+              <DemoHealth
+                title="سلامت کسب‌وکار"
+                value={demoAnalytics.businessHealth}
+              />
+            </div>
+
+            <div className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_1fr]">
+              <div className="rounded-[24px] border border-white/[0.07] bg-black/20 p-5">
+                <div className="text-sm font-semibold">
+                  قیف تبدیل Nova Beauty
+                </div>
+
+                <div className="mt-5 space-y-2">
+                  {demoAnalytics.funnel.map((stage) => (
+                    <div
+                      key={stage.label}
+                      className="flex justify-center"
+                    >
+                      <div
+                        style={{
+                          width: `${stage.percent}%`,
+                        }}
+                        className="rounded-xl border border-violet-300/10 bg-gradient-to-l from-violet-500/15 to-cyan-500/[0.06] px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-sm text-white/50">
+                            {stage.label}
+                          </span>
+
+                          <span className="text-sm font-semibold">
+                            {stage.value}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-white/[0.07] bg-black/20 p-5">
+                <div className="text-sm font-semibold">
+                  روند فروش هفتگی
+                </div>
+
+                <div className="mt-6 flex h-[170px] items-end gap-2">
+                  {demoAnalytics.weeklyRevenue.map(
+                    (value, index) => {
+                      const max = Math.max(
+                        ...demoAnalytics.weeklyRevenue
+                      );
+
+                      const height =
+                        (value / max) * 100;
+
+                      return (
+                        <div
+                          key={index}
+                          className="flex h-full flex-1 items-end"
+                        >
+                          <div
+                            className="w-full rounded-t-lg bg-gradient-to-t from-violet-600/40 to-cyan-300/80"
+                            style={{
+                              height: `${height}%`,
+                            }}
+                          />
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={18} />
@@ -903,14 +1027,14 @@ export default function AnalyticsPage() {
 
               <div className="mt-5 space-y-3">
                 <Link
-                  to="/dashboard/crm"
+                  to={withDemo("/dashboard/crm")}
                   className="block w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-center text-sm text-white/60"
                 >
                   مشاهده مشتریان
                 </Link>
 
                 <Link
-                  to="/dashboard/predictive"
+                  to={withDemo("/dashboard/predictive")}
                   className="block w-full rounded-xl border border-cyan-300/15 bg-cyan-500/[0.08] px-4 py-3 text-center text-sm text-cyan-200"
                 >
                   بررسی سناریوی آینده
@@ -1173,6 +1297,35 @@ function ActionCard({
 
       <div className="mt-2 text-sm font-semibold">
         {value}
+      </div>
+    </div>
+  );
+}
+
+function DemoHealth({
+  title,
+  value,
+}: {
+  title: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-4">
+      <div className="text-sm text-white/40">
+        {title}
+      </div>
+
+      <div className="mt-3 text-2xl font-bold">
+        {value}٪
+      </div>
+
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+        <div
+          className="h-full rounded-full bg-gradient-to-l from-violet-500 to-cyan-300"
+          style={{
+            width: `${value}%`,
+          }}
+        />
       </div>
     </div>
   );

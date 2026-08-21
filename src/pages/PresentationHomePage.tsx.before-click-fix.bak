@@ -1,0 +1,813 @@
+import { useRef } from "react";
+import { Link } from "react-router-dom";
+
+import {
+  ArrowLeft,
+  ArrowDown,
+  Brain,
+  Sparkle,
+  ChartLineUp,
+  UsersThree,
+  Megaphone,
+  Lightning,
+  Globe,
+  InstagramLogo,
+  Gauge,
+  BookOpenText,
+  FileText,
+  CheckCircle,
+  Target,
+  ShoppingCart,
+  Robot,
+  PlayCircle,
+} from "@phosphor-icons/react";
+
+import {
+  gsap,
+  ScrollTrigger,
+  useGSAP,
+} from "../lib/animations/gsap";
+
+const modules = [
+  {
+    icon: Brain,
+    title: "مغز هوشمند کسب‌وکار",
+    text: "شناخت برند، مشتری، محصول و فرصت‌های رشد",
+  },
+  {
+    icon: Sparkle,
+    title: "تولید محتوا",
+    text: "تولید محتوای هماهنگ با هویت برند",
+  },
+  {
+    icon: InstagramLogo,
+    title: "مدیریت شبکه‌های اجتماعی",
+    text: "محتوا، تعامل، دایرکت و شناسایی لید",
+  },
+  {
+    icon: Megaphone,
+    title: "تبلیغات هوشمند",
+    text: "مدیریت کانال‌های تبلیغاتی و کمپین‌های ترکیبی",
+  },
+  {
+    icon: UsersThree,
+    title: "CRM",
+    text: "مدیریت مشتری، لید و ارتباطات در یک مرکز",
+  },
+  {
+    icon: ChartLineUp,
+    title: "تحلیل و گزارش",
+    text: "دید یکپارچه از عملکرد مارکتینگ، فروش و مشتری",
+  },
+  {
+    icon: Gauge,
+    title: "KPI و رشد",
+    text: "کنترل اهداف و فاصله تا تحقق آن‌ها",
+  },
+  {
+    icon: Lightning,
+    title: "اتوماسیون",
+    text: "تبدیل اتفاقات کسب‌وکار به اقدام هوشمند",
+  },
+];
+
+const journey = [
+  {
+    number: "01",
+    title: "شناخت",
+    text: "Loadder برند، محصول، مشتری و داده‌های کسب‌وکار را می‌شناسد.",
+  },
+  {
+    number: "02",
+    title: "تصمیم",
+    text: "Business Brain داده‌ها را تحلیل و فرصت‌ها و ریسک‌ها را پیدا می‌کند.",
+  },
+  {
+    number: "03",
+    title: "اجرا",
+    text: "محتوا، تبلیغات، CRM و Automation وارد عمل می‌شوند.",
+  },
+  {
+    number: "04",
+    title: "یادگیری",
+    text: "نتیجه دوباره به Analytics و Business Brain برمی‌گردد.",
+  },
+];
+
+export default function PresentationHomePage() {
+  const scope = useRef<HTMLDivElement | null>(null);
+
+  useGSAP(
+    () => {
+      gsap.from("[data-hero]", {
+        opacity: 0,
+        y: 32,
+        duration: 0.9,
+        stagger: 0.1,
+        ease: "power3.out",
+      });
+
+      gsap.from("[data-hero-card]", {
+        opacity: 0,
+        scale: 0.92,
+        y: 20,
+        duration: 1,
+        delay: 0.35,
+        ease: "power3.out",
+      });
+
+      gsap.to("[data-core]", {
+        scale: 1.045,
+        duration: 2.4,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+
+      gsap.to("[data-orbit]", {
+        rotate: 360,
+        duration: 30,
+        repeat: -1,
+        ease: "none",
+        transformOrigin: "50% 50%",
+      });
+
+      const sections =
+        gsap.utils.toArray<HTMLElement>(
+          "[data-section]"
+        );
+
+      sections.forEach((section) => {
+        gsap.from(
+          section.querySelectorAll(
+            "[data-reveal]"
+          ),
+          {
+            opacity: 0,
+            y: 35,
+            duration: 0.8,
+            stagger: 0.08,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: section,
+              start: "top 82%",
+              once: true,
+            },
+          }
+        );
+      });
+
+      ScrollTrigger.refresh();
+    },
+    {
+      scope,
+    }
+  );
+
+  return (
+    <div
+      ref={scope}
+      dir="rtl"
+      className="min-h-screen bg-[#04050a] text-white"
+    >
+      {/* NAV */}
+
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/[0.06] bg-[#04050a]/75 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-8 py-4">
+          <div
+            dir="ltr"
+            className="flex items-center gap-3"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-300/20 bg-violet-500/10">
+              <Sparkle
+                size={22}
+                weight="fill"
+                className="text-violet-300"
+              />
+            </div>
+
+            <div>
+              <div className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-2xl font-bold text-transparent">
+                Loadder AI
+              </div>
+
+              <div className="text-[11px] text-white/35">
+                AI Business Growth Platform
+              </div>
+            </div>
+          </div>
+
+          <nav className="hidden items-center gap-6 text-sm text-white/45 xl:flex">
+            <a
+              href="#platform"
+              className="transition hover:text-white"
+            >
+              پلتفرم
+            </a>
+
+            <a
+              href="#brain"
+              className="transition hover:text-white"
+            >
+              مغز هوشمند
+            </a>
+
+            <a
+              href="#how"
+              className="transition hover:text-white"
+            >
+              چطور کار می‌کند؟
+            </a>
+
+            <a
+              href="#demo"
+              className="transition hover:text-white"
+            >
+              نسخه دمو
+            </a>
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <Link
+              to="/dashboard"
+              className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-sm text-white/60 transition hover:bg-white/[0.07] hover:text-white"
+            >
+              ورود
+            </Link>
+
+            <Link
+              to="/dashboard?demo=1"
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-blue-500 via-violet-500 to-fuchsia-500 px-4 py-2.5 text-sm font-semibold"
+            >
+              نسخه دمو
+              <ArrowLeft size={15} />
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* HERO */}
+
+      <main className="relative overflow-hidden pt-[78px]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-[200px] -top-[180px] h-[560px] w-[560px] rounded-full bg-violet-600/[0.14] blur-[160px]" />
+
+          <div className="absolute right-[5%] top-[25%] h-[500px] w-[500px] rounded-full bg-cyan-500/[0.07] blur-[160px]" />
+
+          <div className="absolute bottom-0 left-[35%] h-[500px] w-[500px] rounded-full bg-fuchsia-500/[0.05] blur-[170px]" />
+        </div>
+
+        <section className="relative z-10 mx-auto grid min-h-[850px] max-w-[1500px] items-center gap-16 px-8 py-16 xl:grid-cols-[1fr_620px]">
+          <div>
+            <div
+              data-hero
+              className="inline-flex items-center gap-2 rounded-full border border-violet-300/15 bg-violet-500/[0.08] px-4 py-2"
+            >
+              <Sparkle
+                size={14}
+                weight="fill"
+                className="text-violet-300"
+              />
+
+              <span className="text-sm text-violet-200">
+                نسل جدید مدیریت رشد کسب‌وکار با AI
+              </span>
+            </div>
+
+            <h1
+              data-hero
+              className="mt-7 max-w-[800px] text-[62px] font-bold leading-[1.3] tracking-[-0.04em]"
+            >
+              کسب‌وکارت فقط به ابزار بیشتر نیاز ندارد.
+              <span className="bg-gradient-to-l from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+                {" "}
+                به یک مغز مشترک نیاز دارد.
+              </span>
+            </h1>
+
+            <p
+              data-hero
+              className="mt-6 max-w-[760px] text-lg leading-10 text-white/55"
+            >
+              Loadder برند، محتوا، شبکه‌های اجتماعی، تبلیغات،
+              CRM، تحلیل، KPI و اتوماسیون را به یک لایه هوشمند
+              مشترک متصل می‌کند تا داده به تصمیم و تصمیم به رشد
+              تبدیل شود.
+            </p>
+
+            <div
+              data-hero
+              className="mt-9 flex flex-wrap gap-3"
+            >
+              <Link
+                to="/dashboard?demo=1"
+                className="flex items-center gap-3 rounded-2xl bg-gradient-to-l from-blue-500 via-violet-500 to-fuchsia-500 px-7 py-4 text-base font-semibold shadow-[0_14px_50px_rgba(139,92,246,0.24)] transition hover:scale-[1.025]"
+              >
+                <PlayCircle
+                  size={20}
+                  weight="fill"
+                />
+                تجربه نسخه دمو
+              </Link>
+
+              <a
+                href="#platform"
+                className="flex items-center gap-3 rounded-2xl border border-white/[0.10] bg-white/[0.035] px-7 py-4 text-base text-white/70 backdrop-blur-xl transition hover:bg-white/[0.07]"
+              >
+                کشف پلتفرم
+                <ArrowDown size={17} />
+              </a>
+            </div>
+
+            <div
+              data-hero
+              className="mt-11 grid max-w-[720px] grid-cols-3 gap-3"
+            >
+              <HeroStat
+                value="۹+"
+                label="متخصص هوشمند"
+              />
+
+              <HeroStat
+                value="360°"
+                label="دید کسب‌وکار"
+              />
+
+              <HeroStat
+                value="۱"
+                label="مغز مشترک"
+              />
+            </div>
+          </div>
+
+          {/* HERO BRAIN */}
+
+          <div
+            data-hero-card
+            className="relative h-[650px]"
+          >
+            <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/[0.08]" />
+
+            <div className="absolute left-1/2 top-1/2 h-[375px] w-[375px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/[0.06]" />
+
+            <div
+              data-orbit
+              className="absolute inset-0"
+            >
+              <OrbitDot className="left-[49%] top-[8%]" />
+              <OrbitDot className="right-[8%] top-[49%]" />
+              <OrbitDot className="bottom-[8%] left-[49%]" />
+              <OrbitDot className="left-[8%] top-[49%]" />
+            </div>
+
+            <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+              <div
+                data-core
+                className="relative flex h-[250px] w-[250px] items-center justify-center rounded-[66px] border border-violet-300/25 bg-gradient-to-br from-violet-500/20 via-[#11131d] to-cyan-500/10 shadow-[0_0_110px_rgba(124,58,237,0.30)] backdrop-blur-2xl"
+              >
+                <div className="absolute inset-4 rounded-[52px] border border-white/[0.05]" />
+
+                <div className="relative text-center">
+                  <Brain
+                    size={58}
+                    weight="duotone"
+                    className="mx-auto text-violet-300"
+                  />
+
+                  <div
+                    dir="ltr"
+                    className="mt-4 text-xl font-bold"
+                  >
+                    Loadder Brain
+                  </div>
+
+                  <div className="mt-2 text-sm text-white/40">
+                    مغز هوشمند کسب‌وکار
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <FloatingModule
+              className="left-[2%] top-[8%]"
+              icon={UsersThree}
+              title="CRM"
+            />
+
+            <FloatingModule
+              className="right-[2%] top-[8%]"
+              icon={Megaphone}
+              title="تبلیغات"
+            />
+
+            <FloatingModule
+              className="left-0 top-[43%]"
+              icon={InstagramLogo}
+              title="شبکه اجتماعی"
+            />
+
+            <FloatingModule
+              className="right-0 top-[43%]"
+              icon={Sparkle}
+              title="محتوا"
+            />
+
+            <FloatingModule
+              className="bottom-[5%] left-[5%]"
+              icon={ChartLineUp}
+              title="تحلیل"
+            />
+
+            <FloatingModule
+              className="bottom-[5%] right-[5%]"
+              icon={Lightning}
+              title="اتوماسیون"
+            />
+          </div>
+        </section>
+
+        {/* PLATFORM */}
+
+        <section
+          id="platform"
+          data-section
+          className="relative z-10 border-y border-white/[0.05] bg-white/[0.015] py-28"
+        >
+          <div className="mx-auto max-w-[1500px] px-8">
+            <SectionHeading
+              eyebrow="Loadder Platform"
+              title="یک پلتفرم؛ چند موتور رشد."
+              text="هر ماژول مستقل قابل استفاده است، اما قدرت واقعی Loadder زمانی شکل می‌گیرد که همه آن‌ها از یک Business Brain تغذیه شوند."
+            />
+
+            <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {modules.map((module) => {
+                const Icon = module.icon;
+
+                return (
+                  <div
+                    key={module.title}
+                    data-reveal
+                    className="group rounded-[26px] border border-white/[0.07] bg-[#0a0d13] p-6 transition duration-300 hover:-translate-y-1 hover:border-violet-300/25 hover:bg-white/[0.04]"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.035]">
+                      <Icon
+                        size={23}
+                        weight="duotone"
+                        className="text-cyan-300"
+                      />
+                    </div>
+
+                    <h3 className="mt-5 text-lg font-semibold">
+                      {module.title}
+                    </h3>
+
+                    <p className="mt-3 text-sm leading-8 text-white/45">
+                      {module.text}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* BRAIN */}
+
+        <section
+          id="brain"
+          data-section
+          className="relative z-10 py-28"
+        >
+          <div className="mx-auto grid max-w-[1500px] items-center gap-14 px-8 xl:grid-cols-[1fr_540px]">
+            <div>
+              <div data-reveal>
+                <SectionHeading
+                  eyebrow="Business Brain"
+                  title="AI قبل از تصمیم، کسب‌وکار را می‌شناسد."
+                  text="Loadder قرار نیست یک Prompt Box بزرگ باشد. اطلاعات برند، مشتری، محصول، کمپین و فروش وارد یک Business DNA می‌شوند و همه متخصص‌های AI از همین دانش مشترک استفاده می‌کنند."
+                />
+              </div>
+
+              <div
+                data-reveal
+                className="mt-8 grid gap-3 md:grid-cols-2"
+              >
+                <BrainPoint
+                  icon={BookOpenText}
+                  title="هویت برند"
+                />
+
+                <BrainPoint
+                  icon={UsersThree}
+                  title="شناخت مشتری"
+                />
+
+                <BrainPoint
+                  icon={ShoppingCart}
+                  title="محصول و فروش"
+                />
+
+                <BrainPoint
+                  icon={Target}
+                  title="فرصت و ریسک"
+                />
+              </div>
+
+              <Link
+                data-reveal
+                to="/dashboard/business-brain?demo=1"
+                className="mt-8 inline-flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-500/10 px-5 py-3.5 text-sm text-violet-100 transition hover:bg-violet-500/20"
+              >
+                <Brain size={18} />
+                مشاهده Business Brain
+                <ArrowLeft size={15} />
+              </Link>
+            </div>
+
+            <div
+              data-reveal
+              className="rounded-[34px] border border-violet-300/15 bg-gradient-to-br from-violet-500/[0.08] via-[#0a0d13] to-cyan-500/[0.04] p-7"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-violet-200">
+                    Nova Beauty
+                  </div>
+
+                  <div className="mt-1 text-lg font-semibold">
+                    Business DNA
+                  </div>
+                </div>
+
+                <div className="text-4xl font-bold">
+                  86٪
+                </div>
+              </div>
+
+              <div className="mt-7 space-y-3">
+                <DemoInsight
+                  title="فرصت"
+                  text="محتوای آموزشی بیشترین Lead را ایجاد کرده است."
+                />
+
+                <DemoInsight
+                  title="فرصت"
+                  text="Paid Search بالاترین کیفیت Lead را دارد."
+                />
+
+                <DemoInsight
+                  title="ریسک"
+                  text="۳۲ لید داغ نیازمند پیگیری سریع هستند."
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* HOW */}
+
+        <section
+          id="how"
+          data-section
+          className="relative z-10 border-y border-white/[0.05] bg-white/[0.015] py-28"
+        >
+          <div className="mx-auto max-w-[1500px] px-8">
+            <SectionHeading
+              eyebrow="How Loadder Works"
+              title="از داده تا رشد؛ یک چرخه بسته."
+              text="Loadder فقط خروجی تولید نمی‌کند. نتیجه هر اقدام دوباره وارد سیستم می‌شود تا تصمیم بعدی بهتر باشد."
+            />
+
+            <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {journey.map((item) => (
+                <div
+                  key={item.number}
+                  data-reveal
+                  className="relative overflow-hidden rounded-[28px] border border-white/[0.07] bg-[#0a0d13] p-6"
+                >
+                  <div
+                    dir="ltr"
+                    className="text-5xl font-bold text-white/[0.06]"
+                  >
+                    {item.number}
+                  </div>
+
+                  <h3 className="mt-5 text-xl font-semibold">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-3 text-sm leading-8 text-white/45">
+                    {item.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* DEMO CTA */}
+
+        <section
+          id="demo"
+          data-section
+          className="relative z-10 py-32"
+        >
+          <div className="mx-auto max-w-[1200px] px-8">
+            <div
+              data-reveal
+              className="relative overflow-hidden rounded-[40px] border border-violet-300/20 bg-gradient-to-l from-violet-500/[0.12] via-[#0b0d14] to-cyan-500/[0.07] p-12 text-center"
+            >
+              <div className="pointer-events-none absolute left-1/2 top-1/2 h-[450px] w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/[0.10] blur-[140px]" />
+
+              <div className="relative z-10">
+                <Robot
+                  size={46}
+                  weight="duotone"
+                  className="mx-auto text-violet-300"
+                />
+
+                <h2 className="mx-auto mt-6 max-w-[800px] text-4xl font-bold leading-[1.5]">
+                  Loadder را توضیح نده.
+                  <span className="text-violet-300">
+                    {" "}
+                    تجربه‌اش کن.
+                  </span>
+                </h2>
+
+                <p className="mx-auto mt-5 max-w-[700px] text-base leading-9 text-white/55">
+                  وارد کسب‌وکار دمو Nova Beauty شو و مسیر
+                  Dashboard، CRM، Ads، Social، Analytics، KPI،
+                  Business Brain و Automation را ببین.
+                </p>
+
+                <Link
+                  to="/dashboard?demo=1"
+                  className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-gradient-to-l from-blue-500 via-violet-500 to-fuchsia-500 px-8 py-4 text-base font-semibold shadow-[0_15px_50px_rgba(139,92,246,0.24)] transition hover:scale-[1.025]"
+                >
+                  <PlayCircle
+                    size={21}
+                    weight="fill"
+                  />
+                  شروع نسخه دمو
+                  <ArrowLeft size={18} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FOOTER */}
+
+        <footer className="relative z-10 border-t border-white/[0.06] py-10">
+          <div className="mx-auto flex max-w-[1500px] items-center justify-between px-8">
+            <div
+              dir="ltr"
+              className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-xl font-bold text-transparent"
+            >
+              Loadder AI
+            </div>
+
+            <div className="text-sm text-white/30">
+              پلتفرم هوشمند رشد کسب‌وکار
+            </div>
+          </div>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  text,
+}: {
+  eyebrow: string;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div>
+      <div className="text-sm text-violet-300">
+        {eyebrow}
+      </div>
+
+      <h2 className="mt-3 max-w-[850px] text-4xl font-bold leading-[1.45]">
+        {title}
+      </h2>
+
+      <p className="mt-4 max-w-[820px] text-base leading-9 text-white/50">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function HeroStat({
+  value,
+  label,
+}: {
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 backdrop-blur-xl">
+      <div className="text-2xl font-bold">
+        {value}
+      </div>
+
+      <div className="mt-1 text-sm text-white/40">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function FloatingModule({
+  className,
+  icon: Icon,
+  title,
+}: {
+  className: string;
+  icon: React.ElementType;
+  title: string;
+}) {
+  return (
+    <div
+      className={`absolute z-10 w-[165px] rounded-[22px] border border-white/[0.08] bg-white/[0.035] p-4 shadow-2xl backdrop-blur-2xl ${className}`}
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
+        <Icon
+          size={20}
+          weight="duotone"
+          className="text-cyan-300"
+        />
+      </div>
+
+      <div className="mt-3 text-sm font-semibold">
+        {title}
+      </div>
+    </div>
+  );
+}
+
+function OrbitDot({
+  className,
+}: {
+  className: string;
+}) {
+  return (
+    <div
+      className={`absolute h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_20px_rgba(103,232,249,0.95)] ${className}`}
+    />
+  );
+}
+
+function BrainPoint({
+  icon: Icon,
+  title,
+}: {
+  icon: React.ElementType;
+  title: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
+      <CheckCircle
+        size={19}
+        weight="duotone"
+        className="text-emerald-300"
+      />
+
+      <Icon
+        size={19}
+        weight="duotone"
+        className="text-violet-300"
+      />
+
+      <span className="text-sm">
+        {title}
+      </span>
+    </div>
+  );
+}
+
+function DemoInsight({
+  title,
+  text,
+}: {
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-4">
+      <div className="text-sm font-semibold text-violet-200">
+        {title}
+      </div>
+
+      <p className="mt-2 text-sm leading-7 text-white/50">
+        {text}
+      </p>
+    </div>
+  );
+}

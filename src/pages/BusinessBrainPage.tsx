@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { withDemo } from "../lib/demoMode";
 
 import {
   ArrowRight,
@@ -29,6 +30,26 @@ import {
   Lightbulb,
   ShieldWarning,
 } from "@phosphor-icons/react";
+import { demoBusiness } from "../data/demoBusiness";
+import { apiFetch } from "../lib/api";
+
+type BusinessProfileForm = {
+  name: string;
+  website: string;
+  industry: string;
+  description: string;
+  country: string;
+  city: string;
+};
+
+const emptyBusinessProfile: BusinessProfileForm = {
+  name: "",
+  website: "",
+  industry: "",
+  description: "",
+  country: "",
+  city: "",
+};
 
 type SourceId =
   | "website"
@@ -107,7 +128,7 @@ const initialSources: Source[] = [
   },
 ];
 
-const intelligence = [
+const defaultIntelligence = [
   {
     icon: Target,
     title: "ارزش پیشنهادی",
@@ -145,6 +166,66 @@ const intelligence = [
       "اتصال داده‌های چند کانال به Business Brain و تبدیل داده به پیشنهاد و اقدام.",
   },
 ];
+
+type BusinessDnaVersion = {
+  id: string;
+  versionNumber: number;
+  status: "draft" | "active" | "archived";
+  valueProposition: string | null;
+  targetAudiences: string[];
+  offerings: string[];
+  positioning: string | null;
+  differentiators: string[];
+  goals: string[];
+  constraints: string[];
+  brandVoice: string | null;
+  growthDrivers: string[];
+};
+
+type BusinessDnaForm = {
+  valueProposition: string;
+  targetAudiences: string;
+  offerings: string;
+  positioning: string;
+  brandVoice: string;
+  growthDrivers: string;
+};
+
+type BusinessContextVersion = {
+  id: string;
+  versionNumber: number;
+  status: "draft" | "active" | "archived";
+  sourceManifest: {
+    businessProfile: { id: string; updatedAt: string };
+    businessDna: { id: string; versionNumber: number };
+    brandBook: { id: string; versionNumber: number };
+  };
+};
+
+const emptyDnaForm: BusinessDnaForm = {
+  valueProposition: "",
+  targetAudiences: "",
+  offerings: "",
+  positioning: "",
+  brandVoice: "",
+  growthDrivers: "",
+};
+
+function dnaVersionToForm(version: BusinessDnaVersion | null): BusinessDnaForm {
+  if (!version) return emptyDnaForm;
+  return {
+    valueProposition: version.valueProposition || "",
+    targetAudiences: version.targetAudiences.join("\n"),
+    offerings: version.offerings.join("\n"),
+    positioning: version.positioning || "",
+    brandVoice: version.brandVoice || "",
+    growthDrivers: version.growthDrivers.join("\n"),
+  };
+}
+
+function lines(value: string) {
+  return value.split("\n").map((item) => item.trim()).filter(Boolean);
+}
 
 const opportunities = [
   {
@@ -186,6 +267,12 @@ const risks = [
 ];
 
 export default function BusinessBrainPage() {
+  const isDemo =
+    new URLSearchParams(window.location.search).get("demo") === "1";
+
+  const demoBrain =
+    isDemo ? demoBusiness.demoBrainProfile : null;
+
   const [sources, setSources] =
     useState<Source[]>(initialSources);
 
@@ -194,6 +281,227 @@ export default function BusinessBrainPage() {
   >("dna");
 
   const [notice, setNotice] = useState("");
+  const [businessProfile, setBusinessProfile] =
+    useState<BusinessProfileForm>(emptyBusinessProfile);
+  const [profileExists, setProfileExists] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [activeDna, setActiveDna] = useState<BusinessDnaVersion | null>(null);
+  const [draftDna, setDraftDna] = useState<BusinessDnaVersion | null>(null);
+  const [dnaForm, setDnaForm] = useState<BusinessDnaForm>(emptyDnaForm);
+  const [dnaLoading, setDnaLoading] = useState(true);
+  const [dnaSaving, setDnaSaving] = useState(false);
+  const [dnaError, setDnaError] = useState("");
+  const [activeContext, setActiveContext] = useState<BusinessContextVersion | null>(null);
+  const [contextDraft, setContextDraft] = useState<BusinessContextVersion | null>(null);
+  const [contextStale, setContextStale] = useState(false);
+  const [contextStaleReasons, setContextStaleReasons] = useState<string[]>([]);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [contextSaving, setContextSaving] = useState(false);
+  const [contextError, setContextError] = useState("");
+
+  const loadBusinessContext = async () => {
+    try {
+      const response = await apiFetch("/api/business-context");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setActiveContext(data.activeContext || null);
+      setContextDraft(data.latestDraft || null);
+      setContextStale(Boolean(data.isStale));
+      setContextStaleReasons(data.staleReasons || []);
+    } catch (error) {
+      setContextError(error instanceof Error ? error.message : "خطا در دریافت وضعیت شناخت مشترک.");
+    } finally {
+      setContextLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadBusinessContext();
+  }, []);
+
+  const createContextDraft = async () => {
+    setContextSaving(true);
+    setContextError("");
+    try {
+      const response = await apiFetch("/api/business-context/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setContextDraft(data.version);
+      showNotice(`نسخه پیشنهادی ${data.version.versionNumber} آماده شد.`);
+    } catch (error) {
+      setContextError(error instanceof Error ? error.message : "ساخت نسخه جدید انجام نشد.");
+    } finally {
+      setContextSaving(false);
+    }
+  };
+
+  const activateContextDraft = async () => {
+    if (!contextDraft) return;
+    setContextSaving(true);
+    setContextError("");
+    try {
+      const response = await apiFetch(`/api/business-context/versions/${contextDraft.id}/activate`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setActiveContext(data.version);
+      setContextDraft(null);
+      setContextStale(false);
+      setContextStaleReasons([]);
+      showNotice(`شناخت مشترک نسخه ${data.version.versionNumber} فعال شد.`);
+    } catch (error) {
+      setContextError(error instanceof Error ? error.message : "فعال‌سازی نسخه انجام نشد.");
+    } finally {
+      setContextSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    async function loadBusinessProfile() {
+      try {
+        const response = await apiFetch("/api/business-profile");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message);
+        if (!active) return;
+        if (data.profile) {
+          setBusinessProfile({
+            name: data.profile.name || "",
+            website: data.profile.website || "",
+            industry: data.profile.industry || "",
+            description: data.profile.description || "",
+            country: data.profile.country || "",
+            city: data.profile.city || "",
+          });
+          setProfileExists(true);
+        }
+      } catch (error) {
+        if (active) {
+          setProfileError(
+            error instanceof Error ? error.message : "خطا در دریافت اطلاعات کسب‌وکار."
+          );
+        }
+      } finally {
+        if (active) setProfileLoading(false);
+      }
+    }
+    void loadBusinessProfile();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadBusinessDna() {
+      try {
+        const response = await apiFetch("/api/business-dna");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message);
+        if (!active) return;
+        const activeVersion = data.activeVersion || null;
+        const latestDraft = data.latestDraft || null;
+        setActiveDna(activeVersion);
+        setDraftDna(latestDraft);
+        setDnaForm(dnaVersionToForm(latestDraft || activeVersion));
+      } catch (error) {
+        if (active) setDnaError(error instanceof Error ? error.message : "خطا در دریافت Business DNA.");
+      } finally {
+        if (active) setDnaLoading(false);
+      }
+    }
+    void loadBusinessDna();
+    return () => { active = false; };
+  }, []);
+
+  const dnaPayload = () => ({
+    valueProposition: dnaForm.valueProposition,
+    targetAudiences: lines(dnaForm.targetAudiences),
+    offerings: lines(dnaForm.offerings),
+    positioning: dnaForm.positioning,
+    brandVoice: dnaForm.brandVoice,
+    growthDrivers: lines(dnaForm.growthDrivers),
+  });
+
+  const saveDnaDraft = async () => {
+    setDnaSaving(true);
+    setDnaError("");
+    try {
+      const response = await apiFetch(
+        draftDna ? `/api/business-dna/versions/${draftDna.id}` : "/api/business-dna/versions",
+        {
+          method: draftDna ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dnaPayload()),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setDraftDna(data.version);
+      setDnaForm(dnaVersionToForm(data.version));
+      showNotice(`نسخه پیش‌نویس ${data.version.versionNumber} ذخیره شد.`);
+    } catch (error) {
+      setDnaError(error instanceof Error ? error.message : "ذخیره Business DNA انجام نشد.");
+    } finally {
+      setDnaSaving(false);
+    }
+  };
+
+  const activateDnaDraft = async () => {
+    if (!draftDna) return;
+    setDnaSaving(true);
+    setDnaError("");
+    try {
+      const response = await apiFetch(`/api/business-dna/versions/${draftDna.id}/activate`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setActiveDna(data.version);
+      setDraftDna(null);
+      setDnaForm(dnaVersionToForm(data.version));
+      await loadBusinessContext();
+      showNotice(`نسخه ${data.version.versionNumber} فعال شد.`);
+    } catch (error) {
+      setDnaError(error instanceof Error ? error.message : "فعال‌سازی نسخه انجام نشد.");
+    } finally {
+      setDnaSaving(false);
+    }
+  };
+
+  const saveBusinessProfile = async () => {
+    setProfileSaving(true);
+    setProfileError("");
+    try {
+      const response = await apiFetch("/api/business-profile", {
+        method: profileExists ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(businessProfile),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setBusinessProfile({
+        name: data.profile.name || "",
+        website: data.profile.website || "",
+        industry: data.profile.industry || "",
+        description: data.profile.description || "",
+        country: data.profile.country || "",
+        city: data.profile.city || "",
+      });
+      setProfileExists(true);
+      await loadBusinessContext();
+      showNotice("اطلاعات پایه کسب‌وکار ذخیره شد.");
+    } catch (error) {
+      setProfileError(
+        error instanceof Error ? error.message : "ذخیره اطلاعات انجام نشد."
+      );
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const connectedCount =
     sources.filter((source) => source.connected).length;
@@ -205,6 +513,19 @@ export default function BusinessBrainPage() {
       0
     ) / sources.length
   );
+
+  const displayedDna = draftDna || activeDna;
+  const intelligence = defaultIntelligence.map((item, index) => {
+    const persistedValues = [
+      displayedDna?.valueProposition,
+      displayedDna?.targetAudiences.join("، "),
+      displayedDna?.brandVoice,
+      displayedDna?.positioning,
+      displayedDna?.offerings.join("، "),
+      displayedDna?.growthDrivers.join("، "),
+    ];
+    return { ...item, value: persistedValues[index] || item.value };
+  });
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -235,13 +556,112 @@ export default function BusinessBrainPage() {
       dir="rtl"
       className="min-h-screen bg-[#05070a] text-white"
     >
+      {isDemo && demoBrain && (
+        <section className="mx-auto max-w-[1550px] px-8 pt-6">
+          <div className="rounded-[28px] border border-violet-300/15 bg-violet-500/[0.045] p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm text-violet-200">
+                  Business Brain — نسخه دمو
+                </div>
+
+                <h2 className="mt-1 text-xl font-semibold">
+                  {demoBusiness.name}
+                </h2>
+              </div>
+
+              <div className="text-left">
+                <div className="text-4xl font-bold">
+                  {demoBrain.score}٪
+                </div>
+
+                <div className="text-sm text-white/35">
+                  امتیاز شناخت کسب‌وکار
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {demoBrain.identity.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-white/[0.07] bg-black/20 p-4"
+                >
+                  <div className="text-sm font-semibold text-cyan-200">
+                    {item.title}
+                  </div>
+
+                  <p className="mt-2 text-sm leading-7 text-white/50">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-5 xl:grid-cols-2">
+              <div className="rounded-[24px] border border-emerald-300/10 bg-emerald-500/[0.035] p-5">
+                <div className="text-sm font-semibold text-emerald-200">
+                  فرصت‌های رشد شناسایی‌شده
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {demoBrain.opportunities.map((item) => (
+                    <div
+                      key={item.title}
+                      className="rounded-2xl border border-white/[0.06] bg-black/20 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold">
+                          {item.title}
+                        </div>
+
+                        <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-300">
+                          اثر {item.impact}
+                        </span>
+                      </div>
+
+                      <p className="mt-2 text-sm leading-7 text-white/45">
+                        {item.reason}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-amber-300/10 bg-amber-500/[0.035] p-5">
+                <div className="text-sm font-semibold text-amber-200">
+                  ریسک‌های مهم
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {demoBrain.risks.map((item) => (
+                    <div
+                      key={item.title}
+                      className="rounded-2xl border border-white/[0.06] bg-black/20 p-4"
+                    >
+                      <div className="text-sm font-semibold">
+                        {item.title}
+                      </div>
+
+                      <p className="mt-2 text-sm leading-7 text-white/45">
+                        {item.reason}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* HEADER */}
 
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#05070a]/90 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.03] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={19} />
@@ -276,6 +696,150 @@ export default function BusinessBrainPage() {
       </header>
 
       <div className="mx-auto max-w-[1550px] px-8 py-8">
+
+        <section className="mb-6 rounded-[30px] border border-white/[0.08] bg-[#0a0d13] p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">مشخصات پایه کسب‌وکار</h2>
+              <p className="mt-1 text-sm text-white/45">
+                هویت اصلی این فضای کاری؛ پایه ماژول‌های هوشمند آینده.
+              </p>
+            </div>
+            <span className="rounded-full border border-cyan-300/15 bg-cyan-500/[0.06] px-3 py-1.5 text-xs text-cyan-200">
+              {profileExists ? "ذخیره‌شده" : "تکمیل‌نشده"}
+            </span>
+          </div>
+
+          {profileLoading ? (
+            <div className="mt-6 text-sm text-white/45">در حال دریافت اطلاعات…</div>
+          ) : (
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <ProfileField
+                label="نام کسب‌وکار"
+                value={businessProfile.name}
+                required
+                onChange={(name) => setBusinessProfile((current) => ({ ...current, name }))}
+              />
+              <ProfileField
+                label="وب‌سایت"
+                value={businessProfile.website}
+                placeholder="https://example.com"
+                dir="ltr"
+                onChange={(website) => setBusinessProfile((current) => ({ ...current, website }))}
+              />
+              <ProfileField
+                label="حوزه فعالیت"
+                value={businessProfile.industry}
+                onChange={(industry) => setBusinessProfile((current) => ({ ...current, industry }))}
+              />
+              <ProfileField
+                label="کشور"
+                value={businessProfile.country}
+                onChange={(country) => setBusinessProfile((current) => ({ ...current, country }))}
+              />
+              <ProfileField
+                label="شهر"
+                value={businessProfile.city}
+                onChange={(city) => setBusinessProfile((current) => ({ ...current, city }))}
+              />
+              <label className="md:col-span-2 xl:col-span-3">
+                <span className="text-sm text-white/55">توضیح کوتاه کسب‌وکار</span>
+                <textarea
+                  value={businessProfile.description}
+                  maxLength={4000}
+                  rows={3}
+                  onChange={(event) => setBusinessProfile((current) => ({ ...current, description: event.target.value }))}
+                  className="mt-2 w-full resize-y rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-300/30"
+                />
+              </label>
+            </div>
+          )}
+
+          {profileError && <p className="mt-4 text-sm text-red-300">{profileError}</p>}
+          {!profileLoading && (
+            <button
+              type="button"
+              disabled={profileSaving || businessProfile.name.trim().length < 2}
+              onClick={() => void saveBusinessProfile()}
+              className="mt-5 rounded-xl bg-gradient-to-l from-blue-500 via-violet-500 to-fuchsia-500 px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {profileSaving ? "در حال ذخیره…" : profileExists ? "ذخیره تغییرات" : "ایجاد مشخصات کسب‌وکار"}
+            </button>
+          )}
+        </section>
+
+        <section className="mb-6 rounded-[30px] border border-cyan-300/10 bg-cyan-500/[0.035] p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">شناخت مشترک Loadder</h2>
+              <p className="mt-1 text-sm text-white/45">
+                نسخه‌ای ثابت از اطلاعات کسب‌وکار، هویت برند و مسیر رشد شما.
+              </p>
+            </div>
+            {!contextLoading && (
+              <span className={`rounded-full border px-3 py-1.5 text-xs ${
+                !activeContext
+                  ? "border-white/10 bg-white/[0.04] text-white/45"
+                  : contextStale
+                    ? "border-amber-300/20 bg-amber-500/[0.08] text-amber-200"
+                    : "border-emerald-300/20 bg-emerald-500/[0.08] text-emerald-200"
+              }`}>
+                {!activeContext ? "هنوز فعال نشده" : contextStale ? "نیازمند به‌روزرسانی" : "به‌روز"}
+              </span>
+            )}
+          </div>
+
+          {contextLoading ? (
+            <p className="mt-5 text-sm text-white/40">در حال بررسی وضعیت…</p>
+          ) : (
+            <>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <ContextStatus label="نسخه فعال" value={activeContext ? String(activeContext.versionNumber) : "ندارد"} />
+                <ContextStatus
+                  label="شناخت کسب‌وکار"
+                  value={activeContext ? `نسخه ${activeContext.sourceManifest.businessDna.versionNumber}` : "—"}
+                />
+                <ContextStatus
+                  label="برند بوک"
+                  value={activeContext ? `نسخه ${activeContext.sourceManifest.brandBook.versionNumber}` : "—"}
+                />
+                <ContextStatus label="نسخه پیشنهادی" value={contextDraft ? String(contextDraft.versionNumber) : "ندارد"} />
+              </div>
+
+              {contextStale && (
+                <div className="mt-4 rounded-2xl border border-amber-300/10 bg-amber-500/[0.05] p-4 text-sm text-amber-100/75">
+                  اطلاعات زیر بعد از فعال‌سازی نسخه فعلی تغییر کرده است: {contextStaleReasons.map((reason) => ({
+                    BUSINESS_PROFILE_CHANGED: "مشخصات کسب‌وکار",
+                    BUSINESS_DNA_CHANGED: "شناخت کسب‌وکار",
+                    BRAND_BOOK_CHANGED: "برند بوک",
+                  })[reason] || reason).join("، ")}
+                </div>
+              )}
+
+              {contextError && <p className="mt-4 text-sm text-red-300">{contextError}</p>}
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={contextSaving}
+                  onClick={() => void createContextDraft()}
+                  className="rounded-xl border border-cyan-300/20 bg-cyan-500/[0.08] px-5 py-3 text-sm text-cyan-100 disabled:opacity-50"
+                >
+                  {contextSaving ? "در حال آماده‌سازی…" : activeContext ? "بازسازی نسخه پیشنهادی" : "آماده‌سازی نسخه پیشنهادی"}
+                </button>
+                {contextDraft && (
+                  <button
+                    type="button"
+                    disabled={contextSaving}
+                    onClick={() => void activateContextDraft()}
+                    className="rounded-xl border border-emerald-300/20 bg-emerald-500/[0.08] px-5 py-3 text-sm text-emerald-100 disabled:opacity-50"
+                  >
+                    فعال‌سازی نسخه {contextDraft.versionNumber}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </section>
 
         {/* HERO */}
 
@@ -343,9 +907,7 @@ export default function BusinessBrainPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    showNotice(
-                      "ویرایش دستی Business DNA در مرحله بعد فعال می‌شود."
-                    )
+                    setActiveTab("dna")
                   }
                   className="flex items-center gap-2 rounded-xl border border-white/[0.09] bg-white/[0.035] px-5 py-3.5 text-sm"
                 >
@@ -447,8 +1009,92 @@ export default function BusinessBrainPage() {
                 </div>
 
                 <span className="rounded-full border border-violet-300/15 bg-violet-500/10 px-4 py-2 text-sm text-violet-200">
-                  DNA Version 0.1
+                  {displayedDna
+                    ? `DNA Version ${displayedDna.versionNumber} — ${displayedDna.status === "active" ? "فعال" : "پیش‌نویس"}`
+                    : "DNA بدون نسخه"}
                 </span>
+              </div>
+
+              <div className="mt-6 rounded-[24px] border border-violet-300/10 bg-violet-500/[0.035] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold">ویرایش دستی Business DNA</h3>
+                    <p className="mt-1 text-sm text-white/40">
+                      هر خط در فهرست‌ها به‌عنوان یک مورد مستقل ذخیره می‌شود.
+                    </p>
+                  </div>
+                  {activeDna && (
+                    <span className="text-xs text-emerald-300">
+                      نسخه فعال: {activeDna.versionNumber}
+                    </span>
+                  )}
+                </div>
+
+                {dnaLoading ? (
+                  <div className="mt-5 text-sm text-white/45">در حال دریافت نسخه‌ها…</div>
+                ) : (
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <DnaEditorField
+                      label="ارزش پیشنهادی"
+                      value={dnaForm.valueProposition}
+                      onChange={(valueProposition) => setDnaForm((current) => ({ ...current, valueProposition }))}
+                    />
+                    <DnaEditorField
+                      label="مخاطبان اصلی"
+                      value={dnaForm.targetAudiences}
+                      onChange={(targetAudiences) => setDnaForm((current) => ({ ...current, targetAudiences }))}
+                    />
+                    <DnaEditorField
+                      label="لحن برند"
+                      value={dnaForm.brandVoice}
+                      onChange={(brandVoice) => setDnaForm((current) => ({ ...current, brandVoice }))}
+                    />
+                    <DnaEditorField
+                      label="جایگاه بازار"
+                      value={dnaForm.positioning}
+                      onChange={(positioning) => setDnaForm((current) => ({ ...current, positioning }))}
+                    />
+                    <DnaEditorField
+                      label="محصولات و سرویس‌ها"
+                      value={dnaForm.offerings}
+                      onChange={(offerings) => setDnaForm((current) => ({ ...current, offerings }))}
+                    />
+                    <DnaEditorField
+                      label="محرک‌های رشد"
+                      value={dnaForm.growthDrivers}
+                      onChange={(growthDrivers) => setDnaForm((current) => ({ ...current, growthDrivers }))}
+                    />
+                  </div>
+                )}
+
+                {dnaError && <p className="mt-4 text-sm text-red-300">{dnaError}</p>}
+                {!dnaLoading && (
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      disabled={dnaSaving || !profileExists}
+                      onClick={() => void saveDnaDraft()}
+                      className="rounded-xl bg-gradient-to-l from-blue-500 via-violet-500 to-fuchsia-500 px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {dnaSaving ? "در حال ذخیره…" : draftDna ? "ذخیره پیش‌نویس" : "ایجاد نسخه جدید"}
+                    </button>
+                    {draftDna && (
+                      <button
+                        type="button"
+                        disabled={dnaSaving}
+                        onClick={() => void activateDnaDraft()}
+                        className="rounded-xl border border-emerald-300/20 bg-emerald-500/[0.08] px-5 py-3 text-sm text-emerald-200 disabled:opacity-50"
+                      >
+                        فعال‌سازی نسخه {draftDna.versionNumber}
+                      </button>
+                    )}
+                    {!profileExists && (
+                      <span className="self-center text-xs text-amber-200/70">
+                        ابتدا مشخصات پایه کسب‌وکار را ایجاد کنید.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -833,6 +1479,70 @@ export default function BusinessBrainPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function ProfileField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+  dir = "rtl",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  dir?: "rtl" | "ltr";
+}) {
+  return (
+    <label>
+      <span className="text-sm text-white/55">
+        {label}{required ? " *" : ""}
+      </span>
+      <input
+        dir={dir}
+        value={value}
+        required={required}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-300/30"
+      />
+    </label>
+  );
+}
+
+function ContextStatus({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/20 p-4">
+      <div className="text-xs text-white/35">{label}</div>
+      <div className="mt-2 text-sm font-medium text-white/75">{value}</div>
+    </div>
+  );
+}
+
+function DnaEditorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label>
+      <span className="text-sm text-white/55">{label}</span>
+      <textarea
+        value={value}
+        rows={3}
+        maxLength={4000}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full resize-y rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm leading-7 text-white outline-none transition focus:border-violet-300/30"
+      />
+    </label>
   );
 }
 

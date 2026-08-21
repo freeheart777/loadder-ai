@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { withDemo } from "../lib/demoMode";
+import { demoBusiness } from "../data/demoBusiness";
 
 import {
   ArrowRight,
@@ -139,6 +141,14 @@ const campaignMetrics: CampaignMetric[] = [
 ];
 
 export default function AdsCenterPage() {
+
+  const isDemo =
+    new URLSearchParams(window.location.search).get("demo") === "1";
+
+  const demoCampaigns =
+    isDemo ? demoBusiness.demoCampaigns : [];
+
+
   const [selected, setSelected] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [budgetMode, setBudgetMode] = useState<
@@ -181,12 +191,83 @@ export default function AdsCenterPage() {
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
+      {isDemo && (
+        <section className="mx-auto max-w-[1500px] px-8 pt-6">
+          <div className="rounded-[26px] border border-violet-300/15 bg-violet-500/[0.05] p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-violet-200">
+                  کمپین‌های فعال دمو
+                </div>
+
+                <div className="mt-1 text-lg font-semibold">
+                  {demoBusiness.name}
+                </div>
+              </div>
+
+              <div className="text-left">
+                <div className="text-2xl font-bold">
+                  {demoBusiness.ads.roas}
+                </div>
+
+                <div className="text-sm text-white/40">
+                  ROAS
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {demoCampaigns.map((campaign) => (
+                <div
+                  key={campaign.id}
+                  className="rounded-2xl border border-white/[0.07] bg-black/20 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">
+                      {campaign.name}
+                    </div>
+
+                    <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-300">
+                      {campaign.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 text-sm text-white/45">
+                    {campaign.channel}
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="text-white/35">
+                      هزینه
+                    </span>
+
+                    <span>
+                      {campaign.spend}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-white/35">
+                      بازده
+                    </span>
+
+                    <span className="text-cyan-300">
+                      {campaign.roas}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={18} />

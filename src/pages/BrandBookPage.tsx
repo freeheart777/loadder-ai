@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { withDemo } from "../lib/demoMode";
+import { apiFetch } from "../lib/api";
 import {
   ArrowRight,
   ArrowLeft,
@@ -70,11 +72,39 @@ type FormData = {
   [key: string]: string;
 };
 
+type BrandBookVersion = {
+  id: string;
+  versionNumber: number;
+  status: "draft" | "active" | "archived";
+  brandIdentity: Record<string, string>;
+  brandPersonality: string[];
+  toneOfVoice: string | null;
+  messagingPrinciples: string[];
+  visualDirection: string | null;
+  primaryColors: string[];
+  secondaryColors: string[];
+  typography: Record<string, string>;
+  logoUsageNotes: string | null;
+  imageryDirection: string | null;
+  prohibitedPatterns: string[];
+  keyPhrases: string[];
+  brandPromises: string[];
+};
+
+function splitItems(value: string) {
+  return value.split(/[\n,،]+/).map((item) => item.trim()).filter(Boolean);
+}
+
 export default function BrandBookPage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [activeVersion, setActiveVersion] = useState<BrandBookVersion | null>(null);
+  const [draftVersion, setDraftVersion] = useState<BrandBookVersion | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState<FormData>({
     brandName: "",
@@ -91,6 +121,117 @@ export default function BrandBookPage() {
     competitors: "",
     competitorDifference: "",
   });
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadBrandBook() {
+      try {
+        const response = await apiFetch("/api/brand-book");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message);
+        if (!mounted) return;
+        const active = data.activeVersion || null;
+        const draft = data.latestDraft || null;
+        const current: BrandBookVersion | null = draft || active;
+        setActiveVersion(active);
+        setDraftVersion(draft);
+        if (current) {
+          setForm({
+            brandName: current.brandIdentity.name || "",
+            industry: current.brandIdentity.industry || "",
+            description: current.brandIdentity.description || "",
+            audience: current.brandIdentity.audience || "",
+            audienceProblem: current.brandIdentity.audienceProblem || "",
+            valueProposition: current.brandIdentity.valueProposition || "",
+            differentiation: current.brandIdentity.differentiation || "",
+            personality: current.brandPersonality.join("، "),
+            tone: current.toneOfVoice || "",
+            visualStyle: current.visualDirection || "",
+            colors: current.primaryColors.join("، "),
+            competitors: current.brandIdentity.competitors || "",
+            competitorDifference: current.brandIdentity.competitorDifference || "",
+          });
+        }
+      } catch (cause) {
+        if (mounted) setError(cause instanceof Error ? cause.message : "خطا در دریافت برند بوک.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    void loadBrandBook();
+    return () => { mounted = false; };
+  }, []);
+
+  const buildPayload = () => {
+    const baseVersion = draftVersion || activeVersion;
+    return ({
+    ...(baseVersion ? {
+      messagingPrinciples: baseVersion.messagingPrinciples,
+      secondaryColors: baseVersion.secondaryColors,
+      typography: baseVersion.typography,
+      logoUsageNotes: baseVersion.logoUsageNotes,
+      imageryDirection: baseVersion.imageryDirection,
+      prohibitedPatterns: baseVersion.prohibitedPatterns,
+      keyPhrases: baseVersion.keyPhrases,
+      brandPromises: baseVersion.brandPromises,
+    } : {}),
+    brandIdentity: {
+      name: form.brandName,
+      industry: form.industry,
+      description: form.description,
+      audience: form.audience,
+      audienceProblem: form.audienceProblem,
+      valueProposition: form.valueProposition,
+      differentiation: form.differentiation,
+      competitors: form.competitors,
+      competitorDifference: form.competitorDifference,
+    },
+    brandPersonality: splitItems(form.personality),
+    toneOfVoice: form.tone,
+    visualDirection: form.visualStyle,
+    primaryColors: splitItems(form.colors),
+    });
+  };
+
+  const saveDraft = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await apiFetch(
+        draftVersion ? `/api/brand-book/versions/${draftVersion.id}` : "/api/brand-book/versions",
+        {
+          method: draftVersion ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildPayload()),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setDraftVersion(data.version);
+      setFinished(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "ذخیره برند بوک انجام نشد.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const activateDraft = async () => {
+    if (!draftVersion) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/brand-book/versions/${draftVersion.id}/activate`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setActiveVersion(data.version);
+      setDraftVersion(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "فعال‌سازی برند بوک انجام نشد.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const current = steps[step];
   const CurrentIcon = current.icon;
@@ -118,10 +259,11 @@ export default function BrandBookPage() {
           </h1>
 
           <p className="mt-4 text-sm leading-7 text-white/40">
-            اطلاعات پایه برند ثبت شد. در مرحله بعد این داده‌ها را به
-            موتور هوش مصنوعی Loadder متصل می‌کنیم تا Brand Book واقعی
-            ساخته شود.
+            نسخه {draftVersion?.versionNumber || activeVersion?.versionNumber} برند بوک ذخیره شد.
+            فعال‌سازی آن باعث می‌شود نسخه قبلی به‌صورت خودکار آرشیو شود.
           </p>
+
+          {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
 
           <div className="mt-8 flex justify-center gap-3">
             <button
@@ -130,6 +272,16 @@ export default function BrandBookPage() {
             >
               ویرایش
             </button>
+
+            {draftVersion && (
+              <button
+                disabled={saving}
+                onClick={() => void activateDraft()}
+                className="rounded-full border border-emerald-300/20 bg-emerald-500/10 px-6 py-3 text-xs text-emerald-200 disabled:opacity-50"
+              >
+                {saving ? "در حال فعال‌سازی…" : "فعال‌سازی نسخه"}
+              </button>
+            )}
 
             <button
               onClick={() => navigate("/dashboard")}
@@ -183,6 +335,8 @@ export default function BrandBookPage() {
       </header>
 
       <div className="mx-auto max-w-6xl px-6 py-10">
+        {loading && <p className="mb-5 text-xs text-white/35">در حال دریافت برند بوک…</p>}
+        {error && <p className="mb-5 text-xs text-red-300">{error}</p>}
         {/* INTRO */}
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/15 bg-violet-500/[0.08] px-3 py-1.5">
@@ -327,11 +481,12 @@ export default function BrandBookPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setFinished(true)}
+                  disabled={saving || loading}
+                  onClick={() => void saveDraft()}
                   className="flex items-center gap-2 rounded-full border border-fuchsia-300/25 bg-gradient-to-l from-violet-500/25 to-fuchsia-500/20 px-6 py-3 text-xs"
                 >
                   <Sparkle size={14} weight="fill" />
-                  ساخت برند بوک
+                  {saving ? "در حال ذخیره…" : draftVersion ? "ذخیره پیش‌نویس" : "ساخت نسخه برند بوک"}
                 </button>
               )}
             </div>

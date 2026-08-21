@@ -31,6 +31,9 @@ import {
 } from "@phosphor-icons/react";
 
 import { businessData } from "../data/businessData";
+import { withDemo } from "../lib/demoMode";
+import { apiFetch } from "../lib/api";
+import { demoBusiness } from "../data/demoBusiness";
 
 type AutomationStatus = "فعال" | "متوقف";
 
@@ -88,8 +91,6 @@ type ActionOption = {
   value: string;
   title: string;
 };
-
-const API_BASE = "http://localhost:3001";
 
 const triggerOptions: TriggerOption[] = [
   {
@@ -307,6 +308,12 @@ function getSuggestedPayload(trigger: string) {
 }
 
 export default function AutomationPage() {
+  const isDemo =
+    new URLSearchParams(window.location.search).get("demo") === "1";
+
+  const demoAutomation =
+    isDemo ? demoBusiness.demoAutomation : null;
+
   const [automations, setAutomations] =
     useState<BackendAutomation[]>([]);
 
@@ -379,9 +386,7 @@ export default function AutomationPage() {
 
   async function loadAutomations() {
     try {
-      const response = await fetch(
-        `${API_BASE}/api/automations`
-      );
+      const response = await apiFetch("/api/automations");
 
       if (!response.ok) {
         throw new Error(
@@ -412,9 +417,7 @@ export default function AutomationPage() {
 
   async function loadExecutions() {
     try {
-      const response = await fetch(
-        `${API_BASE}/api/executions`
-      );
+      const response = await apiFetch("/api/executions");
 
       if (!response.ok) {
         throw new Error(
@@ -452,8 +455,8 @@ export default function AutomationPage() {
     try {
       setRunningId(item.id);
 
-      const response = await fetch(
-        `${API_BASE}/api/automations/${item.id}/run`,
+      const response = await apiFetch(
+        `/api/automations/${item.id}/run`,
         {
           method: "POST",
           headers: {
@@ -496,8 +499,8 @@ export default function AutomationPage() {
     item: BackendAutomation
   ) {
     try {
-      const response = await fetch(
-        `${API_BASE}/api/automations/${item.id}`,
+      const response = await apiFetch(
+        `/api/automations/${item.id}`,
         {
           method: "PATCH",
           headers: {
@@ -552,8 +555,8 @@ export default function AutomationPage() {
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE}/api/automations/${item.id}`,
+      const response = await apiFetch(
+        `/api/automations/${item.id}`,
         {
           method: "DELETE",
         }
@@ -648,8 +651,8 @@ export default function AutomationPage() {
           "custom_alert";
       }
 
-      const response = await fetch(
-        `${API_BASE}/api/automations`,
+      const response = await apiFetch(
+        "/api/automations",
         {
           method: "POST",
           headers: {
@@ -701,11 +704,108 @@ export default function AutomationPage() {
       dir="rtl"
       className="loadder-dashboard-bg min-h-screen text-white"
     >
+      {isDemo && demoAutomation && (
+        <section className="mx-auto max-w-[1500px] px-8 pt-6">
+          <div className="rounded-[28px] border border-amber-300/15 bg-amber-500/[0.04] p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-amber-200">
+                  اتوماسیون — نسخه دمو
+                </div>
+
+                <h2 className="mt-1 text-xl font-semibold">
+                  {demoBusiness.name}
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-4 gap-5 text-left">
+                <div>
+                  <div className="text-xl font-bold">
+                    {demoAutomation.active}
+                  </div>
+                  <div className="text-xs text-white/35">
+                    فعال
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xl font-bold">
+                    {demoAutomation.executionsToday}
+                  </div>
+                  <div className="text-xs text-white/35">
+                    اجرای امروز
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xl font-bold">
+                    {demoAutomation.savedHours}
+                  </div>
+                  <div className="text-xs text-white/35">
+                    ساعت ذخیره‌شده
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xl font-bold text-emerald-300">
+                    {demoAutomation.successRate}٪
+                  </div>
+                  <div className="text-xs text-white/35">
+                    موفقیت
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {demoAutomation.workflows.map((workflow) => (
+                <div
+                  key={workflow.id}
+                  className="rounded-[22px] border border-white/[0.07] bg-black/20 p-5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">
+                      {workflow.title}
+                    </div>
+
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs ${
+                        workflow.status === "فعال"
+                          ? "bg-emerald-400/10 text-emerald-300"
+                          : "bg-white/[0.05] text-white/45"
+                      }`}
+                    >
+                      {workflow.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 text-xs text-white/35">
+                    Trigger
+                  </div>
+
+                  <div className="mt-1 text-sm text-white/55">
+                    {workflow.trigger}
+                  </div>
+
+                  <div className="mt-4 text-xs text-white/35">
+                    Action
+                  </div>
+
+                  <div className="mt-1 text-sm leading-7 text-white/55">
+                    {workflow.action}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#030617]/70 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={18} />

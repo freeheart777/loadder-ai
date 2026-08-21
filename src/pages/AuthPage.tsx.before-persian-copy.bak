@@ -1,0 +1,261 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+
+import {
+  ArrowLeft,
+  ArrowRight,
+  DeviceMobile,
+  User,
+  Sparkle,
+  CheckCircle,
+} from "@phosphor-icons/react";
+
+export default function AuthPage() {
+  const navigate = useNavigate();
+
+  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<1 | 2>(1);
+  const [error, setError] = useState("");
+
+  const sendCode = () => {
+    setError("");
+
+    if (name.trim().length < 2) {
+      setError("لطفاً نام خود را وارد کنید.");
+      return;
+    }
+
+    const cleanMobile = mobile.replace(/\s/g, "");
+
+    if (!/^09\d{9}$/.test(cleanMobile)) {
+      setError("شماره موبایل معتبر وارد کنید.");
+      return;
+    }
+
+    setStep(2);
+  };
+
+  const enterPlatform = () => {
+    setError("");
+
+    if (code !== "12345") {
+      setError("برای تست فعلاً کد 12345 را وارد کنید.");
+      return;
+    }
+
+    localStorage.setItem(
+      "loadder-user",
+      JSON.stringify({
+        name,
+        mobile,
+      })
+    );
+
+    navigate("/dashboard");
+  };
+
+  return (
+    <main
+      dir="rtl"
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#03040b] px-5 text-white"
+    >
+      <div className="pointer-events-none absolute -right-32 top-10 h-[480px] w-[480px] rounded-full bg-violet-600/15 blur-[150px]" />
+      <div className="pointer-events-none absolute -bottom-40 left-10 h-[450px] w-[450px] rounded-full bg-cyan-500/10 blur-[160px]" />
+
+      <Link
+        to="/"
+        className="absolute right-7 top-7 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+      >
+        <ArrowRight size={17} />
+        بازگشت
+      </Link>
+
+      <div className="relative z-10 grid w-full max-w-[1100px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#090b13]/90 shadow-2xl backdrop-blur-2xl lg:grid-cols-[0.85fr_1.15fr]">
+        <section className="relative overflow-hidden border-b border-white/[0.07] p-8 lg:border-b-0 lg:border-l lg:p-10">
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/[0.12] via-transparent to-cyan-500/[0.05]" />
+
+          <div className="relative">
+            <img
+              src="/loadder-logo.png"
+              alt="Loadder"
+              className="w-[190px] object-contain"
+            />
+
+            <div className="mt-14 inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-4 py-2">
+              <Sparkle
+                size={15}
+                weight="fill"
+                className="text-violet-300"
+              />
+
+              <span className="text-sm text-violet-200">
+                AI Business Growth Platform
+              </span>
+            </div>
+
+            <h1 className="mt-6 text-3xl font-bold leading-[1.6]">
+              کسب‌وکارت را به
+              <span className="text-violet-300"> Loadder </span>
+              متصل کن.
+            </h1>
+
+            <p className="mt-4 max-w-md text-base leading-8 text-white/50">
+              یک حساب بساز تا Brand Book، محتوا، تبلیغات، CRM،
+              Analytics و Business Brain در یک فضای کاری مشترک قرار بگیرند.
+            </p>
+          </div>
+        </section>
+
+        <section className="p-8 lg:p-12">
+          {step === 1 ? (
+            <>
+              <div className="text-sm text-violet-300">
+                شروع کار
+              </div>
+
+              <h2 className="mt-2 text-2xl font-bold">
+                ساخت حساب کاربری
+              </h2>
+
+              <p className="mt-2 text-sm text-white/45">
+                کمتر از یک دقیقه زمان می‌برد.
+              </p>
+
+              <div className="mt-8 space-y-5">
+                <div>
+                  <label className="mb-2 block text-sm text-white/60">
+                    نام و نام خانوادگی
+                  </label>
+
+                  <div className="relative">
+                    <User
+                      size={19}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30"
+                    />
+
+                    <input
+                      value={name}
+                      onChange={(event) =>
+                        setName(event.target.value)
+                      }
+                      placeholder="مثلاً علی رضایی"
+                      className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] py-4 pl-4 pr-12 text-base outline-none transition focus:border-violet-400/40 focus:bg-white/[0.05]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm text-white/60">
+                    شماره موبایل
+                  </label>
+
+                  <div className="relative">
+                    <DeviceMobile
+                      size={19}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30"
+                    />
+
+                    <input
+                      dir="ltr"
+                      value={mobile}
+                      onChange={(event) =>
+                        setMobile(event.target.value)
+                      }
+                      placeholder="09123456789"
+                      className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] py-4 pl-4 pr-12 text-left text-base outline-none transition focus:border-violet-400/40 focus:bg-white/[0.05]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <p className="mt-4 text-sm text-red-300">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={sendCode}
+                className="mt-7 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-l from-blue-500 via-violet-500 to-fuchsia-500 py-4 text-base font-semibold transition hover:scale-[1.01]"
+              >
+                ادامه
+                <ArrowLeft size={18} />
+              </button>
+            </>
+          ) : (
+            <>
+              <CheckCircle
+                size={38}
+                weight="duotone"
+                className="text-emerald-300"
+              />
+
+              <h2 className="mt-5 text-2xl font-bold">
+                تأیید شماره موبایل
+              </h2>
+
+              <p className="mt-3 text-sm leading-7 text-white/45">
+                کد تأیید برای
+                <span dir="ltr" className="mx-1 text-white/80">
+                  {mobile}
+                </span>
+                ارسال می‌شود.
+              </p>
+
+              <div className="mt-8">
+                <label className="mb-2 block text-sm text-white/60">
+                  کد تأیید
+                </label>
+
+                <input
+                  dir="ltr"
+                  value={code}
+                  onChange={(event) =>
+                    setCode(event.target.value)
+                  }
+                  placeholder="12345"
+                  maxLength={5}
+                  className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-5 py-4 text-center text-xl tracking-[0.5em] outline-none transition focus:border-violet-400/40"
+                />
+              </div>
+
+              <p className="mt-3 text-xs text-white/30">
+                فعلاً برای تست از کد 12345 استفاده کن.
+              </p>
+
+              {error && (
+                <p className="mt-4 text-sm text-red-300">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={enterPlatform}
+                className="mt-7 flex w-full items-center justify-center gap-3 rounded-2xl bg-white py-4 text-base font-semibold text-black transition hover:scale-[1.01]"
+              >
+                ورود به پنل
+                <ArrowLeft size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setCode("");
+                  setError("");
+                }}
+                className="mt-3 w-full py-3 text-sm text-white/40 transition hover:text-white"
+              >
+                اصلاح اطلاعات
+              </button>
+            </>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}

@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { withDemo } from "../lib/demoMode";
+import { apiFetch } from "../lib/api";
 
 import {
   ArrowRight,
@@ -157,6 +159,10 @@ export default function ContentStudioPage() {
   const [goal, setGoal] = useState("افزایش تعامل");
   const [notice, setNotice] = useState("");
 
+  const [generatedContent, setGeneratedContent] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
   const currentType = useMemo(
     () =>
       contentTypes.find((item) => item.id === activeType) ??
@@ -172,6 +178,56 @@ export default function ContentStudioPage() {
     }, 2200);
   };
 
+  const generateContent = async () => {
+    if (!topic.trim()) {
+      setAiError("لطفاً ابتدا موضوع یا ایده اصلی را وارد کن.");
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError("");
+
+    try {
+      const response = await apiFetch(
+        "/api/agent/run",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "content",
+            topic,
+            goal,
+            tone,
+            contentType: currentType.id,
+            typeTitle: currentType.title,
+            maxTokens: 500,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || "تولید محتوا انجام نشد."
+        );
+      }
+
+      setGeneratedContent(data.answer || "");
+      showNotice("محتوا با موفقیت تولید شد.");
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "ارتباط با موتور هوش مصنوعی برقرار نشد."
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <main
       dir="rtl"
@@ -182,7 +238,7 @@ export default function ContentStudioPage() {
         <div className="mx-auto flex max-w-[1550px] items-center justify-between px-8 py-5">
           <div className="flex items-center gap-4">
             <Link
-              to="/dashboard"
+              to={withDemo("/dashboard")}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.07] hover:text-white"
             >
               <ArrowRight size={18} />
@@ -389,20 +445,36 @@ export default function ContentStudioPage() {
                 </div>
               </div>
 
+              {aiError && (
+                <div className="rounded-2xl border border-red-400/15 bg-red-500/[0.06] px-4 py-3 text-sm text-red-200">
+                  {aiError}
+                </div>
+              )}
+
               <button
                 type="button"
-                onClick={() =>
-                  showNotice(
-                    "تولید واقعی محتوا بعد از اتصال مدل هوش مصنوعی و Brand Book فعال می‌شود."
-                  )
-                }
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-fuchsia-500 px-6 py-4 text-sm font-semibold"
+                onClick={generateContent}
+                disabled={aiLoading}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-violet-600 via-blue-600 to-fuchsia-500 px-6 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Sparkle
-                  size={18}
-                  weight="fill"
-                />
-                تولید محتوا با Loadder
+                {aiLoading ? (
+                  <>
+                    <Lightning
+                      size={18}
+                      weight="fill"
+                      className="animate-pulse"
+                    />
+                    Loadder در حال ساخت محتواست...
+                  </>
+                ) : (
+                  <>
+                    <Sparkle
+                      size={18}
+                      weight="fill"
+                    />
+                    تولید محتوا با Loadder
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -422,10 +494,19 @@ export default function ContentStudioPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  showNotice("متن نمونه کپی شد.")
-                }
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/50"
+                onClick={async () => {
+                  if (!generatedContent) {
+                    showNotice("هنوز محتوایی تولید نشده است.");
+                    return;
+                  }
+
+                  await navigator.clipboard.writeText(
+                    generatedContent
+                  );
+
+                  showNotice("محتوا کپی شد.");
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/50 transition hover:bg-white/[0.07] hover:text-white"
               >
                 <Copy size={17} />
               </button>
@@ -436,16 +517,22 @@ export default function ContentStudioPage() {
                 نمونه محتوای تولیدشده
               </div>
 
-              <h3 className="mt-4 text-lg font-bold leading-8">
-                چرا بعضی تبلیغات هزینه می‌کنند ولی فروش نمی‌سازند؟
-              </h3>
+              {generatedContent ? (
+                <div className="mt-4 whitespace-pre-wrap text-sm leading-9 text-white/70">
+                  {generatedContent}
+                </div>
+              ) : (
+                <>
+                  <h3 className="mt-4 text-lg font-bold leading-8">
+                    خروجی هوش مصنوعی اینجا نمایش داده می‌شود
+                  </h3>
 
-              <p className="mt-4 text-sm leading-8 text-white/55">
-                مسئله همیشه کمبود بودجه نیست. اگر پیام تبلیغ با نیاز واقعی
-                مخاطب هماهنگ نباشد، حتی بهترین کمپین هم نتیجه مطلوب ایجاد
-                نمی‌کند. قبل از افزایش بودجه، باید مطمئن شوی مخاطب، پیام
-                و صفحه فروش در یک مسیر قرار دارند.
-              </p>
+                  <p className="mt-4 text-sm leading-8 text-white/45">
+                    موضوع، هدف و لحن محتوا را مشخص کن و روی
+                    «تولید محتوا با Loadder» بزن.
+                  </p>
+                </>
+              )}
 
               <div className="mt-5 flex flex-wrap gap-2">
                 {[

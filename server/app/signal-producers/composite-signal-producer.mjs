@@ -1,0 +1,1 @@
+export function createCompositeSignalProducer(producers){return Object.freeze({produce(event,context){for(const producer of producers){const result=producer.produce(event,context);if(result.state!=="NOT_APPLICABLE")return result;}return{state:"NOT_APPLICABLE",observation:null,signal:null};}});}

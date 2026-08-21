@@ -1,0 +1,263 @@
+@import url("https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* =========================================
+   BASE
+========================================= */
+
+:root {
+  font-family:
+    "Vazirmatn",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: #ffffff;
+  background: #030617;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+* {
+  box-sizing: border-box;
+}
+
+
+html {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100%;
+
+  background: #030617;
+}
+
+
+body {
+  margin: 0;
+
+  min-width: 320px;
+  min-height: 100vh;
+
+  background: #030617;
+  color: #ffffff;
+
+  font-family:
+    "Vazirmatn",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+
+#root {
+  min-height: 100vh;
+}
+
+
+/* =========================================
+   TYPOGRAPHY
+========================================= */
+
+button,
+input,
+textarea,
+select {
+  font-family:
+    "Vazirmatn",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+
+[dir="rtl"] {
+  font-family:
+    "Vazirmatn",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+
+/* =========================================
+   LINKS
+========================================= */
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+
+/* =========================================
+   BUTTONS
+========================================= */
+
+button {
+  cursor: pointer;
+}
+
+
+/* =========================================
+   INPUTS
+========================================= */
+
+input,
+textarea,
+select {
+  color: #ffffff;
+}
+
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+
+/* =========================================
+   LOADDER BACKGROUND
+========================================= */
+
+.loadder-dashboard-bg {
+  min-height: 100vh;
+  width: 100%;
+
+  background:
+    radial-gradient(
+      circle at 12% 18%,
+      rgba(139, 92, 246, 0.16),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 86% 28%,
+      rgba(34, 211, 238, 0.12),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      #030617 0%,
+      #050816 48%,
+      #02030b 100%
+    );
+
+  background-attachment: fixed;
+}
+
+
+/* =========================================
+   LIQUID GLASS
+========================================= */
+
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.01);
+
+  background-blend-mode: luminosity;
+
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+
+  border: none;
+
+  box-shadow:
+    inset 0 1px 1px
+    rgba(255, 255, 255, 0.1);
+}
+
+
+/* =========================================
+   SELECTION
+========================================= */
+
+::selection {
+  background: rgba(139, 92, 246, 0.4);
+  color: #ffffff;
+}
+
+
+/* =========================================
+   SCROLLBAR
+========================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+
+::-webkit-scrollbar-track {
+  background: #030617;
+}
+
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* LOADDER PRESENTATION CLICK SAFETY */
+
+.presentation-page a,
+.presentation-page button {
+  position: relative;
+  z-index: 70;
+  pointer-events: auto !important;
+}
+
+.presentation-page [data-orbit],
+.presentation-page [data-hero-card] {
+  pointer-events: none !important;
+}
+
+.presentation-page header {
+  pointer-events: auto;
+}
+
+.presentation-page header a,
+.presentation-page header button {
+  pointer-events: auto !important;
+}
+
+/* =========================================================
+   LOADDER — INFINITE FEATURE TRAIN
+========================================================= */
+
+@keyframes loadder-feature-train {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.loadder-feature-train {
+  display: flex;
+  width: max-content;
+  flex-shrink: 0;
+  will-change: transform;
+  animation: loadder-feature-train 75s linear infinite;
+}
+
+.loadder-feature-train:hover {
+  animation-play-state: running;
+}
