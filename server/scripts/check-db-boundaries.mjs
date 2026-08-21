@@ -162,6 +162,13 @@ function inspect(target) {
         /process\.env\.(?:KAVENEGAR|RESEND|[^\s;]*(?:TOKEN|API_KEY|SECRET))/i
       );
     }
+    if (target.includes("dispatch-job") || target.includes(`${path.sep}dispatch-jobs${path.sep}`)) {
+      forbidden.push(
+        /from\s+["'][^"']*(provider-adapter|connector-adapter|provider-sdk|credential-resolver|messaging|automation|legacy|campaign|customer|lead|order|cart|optimizer|openai|model|agent|embedding|queue|worker|redis|bullmq|sqs|retry-runtime|reconciliation-runtime|resend|kavenegar)[^"']*["']/i,
+        /\b(customers|leads|orders|carts|marketing_campaigns|automations|job_queue)\b/i,
+        /process\.env\.(?:KAVENEGAR|RESEND|[^\s;]*(?:TOKEN|API_KEY|SECRET))/i
+      );
+    }
     if (/from\s+["'][^"']*(integrations\/providers|connector-adapters|provider-adapters)[^"']*["']/.test(source) &&
       !target.includes(`${path.sep}app${path.sep}integrations${path.sep}`)) {
       consumerBoundaryViolations.push(path.relative(serverRoot, target));

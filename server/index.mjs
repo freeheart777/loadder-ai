@@ -60,6 +60,7 @@ import { createExecutionAuthorizationRepository } from "./app/repositories/execu
 import { createExecutionRequestRepository } from "./app/repositories/execution-request-repository.mjs";
 import { createProviderAccountIdentityRepository } from "./app/repositories/provider-account-identity-repository.mjs";
 import { createExecutionLedgerRepository } from "./app/repositories/execution-ledger-repository.mjs";
+import { createExecutionDispatchJobRepository } from "./app/repositories/execution-dispatch-job-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -104,6 +105,7 @@ import { createExecutionAuthorizationService } from "./app/services/execution-au
 import { createExecutionRequestService } from "./app/services/execution-request-service.mjs";
 import { createProviderAccountIdentityService } from "./app/services/provider-account-identity-service.mjs";
 import { createExecutionLedgerService } from "./app/services/execution-ledger-service.mjs";
+import { createExecutionDispatchJobService } from "./app/services/execution-dispatch-job-service.mjs";
 import { createRecommendationFreshnessQuery } from "./app/recommendations/recommendation-freshness-query.mjs";
 import { actionProposalContractRegistry } from "./app/action-proposals/action-proposal-contract-registry.mjs";
 import { authorizationPolicyRegistry } from "./app/execution-authorizations/authorization-policy-registry.mjs";
@@ -350,6 +352,8 @@ const providerAccountIdentityRepository = createProviderAccountIdentityRepositor
 const providerAccountIdentityService = createProviderAccountIdentityService({ repository: providerAccountIdentityRepository, verifierRegistry: providerIdentityVerifierRegistry });
 const executionLedgerRepository = createExecutionLedgerRepository(db);
 const executionLedgerService = createExecutionLedgerService({ repository: executionLedgerRepository, capabilityRegistry: executionCapabilityRegistry, attemptPolicyRegistry });
+const executionDispatchJobRepository = createExecutionDispatchJobRepository(db);
+createExecutionDispatchJobService({ repository: executionDispatchJobRepository, capabilityRegistry: executionCapabilityRegistry, attemptPolicyRegistry });
 
 app.use(
   "/api/auth",
