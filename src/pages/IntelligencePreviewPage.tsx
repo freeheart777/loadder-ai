@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Brain, CaretDown, Database, Pulse, SpinnerGap } from "@phosphor-icons/react";
 import { apiFetch } from "../lib/api";
+import { useAuth } from "../lib/auth";
 
 type SystemStatus = "READY" | "NO DATA" | "ERROR";
 type ContextVersion = { id: string; versionNumber: number; createdAt: string; activatedAt: string | null };
@@ -24,10 +25,31 @@ type SemanticFinding = {
   evidenceManifestHash: string; evidenceCount: number; contextVersionId: string | null;
   pointInTimeCutoff: string; calculatedAt: string;
 };
+type Recommendation = {
+  id: string; recommendationType: string; recommendationVersion: number; schemaVersion: number;
+  subjectType: string; subjectId: string | null; subjectKey: string; considerationCode: string;
+  rationaleCode: string; reviewPriority: string; semanticFindingReferences: unknown[];
+  semanticManifestHash: string; semanticFindingCount: number; contextVersionId: string | null;
+  pointInTimeCutoff: string; producer: string; producerVersion: string; confidence: number | null;
+  confidenceReason: string; provenance: Record<string, unknown>; calculatedAt: string; createdAt: string;
+};
+type Review = {
+  id: string; recommendationId: string; reviewerRole: string; reviewType: string; reviewedAt: string;
+};
+type Decision = {
+  id: string; recommendationId: string; deciderRole: string; decisionType: string;
+  authorityClass: string; executionAuthorizing: boolean; observedFreshness: string;
+  supersedesDecisionId: string | null; decidedAt: string;
+};
+type Governance = { reviews: Review[]; decisions: Decision[]; error?: string };
+type PendingDecision = {
+  recommendationId: string; decisionType: string; supersedesDecisionId: string | null; idempotencyKey: string;
+};
 
 class ApiRequestError extends Error {
   status: number;
-  constructor(status: number, message: string) { super(message); this.status = status; }
+  code?: string;
+  constructor(status: number, message: string, code?: string) { super(message); this.status = status; this.code = code; }
 }
 
 async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -37,7 +59,7 @@ async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
     const message = response.status >= 500
       ? "An intelligence service is temporarily unavailable."
       : data.message || "The intelligence service could not complete this request.";
-    throw new ApiRequestError(response.status, message);
+    throw new ApiRequestError(response.status, message, data.code);
   }
   return data as T;
 }
@@ -121,6 +143,10 @@ function Meta({ label, value, mono = false }: { label: string; value: string; mo
 }
 
 export default function IntelligencePreviewPage() {
+  const { memberships, activeWorkspace } = useAuth();
+  const role = memberships.find((membership) => membership.workspace.id === activeWorkspace?.id)?.role;
+  const canReview = role === "owner" || role === "admin" || role === "member";
+  const canDecide = role === "owner" || role === "admin";
   const [context, setContext] = useState<ContextResponse | null>(null);
   const [listening, setListening] = useState<ListeningSummary | null>(null);
   const [findings, setFindings] = useState<SemanticFinding[]>([]);
@@ -128,6 +154,15 @@ export default function IntelligencePreviewPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [authError, setAuthError] = useState(false);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [governance, setGovernance] = useState<Record<string, Governance>>({});
+  const [recommendationError, setRecommendationError] = useState(false);
+  const [governanceError, setGovernanceError] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [acting, setActing] = useState<string | null>(null);
+  const [pendingStale, setPendingStale] = useState<PendingDecision | null>(null);
+  const [pendingSupersession, setPendingSupersession] = useState<PendingDecision | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const loadContext = useCallback(async () => {
     const data = await jsonRequest<ContextResponse & { success: true }>("/api/business-context"); setContext(data); return data;
@@ -146,11 +181,44 @@ export default function IntelligencePreviewPage() {
     setErrors((current) => current.includes(message) ? current : [...current, message]);
   }, []);
 
+  const loadGovernance = useCallback(async (items: Recommendation[]) => {
+    const results = await Promise.all(items.map(async (recommendation) => {
+      try {
+        const [reviewData, decisionData] = await Promise.all([
+          jsonRequest<{ reviews: Review[] }>(`/api/intelligence/recommendations/${recommendation.id}/reviews?limit=100`),
+          jsonRequest<{ decisions: Decision[] }>(`/api/intelligence/recommendations/${recommendation.id}/decisions?limit=100`),
+        ]);
+        return [recommendation.id, { reviews: reviewData.reviews || [], decisions: decisionData.decisions || [] }] as const;
+      } catch (error) {
+        setGovernanceError(true);
+        handleFailure(error);
+        return [recommendation.id, { reviews: [], decisions: [], error: "Governance history unavailable." }] as const;
+      }
+    }));
+    setGovernance((current) => ({ ...current, ...Object.fromEntries(results) }));
+  }, [handleFailure]);
+
+  const loadRecommendations = useCallback(async () => {
+    try {
+      const data = await jsonRequest<{ recommendations: Recommendation[] }>("/api/intelligence/recommendations?limit=100");
+      const items = data.recommendations || [];
+      setRecommendations(items);
+      setRecommendationError(false);
+      await loadGovernance(items);
+      return items;
+    } catch (error) {
+      setRecommendationError(true);
+      handleFailure(error);
+      return [];
+    }
+  }, [handleFailure, loadGovernance]);
+
   const loadPreview = useCallback(async () => {
     setErrors([]); setAuthError(false);
-    const results = await Promise.allSettled([loadContext(), loadListening(), loadFindings()]);
+    setGovernanceError(false);
+    const results = await Promise.allSettled([loadContext(), loadListening(), loadFindings(), loadRecommendations()]);
     for (const result of results) if (result.status === "rejected") handleFailure(result.reason);
-  }, [handleFailure, loadContext, loadFindings, loadListening]);
+  }, [handleFailure, loadContext, loadFindings, loadListening, loadRecommendations]);
 
   useEffect(() => { void loadPreview().finally(() => setLoading(false)); }, [loadPreview]);
 
@@ -169,6 +237,8 @@ export default function IntelligencePreviewPage() {
   const contextStatus = !context?.activeContext ? "MISSING" : context.isStale ? "STALE" : "READY";
   const listeningStatus: SystemStatus = errors.length && !listening ? "ERROR" : listening?.aggregates.length ? "READY" : "NO DATA";
   const semanticStatus: SystemStatus = errors.length && !findings.length ? "ERROR" : findings.length ? "READY" : "NO DATA";
+  const recommendationStatus: SystemStatus = recommendationError ? "ERROR" : recommendations.length ? "READY" : "NO DATA";
+  const governanceStatus: SystemStatus = governanceError ? "ERROR" : recommendations.length ? "READY" : "NO DATA";
 
   const metricValue = (aggregate: Aggregate | null, formatter: (value: number) => string = String) => {
     if (!aggregate) return "NO DATA";
@@ -192,7 +262,77 @@ export default function IntelligencePreviewPage() {
       } catch (error) { handleFailure(error); }
     }
     try { await loadFindings(); } catch (error) { handleFailure(error); }
+    await loadRecommendations();
     setRefreshing(false);
+  };
+
+  const calculateRecommendations = async () => {
+    if (!mention) return;
+    setCalculating(true); setNotice(null);
+    try {
+      await jsonRequest("/api/intelligence/recommendations/calculate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recommendationTypes: ["attention_evidence_review", "competitive_visibility_evidence_review"],
+          subjectType: "listening_scope", subjectKey: "intelligence-preview",
+          pointInTimeCutoff: mention.pointInTimeCutoff, scope: { window: mention.window },
+        }),
+      });
+      await loadRecommendations();
+      setNotice("Recommendation calculation completed. Existing immutable results may have been reused.");
+    } catch (error) { handleFailure(error); }
+    finally { setCalculating(false); }
+  };
+
+  const reloadGovernance = async (id: string) => {
+    const recommendation = recommendations.find((item) => item.id === id);
+    if (recommendation) await loadGovernance([recommendation]);
+  };
+
+  const createReview = async (id: string, reviewType: string) => {
+    setActing(`${id}:review`); setNotice(null);
+    try {
+      await jsonRequest(`/api/intelligence/recommendations/${id}/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ reviewType }),
+      });
+      await reloadGovernance(id);
+    } catch (error) { handleFailure(error); }
+    finally { setActing(null); }
+  };
+
+  const sendDecision = async (pending: PendingDecision, allowStale: boolean) => {
+    setActing(`${pending.recommendationId}:decision`); setNotice(null);
+    try {
+      await jsonRequest(`/api/intelligence/recommendations/${pending.recommendationId}/decisions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": pending.idempotencyKey },
+        body: JSON.stringify({
+          decisionType: pending.decisionType, allowStale,
+          supersedesDecisionId: pending.supersedesDecisionId,
+        }),
+      });
+      setPendingStale(null); setPendingSupersession(null);
+      await reloadGovernance(pending.recommendationId);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === "RECOMMENDATION_STALE" && !allowStale) {
+        setPendingStale(pending);
+      } else if (error instanceof ApiRequestError && error.code === "DECISION_CONFLICT") {
+        setNotice("The decision history changed before this action completed. History was reloaded; no decision was guessed or retried.");
+        setPendingStale(null); setPendingSupersession(null);
+        await reloadGovernance(pending.recommendationId);
+      } else handleFailure(error);
+    } finally { setActing(null); }
+  };
+
+  const requestDecision = (id: string, decisionType: string, head: Decision | null) => {
+    const pending = {
+      recommendationId: id, decisionType, supersedesDecisionId: head?.id || null,
+      idempotencyKey: crypto.randomUUID(),
+    };
+    if (head) setPendingSupersession(pending);
+    else void sendDecision(pending, false);
   };
 
   return (
@@ -202,7 +342,7 @@ export default function IntelligencePreviewPage() {
           <div className="flex items-center gap-4">
             <Link to="/dashboard" aria-label="Back to dashboard" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.035] text-white/60 transition hover:bg-white/[0.08] hover:text-white"><ArrowLeft size={18} /></Link>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-300/20 bg-violet-500/10 text-violet-200"><Brain size={26} weight="duotone" /></div>
-            <div><h1 className="text-xl font-semibold md:text-2xl">Intelligence</h1><p className="mt-1 text-sm text-white/45">Live view of Loadder intelligence infrastructure</p></div>
+            <div><h1 className="text-xl font-semibold md:text-2xl">Intelligence Governance</h1><p className="mt-1 text-sm text-white/45">Internal control center for evidence, review, and business intent</p></div>
           </div>
           <button onClick={() => void refresh()} disabled={refreshing || loading} className="flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-500/10 px-4 py-2.5 text-sm font-medium text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-wait disabled:opacity-50">
             {refreshing ? <SpinnerGap size={17} className="animate-spin" /> : <Pulse size={17} />} Refresh Intelligence
@@ -213,6 +353,7 @@ export default function IntelligencePreviewPage() {
       <div className="mx-auto max-w-[1450px] space-y-8 px-5 py-8 md:px-8">
         {authError && <div className="rounded-2xl border border-rose-300/20 bg-rose-500/[0.08] px-5 py-4 text-sm text-rose-100">Your authenticated session cannot access the active workspace intelligence.</div>}
         {errors.map((error) => <div key={error} className="rounded-2xl border border-amber-300/15 bg-amber-500/[0.06] px-5 py-4 text-sm text-amber-100">{error}</div>)}
+        {notice && <div className="rounded-2xl border border-violet-300/20 bg-violet-500/[0.08] px-5 py-4 text-sm text-violet-100">{notice}</div>}
 
         <section className="rounded-[28px] border border-white/[0.08] bg-[#080b14]/80 p-6 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-5">
@@ -241,11 +382,43 @@ export default function IntelligencePreviewPage() {
           <div className="grid gap-5 xl:grid-cols-2"><SemanticCard title="Listening Attention" finding={attention} /><SemanticCard title="Competitive Visibility" finding={competitive} /></div>
         </section>
 
+        <section>
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <div><h2 className="text-lg font-semibold">Recommendation Intelligence</h2><p className="mt-1 max-w-2xl text-sm text-white/40">Advisory considerations derived from semantic findings. Recommendations never authorize execution.</p></div>
+            <button type="button" onClick={() => void calculateRecommendations()} disabled={!mention || calculating} className="flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-35">
+              {calculating && <SpinnerGap size={16} className="animate-spin" />} Calculate Recommendations
+            </button>
+          </div>
+          {!recommendations.length ? (
+            <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+              <h3 className="font-semibold text-white/65">No recommendation records</h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm text-white/35">{mention ? "Calculation is explicit because it persists immutable recommendation records." : "Listening evidence is required before recommendations can be calculated."}</p>
+            </div>
+          ) : <div className="space-y-5">{recommendations.map((recommendation) => (
+            <RecommendationCard
+              key={recommendation.id} recommendation={recommendation}
+              governance={governance[recommendation.id]} role={role}
+              canReview={canReview} canDecide={canDecide}
+              busy={Boolean(acting?.startsWith(recommendation.id))}
+              onReview={(reviewType) => void createReview(recommendation.id, reviewType)}
+              onDecision={(decisionType, head) => requestDecision(recommendation.id, decisionType, head)}
+            />
+          ))}</div>}
+        </section>
+
+        <section className="rounded-[28px] border border-amber-300/15 bg-amber-500/[0.045] p-6">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/65">Execution</div>
+          <h2 className="mt-3 text-xl font-semibold">NOT AVAILABLE</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/50">Decisions recorded here represent business intent only. No external action, campaign, message, provider operation, automation, or execution is initiated from this page.</p>
+        </section>
+
         <footer className="rounded-[24px] border border-white/[0.07] bg-black/20 px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-4"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">System</div><div className="flex flex-wrap gap-3"><SystemItem label="Context" status={contextStatus === "READY" ? "READY" : contextStatus === "MISSING" ? "NO DATA" : contextStatus === "STALE" ? "ERROR" : "ERROR"} /><SystemItem label="Listening" status={listeningStatus} /><SystemItem label="Semantic" status={semanticStatus} /></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-4"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">System</div><div className="flex flex-wrap gap-3"><SystemItem label="Context" status={contextStatus === "READY" ? "READY" : contextStatus === "MISSING" ? "NO DATA" : contextStatus === "STALE" ? "ERROR" : "ERROR"} /><SystemItem label="Listening" status={listeningStatus} /><SystemItem label="Semantic" status={semanticStatus} /><SystemItem label="Recommendations" status={recommendationStatus} /><SystemItem label="Governance" status={governanceStatus} /></div></div>
         </footer>
         {loading && <div className="fixed inset-0 flex items-center justify-center bg-[#030617]/65 backdrop-blur-sm"><SpinnerGap size={30} className="animate-spin text-violet-200" /></div>}
       </div>
+      {pendingSupersession && <Confirm title="Supersede the active decision?" body="This creates a new immutable decision linked to the current decision. It does not edit history or authorize execution." confirm="Record superseding decision" onCancel={() => setPendingSupersession(null)} onConfirm={() => void sendDecision(pendingSupersession, false)} />}
+      {pendingStale && <Confirm title="Recommendation context is stale" body="The server detected that this recommendation no longer reflects the active context. Confirm deliberately to record the decision with stale context; no execution will occur." confirm="Confirm stale-context decision" onCancel={() => setPendingStale(null)} onConfirm={() => void sendDecision(pendingStale, true)} />}
     </main>
   );
 }
@@ -253,4 +426,64 @@ export default function IntelligencePreviewPage() {
 function SystemItem({ label, status }: { label: string; status: SystemStatus }) {
   const dot = status === "READY" ? "bg-emerald-300" : status === "ERROR" ? "bg-rose-300" : "bg-amber-200";
   return <div className="flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-xs text-white/55"><span className={`h-1.5 w-1.5 rounded-full ${dot}`} />{label} <span className="text-white/80">{status}</span></div>;
+}
+
+function ActionButton({ children, disabled, onClick, active = false }: { children: React.ReactNode; disabled?: boolean; onClick: () => void; active?: boolean }) {
+  return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${active ? "border-violet-300/35 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/[0.04] text-white/65 hover:bg-white/[0.09] hover:text-white"}`}>{children}</button>;
+}
+
+function RecommendationCard({ recommendation, governance, role, canReview, canDecide, busy, onReview, onDecision }: {
+  recommendation: Recommendation; governance?: Governance; role?: string; canReview: boolean;
+  canDecide: boolean; busy: boolean; onReview: (type: string) => void;
+  onDecision: (type: string, head: Decision | null) => void;
+}) {
+  const reviews = governance?.reviews || [];
+  const decisions = governance?.decisions || [];
+  const superseded = new Set(decisions.map((decision) => decision.supersedesDecisionId).filter(Boolean));
+  const head = decisions.find((decision) => !superseded.has(decision.id)) || null;
+  return (
+    <article className="overflow-hidden rounded-[28px] border border-cyan-300/15 bg-gradient-to-br from-cyan-500/[0.07] via-[#090c16] to-violet-500/[0.06]">
+      <div className="p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div><div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/60">{displayState(recommendation.recommendationType)}</div><h3 className="mt-3 text-2xl font-semibold">{displayState(recommendation.considerationCode)}</h3><p className="mt-3 max-w-3xl text-sm leading-7 text-white/50">{displayState(recommendation.rationaleCode)}</p></div>
+          <StatusPill status={recommendation.reviewPriority} />
+        </div>
+        <dl className="mt-6 grid gap-4 border-t border-white/[0.07] pt-5 text-xs sm:grid-cols-2 xl:grid-cols-4">
+          <Meta label="Recommendation ID" value={recommendation.id} mono />
+          <Meta label="Version / schema" value={`${recommendation.recommendationVersion} / ${recommendation.schemaVersion}`} />
+          <Meta label="Subject" value={`${recommendation.subjectType} · ${recommendation.subjectKey}`} />
+          <Meta label="Calculated" value={formatDate(recommendation.calculatedAt)} />
+          <Meta label="Point-in-time cutoff" value={formatDate(recommendation.pointInTimeCutoff)} />
+          <Meta label="Context Version" value={recommendation.contextVersionId || "Not available"} mono />
+          <Meta label="Semantic findings" value={String(recommendation.semanticFindingCount)} />
+          <Meta label="Confidence state" value={recommendation.confidence === null ? `NO CONFIDENCE SCORE · ${displayState(recommendation.confidenceReason)}` : `${recommendation.confidence} · ${displayState(recommendation.confidenceReason)}`} />
+          <Meta label="Producer" value={`${recommendation.producer} · ${recommendation.producerVersion}`} />
+          <div className="sm:col-span-2 xl:col-span-4"><Meta label="Semantic Manifest Hash" value={recommendation.semanticManifestHash} mono /></div>
+        </dl>
+        <div className="mt-5 flex flex-wrap gap-2"><StatusPill status="ADVISORY ONLY" /><StatusPill status="NON-CAUSAL" /><StatusPill status="NOT EXECUTABLE" /></div>
+        <details className="group mt-5 rounded-2xl border border-white/[0.07] bg-black/20"><summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm text-white/60"><span>Provenance</span><CaretDown size={16} className="transition group-open:rotate-180" /></summary><pre className="overflow-auto border-t border-white/[0.07] p-4 text-xs leading-6 text-white/55">{JSON.stringify(recommendation.provenance, null, 2)}</pre></details>
+      </div>
+      <div className="grid border-t border-white/[0.08] xl:grid-cols-2">
+        <GovernancePanel title="Human Reviews" note={canReview ? `Available to ${role}. Reviews are immutable and do not change recommendation validity.` : "No active review authority."} actions={<><ActionButton disabled={!canReview || busy} onClick={() => onReview("ACKNOWLEDGED")}>Acknowledge</ActionButton><ActionButton disabled={!canReview || busy} onClick={() => onReview("DISMISSED")}>Dismiss</ActionButton><ActionButton disabled={!canReview || busy} onClick={() => onReview("REQUEST_MORE_EVIDENCE")}>Request more evidence</ActionButton></>} empty="No human reviews recorded.">
+          {reviews.length ? reviews.map((review) => <History key={review.id} title={displayState(review.reviewType)} meta={`${review.reviewerRole} · ${formatDate(review.reviewedAt)}`} id={review.id} />) : null}
+        </GovernancePanel>
+        <GovernancePanel title="Business Decisions" note={canDecide ? "Record decision. Freshness is checked by the server at submission." : `Read-only history. Decision authority requires owner or admin; current role: ${role || "unavailable"}.`} actions={<><ActionButton disabled={!canDecide || busy || head?.decisionType === "ADOPT"} onClick={() => onDecision("ADOPT", head)}>Record decision · Adopt</ActionButton><ActionButton disabled={!canDecide || busy || head?.decisionType === "DECLINE"} onClick={() => onDecision("DECLINE", head)}>Record decision · Decline</ActionButton><ActionButton disabled={!canDecide || busy || head?.decisionType === "DEFER"} onClick={() => onDecision("DEFER", head)}>Record decision · Defer</ActionButton></>} empty="No business decisions recorded.">
+          <p className="rounded-xl border border-amber-300/10 bg-amber-500/[0.04] p-3 text-xs text-amber-100/70">Recording a decision does not perform any external action.</p>
+          {decisions.length ? decisions.map((decision) => <History key={decision.id} title={displayState(decision.decisionType)} meta={`${decision.deciderRole} · ${formatDate(decision.decidedAt)}`} id={decision.id} details={[`Authority: ${displayState(decision.authorityClass)}`, `Supersedes: ${decision.supersedesDecisionId || "None"}`]} badges={[decision.observedFreshness, decision.executionAuthorizing ? "EXECUTION AUTHORIZING" : "NON-EXECUTING"]} />) : <p className="rounded-xl border border-dashed border-white/10 p-4 text-xs text-white/35">No business decisions recorded.</p>}
+        </GovernancePanel>
+      </div>
+    </article>
+  );
+}
+
+function GovernancePanel({ title, note, actions, children, empty }: { title: string; note: string; actions: React.ReactNode; children: React.ReactNode; empty: string }) {
+  return <section className="border-white/[0.08] p-6 xl:first:border-r"><h4 className="font-semibold">{title}</h4><p className="mt-2 text-xs leading-5 text-white/40">{note}</p><div className="mt-4 flex flex-wrap gap-2">{actions}</div><div className="mt-5 space-y-3">{children || <p className="rounded-xl border border-dashed border-white/10 p-4 text-xs text-white/35">{empty}</p>}</div></section>;
+}
+
+function History({ title, meta, id, badges = [], details = [] }: { title: string; meta: string; id: string; badges?: string[]; details?: string[] }) {
+  return <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold text-white/75">{title}</span><div className="flex flex-wrap gap-1">{badges.map((badge) => <StatusPill key={badge} status={badge} />)}</div></div><div className="mt-2 text-xs text-white/40">{meta}</div>{details.map((detail) => <div key={detail} className="mt-1 break-all text-[11px] text-white/35">{detail}</div>)}<div className="mt-2 break-all font-mono text-[10px] text-white/25">{id}</div></div>;
+}
+
+function Confirm({ title, body, confirm, onCancel, onConfirm }: { title: string; body: string; confirm: string; onCancel: () => void; onConfirm: () => void }) {
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-5 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-[#0a0d18] p-6 shadow-2xl"><h2 id="confirm-title" className="text-xl font-semibold">{title}</h2><p className="mt-3 text-sm leading-7 text-white/50">{body}</p><div className="mt-6 flex justify-end gap-3"><ActionButton onClick={onCancel}>Cancel</ActionButton><ActionButton active onClick={onConfirm}>{confirm}</ActionButton></div></div></div>;
 }
