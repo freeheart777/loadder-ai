@@ -28,6 +28,7 @@ import { createActionProposalRouter } from "./app/routes/action-proposals.mjs";
 import { createExecutionAuthorizationRouter } from "./app/routes/execution-authorizations.mjs";
 import { createExecutionRequestRouter } from "./app/routes/execution-requests.mjs";
 import { createProviderAccountIdentityRouter } from "./app/routes/provider-account-identities.mjs";
+import { createExecutionLedgerRouter } from "./app/routes/execution-ledger.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -58,6 +59,7 @@ import { createActionProposalRepository } from "./app/repositories/action-propos
 import { createExecutionAuthorizationRepository } from "./app/repositories/execution-authorization-repository.mjs";
 import { createExecutionRequestRepository } from "./app/repositories/execution-request-repository.mjs";
 import { createProviderAccountIdentityRepository } from "./app/repositories/provider-account-identity-repository.mjs";
+import { createExecutionLedgerRepository } from "./app/repositories/execution-ledger-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -101,11 +103,14 @@ import { createActionProposalService } from "./app/services/action-proposal-serv
 import { createExecutionAuthorizationService } from "./app/services/execution-authorization-service.mjs";
 import { createExecutionRequestService } from "./app/services/execution-request-service.mjs";
 import { createProviderAccountIdentityService } from "./app/services/provider-account-identity-service.mjs";
+import { createExecutionLedgerService } from "./app/services/execution-ledger-service.mjs";
 import { createRecommendationFreshnessQuery } from "./app/recommendations/recommendation-freshness-query.mjs";
 import { actionProposalContractRegistry } from "./app/action-proposals/action-proposal-contract-registry.mjs";
 import { authorizationPolicyRegistry } from "./app/execution-authorizations/authorization-policy-registry.mjs";
 import { executionRequestPolicyRegistry } from "./app/execution-requests/request-policy-registry.mjs";
 import { providerIdentityVerifierRegistry } from "./app/provider-account-identities/verifier-registry.mjs";
+import { executionCapabilityRegistry } from "./app/execution-capabilities/capability-registry.mjs";
+import { attemptPolicyRegistry } from "./app/execution-capabilities/attempt-policy-registry.mjs";
 import { recommendationContractRegistry } from "./app/recommendations/recommendation-contract-registry.mjs";
 import {
   createRequireAuth,
@@ -343,6 +348,8 @@ const executionRequestRepository = createExecutionRequestRepository(db);
 const executionRequestService = createExecutionRequestService({ repository: executionRequestRepository, authorizationQuery: executionAuthorizationRepository, proposalQuery: actionProposalRepository, currentnessQuery: { isCurrent: () => false }, policyRegistry: executionRequestPolicyRegistry, providerIdentityQuery: { resolve: () => null } });
 const providerAccountIdentityRepository = createProviderAccountIdentityRepository(db);
 const providerAccountIdentityService = createProviderAccountIdentityService({ repository: providerAccountIdentityRepository, verifierRegistry: providerIdentityVerifierRegistry });
+const executionLedgerRepository = createExecutionLedgerRepository(db);
+const executionLedgerService = createExecutionLedgerService({ repository: executionLedgerRepository, capabilityRegistry: executionCapabilityRegistry, attemptPolicyRegistry });
 
 app.use(
   "/api/auth",
@@ -434,6 +441,7 @@ app.use("/api", createActionProposalRouter({ service: actionProposalService }));
 app.use("/api", createExecutionAuthorizationRouter({ service: executionAuthorizationService }));
 app.use("/api", createExecutionRequestRouter({ service: executionRequestService }));
 app.use("/api", createProviderAccountIdentityRouter({ service: providerAccountIdentityService }));
+app.use("/api", createExecutionLedgerRouter({ service: executionLedgerService }));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));

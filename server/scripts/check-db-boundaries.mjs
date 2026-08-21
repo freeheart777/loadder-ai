@@ -58,6 +58,10 @@ function inspect(target) {
     || target.endsWith(`${path.sep}provider-account-identity-service.mjs`)
     || target.endsWith(`${path.sep}provider-account-identity-repository.mjs`)
     || target.endsWith(`${path.sep}provider-account-identities.mjs`)
+    || target.includes(`${path.sep}app${path.sep}execution-ledger${path.sep}`)
+    || target.endsWith(`${path.sep}execution-ledger-service.mjs`)
+    || target.endsWith(`${path.sep}execution-ledger-repository.mjs`)
+    || target.endsWith(`${path.sep}execution-ledger.mjs`)
   ) {
     const forbidden = [
       /from\s+["'][^"']*(business-profile|business-dna|brand-book)-(repository|service)\.mjs["']/,
@@ -149,6 +153,13 @@ function inspect(target) {
         /\b(semantic_findings|canonical_listening_records|customers|leads|orders|carts|marketing_campaigns|automations|executions|execution_attempts|execution_results|job_queue)\b/i,
         /process\.env/i,
         /\b(?:KAVENEGAR|RESEND|API_KEY|ACCESS_TOKEN|CLIENT_SECRET|OAUTH_TOKEN)\b/i
+      );
+    }
+    if (target.includes("execution-ledger")) {
+      forbidden.push(
+        /from\s+["'][^"']*(provider-adapter|connector-adapter|provider-sdk|credential-resolver|messaging|automation|legacy|campaign|customer|lead|order|cart|optimizer|openai|model|agent|embedding|queue|worker|retry-runtime|reconciliation-runtime)[^"']*["']/i,
+        /\b(customers|leads|orders|carts|marketing_campaigns|automations|job_queue)\b/i,
+        /process\.env\.(?:KAVENEGAR|RESEND|[^\s;]*(?:TOKEN|API_KEY|SECRET))/i
       );
     }
     if (/from\s+["'][^"']*(integrations\/providers|connector-adapters|provider-adapters)[^"']*["']/.test(source) &&

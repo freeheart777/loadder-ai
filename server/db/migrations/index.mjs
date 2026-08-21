@@ -39,6 +39,7 @@ import { migration038ActionProposals } from "./038_action_proposals.mjs";
 import { migration039ExecutionAuthorizations } from "./039_execution_authorizations.mjs";
 import { migration040ExecutionRequests } from "./040_execution_requests.mjs";
 import { providerAccountIdentitiesMigration } from "./041_provider_account_identities.mjs";
+import { migration042ExecutionAttemptResultLedger } from "./042_execution_attempt_result_ledger.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -82,4 +83,5 @@ export const migrations = [
   migration039ExecutionAuthorizations,
   migration040ExecutionRequests,
   providerAccountIdentitiesMigration,
+  migration042ExecutionAttemptResultLedger,
 ];
