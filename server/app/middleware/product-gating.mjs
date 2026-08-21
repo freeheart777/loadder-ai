@@ -65,12 +65,14 @@ export function classifyApiRequest(method, path) {
     if (/^\/api\/(messaging\/status|database\/status)/.test(path)) return { feature: "development_tools", internal: true };
     if (/^\/api\/(execution|provider-account-identities|integrations\/connections\/[^/]+\/account-identities)/.test(path)) return { feature: "execution", internal: true };
     if (/^\/api\/intelligence/.test(path)) return { feature: "intelligence", internal: true };
+    if (/^\/api\/content\/generations(?:\/|$)/.test(path)) return { feature: "content_studio", internal: false };
     if (/^\/api\/(automations|executions)/.test(path)) return { feature: "legacy_automation", internal: true };
     if (/^\/api\/(crm|customers|leads|orders|carts)/.test(path)) return { feature: "legacy_crm", internal: true };
     if (/^\/api\/marketing/.test(path)) return { feature: "legacy_marketing", internal: true };
     return null;
   }
-  if (upper === "POST" && path === "/api/agent/run") return { feature: "content_studio", internal: false };
+  if (upper === "POST" && path === "/api/content/generate") return { feature: "content_studio", internal: false };
+  if (upper === "POST" && path === "/api/agent/run") return { feature: "experimental_ai", internal: true };
   if (/^\/api\/customers\/[^/]+\/message$/.test(path)) return { feature: "legacy_messaging", internal: false };
   if (/^\/api\/automations(\/|$)/.test(path) || /^\/api\/executions(\/|$)/.test(path)) return { feature: "legacy_automation", internal: false };
   if (/^\/api\/(leads|orders|carts)(\/|$)/.test(path)) return { feature: "legacy_crm", internal: false };

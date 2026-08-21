@@ -6,6 +6,7 @@ const targets = [path.join(serverRoot, "index.mjs"), path.join(serverRoot, "app"
 const violations = [];
 const consumerBoundaryViolations = [];
 const onboardingBoundaryViolations = [];
+const creativeGenerationBoundaryViolations = [];
 
 function inspect(target) {
   const stat = statSync(target);
@@ -15,6 +16,14 @@ function inspect(target) {
   }
   if (!target.endsWith(".mjs")) return;
   const source = readFileSync(target, "utf8");
+  if (target.includes(`${path.sep}content-generation${path.sep}`) || target.endsWith(`${path.sep}content-generation-service.mjs`) || target.endsWith(`${path.sep}content-generation-repository.mjs`) || target.endsWith(`${path.sep}content-generation.mjs`)) {
+    const forbidden = [
+      /from\s+["'][^"']*(action-proposal|execution-authorization|execution-request|execution-ledger|dispatch-job|execution-capabilit|provider-account-identit|action-input|messaging|automation|legacy-crm|campaign)[^"']*["']/i,
+      /\b(action_proposals|execution_authorizations|execution_requests|execution_attempts|execution_results|execution_dispatch_jobs|provider_account_identities|execution_action_inputs|automations|executions)\b/i,
+      /from\s+["'][^"']*db\/database\.mjs["']/,
+    ];
+    if (forbidden.some((pattern) => pattern.test(source))) creativeGenerationBoundaryViolations.push(path.relative(serverRoot, target));
+  }
   if (target.includes(`${path.sep}onboarding${path.sep}`) || target.endsWith(`${path.sep}onboarding-service.mjs`) || target.endsWith(`${path.sep}onboarding.mjs`)) {
     const forbidden = [
       /from\s+["'][^"']*(openai|cloudflare|agent|embedding|model|messaging|automation|execution|provider|worker|queue)[^"']*["']/i,
@@ -218,8 +227,13 @@ if (onboardingBoundaryViolations.length) {
   console.error(`Onboarding accesses forbidden AI, execution, provider, worker, queue, or raw database dependencies: ${onboardingBoundaryViolations.join(", ")}`);
   process.exitCode = 1;
 }
-if (!violations.length && !consumerBoundaryViolations.length && !onboardingBoundaryViolations.length) {
+if (creativeGenerationBoundaryViolations.length) {
+  console.error(`Creative Generation accesses execution, messaging, automation, campaign, or raw database dependencies: ${creativeGenerationBoundaryViolations.join(", ")}`);
+  process.exitCode = 1;
+}
+if (!violations.length && !consumerBoundaryViolations.length && !onboardingBoundaryViolations.length && !creativeGenerationBoundaryViolations.length) {
   console.log("Database import boundary is valid.");
   console.log("Business Context consumer boundary is valid.");
   console.log("Onboarding dependency boundary is valid.");
+  console.log("Creative Generation dependency boundary is valid.");
 }

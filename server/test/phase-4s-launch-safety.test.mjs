@@ -90,7 +90,8 @@ test("modern execution creation and verification routes are frozen", () => {
 
 test("AI endpoints follow the approved split policy", () => {
   const policy = createProductPolicy({ nodeEnv: "production" });
-  assert.equal(runGate(policy, "POST", "/api/agent/run").nextCalled, true);
+  assert.equal(runGate(policy, "POST", "/api/content/generate").nextCalled, true);
+  assert.equal(runGate(policy, "POST", "/api/agent/run").res.body.feature, "experimental_ai");
   assert.equal(runGate(policy, "POST", "/api/ai/chat").res.body.feature, "experimental_ai");
   assert.equal(runGate(policy, "POST", "/api/business-brain/analyze").res.body.feature, "experimental_ai");
 });
@@ -175,7 +176,8 @@ test("production navigation contains only truthful customer tools", () => {
 });
 
 test("route classifier is deterministic and does not accept client feature keys", () => {
-  assert.deepEqual(classifyApiRequest("POST", "/api/agent/run"), { feature: "content_studio", internal: false });
+  assert.deepEqual(classifyApiRequest("POST", "/api/content/generate"), { feature: "content_studio", internal: false });
+  assert.deepEqual(classifyApiRequest("POST", "/api/agent/run"), { feature: "experimental_ai", internal: true });
   assert.deepEqual(classifyApiRequest("GET", "/api/onboarding/status"), { feature: "business_setup", internal: false });
   assert.deepEqual(classifyApiRequest("POST", "/api/onboarding/finalize"), { feature: "business_setup", internal: false });
   assert.equal(classifyApiRequest("POST", "/api/client-selected-feature"), null);

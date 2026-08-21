@@ -55,6 +55,15 @@ export function createOperationMetrics({ limit = DEFAULT_LIMIT, sink = null } = 
       schemaVersion: input.schemaVersion || null,
       sensitivityClass: input.sensitivityClass || null,
       sizeBucket: input.sizeBucket || null,
+      mediaType: input.mediaType || null,
+      contractId: input.contractId || null,
+      contractVersion: input.contractVersion || null,
+      placementId: input.placementId || null,
+      placementVersion: input.placementVersion || null,
+      providerBindingVersion: input.providerBindingVersion || null,
+      providerModel: input.providerModel || null,
+      inputTokens: numeric(input.inputTokens),
+      outputTokens: numeric(input.outputTokens),
     });
     measurements.push(measurement);
     if (measurements.length > limit) measurements.splice(0, measurements.length - limit);
