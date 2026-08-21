@@ -37,6 +37,10 @@ function inspect(target) {
     || target.endsWith(`${path.sep}recommendation-intelligence-service.mjs`)
     || target.endsWith(`${path.sep}recommendation-intelligence.mjs`)
     || target.endsWith(`${path.sep}intelligence-recommendation-repository.mjs`)
+    || target.endsWith(`${path.sep}human-governance-service.mjs`)
+    || target.endsWith(`${path.sep}human-governance.mjs`)
+    || target.endsWith(`${path.sep}human-governance-repository.mjs`)
+    || target.endsWith(`${path.sep}recommendation-freshness-query.mjs`)
   ) {
     const forbidden = [
       /from\s+["'][^"']*(business-profile|business-dna|brand-book)-(repository|service)\.mjs["']/,
@@ -89,6 +93,12 @@ function inspect(target) {
         /from\s+["'][^"']*(database|business-event|forecast|listening-repository|automation|execution|messaging|optimizer|campaign|customer|lead|order|cart|attribution|provider)[^"']*["']/i,
         /from\s+["'](?:openai|[^"']*(agent|embedding|decision)[^"']*)["']/i,
         /\b(customers|leads|orders|carts|marketing_campaigns|campaign_metrics|attribution_touchpoints|business_events|canonical_listening_records|forecast_records|automations|executions)\b/i
+      );
+    }
+    if (target.includes("human-governance") || target.includes("recommendation-freshness-query.mjs")) {
+      forbidden.push(
+        /from\s+["'][^"']*(semantic|listening|customer|lead|order|cart|campaign|attribution|forecast|automation|execution|messaging|optimizer|provider|openai|model|agent|embedding|recommendation-producers)[^"']*["']/i,
+        /\b(semantic_findings|canonical_listening_records|customers|leads|orders|carts|marketing_campaigns|campaign_metrics|attribution_touchpoints|forecast_records|automations|executions)\b/i
       );
     }
     if (/from\s+["'][^"']*(integrations\/providers|connector-adapters|provider-adapters)[^"']*["']/.test(source) &&

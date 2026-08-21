@@ -34,6 +34,7 @@ import { migration033ListeningGuards } from "./033_listening_guards.mjs";
 import { migration034ListeningIntelligence } from "./034_listening_intelligence.mjs";
 import { migration035SemanticFindings } from "./035_semantic_findings.mjs";
 import { migration036IntelligenceRecommendations } from "./036_intelligence_recommendations.mjs";
+import { migration037HumanGovernance } from "./037_human_governance.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -72,4 +73,5 @@ export const migrations = [
   migration034ListeningIntelligence,
   migration035SemanticFindings,
   migration036IntelligenceRecommendations,
+  migration037HumanGovernance,
 ];

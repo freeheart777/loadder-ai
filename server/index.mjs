@@ -23,6 +23,7 @@ import { createListeningRouter } from "./app/routes/listening.mjs";
 import { createListeningIntelligenceRouter } from "./app/routes/listening-intelligence.mjs";
 import { createSemanticIntelligenceRouter } from "./app/routes/semantic-intelligence.mjs";
 import { createRecommendationIntelligenceRouter } from "./app/routes/recommendation-intelligence.mjs";
+import { createHumanGovernanceRouter } from "./app/routes/human-governance.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -48,6 +49,7 @@ import { createListeningRepository } from "./app/repositories/listening-reposito
 import { createListeningIntelligenceRepository } from "./app/repositories/listening-intelligence-repository.mjs";
 import { createSemanticFindingRepository } from "./app/repositories/semantic-finding-repository.mjs";
 import { createIntelligenceRecommendationRepository } from "./app/repositories/intelligence-recommendation-repository.mjs";
+import { createHumanGovernanceRepository } from "./app/repositories/human-governance-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -86,6 +88,8 @@ import { createListeningIntelligenceService } from "./app/services/listening-int
 import { createSemanticIntelligenceService } from "./app/services/semantic-intelligence-service.mjs";
 import { semanticContractRegistry } from "./app/semantic/semantic-contract-registry.mjs";
 import { createRecommendationIntelligenceService } from "./app/services/recommendation-intelligence-service.mjs";
+import { createHumanGovernanceService } from "./app/services/human-governance-service.mjs";
+import { createRecommendationFreshnessQuery } from "./app/recommendations/recommendation-freshness-query.mjs";
 import { recommendationContractRegistry } from "./app/recommendations/recommendation-contract-registry.mjs";
 import {
   createRequireAuth,
@@ -312,6 +316,9 @@ const listeningEventMapperService = createListeningEventMapperService({ registry
 const listeningIntelligenceService = createListeningIntelligenceService({ repository:listeningIntelligenceRepository, contextGateway:businessContextConsumerGateway, intelligenceRepository:intelligenceRecordRepository, featureRepository:featureValueRepository });
 const semanticIntelligenceService = createSemanticIntelligenceService({ repository: semanticFindingRepository, registry: semanticContractRegistry, contextGateway: businessContextConsumerGateway });
 const recommendationIntelligenceService = createRecommendationIntelligenceService({ repository: intelligenceRecommendationRepository, semanticRepository: semanticFindingRepository, registry: recommendationContractRegistry, contextGateway: businessContextConsumerGateway });
+const humanGovernanceRepository = createHumanGovernanceRepository(db);
+const recommendationFreshnessQuery = createRecommendationFreshnessQuery({ recommendationRepository: intelligenceRecommendationRepository, currentContextState: () => { const current = businessContextService.getCurrent(); return { contextVersionId: current.activeContext?.id || null, isStale: current.isStale }; } });
+const humanGovernanceService = createHumanGovernanceService({ repository: humanGovernanceRepository, recommendationRepository: intelligenceRecommendationRepository, freshnessQuery: recommendationFreshnessQuery });
 
 app.use(
   "/api/auth",
@@ -398,6 +405,7 @@ app.use("/api", createListeningRouter({ service: listeningService, mapper: liste
 app.use("/api", createListeningIntelligenceRouter({ service: listeningIntelligenceService }));
 app.use("/api", createSemanticIntelligenceRouter({ service: semanticIntelligenceService }));
 app.use("/api", createRecommendationIntelligenceRouter({ service: recommendationIntelligenceService }));
+app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService }));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));

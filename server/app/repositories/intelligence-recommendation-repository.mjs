@@ -47,5 +47,8 @@ export function createIntelligenceRecommendationRepository(db) {
     const rows = db.prepare(`SELECT * FROM intelligence_recommendations WHERE ${clauses.join(" AND ")} ORDER BY calculated_at DESC,id DESC LIMIT ?`).all(...values).map(map);
     return pageResult(rows, filters.limit, "intelligence_recommendations", (item) => ({ calculatedAt: item.calculatedAt, id: item.id }));
   }
-  return Object.freeze({ findByProducerKey, create, listPage, getById: (id) => map(db.prepare("SELECT * FROM intelligence_recommendations WHERE id=? AND workspace_id=?").get(id, workspace())) });
+  function findNewerForIdentity(item) {
+    return map(db.prepare(`SELECT * FROM intelligence_recommendations WHERE workspace_id=? AND recommendation_type=? AND subject_type=? AND subject_id IS ? AND subject_key=? AND (calculated_at>? OR(calculated_at=? AND id>?)) ORDER BY calculated_at DESC,id DESC LIMIT 1`).get(workspace(),item.recommendationType,item.subjectType,item.subjectId,item.subjectKey,item.calculatedAt,item.calculatedAt,item.id));
+  }
+  return Object.freeze({ findByProducerKey, create, listPage, findNewerForIdentity, getById: (id) => map(db.prepare("SELECT * FROM intelligence_recommendations WHERE id=? AND workspace_id=?").get(id, workspace())) });
 }

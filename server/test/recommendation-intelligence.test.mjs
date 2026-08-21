@@ -8,6 +8,7 @@ import express from "express";
 import crypto from "node:crypto";
 
 import { runMigrations } from "../db/migrate.mjs";
+import { migrations } from "../db/migrations/index.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { recommendationContractRegistry } from "../app/recommendations/recommendation-contract-registry.mjs";
 import { produceAttentionEvidenceReview, produceCompetitiveVisibilityEvidenceReview } from "../app/recommendations/recommendation-producers.mjs";
@@ -29,11 +30,15 @@ test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "loadder-recommendation-")), path = join(dir, "recommendation.sqlite");
   copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
   const db = new Database(path); db.pragma("foreign_keys=ON");
+  if (db.prepare("SELECT 1 FROM schema_migrations WHERE version=37").get()) {
+    db.exec("DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard; DROP TRIGGER IF EXISTS trg_recommendation_reviews_update; DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete; DROP TRIGGER IF EXISTS trg_decision_records_insert_guard; DROP TRIGGER IF EXISTS trg_decision_records_update; DROP TRIGGER IF EXISTS trg_decision_records_delete; DROP TABLE IF EXISTS decision_records; DROP TABLE IF EXISTS recommendation_reviews; DELETE FROM schema_migrations WHERE version=37;");
+  }
   if (db.prepare("SELECT 1 FROM schema_migrations WHERE version=36").get()) {
     db.exec("DROP TRIGGER IF EXISTS trg_intelligence_recommendations_insert_guard; DROP TRIGGER IF EXISTS trg_intelligence_recommendations_update; DROP TRIGGER IF EXISTS trg_intelligence_recommendations_delete; DROP TABLE IF EXISTS intelligence_recommendations; DELETE FROM schema_migrations WHERE version=36;");
   }
   const tableCountBefore = db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c;
-  runMigrations(db); runMigrations(db);
+  runMigrations(db, migrations.filter((migration) => migration.version <= 36));
+  runMigrations(db, migrations.filter((migration) => migration.version <= 36));
   for (const workspace of ["recommendation-a", "recommendation-b"]) {
     db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at) VALUES(?,?,?,?,?)").run(workspace, workspace, workspace, AT, AT);
     db.prepare("INSERT INTO business_profiles(id,workspace_id,name,status,created_at,updated_at) VALUES(?,?,?,?,?,?)").run(`p-${workspace}`, workspace, workspace, "active", AT, AT);
