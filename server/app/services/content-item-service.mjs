@@ -45,6 +45,7 @@ const safe = (item, asset = null) => item && Object.freeze({
   placementId: item.placementId, placementVersion: item.placementVersion, title: item.title, content: item.content,
   revision: item.revision, sourceGenerationId: item.sourceGenerationId, sourceVariantIndex: item.sourceVariantIndex,
   contextVersionId: item.contextVersionId, createdAt: item.createdAt, updatedAt: item.updatedAt,
+  intentId: item.intentId,
   primaryAsset: asset ? Object.freeze({ id: asset.id, mediaType: asset.mediaType, mimeType: asset.canonicalMimeType || asset.mimeType, byteSize: asset.canonicalByteSize || asset.byteSize, width: asset.width, height: asset.height, durationMs: asset.durationMs, originalFilename: asset.originalFilename, status: asset.status }) : null,
 });
 const advancingTimestamp = (candidate, previous) => candidate > previous ? candidate : new Date(Date.parse(previous) + 1).toISOString();
@@ -90,7 +91,7 @@ export function createContentItemService({ repository, generationRepository, ass
       const contract = contractFor(contractRegistry, generation), content = validate(contract, generation.variants[input.variantIndex]);
       const timestamp = now().toISOString();
       const derivedTitle = normalizedTitle ?? `${LABELS[generation.contractId] || "محتوا"} — ${timestamp.slice(0, 10)}`;
-      const result = repository.create({ userId: actor.userId, sourceType: "AI_GENERATED", sourceGenerationId: generation.generationId, sourceVariantIndex: input.variantIndex, mediaType: generation.mediaType, contractId: generation.contractId, contractVersion: generation.contractVersion, placementId: generation.placementId, placementVersion: generation.placementVersion, contextVersionId: generation.contextVersionId, title: derivedTitle, content, operationKind: "content_item.save", idempotencyKey, requestHash, now: timestamp });
+      const result = repository.create({ userId: actor.userId, sourceType: "AI_GENERATED", sourceGenerationId: generation.generationId, sourceVariantIndex: input.variantIndex, mediaType: generation.mediaType, contractId: generation.contractId, contractVersion: generation.contractVersion, placementId: generation.placementId, placementVersion: generation.placementVersion, contextVersionId: generation.contextVersionId, intentId: generation.intentId, title: derivedTitle, content, operationKind: "content_item.save", idempotencyKey, requestHash, now: timestamp });
       if (!result.created && result.item.requestHash !== requestHash) fail("CONTENT_ITEM_IDEMPOTENCY_CONFLICT", 409);
       metric("content_item.save", started, { mediaType: generation.mediaType, contractId: generation.contractId, contractVersion: generation.contractVersion, placementId: generation.placementId, placementVersion: generation.placementVersion, rowsWritten: Number(result.created), reusedResult: !result.created });
       return { item: safe(result.item), reusedResult: !result.created };
@@ -150,7 +151,7 @@ export function createContentItemService({ repository, generationRepository, ass
       if (replay) { metric("content_item.duplicate", started, { reusedResult: true, rowsRead: 1 }); return { item: safe(replay), reusedResult: true }; }
       const stored = getStored(id); if (!stored.primaryAssetId) contractFor(contractRegistry, stored);
       const timestamp = now().toISOString();
-      const result = repository.create({ userId: actor.userId, sourceType: stored.sourceType, sourceGenerationId: stored.sourceGenerationId, sourceVariantIndex: stored.sourceVariantIndex, mediaType: stored.mediaType, contractId: stored.contractId, contractVersion: stored.contractVersion, placementId: stored.placementId, placementVersion: stored.placementVersion, contextVersionId: stored.contextVersionId, primaryAssetId: stored.primaryAssetId, title: normalizedTitle ?? `${stored.title} — نسخه کپی`, content: stored.content, operationKind: "content_item.duplicate", idempotencyKey, requestHash, now: timestamp });
+      const result = repository.create({ userId: actor.userId, sourceType: stored.sourceType, sourceGenerationId: stored.sourceGenerationId, sourceVariantIndex: stored.sourceVariantIndex, mediaType: stored.mediaType, contractId: stored.contractId, contractVersion: stored.contractVersion, placementId: stored.placementId, placementVersion: stored.placementVersion, contextVersionId: stored.contextVersionId, intentId: stored.intentId, primaryAssetId: stored.primaryAssetId, title: normalizedTitle ?? `${stored.title} — نسخه کپی`, content: stored.content, operationKind: "content_item.duplicate", idempotencyKey, requestHash, now: timestamp });
       if (!result.created && result.item.requestHash !== requestHash) fail("CONTENT_ITEM_IDEMPOTENCY_CONFLICT", 409);
       metric("content_item.duplicate", started, { rowsWritten: Number(result.created), reusedResult: !result.created, mediaType: stored.mediaType, contractId: stored.contractId, contractVersion: stored.contractVersion, placementId: stored.placementId, placementVersion: stored.placementVersion });
       return { item: present(result.item), reusedResult: !result.created };

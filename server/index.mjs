@@ -41,6 +41,7 @@ import { createContentGenerationRouter } from "./app/routes/content-generation.m
 import { createContentItemRouter } from "./app/routes/content-items.mjs";
 import { createContentAssetRouter } from "./app/routes/content-assets.mjs";
 import { createCreativePlacementRouter } from "./app/routes/creative-placements.mjs";
+import { createCreativeIntentRouter } from "./app/routes/creative-intents.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -77,6 +78,7 @@ import { createContentGenerationRepository } from "./app/repositories/content-ge
 import { createContentItemRepository } from "./app/repositories/content-item-repository.mjs";
 import { createContentAssetRepository } from "./app/repositories/content-asset-repository.mjs";
 import { createCreativePlacementRepository } from "./app/repositories/creative-placement-repository.mjs";
+import { createCreativeIntentRepository } from "./app/repositories/creative-intent-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -88,6 +90,7 @@ import { createContentGenerationService } from "./app/services/content-generatio
 import { createContentItemService } from "./app/services/content-item-service.mjs";
 import { createContentAssetService } from "./app/services/content-asset-service.mjs";
 import { createCreativePlacementService } from "./app/services/creative-placement-service.mjs";
+import { createCreativeIntentService } from "./app/services/creative-intent-service.mjs";
 import { createUnavailableContentAssetStore } from "./app/content-assets/content-asset-store.mjs";
 import { createR2ContentAssetStore } from "./app/content-assets/r2-content-asset-store.mjs";
 import { createContentGenerationRateLimiter } from "./app/content-generation/content-generation-rate-limiter.mjs";
@@ -287,6 +290,7 @@ const contentGenerationRepository = createContentGenerationRepository(db);
 const contentItemRepository = createContentItemRepository(db);
 const contentAssetRepository = createContentAssetRepository(db);
 const creativePlacementRepository = createCreativePlacementRepository(db);
+const creativeIntentRepository = createCreativeIntentRepository(db);
 const businessEventRepository = createBusinessEventRepository(db);
 const intelligenceRecordRepository = createIntelligenceRecordRepository(db);
 const featureValueRepository = createFeatureValueRepository(db);
@@ -338,6 +342,7 @@ const textAiContextConsumer = createTextAiContextConsumer({
 });
 const contentGenerationService = createContentGenerationService({
   repository: contentGenerationRepository,
+  intentRepository: creativeIntentRepository,
   contractRegistry: generationContractRegistry,
   placementRegistry: contentPlacementRegistry,
   providerBindingRegistry: textProviderBindingRegistry,
@@ -357,6 +362,7 @@ const contentItemService = createContentItemService({
 const contentAssetStore = environment.contentAssetStorage.provider === "r2" ? (createR2ContentAssetStore(environment.contentAssetStorage) || createUnavailableContentAssetStore()) : createUnavailableContentAssetStore();
 const contentAssetService = createContentAssetService({ repository: contentAssetRepository, store: contentAssetStore, operationMetrics: createOperationMetrics() });
 const creativePlacementService = createCreativePlacementService({ repository: creativePlacementRepository, contentItemRepository, operationMetrics: createOperationMetrics() });
+const creativeIntentService = createCreativeIntentService({ repository: creativeIntentRepository, operationMetrics: createOperationMetrics() });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
   featureRegistry,
@@ -506,6 +512,7 @@ app.use("/api", createContentGenerationRouter({ service: contentGenerationServic
 app.use("/api", createContentItemRouter({ service: contentItemService }));
 app.use("/api", createContentAssetRouter({ service: contentAssetService }));
 app.use("/api", createCreativePlacementRouter({ service: creativePlacementService }));
+app.use("/api", createCreativeIntentRouter({ service: creativeIntentService }));
 app.use(
   "/api",
   createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })

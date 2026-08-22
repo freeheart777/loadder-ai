@@ -6,7 +6,8 @@ import { projectGenerationContext } from "../content-generation/generation-conte
 import { composeTextGenerationTemplate } from "../content-generation/template-registry.mjs";
 import { TextProviderError } from "../content-generation/openai-text-provider.mjs";
 
-const REQUEST_FIELDS = ["contractId", "contractVersion", "placementId", "placementVersion", "brief", "variantCount"];
+const REQUIRED_REQUEST_FIELDS = ["contractId", "contractVersion", "placementId", "placementVersion", "brief", "variantCount"];
+const REQUEST_FIELDS = [...REQUIRED_REQUEST_FIELDS, "intentId"];
 const DISABLED_CONTRACTS = new Set(["social_image", "story_image", "website_hero_image", "display_banner", "short_ad_video", "reel_story_video", "product_promo_video", "brand_intro_video"]);
 const PROVIDER_FAILURES = new Set(["CONTENT_PROVIDER_UNAVAILABLE", "CONTENT_PROVIDER_TIMEOUT", "CONTENT_OUTPUT_INVALID", "CONTENT_GENERATION_FAILED"]);
 const canonical = (value) => value === null || typeof value !== "object" ? JSON.stringify(value) : Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
@@ -17,14 +18,15 @@ export class ContentGenerationError extends Error {
 }
 
 function request(input) {
-  if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key) => !REQUEST_FIELDS.includes(key)) || REQUEST_FIELDS.some((key) => !Object.hasOwn(input, key))) throw new ContentGenerationError("CONTENT_INPUT_INVALID");
+  if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key) => !REQUEST_FIELDS.includes(key)) || REQUIRED_REQUEST_FIELDS.some((key) => !Object.hasOwn(input, key))) throw new ContentGenerationError("CONTENT_INPUT_INVALID");
   if (typeof input.contractId !== "string" || !/^[a-z][a-z0-9_]{0,99}$/.test(input.contractId) || !Number.isInteger(input.contractVersion) || input.contractVersion < 1 || typeof input.placementId !== "string" || !/^[a-z][a-z0-9_.]{0,99}$/.test(input.placementId) || !Number.isInteger(input.placementVersion) || input.placementVersion < 1 || !Number.isInteger(input.variantCount) || input.variantCount < 1) throw new ContentGenerationError("CONTENT_INPUT_INVALID");
   let brief;
   try { brief = validateContentBrief(input.brief); } catch { throw new ContentGenerationError("CONTENT_INPUT_INVALID"); }
-  return Object.freeze({ ...input, brief });
+  if (input.intentId !== undefined && input.intentId !== null && (typeof input.intentId !== "string" || !input.intentId || input.intentId.length > 100)) throw new ContentGenerationError("CONTENT_INPUT_INVALID");
+  return Object.freeze({ ...input, intentId: input.intentId ?? null, brief });
 }
 
-export function createContentGenerationService({ repository, contractRegistry, placementRegistry, providerBindingRegistry, contextGateway, provider, rateLimiter, operationMetrics, now = () => new Date() }) {
+export function createContentGenerationService({ repository, intentRepository, contractRegistry, placementRegistry, providerBindingRegistry, contextGateway, provider, rateLimiter, operationMetrics, now = () => new Date() }) {
   const inflight = new Map();
   const metric = (start, input) => operationMetrics.record({ operation: "content.generate", workspaceId: requireWorkspaceId(), durationMs: performance.now() - start, ...input });
   function resolveContext(userId, key) {
@@ -52,13 +54,13 @@ export function createContentGenerationService({ repository, contractRegistry, p
       let variants;
       try { variants = contract.validateOutput(result.output, normalized.variantCount); }
       catch { throw new TextProviderError("CONTENT_OUTPUT_INVALID"); }
-      const saved = repository.create({ userId: actor.userId, mediaType: contract.mediaType, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, contextVersionId: generationContext.contextVersionId, templateVersion: contract.templateVersion, providerBinding: binding.bindingId, providerBindingVersion: binding.bindingVersion, providerModel: binding.model, briefHash, requestFingerprint: fingerprint, idempotencyKey, requestHash, status: "SUCCEEDED", normalizedResult: { variants }, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, estimatedCostMinor: null, costCurrency: null, errorCode: null, createdAt, completedAt: now().toISOString() });
+      const saved = repository.create({ userId: actor.userId, intentId: normalized.intentId, mediaType: contract.mediaType, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, contextVersionId: generationContext.contextVersionId, templateVersion: contract.templateVersion, providerBinding: binding.bindingId, providerBindingVersion: binding.bindingVersion, providerModel: binding.model, briefHash, requestFingerprint: fingerprint, idempotencyKey, requestHash, status: "SUCCEEDED", normalizedResult: { variants }, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, estimatedCostMinor: null, costCurrency: null, errorCode: null, createdAt, completedAt: now().toISOString() });
       const finalResult = saved.created ? { generation: saved.generation, reusedResult: false } : priorResult(saved.generation, fingerprint);
       metric(started, { mediaType: contract.mediaType, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, providerKind: binding.providerKind, providerBindingVersion: binding.bindingVersion, providerModel: binding.model, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, rowsWritten: Number(saved.created), resultCount: variants.length, reusedResult: finalResult.reusedResult });
       return finalResult;
     } catch (error) {
       const code = error instanceof TextProviderError ? error.code : error instanceof ContentGenerationError ? error.code : "CONTENT_GENERATION_FAILED";
-      if (PROVIDER_FAILURES.has(code)) repository.create({ userId: actor.userId, mediaType: contract.mediaType, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, contextVersionId: generationContext.contextVersionId, templateVersion: contract.templateVersion, providerBinding: binding.bindingId, providerBindingVersion: binding.bindingVersion, providerModel: binding.model, briefHash, requestFingerprint: fingerprint, idempotencyKey, requestHash, status: "FAILED", normalizedResult: null, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, estimatedCostMinor: null, costCurrency: null, errorCode: code, createdAt, completedAt: now().toISOString() });
+      if (PROVIDER_FAILURES.has(code)) repository.create({ userId: actor.userId, intentId: normalized.intentId, mediaType: contract.mediaType, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, contextVersionId: generationContext.contextVersionId, templateVersion: contract.templateVersion, providerBinding: binding.bindingId, providerBindingVersion: binding.bindingVersion, providerModel: binding.model, briefHash, requestFingerprint: fingerprint, idempotencyKey, requestHash, status: "FAILED", normalizedResult: null, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, estimatedCostMinor: null, costCurrency: null, errorCode: code, createdAt, completedAt: now().toISOString() });
       metric(started, { mediaType: contract.mediaType, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, providerKind: binding.providerKind, providerBindingVersion: binding.bindingVersion, providerModel: binding.model, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, rowsWritten: Number(PROVIDER_FAILURES.has(code)), errorCode: code });
       if (error instanceof ContentGenerationError) throw error;
       throw new ContentGenerationError(code, code === "CONTENT_PROVIDER_UNAVAILABLE" ? 503 : code === "CONTENT_PROVIDER_TIMEOUT" ? 504 : 502);
@@ -69,6 +71,7 @@ export function createContentGenerationService({ repository, contractRegistry, p
       const started = performance.now();
       if (typeof idempotencyKey !== "string" || !idempotencyKey.trim() || idempotencyKey.length > 200) throw new ContentGenerationError("CONTENT_INPUT_INVALID");
       const normalized = request(input);
+      if (normalized.intentId && !intentRepository.findById(normalized.intentId)) throw new ContentGenerationError("CREATIVE_INTENT_NOT_FOUND", 404);
       if (DISABLED_CONTRACTS.has(normalized.contractId)) throw new ContentGenerationError("CONTENT_MEDIA_DISABLED", 409);
       const contract = contractRegistry.get(normalized.contractId, normalized.contractVersion);
       if (!contract) throw new ContentGenerationError("CONTENT_CONTRACT_NOT_FOUND", 404);
@@ -83,7 +86,7 @@ export function createContentGenerationService({ repository, contractRegistry, p
       let generationContext;
       try { generationContext = projectGenerationContext(contextResult, normalized.brief); }
       catch { throw new ContentGenerationError("CONTENT_CONTEXT_UNSUPPORTED", 422); }
-      const fingerprint = hash({ contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, contextVersionId: generationContext.contextVersionId, brief: normalized.brief, variantCount: normalized.variantCount });
+      const fingerprint = hash({ intentId: normalized.intentId, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, contextVersionId: generationContext.contextVersionId, brief: normalized.brief, variantCount: normalized.variantCount });
       const requestHash = hash({ operation: "content.generate", fingerprint });
       const prior = repository.findByIdempotency(actor.userId, idempotencyKey.trim());
       if (prior) { const result = priorResult(prior, fingerprint); metric(started, { mediaType: contract.mediaType, contractId: contract.contractId, contractVersion: contract.contractVersion, placementId: placement.placementId, placementVersion: placement.placementVersion, reusedResult: true, resultCount: result.generation.variants?.length || 0, rowsRead: 1 }); return result; }
