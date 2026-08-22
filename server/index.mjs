@@ -44,6 +44,7 @@ import { createCreativePlacementRouter } from "./app/routes/creative-placements.
 import { createCreativeIntentRouter } from "./app/routes/creative-intents.mjs";
 import { createDistributionContextRouter } from "./app/routes/distribution-contexts.mjs";
 import { createAttributionTouchRouter } from "./app/routes/attribution-touches.mjs";
+import { createPerformanceObservationRouter } from "./app/routes/performance-observations.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -83,6 +84,7 @@ import { createCreativePlacementRepository } from "./app/repositories/creative-p
 import { createCreativeIntentRepository } from "./app/repositories/creative-intent-repository.mjs";
 import { createDistributionContextRepository } from "./app/repositories/distribution-context-repository.mjs";
 import { createAttributionTouchRepository } from "./app/repositories/attribution-touch-repository.mjs";
+import { createPerformanceObservationRepository } from "./app/repositories/performance-observation-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -97,10 +99,12 @@ import { createCreativePlacementService } from "./app/services/creative-placemen
 import { createCreativeIntentService } from "./app/services/creative-intent-service.mjs";
 import { createDistributionContextService } from "./app/services/distribution-context-service.mjs";
 import { createAttributionTouchService } from "./app/services/attribution-touch-service.mjs";
+import { createPerformanceObservationService } from "./app/services/performance-observation-service.mjs";
 import { createUnavailableContentAssetStore } from "./app/content-assets/content-asset-store.mjs";
 import { createR2ContentAssetStore } from "./app/content-assets/r2-content-asset-store.mjs";
 import { createContentGenerationRateLimiter } from "./app/content-generation/content-generation-rate-limiter.mjs";
 import { channelRegistry } from "./app/distribution/channel-registry.mjs";
+import { observationContractRegistry } from "./app/performance/observation-contract-registry.mjs";
 import { generationContractRegistry } from "./app/content-generation/contract-registry.mjs";
 import { contentPlacementRegistry } from "./app/content-generation/placement-registry.mjs";
 import { textProviderBindingRegistry } from "./app/content-generation/provider-binding-registry.mjs";
@@ -300,6 +304,7 @@ const creativePlacementRepository = createCreativePlacementRepository(db);
 const creativeIntentRepository = createCreativeIntentRepository(db);
 const distributionContextRepository = createDistributionContextRepository(db);
 const attributionTouchRepository = createAttributionTouchRepository(db);
+const performanceObservationRepository = createPerformanceObservationRepository(db);
 const businessEventRepository = createBusinessEventRepository(db);
 const intelligenceRecordRepository = createIntelligenceRecordRepository(db);
 const featureValueRepository = createFeatureValueRepository(db);
@@ -374,6 +379,7 @@ const creativePlacementService = createCreativePlacementService({ repository: cr
 const creativeIntentService = createCreativeIntentService({ repository: creativeIntentRepository, operationMetrics: createOperationMetrics() });
 const distributionContextService = createDistributionContextService({ repository: distributionContextRepository, placementRepository: creativePlacementRepository, registry: channelRegistry, operationMetrics: createOperationMetrics() });
 const attributionTouchService = createAttributionTouchService({ repository: attributionTouchRepository, distributionContextRepository, operationMetrics: createOperationMetrics() });
+const performanceObservationService = createPerformanceObservationService({ repository: performanceObservationRepository, distributionContextRepository, attributionTouchRepository, registry: observationContractRegistry, operationMetrics: createOperationMetrics() });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
   featureRegistry,
@@ -526,6 +532,7 @@ app.use("/api", createCreativePlacementRouter({ service: creativePlacementServic
 app.use("/api", createCreativeIntentRouter({ service: creativeIntentService }));
 app.use("/api", createDistributionContextRouter({ service: distributionContextService }));
 app.use("/api", createAttributionTouchRouter({ service: attributionTouchService }));
+app.use("/api", createPerformanceObservationRouter({ service: performanceObservationService }));
 app.use(
   "/api",
   createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })
