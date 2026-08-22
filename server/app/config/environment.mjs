@@ -90,4 +90,12 @@ export const environment = Object.freeze({
     nodeEnv !== "production" && process.env.LOADDER_SEED_DEMO_DATA !== "false",
   internalAccessToken: process.env.LOADDER_INTERNAL_ACCESS_TOKEN || "",
   productFeatureOverrides: parseFeatureOverrides(process.env.PRODUCT_FEATURE_OVERRIDES),
+  contentAssetStorage: Object.freeze({
+    provider: process.env.CONTENT_ASSET_STORAGE_PROVIDER || "unavailable",
+    accountId: process.env.R2_ACCOUNT_ID || "",
+    bucket: process.env.R2_BUCKET || "",
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+    mediaRuntimeAvailable: process.env.CONTENT_ASSET_FFPROBE_AVAILABLE === "true",
+  }),
 });

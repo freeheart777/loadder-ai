@@ -39,6 +39,7 @@ import { createProviderAccountIdentityRouter } from "./app/routes/provider-accou
 import { createExecutionLedgerRouter } from "./app/routes/execution-ledger.mjs";
 import { createContentGenerationRouter } from "./app/routes/content-generation.mjs";
 import { createContentItemRouter } from "./app/routes/content-items.mjs";
+import { createContentAssetRouter } from "./app/routes/content-assets.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -85,6 +86,7 @@ import { createContentGenerationService } from "./app/services/content-generatio
 import { createContentItemService } from "./app/services/content-item-service.mjs";
 import { createContentAssetService } from "./app/services/content-asset-service.mjs";
 import { createUnavailableContentAssetStore } from "./app/content-assets/content-asset-store.mjs";
+import { createR2ContentAssetStore } from "./app/content-assets/r2-content-asset-store.mjs";
 import { createContentGenerationRateLimiter } from "./app/content-generation/content-generation-rate-limiter.mjs";
 import { generationContractRegistry } from "./app/content-generation/contract-registry.mjs";
 import { contentPlacementRegistry } from "./app/content-generation/placement-registry.mjs";
@@ -347,8 +349,8 @@ const contentItemService = createContentItemService({
   placementRegistry: contentPlacementRegistry,
   operationMetrics: createOperationMetrics(),
 });
-const contentAssetStore = createUnavailableContentAssetStore();
-createContentAssetService({ repository: contentAssetRepository, store: contentAssetStore, operationMetrics: createOperationMetrics() });
+const contentAssetStore = environment.contentAssetStorage.provider === "r2" ? (createR2ContentAssetStore(environment.contentAssetStorage) || createUnavailableContentAssetStore()) : createUnavailableContentAssetStore();
+const contentAssetService = createContentAssetService({ repository: contentAssetRepository, store: contentAssetStore, operationMetrics: createOperationMetrics() });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
   featureRegistry,
@@ -496,6 +498,7 @@ app.use(
 );
 app.use("/api", createContentGenerationRouter({ service: contentGenerationService }));
 app.use("/api", createContentItemRouter({ service: contentItemService }));
+app.use("/api", createContentAssetRouter({ service: contentAssetService }));
 app.use(
   "/api",
   createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })

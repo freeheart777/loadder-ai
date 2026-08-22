@@ -19,12 +19,20 @@ function inspect(target) {
   if (!target.endsWith(".mjs")) return;
   const source = readFileSync(target, "utf8");
   if (target.includes(`${path.sep}content-assets${path.sep}`) || target.endsWith(`${path.sep}content-asset-service.mjs`) || target.endsWith(`${path.sep}content-asset-repository.mjs`)) {
+    const isMediaVerifier = target.endsWith(`${path.sep}content-assets${path.sep}media-verifier.mjs`);
+    const isObjectStorageAdapter = target.endsWith(`${path.sep}content-assets${path.sep}r2-content-asset-store.mjs`);
     const forbidden = [
-      /from\s+["'][^"']*(openai|cloudflare|provider-binding|execution-capabilit|action-proposal|execution-request|dispatch-job|messaging|automation|legacy-crm|campaign|worker|queue|supabase|ffmpeg|ffprobe|sharp|aws-sdk|client-s3)[^"']*["']/i,
+      /from\s+["'][^"']*(openai|cloudflare|provider-binding|execution-capabilit|action-proposal|execution-request|dispatch-job|messaging|automation|legacy-crm|campaign|worker|queue|supabase)[^"']*["']/i,
       /\b(action_proposals|execution_requests|execution_dispatch_jobs|content_items|creative_placements|performance_observations)\b/i,
       /from\s+["'][^"']*db\/database\.mjs["']/,
       /\b(fetch|setInterval|setTimeout)\s*\(/,
     ];
+    if (!isMediaVerifier) forbidden.push(/from\s+["'][^"']*(ffmpeg|ffprobe|sharp)[^"']*["']/i);
+    if (!isObjectStorageAdapter) forbidden.push(/from\s+["'][^"']*(aws-sdk|client-s3|s3-request-presigner)[^"']*["']/i);
+    if (isObjectStorageAdapter) {
+      const awsImports = [...source.matchAll(/from\s+["'](@aws-sdk\/[^"']+)["']/g)].map((match) => match[1]);
+      if (awsImports.some((specifier) => !["@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"].includes(specifier))) contentAssetBoundaryViolations.push(path.relative(serverRoot, target));
+    }
     if (forbidden.some((pattern) => pattern.test(source))) contentAssetBoundaryViolations.push(path.relative(serverRoot, target));
   }
   if (target.includes(`${path.sep}content-items${path.sep}`) || target.endsWith(`${path.sep}content-item-service.mjs`) || target.endsWith(`${path.sep}content-item-repository.mjs`) || target.endsWith(`${path.sep}content-items.mjs`)) {
