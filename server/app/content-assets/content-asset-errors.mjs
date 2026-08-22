@@ -11,6 +11,7 @@ export const CONTENT_ASSET_ERROR_CODES = Object.freeze([
   "CONTENT_ASSET_INTEGRITY_FAILED",
   "CONTENT_ASSET_MEDIA_INVALID",
   "CONTENT_ASSET_BUSY",
+  "CONTENT_ASSET_IN_USE",
 ]);
 
 export const isContentAssetErrorCode = (value) => CONTENT_ASSET_ERROR_CODES.includes(value);

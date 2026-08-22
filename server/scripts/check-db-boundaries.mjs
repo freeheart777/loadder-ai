@@ -23,7 +23,7 @@ function inspect(target) {
     const isObjectStorageAdapter = target.endsWith(`${path.sep}content-assets${path.sep}r2-content-asset-store.mjs`);
     const forbidden = [
       /from\s+["'][^"']*(openai|cloudflare|provider-binding|execution-capabilit|action-proposal|execution-request|dispatch-job|messaging|automation|legacy-crm|campaign|worker|queue|supabase)[^"']*["']/i,
-      /\b(action_proposals|execution_requests|execution_dispatch_jobs|content_items|creative_placements|performance_observations)\b/i,
+      /\b(action_proposals|execution_requests|execution_dispatch_jobs|creative_placements|performance_observations)\b/i,
       /from\s+["'][^"']*db\/database\.mjs["']/,
       /\b(fetch|setInterval|setTimeout)\s*\(/,
     ];

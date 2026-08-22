@@ -9,6 +9,7 @@ const SAVE_FIELDS = ["variantIndex", "title"];
 const UPDATE_FIELDS = ["title", "content", "expectedRevision"];
 const DUPLICATE_FIELDS = ["title"];
 const MANUAL_FIELDS = ["contractId", "contractVersion", "placementId", "placementVersion", "title", "content"];
+const ASSET_FIELDS = ["assetId", "title"];
 const LABELS = Object.freeze({ social_post: "پست اینستاگرام", ad_copy: "متن تبلیغ", marketing_email: "ایمیل بازاریابی", blog_outline: "طرح مقاله", landing_page_copy: "متن صفحه فرود" });
 const canonical = (value) => value === null || typeof value !== "object" ? JSON.stringify(value) : Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
 const hash = (value) => crypto.createHash("sha256").update(canonical(value)).digest("hex");
@@ -39,17 +40,19 @@ const validate = (contract, content) => {
   if ([...JSON.stringify(content)].length > 35000) fail("CONTENT_ITEM_INVALID");
   return content;
 };
-const safe = (item) => item && Object.freeze({
+const safe = (item, asset = null) => item && Object.freeze({
   id: item.contentItemId, sourceType: item.sourceType, mediaType: item.mediaType, contractId: item.contractId, contractVersion: item.contractVersion,
   placementId: item.placementId, placementVersion: item.placementVersion, title: item.title, content: item.content,
   revision: item.revision, sourceGenerationId: item.sourceGenerationId, sourceVariantIndex: item.sourceVariantIndex,
   contextVersionId: item.contextVersionId, createdAt: item.createdAt, updatedAt: item.updatedAt,
+  primaryAsset: asset ? Object.freeze({ id: asset.id, mediaType: asset.mediaType, mimeType: asset.canonicalMimeType || asset.mimeType, byteSize: asset.canonicalByteSize || asset.byteSize, width: asset.width, height: asset.height, durationMs: asset.durationMs, originalFilename: asset.originalFilename, status: asset.status }) : null,
 });
 const advancingTimestamp = (candidate, previous) => candidate > previous ? candidate : new Date(Date.parse(previous) + 1).toISOString();
 
-export function createContentItemService({ repository, generationRepository, contractRegistry, placementRegistry, operationMetrics, now = () => new Date() }) {
+export function createContentItemService({ repository, generationRepository, assetRepository, contractRegistry, placementRegistry, operationMetrics, now = () => new Date() }) {
   const metric = (operation, started, data = {}) => operationMetrics.record({ operation, workspaceId: requireWorkspaceId(), durationMs: performance.now() - started, ...data });
   const getStored = (id) => repository.findById(id) || fail("CONTENT_ITEM_NOT_FOUND", 404);
+  const present = (item) => safe(item, item?.primaryAssetId ? assetRepository.findById(item.primaryAssetId) : null);
   const prior = (userId, operation, idempotencyKey, requestHash) => {
     const item = repository.findByIdempotency(userId, operation, idempotencyKey);
     if (!item) return null;
@@ -57,6 +60,22 @@ export function createContentItemService({ repository, generationRepository, con
     return item;
   };
   return Object.freeze({
+    createFromAsset(input, actor, rawKey) {
+      const started = performance.now(); permission(actor);
+      if (!exact(input, ASSET_FIELDS) || ASSET_FIELDS.some((field) => !Object.hasOwn(input, field)) || typeof input.assetId !== "string" || !input.assetId) fail("CONTENT_ITEM_INVALID");
+      assertContentSourceCreationEnabled("CLIENT_UPLOADED");
+      const normalizedTitle = title(input.title), idempotencyKey = key(rawKey), requestHash = hash({ assetId: input.assetId, title: normalizedTitle });
+      const replay = prior(actor.userId, "content_item.from_asset", idempotencyKey, requestHash);
+      if (replay) return { item: present(replay), reusedResult: true };
+      const asset = assetRepository.findById(input.assetId);
+      if (!asset) fail("CONTENT_ASSET_NOT_FOUND", 404);
+      if (asset.status !== "READY") fail("CONTENT_ASSET_NOT_READY", 409);
+      const timestamp = now().toISOString();
+      const result = repository.create({ userId: actor.userId, sourceType: "CLIENT_UPLOADED", sourceGenerationId: null, sourceVariantIndex: null, mediaType: asset.mediaType, contractId: null, contractVersion: null, placementId: null, placementVersion: null, contextVersionId: null, primaryAssetId: asset.id, title: normalizedTitle, content: {}, operationKind: "content_item.from_asset", idempotencyKey, requestHash, now: timestamp });
+      if (!result.created && result.item.requestHash !== requestHash) fail("CONTENT_ITEM_IDEMPOTENCY_CONFLICT", 409);
+      metric("content_item.from_asset", started, { mediaType: asset.mediaType, rowsWritten: Number(result.created), reusedResult: !result.created });
+      return { item: present(result.item), reusedResult: !result.created };
+    },
     saveGeneration(generationId, input, actor, rawKey) {
       const started = performance.now(); permission(actor);
       if (!exact(input, SAVE_FIELDS) || !Number.isInteger(input.variantIndex) || input.variantIndex < 0) fail("CONTENT_ITEM_INVALID");
@@ -106,19 +125,21 @@ export function createContentItemService({ repository, generationRepository, con
       let cursor; try { cursor = decodeCursor(query.cursor, "content_items", ["updatedAt", "id"]); } catch { fail("CONTENT_ITEM_INVALID"); }
       const page = repository.listPage({ limit, cursor, mediaType: query.mediaType, contractId: query.contractId, placementId: query.placementId });
       metric("content_item.list", started, { rowsRead: page.items.length, resultCount: page.items.length });
-      return { items: page.items.map(safe), nextCursor: page.nextCursor };
+      return { items: page.items.map(present), nextCursor: page.nextCursor };
     },
-    get(id, actor) { const started = performance.now(); permission(actor); const item = getStored(id); metric("content_item.get", started, { rowsRead: 1, mediaType: item.mediaType, contractId: item.contractId, contractVersion: item.contractVersion, placementId: item.placementId, placementVersion: item.placementVersion }); return safe(item); },
+    get(id, actor) { const started = performance.now(); permission(actor); const item = getStored(id); metric("content_item.get", started, { rowsRead: 1, mediaType: item.mediaType, contractId: item.contractId, contractVersion: item.contractVersion, placementId: item.placementId, placementVersion: item.placementVersion }); return present(item); },
     update(id, input, actor) {
       const started = performance.now(); permission(actor);
       if (!exact(input, UPDATE_FIELDS) || !Number.isInteger(input.expectedRevision) || input.expectedRevision < 1 || (input.title === undefined && input.content === undefined)) fail("CONTENT_ITEM_INVALID");
-      const stored = getStored(id), contract = contractFor(contractRegistry, stored);
+      const stored = getStored(id);
+      if (stored.primaryAssetId && (input.content !== undefined || input.title === undefined)) fail("CONTENT_ITEM_INVALID");
+      const contract = stored.primaryAssetId ? null : contractFor(contractRegistry, stored);
       const nextTitle = input.title === undefined ? stored.title : title(input.title);
       const nextContent = input.content === undefined ? stored.content : validate(contract, input.content);
       const updated = repository.update(id, input.expectedRevision, { title: nextTitle, content: nextContent, now: advancingTimestamp(now().toISOString(), stored.updatedAt) });
       if (!updated) { if (!repository.findById(id)) fail("CONTENT_ITEM_NOT_FOUND", 404); fail("CONTENT_ITEM_REVISION_CONFLICT", 409); }
       metric("content_item.update", started, { rowsWritten: 1, mediaType: updated.mediaType, contractId: updated.contractId, contractVersion: updated.contractVersion, placementId: updated.placementId, placementVersion: updated.placementVersion });
-      return safe(updated);
+      return present(updated);
     },
     duplicate(id, input, actor, rawKey) {
       const started = performance.now(); permission(actor);
@@ -127,12 +148,12 @@ export function createContentItemService({ repository, generationRepository, con
       const requestHash = hash({ contentItemId: id, title: normalizedTitle ?? null });
       const replay = prior(actor.userId, "content_item.duplicate", idempotencyKey, requestHash);
       if (replay) { metric("content_item.duplicate", started, { reusedResult: true, rowsRead: 1 }); return { item: safe(replay), reusedResult: true }; }
-      const stored = getStored(id); contractFor(contractRegistry, stored);
+      const stored = getStored(id); if (!stored.primaryAssetId) contractFor(contractRegistry, stored);
       const timestamp = now().toISOString();
-      const result = repository.create({ userId: actor.userId, sourceType: stored.sourceType, sourceGenerationId: stored.sourceGenerationId, sourceVariantIndex: stored.sourceVariantIndex, mediaType: stored.mediaType, contractId: stored.contractId, contractVersion: stored.contractVersion, placementId: stored.placementId, placementVersion: stored.placementVersion, contextVersionId: stored.contextVersionId, title: normalizedTitle ?? `${stored.title} — نسخه کپی`, content: stored.content, operationKind: "content_item.duplicate", idempotencyKey, requestHash, now: timestamp });
+      const result = repository.create({ userId: actor.userId, sourceType: stored.sourceType, sourceGenerationId: stored.sourceGenerationId, sourceVariantIndex: stored.sourceVariantIndex, mediaType: stored.mediaType, contractId: stored.contractId, contractVersion: stored.contractVersion, placementId: stored.placementId, placementVersion: stored.placementVersion, contextVersionId: stored.contextVersionId, primaryAssetId: stored.primaryAssetId, title: normalizedTitle ?? `${stored.title} — نسخه کپی`, content: stored.content, operationKind: "content_item.duplicate", idempotencyKey, requestHash, now: timestamp });
       if (!result.created && result.item.requestHash !== requestHash) fail("CONTENT_ITEM_IDEMPOTENCY_CONFLICT", 409);
       metric("content_item.duplicate", started, { rowsWritten: Number(result.created), reusedResult: !result.created, mediaType: stored.mediaType, contractId: stored.contractId, contractVersion: stored.contractVersion, placementId: stored.placementId, placementVersion: stored.placementVersion });
-      return { item: safe(result.item), reusedResult: !result.created };
+      return { item: present(result.item), reusedResult: !result.created };
     },
   });
 }

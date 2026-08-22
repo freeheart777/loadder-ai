@@ -5,7 +5,7 @@ export const CONTENT_SOURCE_TYPES = Object.freeze([
   "EXTERNAL_IMPORTED",
 ]);
 
-const enabled = new Set(["AI_GENERATED", "MANUAL_TEXT"]);
+const enabled = new Set(["AI_GENERATED", "MANUAL_TEXT", "CLIENT_UPLOADED"]);
 
 export function assertContentSourceType(value) {
   if (!CONTENT_SOURCE_TYPES.includes(value)) {

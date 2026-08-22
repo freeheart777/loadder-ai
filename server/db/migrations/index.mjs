@@ -48,6 +48,7 @@ import { migration047ContentItems } from "./047_content_items.mjs";
 import { migration048ContentItemSourceIdentity } from "./048_content_item_source_identity.mjs";
 import { migration049ContentAssets } from "./049_content_assets.mjs";
 import { migration050RealAssetUpload } from "./050_real_asset_upload.mjs";
+import { migration051UploadedCreativeLinkage } from "./051_uploaded_creative_linkage.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -100,4 +101,5 @@ export const migrations = [
   migration048ContentItemSourceIdentity,
   migration049ContentAssets,
   migration050RealAssetUpload,
+  migration051UploadedCreativeLinkage,
 ];

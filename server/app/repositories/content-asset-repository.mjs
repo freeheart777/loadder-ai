@@ -17,9 +17,11 @@ const map = (row) => row && Object.freeze({
 
 export function createContentAssetRepository(db) {
   const hasStorageBackendKind = db.prepare("SELECT 1 FROM pragma_table_info('content_assets') WHERE name='storage_backend_kind'").get();
+  const hasPrimaryAsset = db.prepare("SELECT 1 FROM pragma_table_info('content_items') WHERE name='primary_asset_id'").get();
   const workspace = () => requireWorkspaceId();
   const findById = (id) => map(db.prepare("SELECT * FROM content_assets WHERE workspace_id=? AND id=?").get(workspace(), id));
   const findByIdempotency = (userId, operationKind, idempotencyKey) => map(db.prepare("SELECT * FROM content_assets WHERE workspace_id=? AND created_by_user_id=? AND operation_kind=? AND idempotency_key=?").get(workspace(), userId, operationKind, idempotencyKey));
+  const isReferenced = (id) => Boolean(hasPrimaryAsset && db.prepare("SELECT 1 FROM content_items WHERE workspace_id=? AND primary_asset_id=? LIMIT 1").get(workspace(), id));
   function create(input) {
     try {
       db.prepare(`INSERT INTO content_assets(
@@ -58,5 +60,5 @@ export function createContentAssetRepository(db) {
   };
   const listLifecycle = ({ status, before, limit = 100 }) => db.prepare("SELECT * FROM content_assets WHERE workspace_id=? AND status=? AND created_at<=? ORDER BY created_at,id LIMIT ?").all(workspace(), status, before, limit).map(map);
   const listMaintenance = ({ status, before, limit = 50 }) => db.prepare("SELECT * FROM content_assets WHERE workspace_id=? AND status=? AND updated_at<=? ORDER BY updated_at,id LIMIT ?").all(workspace(), status, before, limit).map(map);
-  return Object.freeze({ findById, findByIdempotency, create, claimVerification, recordReady, recordCanonicalReady, recordRejected, recordFailed, requestDeletion, recordDeleted, quotaUsage, listHistory, listLifecycle, listMaintenance });
+  return Object.freeze({ findById, findByIdempotency, isReferenced, create, claimVerification, recordReady, recordCanonicalReady, recordRejected, recordFailed, requestDeletion, recordDeleted, quotaUsage, listHistory, listLifecycle, listMaintenance });
 }

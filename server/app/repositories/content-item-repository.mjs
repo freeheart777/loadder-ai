@@ -10,11 +10,13 @@ const map = (row) => row && Object.freeze({
   mediaType: row.media_type, contractId: row.contract_id, contractVersion: row.contract_version,
   placementId: row.placement_id, placementVersion: row.placement_version,
   contextVersionId: row.context_version_id, title: row.title, content: parse(row.content_json),
+  primaryAssetId: row.primary_asset_id ?? null,
   revision: row.revision, operationKind: row.operation_kind, requestHash: row.request_hash,
   createdAt: row.created_at, updatedAt: row.updated_at,
 });
 
 export function createContentItemRepository(db) {
+  const hasPrimaryAsset = Boolean(db.prepare("SELECT 1 FROM pragma_table_info('content_items') WHERE name='primary_asset_id'").get());
   const workspace = () => requireWorkspaceId();
   const select = "SELECT * FROM content_items";
   const findById = (id) => map(db.prepare(`${select} WHERE workspace_id=? AND id=?`).get(workspace(), id));
@@ -22,10 +24,10 @@ export function createContentItemRepository(db) {
   function create(input) {
     const id = crypto.randomUUID();
     try {
-      db.prepare(`INSERT INTO content_items(id,workspace_id,created_by_user_id,source_type,source_generation_id,source_variant_index,media_type,contract_id,contract_version,placement_id,placement_version,context_version_id,title,content_json,revision,operation_kind,idempotency_key,request_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?)`).run(
+      db.prepare(`INSERT INTO content_items(id,workspace_id,created_by_user_id,source_type,source_generation_id,source_variant_index,media_type,contract_id,contract_version,placement_id,placement_version,context_version_id,title,content_json,revision,operation_kind,idempotency_key,request_hash,created_at,updated_at${hasPrimaryAsset ? ",primary_asset_id" : ""}) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?${hasPrimaryAsset ? ",?" : ""})`).run(
         id, workspace(), input.userId, input.sourceType, input.sourceGenerationId, input.sourceVariantIndex, input.mediaType,
         input.contractId, input.contractVersion, input.placementId, input.placementVersion, input.contextVersionId,
-        input.title, JSON.stringify(input.content), input.operationKind, input.idempotencyKey, input.requestHash, input.now, input.now
+        input.title, JSON.stringify(input.content), input.operationKind, input.idempotencyKey, input.requestHash, input.now, input.now, ...(hasPrimaryAsset ? [input.primaryAssetId ?? null] : [])
       );
       return { item: findById(id), created: true };
     } catch (error) {

@@ -345,6 +345,7 @@ const contentGenerationService = createContentGenerationService({
 const contentItemService = createContentItemService({
   repository: contentItemRepository,
   generationRepository: contentGenerationRepository,
+  assetRepository: contentAssetRepository,
   contractRegistry: generationContractRegistry,
   placementRegistry: contentPlacementRegistry,
   operationMetrics: createOperationMetrics(),
