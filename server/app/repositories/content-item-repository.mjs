@@ -5,6 +5,7 @@ import { pageResult } from "../query/cursor-pagination.mjs";
 const parse = (value) => { try { return JSON.parse(value); } catch { return null; } };
 const map = (row) => row && Object.freeze({
   contentItemId: row.id, createdByUserId: row.created_by_user_id,
+  sourceType: row.source_type,
   sourceGenerationId: row.source_generation_id, sourceVariantIndex: row.source_variant_index,
   mediaType: row.media_type, contractId: row.contract_id, contractVersion: row.contract_version,
   placementId: row.placement_id, placementVersion: row.placement_version,
@@ -21,8 +22,8 @@ export function createContentItemRepository(db) {
   function create(input) {
     const id = crypto.randomUUID();
     try {
-      db.prepare(`INSERT INTO content_items(id,workspace_id,created_by_user_id,source_generation_id,source_variant_index,media_type,contract_id,contract_version,placement_id,placement_version,context_version_id,title,content_json,revision,operation_kind,idempotency_key,request_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?)`).run(
-        id, workspace(), input.userId, input.sourceGenerationId, input.sourceVariantIndex, input.mediaType,
+      db.prepare(`INSERT INTO content_items(id,workspace_id,created_by_user_id,source_type,source_generation_id,source_variant_index,media_type,contract_id,contract_version,placement_id,placement_version,context_version_id,title,content_json,revision,operation_kind,idempotency_key,request_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?)`).run(
+        id, workspace(), input.userId, input.sourceType, input.sourceGenerationId, input.sourceVariantIndex, input.mediaType,
         input.contractId, input.contractVersion, input.placementId, input.placementVersion, input.contextVersionId,
         input.title, JSON.stringify(input.content), input.operationKind, input.idempotencyKey, input.requestHash, input.now, input.now
       );

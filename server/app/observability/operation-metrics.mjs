@@ -55,6 +55,7 @@ export function createOperationMetrics({ limit = DEFAULT_LIMIT, sink = null } = 
       schemaVersion: input.schemaVersion || null,
       sensitivityClass: input.sensitivityClass || null,
       sizeBucket: input.sizeBucket || null,
+      sourceType: input.sourceType || null,
       mediaType: input.mediaType || null,
       contractId: input.contractId || null,
       contractVersion: input.contractVersion || null,

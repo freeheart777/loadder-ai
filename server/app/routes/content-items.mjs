@@ -10,6 +10,7 @@ export function createContentItemRouter({ service }) {
   router.post("/content/generations/:generationId/save", (request, response) => {
     try { const result = service.saveGeneration(request.params.generationId, request.body, actor(request), request.headers["idempotency-key"]); return response.status(result.reusedResult ? 200 : 201).json({ success: true, item: result.item, reusedResult: result.reusedResult }); } catch (error) { return handle(error, response); }
   });
+  router.post("/content/items/manual", (request, response) => { try { const result = service.createManual(request.body, actor(request), request.headers["idempotency-key"]); return response.status(result.reusedResult ? 200 : 201).json({ success: true, item: result.item, reusedResult: result.reusedResult }); } catch (error) { return handle(error, response); } });
   router.get("/content/items", (request, response) => { try { const page = service.list(request.query, actor(request)); return response.json({ success: true, items: page.items, nextCursor: page.nextCursor }); } catch (error) { return handle(error, response); } });
   router.get("/content/items/:id", (request, response) => { try { return response.json({ success: true, item: service.get(request.params.id, actor(request)) }); } catch (error) { return handle(error, response); } });
   router.patch("/content/items/:id", (request, response) => { try { return response.json({ success: true, item: service.update(request.params.id, request.body, actor(request)) }); } catch (error) { return handle(error, response); } });

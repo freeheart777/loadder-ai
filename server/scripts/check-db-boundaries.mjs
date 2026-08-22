@@ -17,7 +17,7 @@ function inspect(target) {
   }
   if (!target.endsWith(".mjs")) return;
   const source = readFileSync(target, "utf8");
-  if (target.endsWith(`${path.sep}content-item-service.mjs`) || target.endsWith(`${path.sep}content-item-repository.mjs`) || target.endsWith(`${path.sep}content-items.mjs`)) {
+  if (target.includes(`${path.sep}content-items${path.sep}`) || target.endsWith(`${path.sep}content-item-service.mjs`) || target.endsWith(`${path.sep}content-item-repository.mjs`) || target.endsWith(`${path.sep}content-items.mjs`)) {
     const forbidden = [
       /from\s+["'][^"']*(openai|cloudflare|provider-binding|ai-executor|action-proposal|execution-authorization|execution-request|execution-ledger|dispatch-job|execution-capabilit|messaging|automation|legacy-crm|campaign)[^"']*["']/i,
       /\b(action_proposals|execution_authorizations|execution_requests|execution_attempts|execution_results|execution_dispatch_jobs|automations|marketing_campaigns)\b/i,

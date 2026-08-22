@@ -5,11 +5,13 @@ import Database from "better-sqlite3";
 import { runMigrations } from "../db/migrate.mjs";
 import { migration045ContentGenerations } from "../db/migrations/045_content_generations.mjs";
 import { migration047ContentItems } from "../db/migrations/047_content_items.mjs";
+import { migration048ContentItemSourceIdentity } from "../db/migrations/048_content_item_source_identity.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { createContentGenerationRepository } from "../app/repositories/content-generation-repository.mjs";
 import { createContentItemRepository } from "../app/repositories/content-item-repository.mjs";
 import { ContentItemError, createContentItemService } from "../app/services/content-item-service.mjs";
 import { generationContractRegistry } from "../app/content-generation/contract-registry.mjs";
+import { contentPlacementRegistry } from "../app/content-generation/placement-registry.mjs";
 import { createOperationMetrics } from "../app/observability/operation-metrics.mjs";
 
 const W = "library-workspace", OTHER = "other-workspace", U = "library-user", C = "library-context", G = "library-generation";
@@ -21,11 +23,11 @@ function database() {
   db.exec(`CREATE TABLE users(id TEXT PRIMARY KEY,status TEXT NOT NULL); CREATE TABLE workspaces(id TEXT PRIMARY KEY,status TEXT NOT NULL); CREATE TABLE workspace_memberships(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,user_id TEXT NOT NULL,status TEXT NOT NULL); CREATE TABLE business_context_versions(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL); CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT NOT NULL,applied_at TEXT NOT NULL);`);
   db.prepare("INSERT INTO users VALUES(?,?)").run(U, "active"); for (const workspace of [W, OTHER]) db.prepare("INSERT INTO workspaces VALUES(?,?)").run(workspace, "active");
   db.prepare("INSERT INTO workspace_memberships VALUES(?,?,?,?)").run("membership", W, U, "active"); db.prepare("INSERT INTO business_context_versions VALUES(?,?)").run(C, W);
-  runMigrations(db, [migration045ContentGenerations, migration047ContentItems]);
+  runMigrations(db, [migration045ContentGenerations, migration047ContentItems, migration048ContentItemSourceIdentity]);
   db.prepare(`INSERT INTO content_generations(id,workspace_id,user_id,media_type,contract_id,contract_version,placement_id,placement_version,context_version_id,template_version,provider_binding,provider_binding_version,provider_model,brief_hash,request_fingerprint,operation_kind,idempotency_key,request_hash,status,normalized_result_json,input_tokens,output_tokens,estimated_cost_minor,cost_currency,error_code,created_at,completed_at) VALUES(?,?,?,?,?,?,?,?,?,1,'binding',1,'model',?,?,'content.generate','generation-key',?,'SUCCEEDED',?,1,1,NULL,NULL,NULL,?,?)`).run(G, W, U, "TEXT", "social_post", 1, "instagram.feed.text", 1, C, "a".repeat(64), "b".repeat(64), "c".repeat(64), JSON.stringify({ variants: [VARIANT] }), "2026-08-22T10:00:00.000Z", "2026-08-22T10:00:00.000Z");
   return db;
 }
-function fixture() { const db = database(), metrics = createOperationMetrics(); const service = createContentItemService({ repository: createContentItemRepository(db), generationRepository: createContentGenerationRepository(db), contractRegistry: generationContractRegistry, operationMetrics: metrics, now: () => new Date("2026-08-22T12:00:00.000Z") }); return { db, service, metrics }; }
+function fixture() { const db = database(), metrics = createOperationMetrics(); const service = createContentItemService({ repository: createContentItemRepository(db), generationRepository: createContentGenerationRepository(db), contractRegistry: generationContractRegistry, placementRegistry: contentPlacementRegistry, operationMetrics: metrics, now: () => new Date("2026-08-22T12:00:00.000Z") }); return { db, service, metrics }; }
 const within = (callback, workspace = W) => runWithWorkspace(workspace, callback);
 const throws = (callback, code) => assert.throws(callback, (error) => error instanceof ContentItemError && error.code === code);
 const save = (f, key = "save-key", input = { variantIndex: 0 }, actor = ACTOR) => within(() => f.service.saveGeneration(G, input, actor, key));

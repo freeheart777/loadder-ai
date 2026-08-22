@@ -21,6 +21,7 @@ const BrandBookPage = lazy(() => import("./pages/BrandBookPage"));
 const ContentStudioPage = lazy(() => import("./pages/ContentStudioPage"));
 const ContentLibraryPage = lazy(() => import("./pages/ContentLibraryPage"));
 const ContentItemPage = lazy(() => import("./pages/ContentItemPage"));
+const ManualContentPage = lazy(() => import("./pages/ManualContentPage"));
 const BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage"));
 const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
 const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
@@ -79,6 +80,7 @@ export default function App() {
           element={<ContentStudioPage />}
         />
         <Route path="/dashboard/library" element={<ContentLibraryPage />} />
+        <Route path="/dashboard/library/new" element={<ManualContentPage />} />
         <Route path="/dashboard/library/:id" element={<ContentItemPage />} />
 
         {/* مدیریت شبکه‌های اجتماعی */}

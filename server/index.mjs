@@ -340,6 +340,7 @@ const contentItemService = createContentItemService({
   repository: contentItemRepository,
   generationRepository: contentGenerationRepository,
   contractRegistry: generationContractRegistry,
+  placementRegistry: contentPlacementRegistry,
   operationMetrics: createOperationMetrics(),
 });
 const cartFeatureProducer = createCartFeatureProducer({
