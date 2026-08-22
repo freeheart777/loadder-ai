@@ -46,6 +46,7 @@ import { migration045ContentGenerations } from "./045_content_generations.mjs";
 import { migration046ExecutionDispatchJobTenantPollIndexes } from "./046_execution_dispatch_job_tenant_poll_indexes.mjs";
 import { migration047ContentItems } from "./047_content_items.mjs";
 import { migration048ContentItemSourceIdentity } from "./048_content_item_source_identity.mjs";
+import { migration049ContentAssets } from "./049_content_assets.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -96,4 +97,5 @@ export const migrations = [
   migration046ExecutionDispatchJobTenantPollIndexes,
   migration047ContentItems,
   migration048ContentItemSourceIdentity,
+  migration049ContentAssets,
 ];

@@ -8,6 +8,7 @@ const consumerBoundaryViolations = [];
 const onboardingBoundaryViolations = [];
 const creativeGenerationBoundaryViolations = [];
 const contentLibraryBoundaryViolations = [];
+const contentAssetBoundaryViolations = [];
 
 function inspect(target) {
   const stat = statSync(target);
@@ -17,6 +18,15 @@ function inspect(target) {
   }
   if (!target.endsWith(".mjs")) return;
   const source = readFileSync(target, "utf8");
+  if (target.includes(`${path.sep}content-assets${path.sep}`) || target.endsWith(`${path.sep}content-asset-service.mjs`) || target.endsWith(`${path.sep}content-asset-repository.mjs`)) {
+    const forbidden = [
+      /from\s+["'][^"']*(openai|cloudflare|provider-binding|execution-capabilit|action-proposal|execution-request|dispatch-job|messaging|automation|legacy-crm|campaign|worker|queue|supabase|ffmpeg|ffprobe|sharp|aws-sdk|client-s3)[^"']*["']/i,
+      /\b(action_proposals|execution_requests|execution_dispatch_jobs|content_items|creative_placements|performance_observations)\b/i,
+      /from\s+["'][^"']*db\/database\.mjs["']/,
+      /\b(fetch|setInterval|setTimeout)\s*\(/,
+    ];
+    if (forbidden.some((pattern) => pattern.test(source))) contentAssetBoundaryViolations.push(path.relative(serverRoot, target));
+  }
   if (target.includes(`${path.sep}content-items${path.sep}`) || target.endsWith(`${path.sep}content-item-service.mjs`) || target.endsWith(`${path.sep}content-item-repository.mjs`) || target.endsWith(`${path.sep}content-items.mjs`)) {
     const forbidden = [
       /from\s+["'][^"']*(openai|cloudflare|provider-binding|ai-executor|action-proposal|execution-authorization|execution-request|execution-ledger|dispatch-job|execution-capabilit|messaging|automation|legacy-crm|campaign)[^"']*["']/i,
@@ -230,6 +240,10 @@ if (contentLibraryBoundaryViolations.length) {
   console.error(`Content Library boundary violations: ${contentLibraryBoundaryViolations.join(", ")}`);
   process.exitCode = 1;
 }
+if (contentAssetBoundaryViolations.length) {
+  console.error(`Content Asset boundary violations: ${contentAssetBoundaryViolations.join(", ")}`);
+  process.exitCode = 1;
+}
 if (consumerBoundaryViolations.length) {
   console.error(
     `Business Context consumers, signal producers, feature producers, or model-input builders access forbidden persistence: ${consumerBoundaryViolations.join(", ")}`
@@ -244,9 +258,10 @@ if (creativeGenerationBoundaryViolations.length) {
   console.error(`Creative Generation accesses execution, messaging, automation, campaign, or raw database dependencies: ${creativeGenerationBoundaryViolations.join(", ")}`);
   process.exitCode = 1;
 }
-if (!violations.length && !consumerBoundaryViolations.length && !onboardingBoundaryViolations.length && !creativeGenerationBoundaryViolations.length) {
+if (!violations.length && !consumerBoundaryViolations.length && !onboardingBoundaryViolations.length && !creativeGenerationBoundaryViolations.length && !contentAssetBoundaryViolations.length) {
   console.log("Database import boundary is valid.");
   console.log("Business Context consumer boundary is valid.");
   console.log("Onboarding dependency boundary is valid.");
   console.log("Creative Generation dependency boundary is valid.");
+  console.log("Content Asset dependency boundary is valid.");
 }
