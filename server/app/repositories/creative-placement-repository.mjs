@@ -6,6 +6,7 @@ const map = (row) => row && Object.freeze({ id: row.id, contentItemId: row.conte
 
 export function createCreativePlacementRepository(db) {
   const workspace = () => requireWorkspaceId();
+  const findById = (id) => map(db.prepare("SELECT * FROM creative_placements WHERE workspace_id=? AND id=?").get(workspace(), id));
   const findByIdempotency = (userId, key) => map(db.prepare("SELECT * FROM creative_placements WHERE workspace_id=? AND created_by_user_id=? AND operation_kind='creative_placement.create' AND idempotency_key=?").get(workspace(), userId, key));
   function create(input) {
     const id = crypto.randomUUID();
@@ -25,5 +26,5 @@ export function createCreativePlacementRepository(db) {
     const rows = db.prepare(`SELECT * FROM creative_placements WHERE ${where} ORDER BY created_at DESC,id DESC LIMIT ?`).all(...values).map(map);
     return pageResult(rows, limit, "creative_placements", (item) => ({ createdAt: item.createdAt, id: item.id }));
   }
-  return Object.freeze({ findByIdempotency, create, listPage });
+  return Object.freeze({ findById, findByIdempotency, create, listPage });
 }
