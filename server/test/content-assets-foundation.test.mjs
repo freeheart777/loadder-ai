@@ -42,7 +42,7 @@ const create = (fixture, input = IMAGE, actor = ACTORS.owner, key = `key-${++key
 test("Storage Interface + Content Assets Foundation v1", async (t) => {
   await t.test("migration 049 adds exactly one table, preserves existing schemas/rows, and is idempotent", () => {
     const dir = mkdtempSync(join(tmpdir(), "loadder-assets-migration-")), path = join(dir, "scope.sqlite"); copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
-    const db = new Database(path); db.pragma("foreign_keys=ON"); db.exec("DELETE FROM schema_migrations WHERE version=51;DELETE FROM schema_migrations WHERE version=50;DELETE FROM schema_migrations WHERE version=49;DROP TABLE IF EXISTS content_assets;");
+    const db = new Database(path); db.pragma("foreign_keys=ON"); db.exec("DELETE FROM schema_migrations WHERE version=52;DROP TABLE IF EXISTS creative_placements;DELETE FROM schema_migrations WHERE version=51;DELETE FROM schema_migrations WHERE version=50;DELETE FROM schema_migrations WHERE version=49;DROP TABLE IF EXISTS content_assets;");
     const before = db.prepare("SELECT name,sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
     const counts = new Map(before.map(({ name }) => [name, db.prepare(`SELECT COUNT(*) count FROM "${name}"`).get().count]));
     runMigrations(db, [migration049ContentAssets]); runMigrations(db, [migration049ContentAssets]);
