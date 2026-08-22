@@ -52,6 +52,7 @@ import { migration051UploadedCreativeLinkage } from "./051_uploaded_creative_lin
 import { migration052CreativePlacements } from "./052_creative_placements.mjs";
 import { migration053CreativeIntents } from "./053_creative_intents.mjs";
 import { migration054DistributionContexts } from "./054_distribution_contexts.mjs";
+import { migration055AttributionTouches } from "./055_attribution_touches.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -108,4 +109,5 @@ export const migrations = [
   migration052CreativePlacements,
   migration053CreativeIntents,
   migration054DistributionContexts,
+  migration055AttributionTouches,
 ];
