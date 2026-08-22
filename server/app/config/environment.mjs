@@ -98,4 +98,11 @@ export const environment = Object.freeze({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
     mediaRuntimeAvailable: process.env.CONTENT_ASSET_FFPROBE_AVAILABLE === "true",
   }),
+  landing: Object.freeze({
+    staticDirectory: process.env.LANDING_STATIC_DIRECTORY || "",
+    publicBaseUrl: process.env.LANDING_PUBLIC_BASE_URL || "",
+    publicApiBaseUrl: process.env.LANDING_PUBLIC_API_BASE_URL || "",
+    trackingSecret: process.env.LANDING_TRACKING_SECRET || (nodeEnv === "production" ? "" : "loadder-development-landing-tracking-secret-v1"),
+    trackingTtlSeconds: Number(process.env.LANDING_TRACKING_TTL_SECONDS || 3600),
+  }),
 });

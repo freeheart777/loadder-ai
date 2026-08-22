@@ -4,6 +4,7 @@ const MUTATIONS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function createProductionOriginGuard({ nodeEnv = "development", clientOrigins = [] } = {}) {
   return (req, res, next) => {
+    if (req.path === "/api/public/landing/events") return next();
     if (nodeEnv !== "production" || !MUTATIONS.has(String(req.method).toUpperCase())) return next();
     const origin = String(req.headers.origin || "");
     if (origin && clientOrigins.includes(origin)) return next();

@@ -46,6 +46,7 @@ import { createDistributionContextRouter } from "./app/routes/distribution-conte
 import { createAttributionTouchRouter } from "./app/routes/attribution-touches.mjs";
 import { createPerformanceObservationRouter } from "./app/routes/performance-observations.mjs";
 import { createLandingRouter } from "./app/routes/landings.mjs";
+import { createLandingCommercializationRouter, createLandingPublicRouter } from "./app/routes/landing-commercialization.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -103,8 +104,11 @@ import { createDistributionContextService } from "./app/services/distribution-co
 import { createAttributionTouchService } from "./app/services/attribution-touch-service.mjs";
 import { createPerformanceObservationService } from "./app/services/performance-observation-service.mjs";
 import { createLandingService } from "./app/services/landing-service.mjs";
+import { createLandingCommercializationService } from "./app/services/landing-commercialization-service.mjs";
 import { landingComponentRegistry } from "./app/landing/landing-component-registry.mjs";
 import { createLandingPublisher } from "./app/landing/landing-publisher.mjs";
+import { createLandingTrackingTokenService } from "./app/landing/landing-tracking-token.mjs";
+import { createLandingPublicRateLimiter } from "./app/landing/landing-public-rate-limiter.mjs";
 import { createUnavailableContentAssetStore } from "./app/content-assets/content-asset-store.mjs";
 import { createR2ContentAssetStore } from "./app/content-assets/r2-content-asset-store.mjs";
 import { createContentGenerationRateLimiter } from "./app/content-generation/content-generation-rate-limiter.mjs";
@@ -270,11 +274,12 @@ const productPolicy = createProductPolicy({
   nodeEnv: environment.nodeEnv,
   overrides: environment.productFeatureOverrides,
 });
+const landingPublicOrigin = (() => { try { return new URL(environment.landing.publicBaseUrl).origin; } catch { return ""; } })();
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || environment.clientOrigins.includes(origin)) {
+      if (!origin || environment.clientOrigins.includes(origin) || origin === landingPublicOrigin) {
         return callback(null, true);
       }
 
@@ -283,6 +288,7 @@ app.use(
     credentials: true,
   })
 );
+app.use("/api/public/landing/events", express.json({ limit: "8kb" }));
 app.use(
   express.json({
     limit: "2mb",
@@ -386,7 +392,10 @@ const creativeIntentService = createCreativeIntentService({ repository: creative
 const distributionContextService = createDistributionContextService({ repository: distributionContextRepository, placementRepository: creativePlacementRepository, registry: channelRegistry, operationMetrics: createOperationMetrics() });
 const attributionTouchService = createAttributionTouchService({ repository: attributionTouchRepository, distributionContextRepository, operationMetrics: createOperationMetrics() });
 const performanceObservationService = createPerformanceObservationService({ repository: performanceObservationRepository, distributionContextRepository, attributionTouchRepository, registry: observationContractRegistry, operationMetrics: createOperationMetrics() });
-const landingService = createLandingService({ repository: landingRepository, intentRepository: creativeIntentRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, componentRegistry: landingComponentRegistry, publisher: createLandingPublisher({ nodeEnv: environment.nodeEnv }), operationMetrics: createOperationMetrics() });
+const landingPublisher = createLandingPublisher({ nodeEnv: environment.nodeEnv, staticDirectory: environment.landing.staticDirectory, publicBaseUrl: environment.landing.publicBaseUrl, publicApiBaseUrl: environment.landing.publicApiBaseUrl });
+const landingTrackingTokenService = createLandingTrackingTokenService({ secret: environment.landing.trackingSecret, ttlSeconds: environment.landing.trackingTtlSeconds });
+const landingService = createLandingService({ repository: landingRepository, intentRepository: creativeIntentRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, componentRegistry: landingComponentRegistry, publisher: landingPublisher, operationMetrics: createOperationMetrics() });
+const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
   featureRegistry,
@@ -485,6 +494,7 @@ app.get("/api/health", (req, res) => {
       assetStorageConfigured: contentAssetStore.configured,
       assetUploadEnabled: contentAssetStore.uploadEnabled,
     },
+    landing: landingCommercializationService.readiness(),
     auth: {
       mode: "persistent-session",
       productionReady: false,
@@ -492,6 +502,12 @@ app.get("/api/health", (req, res) => {
     },
     timestamp: new Date().toISOString(),
   });
+});
+
+app.use(createLandingPublicRouter({ service: landingCommercializationService, rateLimiter: createLandingPublicRateLimiter() }));
+app.use((error, req, res, next) => {
+  if (req.path === "/api/public/landing/events" && error?.type === "entity.too.large") return res.status(413).json({ success: false, code: "LANDING_PUBLIC_BODY_TOO_LARGE", message: "Landing public operation could not be completed." });
+  return next(error);
 });
 
 app.use(createRequireAuth(authService));
@@ -541,6 +557,7 @@ app.use("/api", createDistributionContextRouter({ service: distributionContextSe
 app.use("/api", createAttributionTouchRouter({ service: attributionTouchService }));
 app.use("/api", createPerformanceObservationRouter({ service: performanceObservationService }));
 app.use("/api", createLandingRouter({ service: landingService }));
+app.use("/api", createLandingCommercializationRouter({ service: landingCommercializationService }));
 app.use(
   "/api",
   createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })
