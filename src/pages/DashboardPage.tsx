@@ -11,6 +11,7 @@ import {
   FolderOpen,
   Sparkle,
   BookOpenText,
+  Browsers,
   Brain,} from "@phosphor-icons/react";
 
 import { useStagger } from "../lib/animations/useStagger";
@@ -37,6 +38,7 @@ const tools: Tool[] = [
     route: "/dashboard/content",
   },
   { title: "برند بوک", icon: BookOpenText, status: "آماده", route: "/dashboard/brand-book" },
+  { title: "صفحه فرود", icon: Browsers, status: "آماده", route: "/dashboard/landings" },
 ];
 
 function ToolCard({

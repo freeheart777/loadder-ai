@@ -7,6 +7,7 @@ export const FEATURE_EXPOSURE = Object.freeze({
 export const FEATURE_KEYS = Object.freeze([
   "content_studio",
   "business_setup",
+  "landing_builder",
   "intelligence",
   "legacy_crm",
   "legacy_marketing",
@@ -20,6 +21,7 @@ export const FEATURE_KEYS = Object.freeze([
 const PRODUCTION_DEFAULTS = Object.freeze({
   content_studio: FEATURE_EXPOSURE.CUSTOMER,
   business_setup: FEATURE_EXPOSURE.CUSTOMER,
+  landing_builder: FEATURE_EXPOSURE.CUSTOMER,
   intelligence: FEATURE_EXPOSURE.INTERNAL,
   legacy_crm: FEATURE_EXPOSURE.DISABLED,
   legacy_marketing: FEATURE_EXPOSURE.DISABLED,

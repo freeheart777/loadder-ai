@@ -54,6 +54,7 @@ import { migration053CreativeIntents } from "./053_creative_intents.mjs";
 import { migration054DistributionContexts } from "./054_distribution_contexts.mjs";
 import { migration055AttributionTouches } from "./055_attribution_touches.mjs";
 import { migration056PerformanceObservations } from "./056_performance_observations.mjs";
+import { migration057LandingBuilderCore } from "./057_landing_builder_core.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -112,4 +113,5 @@ export const migrations = [
   migration054DistributionContexts,
   migration055AttributionTouches,
   migration056PerformanceObservations,
+  migration057LandingBuilderCore,
 ];

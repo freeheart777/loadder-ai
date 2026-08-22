@@ -26,6 +26,7 @@ const BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage"));
 const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
 const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+const LandingBuilderPage = lazy(() => import("./pages/LandingBuilderPage"));
 
 export default function App() {
   return (
@@ -82,6 +83,10 @@ export default function App() {
         <Route path="/dashboard/library" element={<ContentLibraryPage />} />
         <Route path="/dashboard/library/new" element={<ManualContentPage />} />
         <Route path="/dashboard/library/:id" element={<ContentItemPage />} />
+        <Route path="/dashboard/landings" element={<LandingBuilderPage />} />
+        <Route path="/dashboard/landings/new" element={<LandingBuilderPage />} />
+        <Route path="/dashboard/landings/:id" element={<LandingBuilderPage />} />
+        <Route path="/dashboard/landings/:id/edit" element={<LandingBuilderPage />} />
 
         {/* مدیریت شبکه‌های اجتماعی */}
         <Route

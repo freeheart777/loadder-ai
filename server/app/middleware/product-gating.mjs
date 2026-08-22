@@ -58,6 +58,7 @@ export function classifyApiRequest(method, path) {
   if (/^\/api\/onboarding(?:\/|$)/.test(path)) {
     return { feature: "business_setup", internal: false };
   }
+  if (/^\/api\/landing(?:\/|$)/.test(path)) return { feature: "landing_builder", internal: false };
   if (upper === "POST" && /^\/api\/intelligence\/decisions\/[^/]+\/action-proposals$/.test(path)) {
     return { feature: "execution", internal: false };
   }
