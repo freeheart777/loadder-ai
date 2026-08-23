@@ -49,6 +49,7 @@ import { createLandingRouter } from "./app/routes/landings.mjs";
 import { createLandingCommercializationRouter, createLandingPublicRouter } from "./app/routes/landing-commercialization.mjs";
 import { createWebsiteRouter } from "./app/routes/websites.mjs";
 import { createCommerceCatalogRouter } from "./app/routes/commerce-catalogs.mjs";
+import { createCartCheckoutRouter } from "./app/routes/cart-checkout.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -92,6 +93,7 @@ import { createPerformanceObservationRepository } from "./app/repositories/perfo
 import { createLandingRepository } from "./app/repositories/landing-repository.mjs";
 import { createWebsiteRepository } from "./app/repositories/website-repository.mjs";
 import { createCommerceCatalogRepository } from "./app/repositories/commerce-catalog-repository.mjs";
+import { createCartCheckoutRepository } from "./app/repositories/cart-checkout-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -112,6 +114,8 @@ import { createLandingCommercializationService } from "./app/services/landing-co
 import { createWebsiteService } from "./app/services/website-service.mjs";
 import { storefrontComponentRegistry } from "./app/commerce/storefront-component-registry.mjs";
 import { createCommerceCatalogService } from "./app/services/commerce-catalog-service.mjs";
+import { createCartCheckoutService } from "./app/services/cart-checkout-service.mjs";
+import { commerceShippingRegistry } from "./app/commerce/commerce-shipping-registry.mjs";
 import { landingComponentRegistry } from "./app/landing/landing-component-registry.mjs";
 import { createLandingPublisher } from "./app/landing/landing-publisher.mjs";
 import { createLandingTrackingTokenService } from "./app/landing/landing-tracking-token.mjs";
@@ -329,6 +333,7 @@ const performanceObservationRepository = createPerformanceObservationRepository(
 const landingRepository = createLandingRepository(db);
 const websiteRepository = createWebsiteRepository(db);
 const commerceCatalogRepository = createCommerceCatalogRepository(db);
+const cartCheckoutRepository = createCartCheckoutRepository(db);
 const businessEventRepository = createBusinessEventRepository(db);
 const intelligenceRecordRepository = createIntelligenceRecordRepository(db);
 const featureValueRepository = createFeatureValueRepository(db);
@@ -410,6 +415,7 @@ const landingService = createLandingService({ repository: landingRepository, int
 const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
+const cartCheckoutService = createCartCheckoutService({ repository: cartCheckoutRepository, shippingRegistry: commerceShippingRegistry });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
   featureRegistry,
@@ -519,6 +525,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use(createLandingPublicRouter({ service: landingCommercializationService, rateLimiter: createLandingPublicRateLimiter() }));
+app.use(createCartCheckoutRouter({ service: cartCheckoutService }));
 app.use((error, req, res, next) => {
   if (req.path === "/api/public/landing/events" && error?.type === "entity.too.large") return res.status(413).json({ success: false, code: "LANDING_PUBLIC_BODY_TOO_LARGE", message: "Landing public operation could not be completed." });
   return next(error);

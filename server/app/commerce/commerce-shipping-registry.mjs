@@ -1,0 +1,2 @@
+const methods=[{id:"STANDARD",label:"ارسال استاندارد",amount:0,modes:["PHYSICAL_DELIVERY"]},{id:"PICKUP",label:"تحویل حضوری",amount:0,modes:["PHYSICAL_DELIVERY"]},{id:"CUSTOM_CONTACT",label:"هماهنگی تلفنی",amount:0,modes:["PHYSICAL_DELIVERY","CONTACT_TO_COMPLETE"]},{id:"NONE",label:"بدون ارسال",amount:0,modes:["DIGITAL_OR_SERVICE"]}].map(Object.freeze);
+export const commerceShippingRegistry=Object.freeze({version:1,list:()=>Object.freeze(methods),get:id=>methods.find(x=>x.id===id)||null});
