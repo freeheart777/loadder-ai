@@ -12,7 +12,8 @@ import {
   Sparkle,
   BookOpenText,
   Browsers,
-  Brain,} from "@phosphor-icons/react";
+  Brain,
+  Storefront,} from "@phosphor-icons/react";
 
 import { useStagger } from "../lib/animations/useStagger";
 import { demoBusiness } from "../data/demoBusiness";
@@ -40,6 +41,7 @@ const tools: Tool[] = [
   { title: "برند بوک", icon: BookOpenText, status: "آماده", route: "/dashboard/brand-book" },
   { title: "صفحه فرود", icon: Browsers, status: "آماده", route: "/dashboard/landings" },
   { title: "وب‌سایت", icon: Browsers, status: "آماده", route: "/dashboard/websites" },
+  { title: "کاتالوگ تجاری", icon: Storefront, status: "آماده", route: "/dashboard/catalog" },
 ];
 
 function ToolCard({
@@ -206,6 +208,7 @@ export default function DashboardPage() {
             استودیوی محتوا
           </Link>
           <Link to="/dashboard/library" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><FolderOpen size={20}/>کتابخانه محتوا</Link>
+          <Link to="/dashboard/catalog" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><Storefront size={20}/>کاتالوگ تجاری</Link>
           <Link
             to="/dashboard/business-brain"
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"

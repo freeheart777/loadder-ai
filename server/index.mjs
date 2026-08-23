@@ -48,6 +48,7 @@ import { createPerformanceObservationRouter } from "./app/routes/performance-obs
 import { createLandingRouter } from "./app/routes/landings.mjs";
 import { createLandingCommercializationRouter, createLandingPublicRouter } from "./app/routes/landing-commercialization.mjs";
 import { createWebsiteRouter } from "./app/routes/websites.mjs";
+import { createCommerceCatalogRouter } from "./app/routes/commerce-catalogs.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -90,6 +91,7 @@ import { createAttributionTouchRepository } from "./app/repositories/attribution
 import { createPerformanceObservationRepository } from "./app/repositories/performance-observation-repository.mjs";
 import { createLandingRepository } from "./app/repositories/landing-repository.mjs";
 import { createWebsiteRepository } from "./app/repositories/website-repository.mjs";
+import { createCommerceCatalogRepository } from "./app/repositories/commerce-catalog-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -108,12 +110,15 @@ import { createPerformanceObservationService } from "./app/services/performance-
 import { createLandingService } from "./app/services/landing-service.mjs";
 import { createLandingCommercializationService } from "./app/services/landing-commercialization-service.mjs";
 import { createWebsiteService } from "./app/services/website-service.mjs";
+import { storefrontComponentRegistry } from "./app/commerce/storefront-component-registry.mjs";
+import { createCommerceCatalogService } from "./app/services/commerce-catalog-service.mjs";
 import { landingComponentRegistry } from "./app/landing/landing-component-registry.mjs";
 import { createLandingPublisher } from "./app/landing/landing-publisher.mjs";
 import { createLandingTrackingTokenService } from "./app/landing/landing-tracking-token.mjs";
 import { createLandingPublicRateLimiter } from "./app/landing/landing-public-rate-limiter.mjs";
 import { websitePresetRegistry } from "./app/website/website-preset-registry.mjs";
 import { createWebsitePublisher } from "./app/website/website-publisher.mjs";
+import { storeArchetypeRegistry } from "./app/commerce/store-archetype-registry.mjs";
 import { createUnavailableContentAssetStore } from "./app/content-assets/content-asset-store.mjs";
 import { createR2ContentAssetStore } from "./app/content-assets/r2-content-asset-store.mjs";
 import { createContentGenerationRateLimiter } from "./app/content-generation/content-generation-rate-limiter.mjs";
@@ -323,6 +328,7 @@ const attributionTouchRepository = createAttributionTouchRepository(db);
 const performanceObservationRepository = createPerformanceObservationRepository(db);
 const landingRepository = createLandingRepository(db);
 const websiteRepository = createWebsiteRepository(db);
+const commerceCatalogRepository = createCommerceCatalogRepository(db);
 const businessEventRepository = createBusinessEventRepository(db);
 const intelligenceRecordRepository = createIntelligenceRecordRepository(db);
 const featureValueRepository = createFeatureValueRepository(db);
@@ -402,7 +408,8 @@ const landingPublisher = createLandingPublisher({ nodeEnv: environment.nodeEnv, 
 const landingTrackingTokenService = createLandingTrackingTokenService({ secret: environment.landing.trackingSecret, ttlSeconds: environment.landing.trackingTtlSeconds });
 const landingService = createLandingService({ repository: landingRepository, intentRepository: creativeIntentRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, componentRegistry: landingComponentRegistry, publisher: landingPublisher, operationMetrics: createOperationMetrics() });
 const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
-const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, componentRegistry: landingComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
+const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
+const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
   featureRegistry,
@@ -566,6 +573,7 @@ app.use("/api", createPerformanceObservationRouter({ service: performanceObserva
 app.use("/api", createLandingRouter({ service: landingService }));
 app.use("/api", createLandingCommercializationRouter({ service: landingCommercializationService }));
 app.use("/api", createWebsiteRouter({ service: websiteService }));
+app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
 app.use(
   "/api",
   createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })
