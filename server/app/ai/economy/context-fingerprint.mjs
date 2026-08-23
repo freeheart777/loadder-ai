@@ -1,0 +1,4 @@
+import crypto from"node:crypto";
+const canonical=value=>value===null||typeof value!=="object"?JSON.stringify(value):Array.isArray(value)?`[${value.map(canonical).join(",")}]`:`{${Object.keys(value).sort().filter(k=>![/^(created|updated|requested|measured)At$/i,/^(request|trace|audit)Id$/i].some(r=>r.test(k))).map(k=>`${JSON.stringify(k)}:${canonical(value[k])}`).join(",")}}`;
+export function createContextFingerprint({workspaceId,operation,operationPolicyVersion,promptVersion,modelPolicyVersion,input}){if(!workspaceId||!operation||!Number.isInteger(operationPolicyVersion)||!Number.isInteger(promptVersion)||!Number.isInteger(modelPolicyVersion))throw Error("AI_FINGERPRINT_INVALID");const material=canonical({workspaceId,operation,operationPolicyVersion,promptVersion,modelPolicyVersion,input});return Object.freeze({fingerprint:crypto.createHash("sha256").update(material).digest("hex"),canonicalCharacters:material.length});}
+export{canonical as canonicalAiInput};

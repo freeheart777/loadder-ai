@@ -1,0 +1,2 @@
+export const growthPatternRegistry=Object.freeze({version:1,list:()=>[],get:()=>null,activationPolicy:"HUMAN_APPROVAL_REQUIRED",supportedStatuses:Object.freeze(["CANDIDATE","EVALUATED","APPROVED","ACTIVE"])});
+export const learnedIntelligencePolicy=Object.freeze({version:1,lifecycle:Object.freeze(["CANDIDATE","EVALUATED","APPROVED","ACTIVE"]),automaticActivation:false,generatedCode:false,dynamicEval:false,automaticPromptModification:false,customerDataTraining:false});

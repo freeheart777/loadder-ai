@@ -6,13 +6,22 @@ const DEFAULTS = Object.freeze([
   Object.freeze({ operationId: "LANDING_PROPOSAL_GENERATION", operationVersion: 1, provider: "OPENAI", modelConfigKey: "OPENAI_LANDING_PROPOSAL_MODEL", defaultModel: "gpt-5.6-luna", reasoningEffort: "low", maxInputCharacters: 24_000, maxOutputTokens: 4_000, timeoutMs: 25_000, automaticRetries: 0, featureExposure: "CUSTOMER", structuredOutput: true, rawFreeText: false, sideEffects: false }),
   Object.freeze({ operationId: "WEBSITE_PROPOSAL_GENERATION", operationVersion: 1, provider: "OPENAI", modelConfigKey: "OPENAI_WEBSITE_PROPOSAL_MODEL", defaultModel: "gpt-5.6-luna", reasoningEffort: "low", maxInputCharacters: 24_000, maxOutputTokens: 5_000, timeoutMs: 25_000, automaticRetries: 0, featureExposure: "CUSTOMER", structuredOutput: true, rawFreeText: false, sideEffects: false }),
 ]);
+const ECONOMY = Object.freeze({
+  BUSINESS_BRAIN_ANALYSIS: Object.freeze({ costClass: "STANDARD_AI", defaultRoute: "TERRA", routingDecision: "BENCHMARK_REQUIRED", promptVersion: 1, modelPolicyVersion: 1 }),
+  CONTENT_TEXT_GENERATION: Object.freeze({ costClass: "CHEAP_AI", defaultRoute: "LUNA", routingDecision: "DEFAULT_CHEAP_MODEL", promptVersion: 1, modelPolicyVersion: 1 }),
+  GROWTH_STRATEGY_GENERATION: Object.freeze({ costClass: "STANDARD_AI", defaultRoute: "TERRA", routingDecision: "BENCHMARK_REQUIRED", promptVersion: 1, modelPolicyVersion: 1 }),
+  CONTENT_PLAN_GENERATION: Object.freeze({ costClass: "CHEAP_AI", defaultRoute: "LUNA", routingDecision: "DEFAULT_CHEAP_MODEL", promptVersion: 1, modelPolicyVersion: 1 }),
+  LANDING_PROPOSAL_GENERATION: Object.freeze({ costClass: "CHEAP_AI", defaultRoute: "LUNA", routingDecision: "DEFAULT_CHEAP_MODEL", promptVersion: 1, modelPolicyVersion: 1 }),
+  WEBSITE_PROPOSAL_GENERATION: Object.freeze({ costClass: "CHEAP_AI", defaultRoute: "LUNA", routingDecision: "DEFAULT_CHEAP_MODEL", promptVersion: 1, modelPolicyVersion: 1 }),
+});
 
 export function createAiOperationRegistry(entries = DEFAULTS, environment = process.env) {
   const allowed = ["operationId", "operationVersion", "provider", "modelConfigKey", "defaultModel", "reasoningEffort", "maxInputCharacters", "maxOutputTokens", "timeoutMs", "automaticRetries", "featureExposure", "structuredOutput", "rawFreeText", "sideEffects"];
   const policies = entries.map((entry) => {
     if (!entry || Object.keys(entry).some((key) => !allowed.includes(key)) || allowed.some((key) => !Object.hasOwn(entry, key)) || !/^[A-Z][A-Z0-9_]{2,79}$/.test(entry.operationId) || entry.operationVersion !== 1 || entry.provider !== "OPENAI" || !/^OPENAI_[A-Z0-9_]+$/.test(entry.modelConfigKey) || typeof entry.defaultModel !== "string" || !entry.defaultModel || entry.defaultModel.length > 120 || entry.reasoningEffort !== "low" || !Number.isInteger(entry.maxInputCharacters) || entry.maxInputCharacters < 100 || entry.maxInputCharacters > 100_000 || !Number.isInteger(entry.maxOutputTokens) || entry.maxOutputTokens < 100 || entry.maxOutputTokens > 12_000 || !Number.isInteger(entry.timeoutMs) || entry.timeoutMs < 1_000 || entry.timeoutMs > 30_000 || entry.automaticRetries !== 0 || !["INTERNAL", "CUSTOMER"].includes(entry.featureExposure) || entry.structuredOutput !== true || entry.rawFreeText !== false || entry.sideEffects !== false) throw new Error("AI operation policy is invalid.");
-    const configuredModel = environment[entry.modelConfigKey];
-    return Object.freeze({ ...entry, model: typeof configuredModel === "string" && configuredModel.trim() && configuredModel.length <= 120 ? configuredModel.trim() : entry.defaultModel });
+    const configuredModel = environment[entry.modelConfigKey], economy = ECONOMY[entry.operationId];
+    if (!economy) throw new Error("AI economy policy is missing.");
+    return Object.freeze({ ...entry, ...economy, model: typeof configuredModel === "string" && configuredModel.trim() && configuredModel.length <= 120 ? configuredModel.trim() : entry.defaultModel });
   });
   const map = new Map(policies.map((policy) => [policy.operationId, policy]));
   if (map.size !== policies.length) throw new Error("Duplicate AI operation policy.");

@@ -3,6 +3,7 @@ import { AiProviderError } from "../ai/ai-provider-errors.mjs";
 import { requireWorkspaceId } from "../tenant-context.mjs";
 import { composeBusinessBrainInput } from "./business-brain-prompt.mjs";
 import { businessDnaJsonSchema, validateBusinessDna } from "./business-brain-schema.mjs";
+import { aiQualityGates } from "../ai/economy/quality-gates.mjs";
 
 const FIELDS = Object.freeze(["website", "businessDescription", "brandNotes"]);
 const LIMITS = Object.freeze({ website: 2_048, businessDescription: 6_000, brandNotes: 3_000 });
@@ -22,7 +23,7 @@ export function validateBusinessBrainInput(input, maximumTotal = 10_000) {
   return normalized;
 }
 
-export function createBusinessBrainService({ provider, policyRegistry, rateLimiter, operationMetrics = null, now = () => Date.now(), duplicateTtlMs = 15_000 } = {}) {
+export function createBusinessBrainService({ provider, economyService = null, policyRegistry, rateLimiter, operationMetrics = null, now = () => Date.now(), duplicateTtlMs = 15_000 } = {}) {
   const recent = new Map(), inflight = new Map();
   const readiness = () => Object.freeze({ configured: Boolean(provider?.configured), enabled: Boolean(policyRegistry?.get("BUSINESS_BRAIN_ANALYSIS")), providerAvailability: "not-probed" });
   return Object.freeze({
@@ -38,7 +39,8 @@ export function createBusinessBrainService({ provider, policyRegistry, rateLimit
       const limit = rateLimiter.acquire(workspaceId, actor.userId);
       if (!limit.allowed) { const error = new AiProviderError("AI_PROVIDER_RATE_LIMITED"); error.retryAfter = limit.retryAfter; throw error; }
       const run = (async () => {
-        const result = await provider.executeStructured({ operation: policy.operationId, model: policy.model, input: composeBusinessBrainInput(normalized), schema: businessDnaJsonSchema, schemaName: "loadder_business_dna_v1", reasoningEffort: policy.reasoningEffort, maxOutputTokens: policy.maxOutputTokens, timeoutMs: policy.timeoutMs });
+        const providerInput = composeBusinessBrainInput(normalized);
+        const result = economyService ? await economyService.execute({ workspaceId, userId: actor.userId, operation: policy.operationId, input: normalized, providerInput, schema: businessDnaJsonSchema, schemaName: "loadder_business_dna_v1", qualityGate: aiQualityGates.BUSINESS_BRAIN_ANALYSIS }) : await provider.executeStructured({ operation: policy.operationId, model: policy.model, input: providerInput, schema: businessDnaJsonSchema, schemaName: "loadder_business_dna_v1", reasoningEffort: policy.reasoningEffort, maxOutputTokens: policy.maxOutputTokens, timeoutMs: policy.timeoutMs });
         const data = validateBusinessDna(result.data), completed = Object.freeze({ data, usage: result.usage });
         recent.set(key, { ...completed, at: now() });
         operationMetrics?.record({ operation: "business_brain.analyze", workspaceId, durationMs: performance.now() - started, providerKind: result.provider, providerModel: result.model, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens });

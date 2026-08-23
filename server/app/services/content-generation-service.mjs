@@ -49,7 +49,7 @@ export function createContentGenerationService({ repository, intentRepository, c
     let usage = { inputTokens: null, outputTokens: null };
     try {
       const template = composeTextGenerationTemplate({ contract, placement, brief, generationContext, variantCount: normalized.variantCount });
-      const result = await provider.generateRegisteredContract({ binding, contract, template });
+      const result = await provider.generateRegisteredContract({ binding, contract, template, workspaceId, userId: actor.userId });
       usage = result.usage;
       let variants;
       try { variants = contract.validateOutput(result.output, normalized.variantCount); }

@@ -11,9 +11,16 @@ import {
   createProductionOriginGuard,
 } from "./app/middleware/product-gating.mjs";
 import { createAiRouter } from "./app/routes/ai.mjs";
+import { createAiEconomyRouter } from "./app/routes/ai-economy.mjs";
 import { createGrowthWorkflowRouter } from "./app/routes/growth-workflow.mjs";
 import { createAiOperationRegistry } from "./app/ai/ai-operation-registry.mjs";
 import { createOpenAiResponsesProvider } from "./app/ai/providers/openai-responses-provider.mjs";
+import { createAiEconomyService } from "./app/ai/economy/ai-economy-service.mjs";
+import { createAiEconomyMetrics } from "./app/ai/economy/ai-economy-metrics.mjs";
+import { createAiBudgetGovernor } from "./app/ai/economy/budget-governor.mjs";
+import { deterministicCapabilityRegistry } from "./app/ai/economy/deterministic-capability-registry.mjs";
+import { growthPatternRegistry, learnedIntelligencePolicy } from "./app/ai/economy/pattern-registry.mjs";
+import { persianAiBenchmarkRegistry } from "./app/ai/benchmarks/persian-benchmark-registry.mjs";
 import { createBusinessBrainRateLimiter } from "./app/business-brain/business-brain-rate-limiter.mjs";
 import { createBusinessBrainService } from "./app/business-brain/business-brain-service.mjs";
 import { createAuthRouter } from "./app/routes/auth.mjs";
@@ -437,7 +444,9 @@ const textAiContextConsumer = createTextAiContextConsumer({
 });
 const aiOperationPolicyRegistry = createAiOperationRegistry();
 const openAiResponsesProvider = createOpenAiResponsesProvider();
-const businessBrainService = createBusinessBrainService({ provider: openAiResponsesProvider, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createBusinessBrainRateLimiter(), operationMetrics: createOperationMetrics() });
+const aiBudgetGovernor = createAiBudgetGovernor();
+const aiEconomyService = createAiEconomyService({ provider: openAiResponsesProvider, policyRegistry: aiOperationPolicyRegistry, deterministicRegistry: deterministicCapabilityRegistry, metrics: createAiEconomyMetrics(), budgetGovernor: aiBudgetGovernor });
+const businessBrainService = createBusinessBrainService({ provider: openAiResponsesProvider, economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createBusinessBrainRateLimiter(), operationMetrics: createOperationMetrics() });
 const contentGenerationService = createContentGenerationService({
   repository: contentGenerationRepository,
   intentRepository: creativeIntentRepository,
@@ -445,7 +454,7 @@ const contentGenerationService = createContentGenerationService({
   placementRegistry: contentPlacementRegistry,
   providerBindingRegistry: textProviderBindingRegistry,
   contextGateway: businessContextConsumerGateway,
-  provider: createOpenAITextGenerationProvider({ responsesProvider: openAiResponsesProvider }),
+  provider: createOpenAITextGenerationProvider({ responsesProvider: openAiResponsesProvider, economyService: aiEconomyService }),
   rateLimiter: createContentGenerationRateLimiter(),
   operationMetrics: createOperationMetrics(),
 });
@@ -471,7 +480,7 @@ const secureFormsCrmService = createSecureFormsCrmService({ repository: secureFo
 const landingService = createLandingService({ repository: landingRepository, intentRepository: creativeIntentRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, componentRegistry: landingComponentRegistry, publisher: landingPublisher, operationMetrics: createOperationMetrics() });
 const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
-const growthWorkflowService = createGrowthWorkflowService({ repository: growthWorkflowRepository, contextRepository: businessContextRepository, provider: openAiResponsesProvider, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createGrowthRateLimiter(), landingService, websiteService, contentGenerationService });
+const growthWorkflowService = createGrowthWorkflowService({ repository: growthWorkflowRepository, contextRepository: businessContextRepository, provider: openAiResponsesProvider, economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createGrowthRateLimiter(), landingService, websiteService, contentGenerationService });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
 const marketplaceCommerceService = createMarketplaceCommerceService({ repository: marketplaceCommerceRepository, registry: marketplaceProviderRegistry, publicUrlResolver: (catalog, product) => domainPublishingRepository.productUrl(catalog.id, product.id), assetUrlResolver: (assetId) => domainPublishingRepository.publicAssetUrl(assetId) });
 const cartCheckoutService = createCartCheckoutService({ repository: cartCheckoutRepository, shippingRegistry: commerceShippingRegistry });
@@ -577,6 +586,7 @@ app.get("/api/health", (req, res) => {
       businessBrainConfigured: businessBrainService.readiness().configured,
       contentTextGenerationConfigured: environment.openAIConfigured,
       providerAvailability: "not-probed",
+      economy: aiEconomyService.readiness(),
     },
     assets: {
       assetStorageConfigured: contentAssetStore.configured,
@@ -658,6 +668,7 @@ app.use("/api", createLandingRouter({ service: landingService }));
 app.use("/api", createLandingCommercializationRouter({ service: landingCommercializationService }));
 app.use("/api", createWebsiteRouter({ service: websiteService }));
 app.use("/api", createGrowthWorkflowRouter({ service: growthWorkflowService }));
+app.use("/api", createAiEconomyRouter({ economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, budgetGovernor: aiBudgetGovernor, benchmarkRegistry: persianAiBenchmarkRegistry, patternRegistry: growthPatternRegistry, learnedPolicy: learnedIntelligencePolicy }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
 app.use("/api", createMarketplaceCommerceRouter({ marketplaceService: marketplaceCommerceService, bulkService: commerceBulkService, integrationHubService }));
 app.use("/api", createDomainPublishingRouter({ service: domainPublishingService }));

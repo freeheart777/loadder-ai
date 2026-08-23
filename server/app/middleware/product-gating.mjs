@@ -65,6 +65,7 @@ export function classifyApiRequest(method, path) {
     return { feature: "execution", internal: false };
   }
   if (!MUTATIONS.has(upper)) {
+    if (/^\/api\/ai\/economy(?:\/|$)/.test(path)) return { feature: "development_tools", internal: true };
     if (/^\/api\/(messaging\/status|database\/status)/.test(path)) return { feature: "development_tools", internal: true };
     if (/^\/api\/(execution|provider-account-identities|integrations\/connections\/[^/]+\/account-identities)/.test(path)) return { feature: "execution", internal: true };
     if (/^\/api\/intelligence/.test(path)) return { feature: "intelligence", internal: true };

@@ -16,6 +16,7 @@ export const INTERNAL_ROUTE_ALLOWLIST = Object.freeze([
   "/intelligence",
   "/legacy-dashboard",
   "/click-test",
+  "/dashboard/ai-economy",
 ]);
 
 export const internalToolsEnabled =
