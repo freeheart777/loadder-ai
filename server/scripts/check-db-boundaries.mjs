@@ -18,6 +18,7 @@ const landingBoundaryViolations = [];
 const paymentBoundaryViolations = [];
 const domainPublishingBoundaryViolations = [];
 const secureFormsCrmBoundaryViolations = [];
+const governedAiBoundaryViolations = [];
 
 function inspect(target) {
   const stat = statSync(target);
@@ -136,6 +137,14 @@ function inspect(target) {
       /console\.(?:log|info|warn|error)/,
     ];
     if (forbidden.some((pattern) => pattern.test(source))) secureFormsCrmBoundaryViolations.push(path.relative(serverRoot, target));
+  }
+  if (target.includes(`${path.sep}app${path.sep}ai${path.sep}`) || target.includes(`${path.sep}business-brain${path.sep}`)) {
+    const forbidden = [
+      /from\s+["'][^"']*(repositories|db\/database|execution|campaign|automation|messaging|payments|shipping|refunds)[^"']*["']/i,
+      /from\s+["'](?:node:)?(?:child_process|worker_threads|vm)["']/i,
+      /\b(eval|new Function)\s*\(/,
+    ];
+    if (forbidden.some((pattern) => pattern.test(source))) governedAiBoundaryViolations.push(path.relative(serverRoot, target));
   }
   if (target.includes(`${path.sep}content-generation${path.sep}`) || target.endsWith(`${path.sep}content-generation-service.mjs`) || target.endsWith(`${path.sep}content-generation-repository.mjs`) || target.endsWith(`${path.sep}content-generation.mjs`)) {
     const forbidden = [
@@ -382,6 +391,10 @@ if (secureFormsCrmBoundaryViolations.length) {
   console.error(`Secure Forms CRM boundary violations: ${secureFormsCrmBoundaryViolations.join(", ")}`);
   process.exitCode = 1;
 }
+if (governedAiBoundaryViolations.length) {
+  console.error(`Governed AI boundary violations: ${governedAiBoundaryViolations.join(", ")}`);
+  process.exitCode = 1;
+}
 if (consumerBoundaryViolations.length) {
   console.error(
     `Business Context consumers, signal producers, feature producers, or model-input builders access forbidden persistence: ${consumerBoundaryViolations.join(", ")}`
@@ -396,7 +409,7 @@ if (creativeGenerationBoundaryViolations.length) {
   console.error(`Creative Generation accesses execution, messaging, automation, campaign, or raw database dependencies: ${creativeGenerationBoundaryViolations.join(", ")}`);
   process.exitCode = 1;
 }
-if (!violations.length && !consumerBoundaryViolations.length && !onboardingBoundaryViolations.length && !creativeGenerationBoundaryViolations.length && !contentAssetBoundaryViolations.length && !creativePlacementBoundaryViolations.length && !creativeIntentBoundaryViolations.length && !distributionBoundaryViolations.length && !attributionTouchBoundaryViolations.length && !performanceObservationBoundaryViolations.length && !landingBoundaryViolations.length && !paymentBoundaryViolations.length && !domainPublishingBoundaryViolations.length && !secureFormsCrmBoundaryViolations.length) {
+if (!violations.length && !consumerBoundaryViolations.length && !onboardingBoundaryViolations.length && !creativeGenerationBoundaryViolations.length && !contentAssetBoundaryViolations.length && !creativePlacementBoundaryViolations.length && !creativeIntentBoundaryViolations.length && !distributionBoundaryViolations.length && !attributionTouchBoundaryViolations.length && !performanceObservationBoundaryViolations.length && !landingBoundaryViolations.length && !paymentBoundaryViolations.length && !domainPublishingBoundaryViolations.length && !secureFormsCrmBoundaryViolations.length && !governedAiBoundaryViolations.length) {
   console.log("Database import boundary is valid.");
   console.log("Business Context consumer boundary is valid.");
   console.log("Onboarding dependency boundary is valid.");
@@ -411,4 +424,5 @@ if (!violations.length && !consumerBoundaryViolations.length && !onboardingBound
   console.log("Payment dependency boundary is valid.");
   console.log("Domain Publishing dependency boundary is valid.");
   console.log("Secure Forms CRM dependency boundary is valid.");
+  console.log("Governed AI dependency boundary is valid.");
 }

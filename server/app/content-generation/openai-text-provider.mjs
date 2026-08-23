@@ -1,40 +1,32 @@
-import OpenAI from "openai";
+import { AiProviderError } from "../ai/ai-provider-errors.mjs";
+import { createOpenAiResponsesProvider } from "../ai/providers/openai-responses-provider.mjs";
 
 export class TextProviderError extends Error {
   constructor(code) { super("Text generation provider failed."); this.name = "TextProviderError"; this.code = code; }
 }
 
-export function createOpenAITextGenerationProvider({ apiKey = process.env.OPENAI_API_KEY, client = null } = {}) {
+const CONTENT_CODES = Object.freeze({ AI_PROVIDER_NOT_CONFIGURED: "CONTENT_PROVIDER_UNAVAILABLE", AI_PROVIDER_AUTH_FAILED: "CONTENT_PROVIDER_UNAVAILABLE", AI_PROVIDER_RATE_LIMITED: "CONTENT_GENERATION_FAILED", AI_PROVIDER_TIMEOUT: "CONTENT_PROVIDER_TIMEOUT", AI_PROVIDER_UNAVAILABLE: "CONTENT_GENERATION_FAILED", AI_PROVIDER_BAD_RESPONSE: "CONTENT_OUTPUT_INVALID", AI_OUTPUT_INVALID: "CONTENT_OUTPUT_INVALID", AI_REQUEST_REJECTED: "CONTENT_GENERATION_FAILED" });
+
+export function createOpenAITextGenerationProvider({ apiKey = process.env.OPENAI_API_KEY, client = null, responsesProvider = null } = {}) {
+  const provider = responsesProvider || createOpenAiResponsesProvider({ apiKey, client });
   return Object.freeze({
     async generateRegisteredContract({ binding, contract, template }) {
-      if (!apiKey && !client) throw new TextProviderError("CONTENT_PROVIDER_UNAVAILABLE");
-      const openai = client || new OpenAI({ apiKey });
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), binding.providerDeadlineMs);
       try {
-        const response = await openai.responses.create({
-          model: binding.model,
-          reasoning: { effort: binding.reasoningEffort },
+        const result = await provider.executeStructured({
+          operation: "CONTENT_TEXT_GENERATION", model: binding.model, reasoningEffort: binding.reasoningEffort,
           input: [
             { role: "system", content: template.system },
             { role: "user", content: template.user },
           ],
-          text: { format: { type: "json_schema", name: `${contract.contractId}_v${contract.contractVersion}`, strict: true, schema: contract.outputSchema } },
-          max_output_tokens: Math.min(12_000, Math.max(1_500, Math.ceil(contract.maximumOutputCharacters / 2))),
-          store: false,
-        }, { signal: controller.signal });
-        let output;
-        try { output = JSON.parse(response.output_text || ""); }
-        catch { throw new TextProviderError("CONTENT_OUTPUT_INVALID"); }
-        return Object.freeze({
-          output,
-          usage: Object.freeze({ inputTokens: response.usage?.input_tokens ?? null, outputTokens: response.usage?.output_tokens ?? null }),
+          schema: contract.outputSchema, schemaName: `${contract.contractId}_v${contract.contractVersion}`,
+          maxOutputTokens: Math.min(12_000, Math.max(1_500, Math.ceil(contract.maximumOutputCharacters / 2))), timeoutMs: binding.providerDeadlineMs,
         });
+        return Object.freeze({ output: result.data, usage: Object.freeze({ inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens }) });
       } catch (error) {
         if (error instanceof TextProviderError) throw error;
-        if (controller.signal.aborted || error?.name === "AbortError") throw new TextProviderError("CONTENT_PROVIDER_TIMEOUT");
+        if (error instanceof AiProviderError) throw new TextProviderError(CONTENT_CODES[error.code] || "CONTENT_GENERATION_FAILED");
         throw new TextProviderError("CONTENT_GENERATION_FAILED");
-      } finally { clearTimeout(timer); }
+      }
     },
   });
 }

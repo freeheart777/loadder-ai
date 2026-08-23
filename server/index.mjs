@@ -10,7 +10,11 @@ import {
   createInternalAccessMiddleware,
   createProductionOriginGuard,
 } from "./app/middleware/product-gating.mjs";
-import aiRouter from "./app/routes/ai.mjs";
+import { createAiRouter } from "./app/routes/ai.mjs";
+import { createAiOperationRegistry } from "./app/ai/ai-operation-registry.mjs";
+import { createOpenAiResponsesProvider } from "./app/ai/providers/openai-responses-provider.mjs";
+import { createBusinessBrainRateLimiter } from "./app/business-brain/business-brain-rate-limiter.mjs";
+import { createBusinessBrainService } from "./app/business-brain/business-brain-service.mjs";
 import { createAuthRouter } from "./app/routes/auth.mjs";
 import { createWorkspaceRouter } from "./app/routes/workspaces.mjs";
 import { createBusinessProfileRouter } from "./app/routes/business-profile.mjs";
@@ -426,6 +430,9 @@ const businessContextConsumerGateway = createBusinessContextConsumerGateway({
 const textAiContextConsumer = createTextAiContextConsumer({
   contextGateway: businessContextConsumerGateway,
 });
+const aiOperationPolicyRegistry = createAiOperationRegistry();
+const openAiResponsesProvider = createOpenAiResponsesProvider();
+const businessBrainService = createBusinessBrainService({ provider: openAiResponsesProvider, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createBusinessBrainRateLimiter(), operationMetrics: createOperationMetrics() });
 const contentGenerationService = createContentGenerationService({
   repository: contentGenerationRepository,
   intentRepository: creativeIntentRepository,
@@ -433,7 +440,7 @@ const contentGenerationService = createContentGenerationService({
   placementRegistry: contentPlacementRegistry,
   providerBindingRegistry: textProviderBindingRegistry,
   contextGateway: businessContextConsumerGateway,
-  provider: createOpenAITextGenerationProvider(),
+  provider: createOpenAITextGenerationProvider({ responsesProvider: openAiResponsesProvider }),
   rateLimiter: createContentGenerationRateLimiter(),
   operationMetrics: createOperationMetrics(),
 });
@@ -561,7 +568,9 @@ app.get("/api/health", (req, res) => {
     ai: {
       openaiConfigured: environment.openAIConfigured,
       cloudflareConfigured: environment.cloudflareAIConfigured,
+      businessBrainConfigured: businessBrainService.readiness().configured,
       contentTextGenerationConfigured: environment.openAIConfigured,
+      providerAvailability: "not-probed",
     },
     assets: {
       assetStorageConfigured: contentAssetStore.configured,
@@ -678,7 +687,7 @@ app.use("/api", createExecutionLedgerRouter({ service: executionLedgerService })
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));
-app.use("/api", aiRouter);
+app.use("/api", createAiRouter({ businessBrainService, readiness: () => ({ openaiConfigured: environment.openAIConfigured, cloudflareConfigured: environment.cloudflareAIConfigured, businessBrainConfigured: businessBrainService.readiness().configured, contentGenerationConfigured: environment.openAIConfigured, providerAvailability: "not-probed" }) }));
 
 /* =========================================================
    CAMPAIGN RUNTIME CONFIG

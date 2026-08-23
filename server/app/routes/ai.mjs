@@ -1,63 +1,7 @@
 import express from "express";
-import OpenAI from "openai";
-
 import { executeAgentTask } from "../../ai/agent/executor.js";
 import { runCloudflare } from "../../ai/providers/cloudflare.js";
-
-const router = express.Router();
-
-const businessBrainPrompt = ({
-  website,
-  businessDescription,
-  brandNotes,
-}) => `
-تو مغز هوشمند کسب‌وکار پلتفرم Loadder هستی.
-
-وظیفه تو ساخت یک Business DNA اولیه برای کسب‌وکار است.
-
-اطلاعات ورودی:
-
-وب‌سایت:
-${website || "ارائه نشده"}
-
-توضیح کسب‌وکار:
-${businessDescription || "ارائه نشده"}
-
-اطلاعات برند:
-${brandNotes || "ارائه نشده"}
-
-خروجی را فقط به زبان فارسی و دقیقاً با این ساختار JSON بده:
-
-{
-  "businessSummary": "",
-  "valueProposition": "",
-  "targetAudience": [],
-  "productsServices": [],
-  "toneOfVoice": [],
-  "marketPosition": "",
-  "brandPersonality": [],
-  "customerSegments": [],
-  "growthOpportunities": [{ "title": "", "reason": "", "priority": "بالا" }],
-  "risks": [{ "title": "", "reason": "" }],
-  "recommendedActions": [],
-  "confidenceScore": 0
-}
-
-قوانین:
-- چیزی را که از ورودی قابل استنتاج نیست قطعی اعلام نکن.
-- اگر داده کم است، محتاط باش.
-- confidenceScore عددی بین 0 تا 100 باشد.
-- پیشنهادها عملی و کوتاه باشند.
-- متن تبلیغاتی یا کلیشه‌ای ننویس.
-`;
-
-function cleanJsonResponse(raw) {
-  return String(raw || "")
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```$/i, "")
-    .trim();
-}
+import { AiProviderError } from "../ai/ai-provider-errors.mjs";
 
 function cleanPersian(value) {
   if (typeof value !== "string") return value;
@@ -79,33 +23,16 @@ function cleanPersian(value) {
     .trim();
 }
 
-router.get("/ai/health", (req, res) => {
-  res.json({
-    success: true,
-    service: "Loadder AI",
-    providers: {
-      openai: Boolean(process.env.OPENAI_API_KEY),
-      cloudflare: Boolean(
-        process.env.CLOUDFLARE_ACCOUNT_ID &&
-          process.env.CLOUDFLARE_API_TOKEN
-      ),
-    },
-  });
-});
+export function createAiRouter({ businessBrainService = null, cloudflareRunner = runCloudflare, agentRunner = executeAgentTask, readiness = () => ({ openaiConfigured: false, cloudflareConfigured: false, businessBrainConfigured: false, contentGenerationConfigured: false }) } = {}) {
+const router = express.Router();
+router.get("/ai/health", (_req, res) => res.json({ success: true, service: "Loadder AI", providers: readiness() }));
 
 router.post("/agent/run", async (req, res) => {
   try {
-    const result = await executeAgentTask(req.body);
+    const result = await agentRunner(req.body);
     res.json(result);
-  } catch (error) {
-    console.error("Agent execution error:", error);
-    res.status(500).json({
-      success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Agent execution failed.",
-    });
+  } catch {
+    res.status(502).json({ success: false, code: "AI_PROVIDER_UNAVAILABLE", message: "Agent request could not be completed." });
   }
 });
 
@@ -120,7 +47,8 @@ router.post("/ai/chat", async (req, res) => {
       });
     }
 
-    const result = await runCloudflare({
+    if (message.length > 4000) return res.status(400).json({ success: false, code: "AI_INPUT_INVALID", message: "پیام معتبر نیست." });
+    const result = await cloudflareRunner({
       system:
         "You are Loadder AI, a senior Persian-speaking business growth strategist. If the user writes in Persian, respond only in fluent natural Persian. Do not mix Persian with Vietnamese, Chinese, Korean, or other languages. Use clear headings, concise explanations, practical recommendations, and correct digital marketing terminology. Avoid repetition.",
       user: message,
@@ -132,12 +60,11 @@ router.post("/ai/chat", async (req, res) => {
       success: true,
       model: result.model,
       answer: cleanPersian(result.answer),
-      raw: result.raw,
     });
-  } catch (error) {
-    console.error("AI chat error:", error);
+  } catch {
     return res.status(502).json({
       success: false,
+      code: "AI_PROVIDER_UNAVAILABLE",
       message: "ارتباط با موتور هوش مصنوعی ناموفق بود.",
     });
   }
@@ -145,50 +72,16 @@ router.post("/ai/chat", async (req, res) => {
 
 router.post("/business-brain/analyze", async (req, res) => {
   try {
-    const website = String(req.body.website || "").trim();
-    const businessDescription = String(
-      req.body.businessDescription || ""
-    ).trim();
-    const brandNotes = String(req.body.brandNotes || "").trim();
-
-    if (!website && !businessDescription && !brandNotes) {
-      return res.status(400).json({
-        success: false,
-        error: "حداقل یک منبع اطلاعاتی وارد کن.",
-      });
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        error: "OpenAI برای Business Brain پیکربندی نشده است.",
-      });
-    }
-
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await openai.responses.create({
-      model: process.env.OPENAI_BUSINESS_BRAIN_MODEL || "gpt-5.6-terra",
-      reasoning: { effort: "low" },
-      input: businessBrainPrompt({
-        website,
-        businessDescription,
-        brandNotes,
-      }),
-      max_output_tokens: 2500,
-    });
-
-    return res.json({
-      success: true,
-      data: JSON.parse(cleanJsonResponse(response.output_text)),
-    });
+    if (!businessBrainService) throw new AiProviderError("AI_OPERATION_DISABLED");
+    const result = await businessBrainService.analyze(req.body, { userId: req.user.id });
+    return res.json({ success: true, data: result.data, reusedResult: result.reusedResult });
   } catch (error) {
-    console.error("Business Brain error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "تحلیل Business Brain انجام نشد.",
-    });
+    const normalized = error instanceof AiProviderError ? error : new AiProviderError("AI_PROVIDER_UNAVAILABLE");
+    if (normalized.retryAfter) res.set("Retry-After", String(normalized.retryAfter));
+    return res.status(normalized.status).json({ success: false, code: normalized.code, message: "تحلیل Business Brain انجام نشد." });
   }
 });
+return router;
+}
 
-export default router;
-
+export default createAiRouter();

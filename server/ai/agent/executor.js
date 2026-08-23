@@ -22,6 +22,5 @@ export async function executeAgentTask(input) {
     provider: result.provider,
     model: result.model,
     answer: result.answer,
-    raw: result.raw,
   };
 }

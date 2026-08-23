@@ -2,7 +2,7 @@ const DEFAULT_BINDINGS = [{
   bindingId: "openai_text_primary",
   bindingVersion: 1,
   providerKind: "openai",
-  model: process.env.OPENAI_CONTENT_MODEL || "gpt-5.6-terra",
+  model: process.env.OPENAI_CONTENT_MODEL || "gpt-5.6-luna",
   providerDeadlineMs: 25_000,
   reasoningEffort: "low",
 }];
