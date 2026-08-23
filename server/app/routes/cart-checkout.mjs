@@ -6,6 +6,7 @@ return s.status(x.reusedResult?200:status).json({success:true,...x});
 return s.status(status).json({success:false,code,message:"Commerce checkout operation could not be completed."});
 }},bounded=(q,s,n)=>JSON.stringify(q.body||{}).length>16384?s.status(413).json({success:false,code:"COMMERCE_BODY_TOO_LARGE",message:"Commerce checkout operation could not be completed."}):n();
 const windows=new Map(),limited=(q,s,n)=>{const now=Date.now(),id=String(q.ip||q.socket.remoteAddress||"unknown"),prior=windows.get(id);if(!prior||prior.until<=now)windows.set(id,{count:1,until:now+60000});else if(++prior.count>120)return s.status(429).json({success:false,code:"COMMERCE_RATE_LIMITED",message:"Commerce checkout operation could not be completed."});if(windows.size>10000)for(const[k,v]of windows)if(v.until<=now)windows.delete(k);return n();};
+r.use((_q,s,n)=>{s.set("Cache-Control","no-store");s.set("Pragma","no-cache");n();});
 r.use((q,s,n)=>limited(q,s,n));
 
 r.get("/api/public/commerce/shipping",(_q,s)=>run(s,()=>service.shipping()));
