@@ -62,6 +62,8 @@ import { migration061PaymentOrderLifecycle } from "./061_payment_order_lifecycle
 import { migration062InventoryFulfillmentFoundation } from "./062_inventory_fulfillment_foundation.mjs";
 import { migration063ReturnRefundLifecycle } from "./063_return_refund_lifecycle.mjs";
 import { migration064CustomDomainPublishing } from "./064_custom_domain_publishing.mjs";
+import { migration065SecureFormsCrmFoundation } from "./065_secure_forms_crm_foundation.mjs";
+import { migration066CrmIdentityConflicts } from "./066_crm_identity_conflicts.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -128,4 +130,6 @@ export const migrations = [
   migration062InventoryFulfillmentFoundation,
   migration063ReturnRefundLifecycle,
   migration064CustomDomainPublishing,
+  migration065SecureFormsCrmFoundation,
+  migration066CrmIdentityConflicts,
 ];

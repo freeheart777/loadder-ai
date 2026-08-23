@@ -154,6 +154,9 @@ test("production origin guard accepts exact origins and rejects foreign or missi
   const publicResponse = response(); let publicNext = false;
   guard({ method: "POST", path: "/api/public/landing/events", headers: {} }, publicResponse, () => { publicNext = true; });
   assert.equal(publicNext, true);
+  const formResponse = response(); let formNext = false;
+  guard({ method: "POST", path: "/api/public/forms/public-reference/submissions", headers: { origin: "https://publisher.example" } }, formResponse, () => { formNext = true; });
+  assert.equal(formNext, true);
 });
 
 test("auth production response invariant remains code-free and health remains non-ready", () => {

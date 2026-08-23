@@ -51,6 +51,7 @@ import { createWebsiteRouter } from "./app/routes/websites.mjs";
 import { createCommerceCatalogRouter } from "./app/routes/commerce-catalogs.mjs";
 import { createMarketplaceCommerceRouter, createMarketplacePublicRouter } from "./app/routes/marketplace-commerce.mjs";
 import { createDomainPublishingRouter, createPublicHostRouter } from "./app/routes/domain-publishing.mjs";
+import { createPublicFormsRouter, createSecureFormsCrmRouter } from "./app/routes/secure-forms-crm.mjs";
 import { createCartCheckoutRouter } from "./app/routes/cart-checkout.mjs";
 import { createPaymentOrderRouter } from "./app/routes/payment-orders.mjs";
 import { createInventoryFulfillmentRouter } from "./app/routes/inventory-fulfillment.mjs";
@@ -88,6 +89,7 @@ import { createProviderAccountIdentityRepository } from "./app/repositories/prov
 import { createExecutionLedgerRepository } from "./app/repositories/execution-ledger-repository.mjs";
 import { createExecutionDispatchJobRepository } from "./app/repositories/execution-dispatch-job-repository.mjs";
 import { createContentGenerationRepository } from "./app/repositories/content-generation-repository.mjs";
+import { createSecureFormsCrmRepository } from "./app/repositories/secure-forms-crm-repository.mjs";
 import { createContentItemRepository } from "./app/repositories/content-item-repository.mjs";
 import { createContentAssetRepository } from "./app/repositories/content-asset-repository.mjs";
 import { createCreativePlacementRepository } from "./app/repositories/creative-placement-repository.mjs";
@@ -143,8 +145,9 @@ import { createReturnRefundService } from "./app/services/return-refund-service.
 import { createUnavailableRefundProvider } from "./app/refunds/refund-providers.mjs";
 import { returnReasonRegistry } from "./app/returns/return-reason-registry.mjs";
 import { landingComponentRegistry } from "./app/landing/landing-component-registry.mjs";
-import { createLandingPublisher } from "./app/landing/landing-publisher.mjs";
+import { createGovernedExperiencePublisher } from "./app/forms/governed-experience-publisher.mjs";
 import { createLandingTrackingTokenService } from "./app/landing/landing-tracking-token.mjs";
+import { createSecureFormsCrmService } from "./app/services/secure-forms-crm-service.mjs";
 import { createLandingPublicRateLimiter } from "./app/landing/landing-public-rate-limiter.mjs";
 import { websitePresetRegistry } from "./app/website/website-preset-registry.mjs";
 import { createWebsitePublisher } from "./app/website/website-publisher.mjs";
@@ -317,18 +320,26 @@ const productPolicy = createProductPolicy({
 const landingPublicOrigin = (() => { try { return new URL(environment.landing.publicBaseUrl).origin; } catch { return ""; } })();
 
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || environment.clientOrigins.includes(origin) || origin === landingPublicOrigin) {
-        return callback(null, true);
-      }
+  cors((request, callback) => {
+    callback(null, {
+      origin(origin, originCallback) {
+        if (
+          !origin ||
+          environment.clientOrigins.includes(origin) ||
+          origin === landingPublicOrigin ||
+          request.path.startsWith("/api/public/forms/")
+        ) {
+          return originCallback(null, true);
+        }
 
-      return callback(new Error("Origin is not allowed by CORS."));
-    },
-    credentials: true,
+        return originCallback(new Error("Origin is not allowed by CORS."));
+      },
+      credentials: !request.path.startsWith("/api/public/forms/"),
+    });
   })
 );
 app.use("/api/public/landing/events", express.json({ limit: "8kb" }));
+app.use("/api/public/forms", express.json({ limit: "40kb" }));
 app.use(
   express.json({
     limit: "2mb",
@@ -361,6 +372,7 @@ const websiteRepository = createWebsiteRepository(db);
 const commerceCatalogRepository = createCommerceCatalogRepository(db);
 const marketplaceCommerceRepository = createMarketplaceCommerceRepository(db);
 const domainPublishingRepository = createDomainPublishingRepository(db);
+const secureFormsCrmRepository = createSecureFormsCrmRepository(db);
 const cartCheckoutRepository = createCartCheckoutRepository(db);
 const paymentOrderRepository = createPaymentOrderRepository(db);
 const inventoryFulfillmentRepository = createInventoryFulfillmentRepository(db);
@@ -440,8 +452,10 @@ const creativeIntentService = createCreativeIntentService({ repository: creative
 const distributionContextService = createDistributionContextService({ repository: distributionContextRepository, placementRepository: creativePlacementRepository, registry: channelRegistry, operationMetrics: createOperationMetrics() });
 const attributionTouchService = createAttributionTouchService({ repository: attributionTouchRepository, distributionContextRepository, operationMetrics: createOperationMetrics() });
 const performanceObservationService = createPerformanceObservationService({ repository: performanceObservationRepository, distributionContextRepository, attributionTouchRepository, registry: observationContractRegistry, operationMetrics: createOperationMetrics() });
-const landingPublisher = createLandingPublisher({ nodeEnv: environment.nodeEnv, staticDirectory: environment.landing.staticDirectory, publicBaseUrl: environment.landing.publicBaseUrl, publicApiBaseUrl: environment.landing.publicApiBaseUrl });
+const baseExperiencePublisher = createGovernedExperiencePublisher({ nodeEnv: environment.nodeEnv, staticDirectory: environment.landing.staticDirectory, publicBaseUrl: environment.landing.publicBaseUrl, publicApiBaseUrl: environment.landing.publicApiBaseUrl });
+const landingPublisher = Object.freeze({ ...baseExperiencePublisher, publishRegisteredBlueprint(input) { for (const section of input.blueprint.blueprint.sections) { if (section.componentId !== "FORM_OR_ACTION" || section.variant !== "FORM_DEFINITION") continue; const form = secureFormsCrmRepository.publicForm(section.props?.publicFormReference); if (!form || form.workspaceId !== input.project.workspaceId || form.revision !== section.props?.formRevision) return Object.freeze({ available: false, failureCode: "GOVERNED_FORM_UNAVAILABLE" }); } return baseExperiencePublisher.publishRegisteredBlueprint(input); } });
 const landingTrackingTokenService = createLandingTrackingTokenService({ secret: environment.landing.trackingSecret, ttlSeconds: environment.landing.trackingTtlSeconds });
+const secureFormsCrmService = createSecureFormsCrmService({ repository: secureFormsCrmRepository, trackingTokenService: landingTrackingTokenService });
 const landingService = createLandingService({ repository: landingRepository, intentRepository: creativeIntentRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, componentRegistry: landingComponentRegistry, publisher: landingPublisher, operationMetrics: createOperationMetrics() });
 const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
@@ -568,6 +582,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use(createLandingPublicRouter({ service: landingCommercializationService, rateLimiter: createLandingPublicRateLimiter() }));
+app.use(createPublicFormsRouter({ service: secureFormsCrmService }));
 app.use(createCartCheckoutRouter({ service: cartCheckoutService }));
 app.use(createPaymentOrderRouter({ service: paymentOrderService, customerReturnBaseUrl: environment.clientOrigins[0] || "" }));
 app.use(createReturnPublicRouter({ service: returnRefundService }));
@@ -630,6 +645,7 @@ app.use("/api", createWebsiteRouter({ service: websiteService }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
 app.use("/api", createMarketplaceCommerceRouter({ marketplaceService: marketplaceCommerceService, bulkService: commerceBulkService, integrationHubService }));
 app.use("/api", createDomainPublishingRouter({ service: domainPublishingService }));
+app.use("/api", createSecureFormsCrmRouter({ service: secureFormsCrmService }));
 app.use("/api", createInventoryFulfillmentRouter({ service: inventoryFulfillmentService }));
 app.use("/api", createReturnRefundRouter({ service: returnRefundService }));
 app.use(

@@ -33,6 +33,8 @@ const CommerceCheckoutPage = lazy(() => import("./pages/CommerceCheckoutPage"));
 const CommercePaymentPage = lazy(() => import("./pages/CommercePaymentPage"));
 const IntegrationHubPage = lazy(() => import("./pages/IntegrationHubPage"));
 const DomainManagementPage = lazy(() => import("./pages/DomainManagementPage"));
+const FormBuilderPage = lazy(() => import("./pages/GovernedFormBuilderPage"));
+const CrmLeadsPage = lazy(() => import("./pages/CrmWorkspacePage"));
 
 export default function App() {
   return (
@@ -99,6 +101,7 @@ export default function App() {
         <Route path="/dashboard/catalog" element={<CommerceCatalogPage />} />
         <Route path="/dashboard/integrations" element={<IntegrationHubPage />} />
         <Route path="/dashboard/domains" element={<DomainManagementPage />} />
+        <Route path="/dashboard/forms" element={<FormBuilderPage />} />
         <Route path="/store/cart" element={<CommerceCheckoutPage />} />
         <Route path="/store/payment" element={<CommercePaymentPage />} />
 
@@ -123,8 +126,9 @@ export default function App() {
         {/* ارتباط با مشتری */}
         <Route
           path="/dashboard/crm"
-          element={<Navigate to="/dashboard" replace />}
+          element={<CrmLeadsPage />}
         />
+        <Route path="/dashboard/crm/:leadId" element={<CrmLeadsPage />} />
 
         {/* پروفایل 360 مشتری */}
         <Route
