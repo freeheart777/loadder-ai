@@ -30,7 +30,7 @@ export function createPaymentOrderService({ repository, provider, callbackBaseUr
   const operational = (order) => { if (!order || !postPaymentProcessor) return null; try { return postPaymentProcessor.processOrder(order.id, { system: true }).fulfillment; } catch { return null; } };
 
   const service = {
-    readiness() { const registered = binding(); return { paymentConfigured: Boolean(registered && provider.configured), paymentEnabled: Boolean(registered && provider.configured && provider.enabled), provider: registered && provider.configured ? provider.provider : null }; },
+    readiness() { const registered = binding(), readinessFor = (id) => { const entry = registry.get(id); return { configured: false, enabled: false, liveValidationStatus: entry?.liveValidationStatus || null }; }, torobPay = readinessFor("TOROB_PAY"), snappPay = readinessFor("SNAPP_PAY"), digiPay = readinessFor("DIGIPAY"); return { paymentConfigured: Boolean(registered && provider.configured), paymentEnabled: Boolean(registered && provider.configured && provider.enabled), provider: registered && provider.configured ? provider.provider : null, torobPayConfigured: torobPay.configured, torobPayEnabled: torobPay.enabled, torobPayLiveValidationStatus: torobPay.liveValidationStatus, snappPayConfigured: snappPay.configured, snappPayEnabled: snappPay.enabled, snappPayLiveValidationStatus: snappPay.liveValidationStatus, digiPayConfigured: digiPay.configured, digiPayEnabled: digiPay.enabled, digiPayLiveValidationStatus: digiPay.liveValidationStatus }; },
     initiate(token, input, rawKey) {
       if (!strict(input, ["orderReference"]) || typeof input.orderReference !== "string") fail("PAYMENT_ATTEMPT_INVALID");
       const pending = capability(token, input.orderReference);

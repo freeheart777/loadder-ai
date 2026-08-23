@@ -125,7 +125,7 @@ import { commerceShippingRegistry } from "./app/commerce/commerce-shipping-regis
 import { createUnavailablePaymentProvider } from "./app/payments/payment-providers.mjs";
 import { createPaymentOrderService } from "./app/services/payment-order-service.mjs";
 import { createInventoryFulfillmentService } from "./app/services/inventory-fulfillment-service.mjs";
-import { createUnavailableShippingProvider } from "./app/shipping/shipping-providers.mjs";
+import { createTipaxShippingProvider } from "./app/shipping/tipax-shipping-provider.mjs";
 import { createReturnRefundService } from "./app/services/return-refund-service.mjs";
 import { createUnavailableRefundProvider } from "./app/refunds/refund-providers.mjs";
 import { returnReasonRegistry } from "./app/returns/return-reason-registry.mjs";
@@ -432,7 +432,7 @@ const landingCommercializationService = createLandingCommercializationService({ 
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
 const cartCheckoutService = createCartCheckoutService({ repository: cartCheckoutRepository, shippingRegistry: commerceShippingRegistry });
-const inventoryFulfillmentService = createInventoryFulfillmentService({ repository: inventoryFulfillmentRepository, provider: createUnavailableShippingProvider(), now: () => new Date() });
+const inventoryFulfillmentService = createInventoryFulfillmentService({ repository: inventoryFulfillmentRepository, provider: createTipaxShippingProvider(), now: () => new Date() });
 const paymentOrderService = createPaymentOrderService({ repository: paymentOrderRepository, provider: createUnavailablePaymentProvider(), callbackBaseUrl: environment.clientOrigins[0] || "http://127.0.0.1", postPaymentProcessor: inventoryFulfillmentService, now: () => new Date() });
 const returnRefundService = createReturnRefundService({ repository: returnRefundRepository, provider: createUnavailableRefundProvider(), reasonRegistry: returnReasonRegistry, now: () => new Date() });
 const cartFeatureProducer = createCartFeatureProducer({

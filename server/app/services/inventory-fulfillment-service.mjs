@@ -1,5 +1,6 @@
 import { landingHash } from "../landing/landing-contracts.mjs";
 import { ShippingProviderError } from "../shipping/shipping-providers.mjs";
+import { shippingProviderRegistry } from "../shipping/shipping-provider-registry.mjs";
 export class InventoryFulfillmentError extends Error { constructor(code, status = 400) { super(code); this.code = code; this.status = status; } }
 const fail = (code, status = 400) => { throw new InventoryFulfillmentError(code, status); };
 const roles = new Set(["owner", "admin"]);
@@ -7,11 +8,11 @@ const strict = (value, keys) => value && typeof value === "object" && !Array.isA
 const requireActor = (actor) => { if (!actor?.userId || !actor.workspaceId || !roles.has(actor.role)) fail("SHIPPING_PERMISSION_DENIED", 403); };
 const requireKey = (value) => typeof value === "string" && value.trim() && value.length <= 200 ? value.trim() : fail("FULFILLMENT_IDEMPOTENCY_CONFLICT", 409);
 
-export function createInventoryFulfillmentService({ repository, provider, now = () => new Date() }) {
+export function createInventoryFulfillmentService({ repository, provider, registry = shippingProviderRegistry, now = () => new Date() }) {
   const at = () => now().toISOString();
   const providerResultValid = (result) => strict(result, ["providerShipmentReference", "trackingNumber", "status"]) && typeof result.providerShipmentReference === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(result.providerShipmentReference) && (result.trackingNumber === null || typeof result.trackingNumber === "string" && result.trackingNumber.length <= 200) && ["CREATED", "READY", "IN_TRANSIT"].includes(result.status);
   return Object.freeze({
-    readiness() { return { shippingConfigured: Boolean(provider.configured), shippingEnabled: Boolean(provider.configured && provider.enabled), manualShippingEnabled: true }; },
+    readiness() { return { shippingManualEnabled: true, shippingProviderConfigured: Boolean(provider.configured), shippingProviderEnabled: Boolean(provider.configured && provider.enabled), provider: provider.provider, liveValidationStatus: provider.liveValidationStatus || null, providers: registry.list() }; },
     setInventory(productId, input, actor) {
       requireActor(actor);
       if (!strict(input, ["variantId", "trackingMode", "stockOnHand", "lowStockThreshold", "revision"]) || !["TRACKED", "UNTRACKED"].includes(input.trackingMode) || !Number.isSafeInteger(input.stockOnHand) || input.stockOnHand < 0 || input.lowStockThreshold !== null && (!Number.isSafeInteger(input.lowStockThreshold) || input.lowStockThreshold < 0) || !Number.isInteger(input.revision) || input.revision < 0) fail("INVENTORY_INVALID");
@@ -32,11 +33,11 @@ export function createInventoryFulfillmentService({ repository, provider, now = 
     transitionFulfillment(id, input, actor) { requireActor(actor); if (!strict(input, ["status", "revision"]) || !Number.isInteger(input.revision)) fail("FULFILLMENT_INVALID_STATE", 409); const prior = repository.fulfillment(id, actor.workspaceId); if (!prior) fail("FULFILLMENT_NOT_FOUND", 404); const value = repository.transitionFulfillment({ id, workspaceId: actor.workspaceId, status: input.status, revision: input.revision, now: at() }); if (!value) fail("FULFILLMENT_INVALID_STATE", 409); return { fulfillment: value }; },
     createShipment(fulfillmentId, input, actor, rawKey) {
       requireActor(actor);
-      if (!strict(input, ["provider", "trackingNumber"]) || !["MANUAL", "TEST"].includes(input.provider) || input.trackingNumber !== null && (typeof input.trackingNumber !== "string" || input.trackingNumber.trim().length < 1 || input.trackingNumber.length > 200)) fail("SHIPMENT_INVALID");
+      if (!strict(input, ["provider", "trackingNumber"]) || !registry.supports(input.provider, "CREATE") || input.trackingNumber !== null && (typeof input.trackingNumber !== "string" || input.trackingNumber.trim().length < 1 || input.trackingNumber.length > 200)) fail("SHIPMENT_INVALID");
       const fulfillment = repository.fulfillment(fulfillmentId, actor.workspaceId); if (!fulfillment) fail("FULFILLMENT_NOT_FOUND", 404); if (fulfillment.fulfillmentMode !== "PHYSICAL_DELIVERY") fail("FULFILLMENT_INVALID_STATE", 409);
       const idempotencyKey = requireKey(rawKey), normalized = { fulfillmentId, provider: input.provider, trackingNumber: input.trackingNumber }, requestHash = landingHash(normalized);
       let output = { providerShipmentReference: null, trackingNumber: input.trackingNumber, status: "CREATED" };
-      if (input.provider === "TEST") { if (!provider.configured || !provider.enabled) fail("SHIPPING_NOT_CONFIGURED", 503); try { output = provider.createShipment({ fulfillmentId, orderId: fulfillment.confirmedOrderId }); if (!providerResultValid(output)) fail("SHIPPING_PROVIDER_INVALID_RESPONSE", 502); } catch (error) { if (error instanceof InventoryFulfillmentError) throw error; fail(error instanceof ShippingProviderError ? error.code : "SHIPPING_PROVIDER_UNAVAILABLE", 503); } }
+      if (input.provider !== "MANUAL") { if (provider.provider !== input.provider || !provider.configured || !provider.enabled) fail("SHIPPING_NOT_CONFIGURED", 503); try { output = provider.createShipment({ fulfillmentId, orderId: fulfillment.confirmedOrderId }); if (!providerResultValid(output)) fail("SHIPPING_PROVIDER_INVALID_RESPONSE", 502); } catch (error) { if (error instanceof InventoryFulfillmentError) throw error; fail(error instanceof ShippingProviderError ? error.code : "SHIPPING_PROVIDER_UNAVAILABLE", 503); } }
       const result = repository.createShipment({ workspaceId: actor.workspaceId, fulfillmentId, orderId: fulfillment.confirmedOrderId, provider: input.provider, providerVersion: 1, status: output.status, trackingNumber: output.trackingNumber, providerReference: output.providerShipmentReference, idempotencyKey, requestHash, userId: actor.userId, now: at() });
       if (!result.created && result.value.requestHash !== requestHash) fail("FULFILLMENT_IDEMPOTENCY_CONFLICT", 409); return { shipment: result.value, reusedResult: !result.created };
     },

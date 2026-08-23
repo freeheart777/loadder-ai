@@ -1,0 +1,3 @@
+const normalized=new Set(["CREATED","READY","IN_TRANSIT","DELIVERED","FAILED","CANCELLED"]);
+export function normalizeShippingStatus(value,mapping={}){if(typeof value!=="string"||value.length<1||value.length>80)return Object.freeze({status:null,unknown:true});const mapped=mapping[value]||value;return normalized.has(mapped)?Object.freeze({status:mapped,unknown:false}):Object.freeze({status:null,unknown:true});}
+export function validateTrackingUrl(value){if(value===null||value===undefined)return null;if(typeof value!=="string"||value.length>2000)throw new Error("SHIPPING_PROVIDER_INVALID_RESPONSE");const url=new URL(value);if(url.protocol!=="https:"||url.username||url.password)throw new Error("SHIPPING_PROVIDER_INVALID_RESPONSE");return url.toString();}
