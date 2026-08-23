@@ -60,6 +60,7 @@ import { migration059CommerceCatalogFoundation } from "./059_commerce_catalog_fo
 import { migration060CartCheckoutFoundation } from "./060_cart_checkout_foundation.mjs";
 import { migration061PaymentOrderLifecycle } from "./061_payment_order_lifecycle.mjs";
 import { migration062InventoryFulfillmentFoundation } from "./062_inventory_fulfillment_foundation.mjs";
+import { migration063ReturnRefundLifecycle } from "./063_return_refund_lifecycle.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -124,4 +125,5 @@ export const migrations = [
   migration060CartCheckoutFoundation,
   migration061PaymentOrderLifecycle,
   migration062InventoryFulfillmentFoundation,
+  migration063ReturnRefundLifecycle,
 ];
