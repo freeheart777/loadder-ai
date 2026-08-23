@@ -39,6 +39,7 @@ const tools: Tool[] = [
   },
   { title: "برند بوک", icon: BookOpenText, status: "آماده", route: "/dashboard/brand-book" },
   { title: "صفحه فرود", icon: Browsers, status: "آماده", route: "/dashboard/landings" },
+  { title: "وب‌سایت", icon: Browsers, status: "آماده", route: "/dashboard/websites" },
 ];
 
 function ToolCard({

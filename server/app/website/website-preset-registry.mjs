@@ -1,0 +1,10 @@
+const pages=list=>list.map(([pageType,name,path,sections],navigationOrder)=>Object.freeze({pageType,name,path,sections:Object.freeze(sections),navigationVisible:true,navigationOrder}));
+const preset=(presetId,websiteType,pageList,primaryCta)=>Object.freeze({presetId,presetVersion:1,websiteType,pages:Object.freeze(pages(pageList)),proofPriority:"HIGH",primaryCta});
+const entries=Object.freeze([
+ preset("CORPORATE","CORPORATE",[["HOME","خانه","/",["HERO","FEATURES","TRUST","CTA"]],["ABOUT","درباره ما","/about",["HERO","SOLUTION","TRUST"]],["SERVICES","خدمات","/services",["HERO","FEATURES","CTA"]],["CONTACT","تماس","/contact",["HERO","FORM_OR_ACTION"]]],"CONTACT"),
+ preset("CLINIC","MEDICAL",[["HOME","خانه","/",["HERO","FEATURES","TRUST","CTA"]],["SERVICES","خدمات","/services",["HERO","FEATURES","FAQ"]],["ABOUT","پزشکان و درباره ما","/about",["HERO","TRUST","TESTIMONIALS"]],["FAQ","پرسش‌ها","/faq",["HERO","FAQ"]],["CONTACT","تماس و رزرو","/contact",["HERO","FORM_OR_ACTION"]]],"BOOKING"),
+ preset("LAWYER_CONSULTANT","LEGAL",[["HOME","خانه","/",["HERO","TRUST","FEATURES","CTA"]],["SERVICES","حوزه‌های مشاوره","/services",["HERO","FEATURES","CTA"]],["ABOUT","درباره ما","/about",["HERO","TRUST"]],["FAQ","پرسش‌ها","/faq",["HERO","FAQ"]],["CONTACT","تماس","/contact",["HERO","FORM_OR_ACTION"]]],"CONTACT"),
+ preset("SERVICE_BUSINESS","SERVICE",[["HOME","خانه","/",["HERO","BENEFITS","TRUST","CTA"]],["SERVICES","خدمات","/services",["HERO","FEATURES","CTA"]],["ABOUT","درباره ما","/about",["HERO","TRUST"]],["CONTACT","تماس","/contact",["HERO","FORM_OR_ACTION"]]],"CONTACT"),
+ preset("CATALOG","CATALOG",[["HOME","خانه","/",["HERO","FEATURES","TRUST","CTA"]],["SERVICES","محصولات و خدمات","/catalog",["HERO","FEATURES","CTA"]],["ABOUT","درباره ما","/about",["HERO","TRUST"]],["FAQ","پرسش‌ها","/faq",["HERO","FAQ"]],["CONTACT","تماس","/contact",["HERO","FORM_OR_ACTION"]]],"EXTERNAL")
+]);
+export const websitePresetRegistry=Object.freeze({version:1,get:id=>entries.find(x=>x.presetId===id)||null,list:()=>entries});
