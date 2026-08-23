@@ -64,6 +64,7 @@ import { migration063ReturnRefundLifecycle } from "./063_return_refund_lifecycle
 import { migration064CustomDomainPublishing } from "./064_custom_domain_publishing.mjs";
 import { migration065SecureFormsCrmFoundation } from "./065_secure_forms_crm_foundation.mjs";
 import { migration066CrmIdentityConflicts } from "./066_crm_identity_conflicts.mjs";
+import { migration067AiNativeGrowthWorkflow } from "./067_ai_native_growth_workflow.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -132,4 +133,5 @@ export const migrations = [
   migration064CustomDomainPublishing,
   migration065SecureFormsCrmFoundation,
   migration066CrmIdentityConflicts,
+  migration067AiNativeGrowthWorkflow,
 ];

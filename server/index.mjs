@@ -11,6 +11,7 @@ import {
   createProductionOriginGuard,
 } from "./app/middleware/product-gating.mjs";
 import { createAiRouter } from "./app/routes/ai.mjs";
+import { createGrowthWorkflowRouter } from "./app/routes/growth-workflow.mjs";
 import { createAiOperationRegistry } from "./app/ai/ai-operation-registry.mjs";
 import { createOpenAiResponsesProvider } from "./app/ai/providers/openai-responses-provider.mjs";
 import { createBusinessBrainRateLimiter } from "./app/business-brain/business-brain-rate-limiter.mjs";
@@ -70,6 +71,7 @@ import { createBusinessProfileRepository } from "./app/repositories/business-pro
 import { createBusinessDnaRepository } from "./app/repositories/business-dna-repository.mjs";
 import { createBrandBookRepository } from "./app/repositories/brand-book-repository.mjs";
 import { createBusinessContextRepository } from "./app/repositories/business-context-repository.mjs";
+import { createGrowthWorkflowRepository } from "./app/repositories/growth-workflow-repository.mjs";
 import { createBusinessContextUsageRepository } from "./app/repositories/business-context-usage-repository.mjs";
 import { createBusinessEventRepository } from "./app/repositories/business-event-repository.mjs";
 import { createIntelligenceRecordRepository } from "./app/repositories/intelligence-record-repository.mjs";
@@ -115,6 +117,8 @@ import { createBusinessProfileService } from "./app/services/business-profile-se
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
 import { createBrandBookService } from "./app/services/brand-book-service.mjs";
 import { createBusinessContextService } from "./app/services/business-context-service.mjs";
+import { createGrowthWorkflowService } from "./app/services/growth-workflow-service.mjs";
+import { createGrowthRateLimiter } from "./app/growth/growth-rate-limiter.mjs";
 import { createOnboardingService } from "./app/services/onboarding-service.mjs";
 import { createOperationMetrics } from "./app/observability/operation-metrics.mjs";
 import { createContentGenerationService } from "./app/services/content-generation-service.mjs";
@@ -362,6 +366,7 @@ const businessProfileRepository = createBusinessProfileRepository(db);
 const businessDnaRepository = createBusinessDnaRepository(db);
 const brandBookRepository = createBrandBookRepository(db);
 const businessContextRepository = createBusinessContextRepository(db);
+const growthWorkflowRepository = createGrowthWorkflowRepository(db);
 const businessContextUsageRepository = createBusinessContextUsageRepository(db);
 const contentGenerationRepository = createContentGenerationRepository(db);
 const contentItemRepository = createContentItemRepository(db);
@@ -466,6 +471,7 @@ const secureFormsCrmService = createSecureFormsCrmService({ repository: secureFo
 const landingService = createLandingService({ repository: landingRepository, intentRepository: creativeIntentRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, componentRegistry: landingComponentRegistry, publisher: landingPublisher, operationMetrics: createOperationMetrics() });
 const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
+const growthWorkflowService = createGrowthWorkflowService({ repository: growthWorkflowRepository, contextRepository: businessContextRepository, provider: openAiResponsesProvider, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createGrowthRateLimiter(), landingService, websiteService, contentGenerationService });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
 const marketplaceCommerceService = createMarketplaceCommerceService({ repository: marketplaceCommerceRepository, registry: marketplaceProviderRegistry, publicUrlResolver: (catalog, product) => domainPublishingRepository.productUrl(catalog.id, product.id), assetUrlResolver: (assetId) => domainPublishingRepository.publicAssetUrl(assetId) });
 const cartCheckoutService = createCartCheckoutService({ repository: cartCheckoutRepository, shippingRegistry: commerceShippingRegistry });
@@ -651,6 +657,7 @@ app.use("/api", createPerformanceObservationRouter({ service: performanceObserva
 app.use("/api", createLandingRouter({ service: landingService }));
 app.use("/api", createLandingCommercializationRouter({ service: landingCommercializationService }));
 app.use("/api", createWebsiteRouter({ service: websiteService }));
+app.use("/api", createGrowthWorkflowRouter({ service: growthWorkflowService }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
 app.use("/api", createMarketplaceCommerceRouter({ marketplaceService: marketplaceCommerceService, bulkService: commerceBulkService, integrationHubService }));
 app.use("/api", createDomainPublishingRouter({ service: domainPublishingService }));

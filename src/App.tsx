@@ -35,6 +35,7 @@ const IntegrationHubPage = lazy(() => import("./pages/IntegrationHubPage"));
 const DomainManagementPage = lazy(() => import("./pages/DomainManagementPage"));
 const FormBuilderPage = lazy(() => import("./pages/GovernedFormBuilderPage"));
 const CrmLeadsPage = lazy(() => import("./pages/CrmWorkspacePage"));
+const GrowthWorkflowPage = lazy(() => import("./pages/GrowthWorkflowPage"));
 
 export default function App() {
   return (
@@ -64,6 +65,7 @@ export default function App() {
               path="/dashboard/onboarding"
               element={<OnboardingPage />}
             />
+            <Route path="/dashboard/growth" element={<GrowthWorkflowPage />} />
 
         {/* داشبورد قدیمی - فقط برای بکاپ */}
         <Route

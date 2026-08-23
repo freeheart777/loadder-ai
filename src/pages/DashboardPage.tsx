@@ -26,6 +26,7 @@ type Tool = {
 };
 
 const tools: Tool[] = [
+  { title: "استراتژی رشد", icon: Sparkle, status: "آماده", route: "/dashboard/growth" },
   {
     title: "برند و کسب‌وکار",
     icon: Brain,
@@ -200,6 +201,13 @@ export default function DashboardPage() {
             صفحه اصلی
           </div>
 
+          <Link
+            to="/dashboard/growth"
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
+          >
+            <Sparkle size={20} />
+            استراتژی رشد
+          </Link>
           <Link
             to="/dashboard/content"
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"

@@ -1,0 +1,22 @@
+import crypto from "node:crypto";
+import { requireWorkspaceId } from "../tenant-context.mjs";
+
+const TABLES=Object.freeze({strategy:["growth_strategies","strategy_json"],plan:["growth_content_plans","plan_json"],landing:["growth_landing_proposals","proposal_json"],website:["growth_website_proposals","proposal_json"]});
+const parse=(v)=>{try{return JSON.parse(v);}catch{return null;}};
+const map=(kind,row)=>row?Object.freeze({id:row.id,workspaceId:row.workspace_id,growthStrategyId:row.growth_strategy_id??null,contentPlanId:row.content_plan_id??null,versionNumber:row.version_number,status:row.status,data:parse(row[TABLES[kind][1]]),businessContextVersionId:row.business_context_version_id??null,businessProfileId:row.business_profile_id??null,businessDnaVersionId:row.business_dna_version_id??null,brandBookVersionId:row.brand_book_version_id??null,objective:row.objective??null,operationId:row.operation_id,createdByUserId:row.created_by_user_id,createdAt:row.created_at,reviewedByUserId:row.reviewed_by_user_id??null,reviewedAt:row.reviewed_at??null,savedDraftId:row.saved_draft_id??null}):null;
+
+export function createGrowthWorkflowRepository(db){
+ const ws=()=>requireWorkspaceId();
+ const find=(kind,id)=>map(kind,db.prepare(`SELECT * FROM ${TABLES[kind][0]} WHERE id=? AND workspace_id=?`).get(id,ws()));
+ const list=(kind)=>db.prepare(`SELECT * FROM ${TABLES[kind][0]} WHERE workspace_id=? ORDER BY created_at DESC,id DESC`).all(ws()).map(r=>map(kind,r));
+ const next=(table,where="",args=[])=>db.prepare(`SELECT COALESCE(MAX(version_number),0)+1 n FROM ${table} WHERE workspace_id=? ${where}`).get(ws(),...args).n;
+ return Object.freeze({
+  find,list,
+  latestStrategy(contextId,objective){return map("strategy",db.prepare("SELECT * FROM growth_strategies WHERE workspace_id=? AND business_context_version_id=? AND objective=? ORDER BY version_number DESC LIMIT 1").get(ws(),contextId,objective));},
+  latestChild(kind,strategyId){const table=TABLES[kind][0];return map(kind,db.prepare(`SELECT * FROM ${table} WHERE workspace_id=? AND growth_strategy_id=? ORDER BY version_number DESC LIMIT 1`).get(ws(),strategyId));},
+  createStrategy({source,objective,data,userId,operationId,at}){const id=crypto.randomUUID(),version=next("growth_strategies");db.prepare(`INSERT INTO growth_strategies(id,workspace_id,version_number,status,business_context_version_id,business_profile_id,business_dna_version_id,brand_book_version_id,objective,strategy_json,operation_id,created_by_user_id,created_at) VALUES(?,?,?,'PROPOSED',?,?,?,?,?,?,?,?,?)`).run(id,ws(),version,source.id,source.businessProfileId,source.businessDnaVersionId,source.brandBookVersionId,objective,JSON.stringify(data),operationId,userId,at);return find("strategy",id);},
+  createChild(kind,{strategyId,contentPlanId=null,data,userId,operationId,at}){const [table,column]=TABLES[kind],id=crypto.randomUUID(),version=next(table,"AND growth_strategy_id=?",[strategyId]);db.prepare(`INSERT INTO ${table}(id,workspace_id,growth_strategy_id,${kind==="plan"?"":"content_plan_id,"}version_number,status,${column},operation_id,created_by_user_id,created_at) VALUES(?,?,?,${kind==="plan"?"":"?,"}?,'PROPOSED',?,?,?,?)`).run(...(kind==="plan"?[id,ws(),strategyId,version,JSON.stringify(data),operationId,userId,at]:[id,ws(),strategyId,contentPlanId,version,JSON.stringify(data),operationId,userId,at]));return find(kind,id);},
+  review(kind,id,status,userId,at){const table=TABLES[kind][0];const result=db.prepare(`UPDATE ${table} SET status=?,reviewed_by_user_id=?,reviewed_at=? WHERE id=? AND workspace_id=? AND status='PROPOSED'`).run(status,userId,at,id,ws());return result.changes?find(kind,id):null;},
+  saveDraft(kind,id,draftId){const table=TABLES[kind][0];const result=db.prepare(`UPDATE ${table} SET saved_draft_id=? WHERE id=? AND workspace_id=? AND status='APPROVED' AND saved_draft_id IS NULL`).run(draftId,id,ws());return result.changes?find(kind,id):null;},
+ });
+}
