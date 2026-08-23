@@ -37,6 +37,7 @@ const FormBuilderPage = lazy(() => import("./pages/GovernedFormBuilderPage"));
 const CrmLeadsPage = lazy(() => import("./pages/CrmWorkspacePage"));
 const GrowthWorkflowPage = lazy(() => import("./pages/GrowthWorkflowPage"));
 const AiEconomyPage = lazy(() => import("./pages/AiEconomyPage"));
+const ModelBenchmarkLabPage = lazy(() => import("./pages/ModelBenchmarkLabPage"));
 
 export default function App() {
   return (
@@ -180,6 +181,7 @@ export default function App() {
               element={internalToolsEnabled ? <IntelligencePreviewPage /> : <Navigate to="/dashboard" replace />}
             />
             <Route path="/dashboard/ai-economy" element={internalToolsEnabled ? <AiEconomyPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/ai-economy/benchmarks" element={internalToolsEnabled ? <ModelBenchmarkLabPage /> : <Navigate to="/dashboard" replace />} />
           </Route>
 
         <Route

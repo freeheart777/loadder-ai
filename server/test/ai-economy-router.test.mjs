@@ -164,7 +164,7 @@ test("budget governor observes and warns but never blocks", () => {
 
 test("Persian benchmark registry is synthetic, PII-free, and human-gated", () => {
   const fixtures = persianAiBenchmarkRegistry.list();
-  assert.equal(fixtures.length, 10);
+  assert.equal(fixtures.length, 72);
   assert.ok(fixtures.every((fixture) => fixture.locale === "fa-IR" && fixture.containsPii === false));
   const result = evaluateBenchmarkResult({ fixture: fixtures[0], output: { summary: "رشد پایدار" }, schemaValid: true });
   assert.equal(result.decision, "BENCHMARK_REQUIRED");
