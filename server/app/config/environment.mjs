@@ -105,4 +105,8 @@ export const environment = Object.freeze({
     trackingSecret: process.env.LANDING_TRACKING_SECRET || (nodeEnv === "production" ? "" : "loadder-development-landing-tracking-secret-v1"),
     trackingTtlSeconds: Number(process.env.LANDING_TRACKING_TTL_SECONDS || 3600),
   }),
+  publishing: Object.freeze({
+    staticDirectory: process.env.PUBLIC_STATIC_DIRECTORY || "",
+    publicBaseUrl: process.env.PUBLIC_BASE_URL || "",
+  }),
 });

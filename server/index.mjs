@@ -50,6 +50,7 @@ import { createLandingCommercializationRouter, createLandingPublicRouter } from 
 import { createWebsiteRouter } from "./app/routes/websites.mjs";
 import { createCommerceCatalogRouter } from "./app/routes/commerce-catalogs.mjs";
 import { createMarketplaceCommerceRouter, createMarketplacePublicRouter } from "./app/routes/marketplace-commerce.mjs";
+import { createDomainPublishingRouter, createPublicHostRouter } from "./app/routes/domain-publishing.mjs";
 import { createCartCheckoutRouter } from "./app/routes/cart-checkout.mjs";
 import { createPaymentOrderRouter } from "./app/routes/payment-orders.mjs";
 import { createInventoryFulfillmentRouter } from "./app/routes/inventory-fulfillment.mjs";
@@ -98,6 +99,7 @@ import { createLandingRepository } from "./app/repositories/landing-repository.m
 import { createWebsiteRepository } from "./app/repositories/website-repository.mjs";
 import { createCommerceCatalogRepository } from "./app/repositories/commerce-catalog-repository.mjs";
 import { createMarketplaceCommerceRepository } from "./app/repositories/marketplace-commerce-repository.mjs";
+import { createDomainPublishingRepository } from "./app/repositories/domain-publishing-repository.mjs";
 import { createCartCheckoutRepository } from "./app/repositories/cart-checkout-repository.mjs";
 import { createPaymentOrderRepository } from "./app/repositories/payment-order-repository.mjs";
 import { createInventoryFulfillmentRepository } from "./app/repositories/inventory-fulfillment-repository.mjs";
@@ -125,6 +127,9 @@ import { createCommerceCatalogService } from "./app/services/commerce-catalog-se
 import { createMarketplaceCommerceService } from "./app/services/marketplace-commerce-service.mjs";
 import { createCommerceBulkService } from "./app/services/commerce-bulk-service.mjs";
 import { createIntegrationHubService } from "./app/services/integration-hub-service.mjs";
+import { createDomainPublishingService } from "./app/services/domain-publishing-service.mjs";
+import { createSystemDnsVerifier, createUnavailableTlsProvider } from "./app/publishing/domain-providers.mjs";
+import { createPublicStaticProvider, createUnavailablePublicMediaProvider } from "./app/publishing/public-static-provider.mjs";
 import { marketplaceProviderRegistry } from "./app/marketplaces/marketplace-provider-registry.mjs";
 import { createCartCheckoutService } from "./app/services/cart-checkout-service.mjs";
 import { commerceShippingRegistry } from "./app/commerce/commerce-shipping-registry.mjs";
@@ -355,6 +360,7 @@ const landingRepository = createLandingRepository(db);
 const websiteRepository = createWebsiteRepository(db);
 const commerceCatalogRepository = createCommerceCatalogRepository(db);
 const marketplaceCommerceRepository = createMarketplaceCommerceRepository(db);
+const domainPublishingRepository = createDomainPublishingRepository(db);
 const cartCheckoutRepository = createCartCheckoutRepository(db);
 const paymentOrderRepository = createPaymentOrderRepository(db);
 const inventoryFulfillmentRepository = createInventoryFulfillmentRepository(db);
@@ -440,12 +446,14 @@ const landingService = createLandingService({ repository: landingRepository, int
 const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
-const marketplaceCommerceService = createMarketplaceCommerceService({ repository: marketplaceCommerceRepository, registry: marketplaceProviderRegistry });
+const marketplaceCommerceService = createMarketplaceCommerceService({ repository: marketplaceCommerceRepository, registry: marketplaceProviderRegistry, publicUrlResolver: (catalog, product) => domainPublishingRepository.productUrl(catalog.id, product.id), assetUrlResolver: (assetId) => domainPublishingRepository.publicAssetUrl(assetId) });
 const cartCheckoutService = createCartCheckoutService({ repository: cartCheckoutRepository, shippingRegistry: commerceShippingRegistry });
 const inventoryFulfillmentService = createInventoryFulfillmentService({ repository: inventoryFulfillmentRepository, provider: createTipaxShippingProvider(), now: () => new Date() });
 const commerceBulkService = createCommerceBulkService({ repository: marketplaceCommerceRepository, catalogService: commerceCatalogService, inventoryService: inventoryFulfillmentService });
 const paymentOrderService = createPaymentOrderService({ repository: paymentOrderRepository, provider: createUnavailablePaymentProvider(), callbackBaseUrl: environment.clientOrigins[0] || "http://127.0.0.1", postPaymentProcessor: inventoryFulfillmentService, now: () => new Date() });
 const integrationHubService = createIntegrationHubService({ marketplaceRegistry: marketplaceProviderRegistry, paymentRegistry: paymentProviderRegistry, shippingRegistry: shippingProviderRegistry, paymentReadiness: () => paymentOrderService.readiness(), shippingReadiness: () => inventoryFulfillmentService.readiness() });
+const publicStaticProvider = createPublicStaticProvider({ nodeEnv: environment.nodeEnv, staticDirectory: environment.publishing.staticDirectory, publicBaseUrl: environment.publishing.publicBaseUrl });
+const domainPublishingService = createDomainPublishingService({ repository: domainPublishingRepository, dnsVerifier: createSystemDnsVerifier(), tlsProvider: createUnavailableTlsProvider(), staticProvider: publicStaticProvider, mediaProvider: createUnavailablePublicMediaProvider(), artifactResolver: (page) => landingPublisher.resolvePublication({ publication: { path: page.artifactPath, artifactChecksum: page.artifactChecksum }, blueprint: page.blueprint }) });
 const returnRefundService = createReturnRefundService({ repository: returnRefundRepository, provider: createUnavailableRefundProvider(), reasonRegistry: returnReasonRegistry, now: () => new Date() });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
@@ -549,6 +557,7 @@ app.get("/api/health", (req, res) => {
     payment: paymentOrderService.readiness(),
     shipping: inventoryFulfillmentService.readiness(),
     returns: returnRefundService.readiness(),
+    publishing: domainPublishingService.readiness(),
     auth: {
       mode: "persistent-session",
       productionReady: false,
@@ -563,6 +572,7 @@ app.use(createCartCheckoutRouter({ service: cartCheckoutService }));
 app.use(createPaymentOrderRouter({ service: paymentOrderService, customerReturnBaseUrl: environment.clientOrigins[0] || "" }));
 app.use(createReturnPublicRouter({ service: returnRefundService }));
 app.use(createMarketplacePublicRouter({ marketplaceService: marketplaceCommerceService }));
+app.use(createPublicHostRouter({ service: domainPublishingService }));
 app.use((error, req, res, next) => {
   if (req.path === "/api/public/landing/events" && error?.type === "entity.too.large") return res.status(413).json({ success: false, code: "LANDING_PUBLIC_BODY_TOO_LARGE", message: "Landing public operation could not be completed." });
   return next(error);
@@ -619,6 +629,7 @@ app.use("/api", createLandingCommercializationRouter({ service: landingCommercia
 app.use("/api", createWebsiteRouter({ service: websiteService }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
 app.use("/api", createMarketplaceCommerceRouter({ marketplaceService: marketplaceCommerceService, bulkService: commerceBulkService, integrationHubService }));
+app.use("/api", createDomainPublishingRouter({ service: domainPublishingService }));
 app.use("/api", createInventoryFulfillmentRouter({ service: inventoryFulfillmentService }));
 app.use("/api", createReturnRefundRouter({ service: returnRefundService }));
 app.use(
