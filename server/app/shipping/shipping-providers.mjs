@@ -1,0 +1,4 @@
+export class ShippingProviderError extends Error{constructor(code){super(code);this.code=code;}}
+const result=(reference,tracking,status="READY")=>Object.freeze({providerShipmentReference:reference,trackingNumber:tracking,status});
+export function createTestShippingProvider({mode="success"}={}){return Object.freeze({provider:"TEST",version:1,configured:true,enabled:true,createShipment(input){if(mode==="unavailable")throw new ShippingProviderError("SHIPPING_PROVIDER_UNAVAILABLE");if(mode==="invalid")return {raw:true};return result(`test:${input.fulfillmentId}`,`TEST-${input.fulfillmentId.slice(0,12)}`);}});}
+export function createUnavailableShippingProvider(){return Object.freeze({provider:"OTHER",version:1,configured:false,enabled:false,createShipment(){throw new ShippingProviderError("SHIPPING_NOT_CONFIGURED");}});}

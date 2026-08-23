@@ -51,6 +51,7 @@ import { createWebsiteRouter } from "./app/routes/websites.mjs";
 import { createCommerceCatalogRouter } from "./app/routes/commerce-catalogs.mjs";
 import { createCartCheckoutRouter } from "./app/routes/cart-checkout.mjs";
 import { createPaymentOrderRouter } from "./app/routes/payment-orders.mjs";
+import { createInventoryFulfillmentRouter } from "./app/routes/inventory-fulfillment.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -96,6 +97,7 @@ import { createWebsiteRepository } from "./app/repositories/website-repository.m
 import { createCommerceCatalogRepository } from "./app/repositories/commerce-catalog-repository.mjs";
 import { createCartCheckoutRepository } from "./app/repositories/cart-checkout-repository.mjs";
 import { createPaymentOrderRepository } from "./app/repositories/payment-order-repository.mjs";
+import { createInventoryFulfillmentRepository } from "./app/repositories/inventory-fulfillment-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -120,6 +122,8 @@ import { createCartCheckoutService } from "./app/services/cart-checkout-service.
 import { commerceShippingRegistry } from "./app/commerce/commerce-shipping-registry.mjs";
 import { createUnavailablePaymentProvider } from "./app/payments/payment-providers.mjs";
 import { createPaymentOrderService } from "./app/services/payment-order-service.mjs";
+import { createInventoryFulfillmentService } from "./app/services/inventory-fulfillment-service.mjs";
+import { createUnavailableShippingProvider } from "./app/shipping/shipping-providers.mjs";
 import { landingComponentRegistry } from "./app/landing/landing-component-registry.mjs";
 import { createLandingPublisher } from "./app/landing/landing-publisher.mjs";
 import { createLandingTrackingTokenService } from "./app/landing/landing-tracking-token.mjs";
@@ -339,6 +343,7 @@ const websiteRepository = createWebsiteRepository(db);
 const commerceCatalogRepository = createCommerceCatalogRepository(db);
 const cartCheckoutRepository = createCartCheckoutRepository(db);
 const paymentOrderRepository = createPaymentOrderRepository(db);
+const inventoryFulfillmentRepository = createInventoryFulfillmentRepository(db);
 const businessEventRepository = createBusinessEventRepository(db);
 const intelligenceRecordRepository = createIntelligenceRecordRepository(db);
 const featureValueRepository = createFeatureValueRepository(db);
@@ -421,7 +426,8 @@ const landingCommercializationService = createLandingCommercializationService({ 
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
 const cartCheckoutService = createCartCheckoutService({ repository: cartCheckoutRepository, shippingRegistry: commerceShippingRegistry });
-const paymentOrderService = createPaymentOrderService({ repository: paymentOrderRepository, provider: createUnavailablePaymentProvider(), callbackBaseUrl: environment.clientOrigins[0] || "http://127.0.0.1", now: () => new Date() });
+const inventoryFulfillmentService = createInventoryFulfillmentService({ repository: inventoryFulfillmentRepository, provider: createUnavailableShippingProvider(), now: () => new Date() });
+const paymentOrderService = createPaymentOrderService({ repository: paymentOrderRepository, provider: createUnavailablePaymentProvider(), callbackBaseUrl: environment.clientOrigins[0] || "http://127.0.0.1", postPaymentProcessor: inventoryFulfillmentService, now: () => new Date() });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
   featureRegistry,
@@ -522,6 +528,7 @@ app.get("/api/health", (req, res) => {
     },
     landing: landingCommercializationService.readiness(),
     payment: paymentOrderService.readiness(),
+    shipping: inventoryFulfillmentService.readiness(),
     auth: {
       mode: "persistent-session",
       productionReady: false,
@@ -589,6 +596,7 @@ app.use("/api", createLandingRouter({ service: landingService }));
 app.use("/api", createLandingCommercializationRouter({ service: landingCommercializationService }));
 app.use("/api", createWebsiteRouter({ service: websiteService }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
+app.use("/api", createInventoryFulfillmentRouter({ service: inventoryFulfillmentService }));
 app.use(
   "/api",
   createIntelligenceDataRouter({ businessEventService, intelligenceQueryService })

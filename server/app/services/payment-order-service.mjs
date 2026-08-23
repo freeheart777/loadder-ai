@@ -21,12 +21,13 @@ const validVerification = (value) => {
   return validReference(value.providerTransactionReference) && Number.isSafeInteger(value.verifiedAmount) && value.verifiedAmount >= 0 && /^[A-Z]{3}$/.test(value.currency) && validIso(value.verifiedAt);
 };
 
-export function createPaymentOrderService({ repository, provider, callbackBaseUrl, registry = paymentProviderRegistry, now = () => new Date() }) {
+export function createPaymentOrderService({ repository, provider, callbackBaseUrl, registry = paymentProviderRegistry, postPaymentProcessor = null, now = () => new Date() }) {
   const timestamp = () => now().toISOString();
   const binding = () => registry.get(provider.provider);
   const idempotencyKey = (value) => { if (typeof value !== "string" || !value.trim() || value.length > 200) fail("PAYMENT_IDEMPOTENCY_CONFLICT", 409); return value.trim(); };
   const capability = (token, reference) => { if (typeof token !== "string" || token.length < 32 || typeof reference !== "string") fail("PAYMENT_ATTEMPT_NOT_FOUND", 404); return repository.pending(reference, hash(token)) || fail("PAYMENT_ATTEMPT_NOT_FOUND", 404); };
   const safe = (attempt) => Object.freeze({ paymentAttemptId: attempt.publicId, status: attempt.status, redirectUrl: attempt.status === "REDIRECT_READY" ? attempt.redirectUrl : undefined, createdAt: attempt.createdAt, updatedAt: attempt.updatedAt, failureCode: attempt.failureCode });
+  const operational = (order) => { if (!order || !postPaymentProcessor) return null; try { return postPaymentProcessor.processOrder(order.id, { system: true }).fulfillment; } catch { return null; } };
 
   const service = {
     readiness() { const registered = binding(); return { paymentConfigured: Boolean(registered && provider.configured), paymentEnabled: Boolean(registered && provider.configured && provider.enabled), provider: registered && provider.configured ? provider.provider : null }; },
@@ -61,7 +62,7 @@ export function createPaymentOrderService({ repository, provider, callbackBaseUr
     },
     verify(publicId) {
       const attempt = repository.attempt(publicId); if (!attempt) fail("PAYMENT_ATTEMPT_NOT_FOUND", 404);
-      if (attempt.status === "VERIFIED") return { attempt: safe(attempt), order: repository.orderByPending(attempt.pendingOrderId), reusedResult: true };
+      if (attempt.status === "VERIFIED") { const order=repository.orderByPending(attempt.pendingOrderId); return { attempt: safe(attempt), order, fulfillment: operational(order), reusedResult: true }; }
       if (!["REDIRECT_READY", "RETURNED", "VERIFYING"].includes(attempt.status)) fail("PAYMENT_ATTEMPT_INVALID", 409);
       const claimed = repository.claim({ publicId: attempt.publicId, now: timestamp() }); if (claimed.status !== "VERIFYING") fail("PAYMENT_VERIFICATION_PENDING", 409);
       let result;
@@ -73,11 +74,11 @@ export function createPaymentOrderService({ repository, provider, callbackBaseUr
       if (result.currency !== claimed.currency) { repository.inconclusive({ id: claimed.id, publicId: claimed.publicId, status: "FAILED", code: "PAYMENT_CURRENCY_MISMATCH", now: timestamp() }); fail("PAYMENT_CURRENCY_MISMATCH", 409); }
       const evidence = { provider: claimed.provider, transactionReference: result.providerTransactionReference, amount: result.verifiedAmount, currency: result.currency, verifiedAt: result.verifiedAt, code: result.boundedProviderCode };
       const finalized = repository.finalize({ workspaceId: claimed.workspaceId, attemptId: claimed.id, pendingOrderId: claimed.pendingOrderId, provider: claimed.provider, transactionReference: result.providerTransactionReference, amount: result.verifiedAmount, currency: result.currency, verifiedAt: result.verifiedAt, fingerprint: landingHash(evidence), providerCode: result.boundedProviderCode, now: timestamp() });
-      return { attempt: safe(repository.attempt(publicId)), order: finalized.order, reusedResult: !finalized.created };
+      return { attempt: safe(repository.attempt(publicId)), order: finalized.order, fulfillment: operational(finalized.order), reusedResult: !finalized.created };
     },
-    status(token, publicId) { const attempt = repository.attempt(publicId); if (!attempt || typeof token !== "string" || !repository.ownsAttempt(publicId, hash(token))) fail("PAYMENT_ATTEMPT_NOT_FOUND", 404); return { attempt: safe(attempt), order: repository.orderByPending(attempt.pendingOrderId) }; },
+    status(token, publicId) { const attempt = repository.attempt(publicId); if (!attempt || typeof token !== "string" || !repository.ownsAttempt(publicId, hash(token))) fail("PAYMENT_ATTEMPT_NOT_FOUND", 404); const order=repository.orderByPending(attempt.pendingOrderId); return { attempt: safe(attempt), order, fulfillment: order ? postPaymentProcessor?.getPublicStatus?.(order.id)||null : null }; },
     retry(token, publicId) { if (typeof token !== "string" || !repository.ownsAttempt(publicId, hash(token))) fail("PAYMENT_ATTEMPT_NOT_FOUND", 404); return service.verify(publicId); },
-    order(token, reference) { const pending = capability(token, reference), order = repository.orderByPending(pending.id); if (!order) fail("ORDER_NOT_FOUND", 404); return { order, items: repository.orderItems(order.id), paymentStatus: "VERIFIED" }; },
+    order(token, reference) { const pending = capability(token, reference), order = repository.orderByPending(pending.id); if (!order) fail("ORDER_NOT_FOUND", 404); const fulfillment=postPaymentProcessor?.getPublicStatus?.(order.id)||null; return { order, items: repository.orderItems(order.id), paymentStatus: "VERIFIED", fulfillment }; },
   };
   return Object.freeze(service);
 }
