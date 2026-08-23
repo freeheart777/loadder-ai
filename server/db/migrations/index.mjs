@@ -65,6 +65,7 @@ import { migration064CustomDomainPublishing } from "./064_custom_domain_publishi
 import { migration065SecureFormsCrmFoundation } from "./065_secure_forms_crm_foundation.mjs";
 import { migration066CrmIdentityConflicts } from "./066_crm_identity_conflicts.mjs";
 import { migration067AiNativeGrowthWorkflow } from "./067_ai_native_growth_workflow.mjs";
+import { migration068ContinuousImprovementPdca } from "./068_continuous_improvement_pdca.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -134,4 +135,5 @@ export const migrations = [
   migration065SecureFormsCrmFoundation,
   migration066CrmIdentityConflicts,
   migration067AiNativeGrowthWorkflow,
+  migration068ContinuousImprovementPdca,
 ];

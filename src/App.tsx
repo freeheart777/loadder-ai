@@ -38,6 +38,8 @@ const CrmLeadsPage = lazy(() => import("./pages/CrmWorkspacePage"));
 const GrowthWorkflowPage = lazy(() => import("./pages/GrowthWorkflowPage"));
 const AiEconomyPage = lazy(() => import("./pages/AiEconomyPage"));
 const ModelBenchmarkLabPage = lazy(() => import("./pages/ModelBenchmarkLabPage"));
+const ImprovementCyclesPage = lazy(() => import("./pages/ImprovementCyclesPage"));
+const ImprovementCycleDetailPage = lazy(() => import("./pages/ImprovementCycleDetailPage"));
 
 export default function App() {
   return (
@@ -133,6 +135,8 @@ export default function App() {
           element={<CrmLeadsPage />}
         />
         <Route path="/dashboard/crm/:leadId" element={<CrmLeadsPage />} />
+        <Route path="/dashboard/improvement" element={<ImprovementCyclesPage />} />
+        <Route path="/dashboard/improvement/:id" element={<ImprovementCycleDetailPage />} />
 
         {/* پروفایل 360 مشتری */}
         <Route
