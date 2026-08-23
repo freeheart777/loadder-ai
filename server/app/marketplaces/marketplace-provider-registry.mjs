@@ -1,0 +1,6 @@
+const blocked="BLOCKED_EXTERNAL_VALIDATION";
+const entries=[
+ {id:"TOROB",version:1,capabilities:["PRODUCT_FEED","PRICE","AVAILABILITY","PRODUCT_URL","IMAGES","SPECIFICATIONS","CATEGORY","BRAND","WARRANTY","INBOUND_ATTRIBUTION"],configurationRequirements:["APPROVED_CURRENT_PROVIDER_CONTRACT","DURABLE_PUBLIC_STOREFRONT","DURABLE_PUBLIC_MEDIA"],status:blocked,supportedProjectionVersions:[1],liveValidationStatus:"TOROB_LIVE_VALIDATION_BLOCKED_EXTERNAL"},
+ {id:"EMALLS",version:1,capabilities:["PRODUCT_FEED","PRICE","AVAILABILITY","PRODUCT_URL","IMAGES","SPECIFICATIONS","CATEGORY","BRAND","WARRANTY","INBOUND_ATTRIBUTION"],configurationRequirements:["APPROVED_CURRENT_PROVIDER_CONTRACT","DURABLE_PUBLIC_STOREFRONT","DURABLE_PUBLIC_MEDIA"],status:blocked,supportedProjectionVersions:[1],liveValidationStatus:"EMALLS_LIVE_VALIDATION_BLOCKED_EXTERNAL"},
+].map(x=>Object.freeze({...x,capabilities:Object.freeze(x.capabilities),configurationRequirements:Object.freeze(x.configurationRequirements),supportedProjectionVersions:Object.freeze(x.supportedProjectionVersions)}));
+export const marketplaceProviderRegistry=Object.freeze({version:1,list:()=>Object.freeze([...entries]),get:id=>entries.find(x=>x.id===id)||null});

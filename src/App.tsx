@@ -31,6 +31,7 @@ const WebsiteBuilderPage = lazy(() => import("./pages/WebsiteBuilderPage"));
 const CommerceCatalogPage = lazy(() => import("./pages/CommerceCatalogPage"));
 const CommerceCheckoutPage = lazy(() => import("./pages/CommerceCheckoutPage"));
 const CommercePaymentPage = lazy(() => import("./pages/CommercePaymentPage"));
+const IntegrationHubPage = lazy(() => import("./pages/IntegrationHubPage"));
 
 export default function App() {
   return (
@@ -95,6 +96,7 @@ export default function App() {
         <Route path="/dashboard/websites/new" element={<WebsiteBuilderPage />} />
         <Route path="/dashboard/websites/:id/edit" element={<WebsiteBuilderPage />} />
         <Route path="/dashboard/catalog" element={<CommerceCatalogPage />} />
+        <Route path="/dashboard/integrations" element={<IntegrationHubPage />} />
         <Route path="/store/cart" element={<CommerceCheckoutPage />} />
         <Route path="/store/payment" element={<CommercePaymentPage />} />
 

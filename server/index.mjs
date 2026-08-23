@@ -49,6 +49,7 @@ import { createLandingRouter } from "./app/routes/landings.mjs";
 import { createLandingCommercializationRouter, createLandingPublicRouter } from "./app/routes/landing-commercialization.mjs";
 import { createWebsiteRouter } from "./app/routes/websites.mjs";
 import { createCommerceCatalogRouter } from "./app/routes/commerce-catalogs.mjs";
+import { createMarketplaceCommerceRouter, createMarketplacePublicRouter } from "./app/routes/marketplace-commerce.mjs";
 import { createCartCheckoutRouter } from "./app/routes/cart-checkout.mjs";
 import { createPaymentOrderRouter } from "./app/routes/payment-orders.mjs";
 import { createInventoryFulfillmentRouter } from "./app/routes/inventory-fulfillment.mjs";
@@ -96,6 +97,7 @@ import { createPerformanceObservationRepository } from "./app/repositories/perfo
 import { createLandingRepository } from "./app/repositories/landing-repository.mjs";
 import { createWebsiteRepository } from "./app/repositories/website-repository.mjs";
 import { createCommerceCatalogRepository } from "./app/repositories/commerce-catalog-repository.mjs";
+import { createMarketplaceCommerceRepository } from "./app/repositories/marketplace-commerce-repository.mjs";
 import { createCartCheckoutRepository } from "./app/repositories/cart-checkout-repository.mjs";
 import { createPaymentOrderRepository } from "./app/repositories/payment-order-repository.mjs";
 import { createInventoryFulfillmentRepository } from "./app/repositories/inventory-fulfillment-repository.mjs";
@@ -120,12 +122,18 @@ import { createLandingCommercializationService } from "./app/services/landing-co
 import { createWebsiteService } from "./app/services/website-service.mjs";
 import { storefrontComponentRegistry } from "./app/commerce/storefront-component-registry.mjs";
 import { createCommerceCatalogService } from "./app/services/commerce-catalog-service.mjs";
+import { createMarketplaceCommerceService } from "./app/services/marketplace-commerce-service.mjs";
+import { createCommerceBulkService } from "./app/services/commerce-bulk-service.mjs";
+import { createIntegrationHubService } from "./app/services/integration-hub-service.mjs";
+import { marketplaceProviderRegistry } from "./app/marketplaces/marketplace-provider-registry.mjs";
 import { createCartCheckoutService } from "./app/services/cart-checkout-service.mjs";
 import { commerceShippingRegistry } from "./app/commerce/commerce-shipping-registry.mjs";
 import { createUnavailablePaymentProvider } from "./app/payments/payment-providers.mjs";
+import { paymentProviderRegistry } from "./app/payments/payment-provider-registry.mjs";
 import { createPaymentOrderService } from "./app/services/payment-order-service.mjs";
 import { createInventoryFulfillmentService } from "./app/services/inventory-fulfillment-service.mjs";
 import { createTipaxShippingProvider } from "./app/shipping/tipax-shipping-provider.mjs";
+import { shippingProviderRegistry } from "./app/shipping/shipping-provider-registry.mjs";
 import { createReturnRefundService } from "./app/services/return-refund-service.mjs";
 import { createUnavailableRefundProvider } from "./app/refunds/refund-providers.mjs";
 import { returnReasonRegistry } from "./app/returns/return-reason-registry.mjs";
@@ -346,6 +354,7 @@ const performanceObservationRepository = createPerformanceObservationRepository(
 const landingRepository = createLandingRepository(db);
 const websiteRepository = createWebsiteRepository(db);
 const commerceCatalogRepository = createCommerceCatalogRepository(db);
+const marketplaceCommerceRepository = createMarketplaceCommerceRepository(db);
 const cartCheckoutRepository = createCartCheckoutRepository(db);
 const paymentOrderRepository = createPaymentOrderRepository(db);
 const inventoryFulfillmentRepository = createInventoryFulfillmentRepository(db);
@@ -431,9 +440,12 @@ const landingService = createLandingService({ repository: landingRepository, int
 const landingCommercializationService = createLandingCommercializationService({ landingRepository, distributionContextRepository, touchRepository: attributionTouchRepository, observationRepository: performanceObservationRepository, tokenService: landingTrackingTokenService, publisher: landingPublisher, atomic: (work) => db.transaction(work)() });
 const websiteService = createWebsiteService({ repository: websiteRepository, contextRepository: businessContextRepository, placementRepository: creativePlacementRepository, assetRepository: contentAssetRepository, catalogRepository: commerceCatalogRepository, componentRegistry: storefrontComponentRegistry, presetRegistry: websitePresetRegistry, publisher: createWebsitePublisher({ landingPublisher }) });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
+const marketplaceCommerceService = createMarketplaceCommerceService({ repository: marketplaceCommerceRepository, registry: marketplaceProviderRegistry });
 const cartCheckoutService = createCartCheckoutService({ repository: cartCheckoutRepository, shippingRegistry: commerceShippingRegistry });
 const inventoryFulfillmentService = createInventoryFulfillmentService({ repository: inventoryFulfillmentRepository, provider: createTipaxShippingProvider(), now: () => new Date() });
+const commerceBulkService = createCommerceBulkService({ repository: marketplaceCommerceRepository, catalogService: commerceCatalogService, inventoryService: inventoryFulfillmentService });
 const paymentOrderService = createPaymentOrderService({ repository: paymentOrderRepository, provider: createUnavailablePaymentProvider(), callbackBaseUrl: environment.clientOrigins[0] || "http://127.0.0.1", postPaymentProcessor: inventoryFulfillmentService, now: () => new Date() });
+const integrationHubService = createIntegrationHubService({ marketplaceRegistry: marketplaceProviderRegistry, paymentRegistry: paymentProviderRegistry, shippingRegistry: shippingProviderRegistry, paymentReadiness: () => paymentOrderService.readiness(), shippingReadiness: () => inventoryFulfillmentService.readiness() });
 const returnRefundService = createReturnRefundService({ repository: returnRefundRepository, provider: createUnavailableRefundProvider(), reasonRegistry: returnReasonRegistry, now: () => new Date() });
 const cartFeatureProducer = createCartFeatureProducer({
   contextGateway: businessContextConsumerGateway,
@@ -550,6 +562,7 @@ app.use(createLandingPublicRouter({ service: landingCommercializationService, ra
 app.use(createCartCheckoutRouter({ service: cartCheckoutService }));
 app.use(createPaymentOrderRouter({ service: paymentOrderService, customerReturnBaseUrl: environment.clientOrigins[0] || "" }));
 app.use(createReturnPublicRouter({ service: returnRefundService }));
+app.use(createMarketplacePublicRouter({ marketplaceService: marketplaceCommerceService }));
 app.use((error, req, res, next) => {
   if (req.path === "/api/public/landing/events" && error?.type === "entity.too.large") return res.status(413).json({ success: false, code: "LANDING_PUBLIC_BODY_TOO_LARGE", message: "Landing public operation could not be completed." });
   return next(error);
@@ -605,6 +618,7 @@ app.use("/api", createLandingRouter({ service: landingService }));
 app.use("/api", createLandingCommercializationRouter({ service: landingCommercializationService }));
 app.use("/api", createWebsiteRouter({ service: websiteService }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
+app.use("/api", createMarketplaceCommerceRouter({ marketplaceService: marketplaceCommerceService, bulkService: commerceBulkService, integrationHubService }));
 app.use("/api", createInventoryFulfillmentRouter({ service: inventoryFulfillmentService }));
 app.use("/api", createReturnRefundRouter({ service: returnRefundService }));
 app.use(
