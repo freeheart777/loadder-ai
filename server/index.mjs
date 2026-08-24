@@ -18,6 +18,8 @@ import { createSystemConstraintRouter } from "./app/routes/system-constraint-cor
 import { createInternalTqmRouter } from "./app/routes/internal-tqm.mjs";
 import { createInternalTqmPdcaRouter } from "./app/routes/internal-tqm-pdca.mjs";
 import { createInternalTqmDogfoodRouter } from "./app/routes/internal-tqm-dogfood.mjs";
+import { createInternalVisualComponentsRouter } from "./app/routes/internal-visual-components.mjs";
+import { visualComponentRegistry } from "./app/visual-components/visual-component-registry.mjs";
 import { createWorkflowOutcomeRouter } from "./app/routes/workflow-outcomes.mjs";
 import { createInternalQualitySource } from "./app/internal-quality/internal-quality-source.mjs";
 import { createAiOperationRegistry } from "./app/ai/ai-operation-registry.mjs";
@@ -697,6 +699,7 @@ app.use("/api", createSystemConstraintRouter({ service: systemConstraintService 
 app.use("/api", createInternalTqmRouter({ service: internalTqmService }));
 app.use("/api", createInternalTqmPdcaRouter({ service: internalTqmService }));
 app.use("/api", createInternalTqmDogfoodRouter({ service: internalTqmDogfoodService }));
+app.use("/api", createInternalVisualComponentsRouter({ registry: visualComponentRegistry }));
 app.use("/api", createWorkflowOutcomeRouter({ service: workflowOutcomeService }));
 app.use("/api", createAiEconomyRouter({ economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, budgetGovernor: aiBudgetGovernor, benchmarkRegistry: persianAiBenchmarkRegistry, patternRegistry: growthPatternRegistry, learnedPolicy: learnedIntelligencePolicy }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
