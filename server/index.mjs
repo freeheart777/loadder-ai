@@ -18,6 +18,7 @@ import { createSystemConstraintRouter } from "./app/routes/system-constraint-cor
 import { createInternalTqmRouter } from "./app/routes/internal-tqm.mjs";
 import { createInternalTqmPdcaRouter } from "./app/routes/internal-tqm-pdca.mjs";
 import { createInternalTqmDogfoodRouter } from "./app/routes/internal-tqm-dogfood.mjs";
+import { createWorkflowOutcomeRouter } from "./app/routes/workflow-outcomes.mjs";
 import { createInternalQualitySource } from "./app/internal-quality/internal-quality-source.mjs";
 import { createAiOperationRegistry } from "./app/ai/ai-operation-registry.mjs";
 import { createOpenAiResponsesProvider } from "./app/ai/providers/openai-responses-provider.mjs";
@@ -110,6 +111,7 @@ import { createProviderAccountIdentityRepository } from "./app/repositories/prov
 import { createExecutionLedgerRepository } from "./app/repositories/execution-ledger-repository.mjs";
 import { createExecutionDispatchJobRepository } from "./app/repositories/execution-dispatch-job-repository.mjs";
 import { createContentGenerationRepository } from "./app/repositories/content-generation-repository.mjs";
+import { createWorkflowOutcomeRepository } from "./app/repositories/workflow-outcome-repository.mjs";
 import { createSecureFormsCrmRepository } from "./app/repositories/secure-forms-crm-repository.mjs";
 import { createContentItemRepository } from "./app/repositories/content-item-repository.mjs";
 import { createContentAssetRepository } from "./app/repositories/content-asset-repository.mjs";
@@ -137,6 +139,7 @@ import { createImprovementCycleService } from "./app/services/improvement-cycle-
 import { createSystemConstraintService } from "./app/services/system-constraint-service.mjs";
 import { createGovernedInternalTqmService } from "./app/services/internal-tqm-pdca-service.mjs";
 import { createInternalTqmDogfoodService } from "./app/services/internal-tqm-dogfood-service.mjs";
+import { createWorkflowOutcomeService } from "./app/services/workflow-outcome-service.mjs";
 import { createGrowthRateLimiter } from "./app/growth/growth-rate-limiter.mjs";
 import { createOnboardingService } from "./app/services/onboarding-service.mjs";
 import { createOperationMetrics } from "./app/observability/operation-metrics.mjs";
@@ -397,6 +400,7 @@ const creativeIntentRepository = createCreativeIntentRepository(db);
 const distributionContextRepository = createDistributionContextRepository(db);
 const attributionTouchRepository = createAttributionTouchRepository(db);
 const performanceObservationRepository = createPerformanceObservationRepository(db);
+const workflowOutcomeRepository = createWorkflowOutcomeRepository(db);
 const landingRepository = createLandingRepository(db);
 const websiteRepository = createWebsiteRepository(db);
 const commerceCatalogRepository = createCommerceCatalogRepository(db);
@@ -499,6 +503,7 @@ const growthWorkflowService = createGrowthWorkflowService({ repository: growthWo
 const improvementCycleService = createImprovementCycleService({ repository: improvementCycleRepository });
 const internalTqmService = createGovernedInternalTqmService({ source: internalQualitySource, pdcaService: improvementCycleService });
 const internalTqmDogfoodService = createInternalTqmDogfoodService({ economyService: aiEconomyService, benchmarkRegistry: persianAiBenchmarkRegistry, databaseStatus: () => { const pages = db.pragma("page_count", { simple: true }), pageSize = db.pragma("page_size", { simple: true }); return { bytes: pages * pageSize, pages, pageSize }; } });
+const workflowOutcomeService = createWorkflowOutcomeService({ repository: workflowOutcomeRepository });
 const systemConstraintService = createSystemConstraintService({ repository: systemConstraintRepository });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
 const marketplaceCommerceService = createMarketplaceCommerceService({ repository: marketplaceCommerceRepository, registry: marketplaceProviderRegistry, publicUrlResolver: (catalog, product) => domainPublishingRepository.productUrl(catalog.id, product.id), assetUrlResolver: (assetId) => domainPublishingRepository.publicAssetUrl(assetId) });
@@ -692,6 +697,7 @@ app.use("/api", createSystemConstraintRouter({ service: systemConstraintService 
 app.use("/api", createInternalTqmRouter({ service: internalTqmService }));
 app.use("/api", createInternalTqmPdcaRouter({ service: internalTqmService }));
 app.use("/api", createInternalTqmDogfoodRouter({ service: internalTqmDogfoodService }));
+app.use("/api", createWorkflowOutcomeRouter({ service: workflowOutcomeService }));
 app.use("/api", createAiEconomyRouter({ economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, budgetGovernor: aiBudgetGovernor, benchmarkRegistry: persianAiBenchmarkRegistry, patternRegistry: growthPatternRegistry, learnedPolicy: learnedIntelligencePolicy }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
 app.use("/api", createMarketplaceCommerceRouter({ marketplaceService: marketplaceCommerceService, bulkService: commerceBulkService, integrationHubService }));
