@@ -65,7 +65,7 @@ export function classifyApiRequest(method, path) {
     return { feature: "execution", internal: false };
   }
   if (!MUTATIONS.has(upper)) {
-    if (/^\/api\/internal\/(quality|visual-components|visual-publishing)(?:\/|$)/.test(path)) return { feature: "development_tools", internal: true };
+    if (/^\/api\/internal\/(quality|visual-components|visual-publishing|visual-recommendation-benchmark)(?:\/|$)/.test(path)) return { feature: "development_tools", internal: true };
     if (/^\/api\/improvement(?:\/|$)/.test(path)) return { feature: "continuous_improvement", internal: false };
     if (/^\/api\/system-analysis(?:\/|$)/.test(path)) return { feature: "continuous_improvement", internal: false };
     if (/^\/api\/ai\/economy(?:\/|$)/.test(path)) return { feature: "development_tools", internal: true };
@@ -79,7 +79,7 @@ export function classifyApiRequest(method, path) {
     return null;
   }
   if (/^\/api\/improvement(?:\/|$)/.test(path)) return { feature: "continuous_improvement", internal: false };
-  if (/^\/api\/internal\/(quality|visual-components|visual-publishing)(?:\/|$)/.test(path)) return { feature: "development_tools", internal: true };
+  if (/^\/api\/internal\/(quality|visual-components|visual-publishing|visual-recommendation-benchmark)(?:\/|$)/.test(path)) return { feature: "development_tools", internal: true };
   if (/^\/api\/system-analysis(?:\/|$)/.test(path)) return { feature: "continuous_improvement", internal: false };
   if (upper === "POST" && path === "/api/content/generate") return { feature: "content_studio", internal: false };
   if (upper === "POST" && path === "/api/agent/run") return { feature: "experimental_ai", internal: true };
