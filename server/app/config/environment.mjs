@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { assertBootReady, createProductionConfiguration } from "./production-configuration.mjs";
 
 const configDirectory = dirname(fileURLToPath(import.meta.url));
 const serverDirectory = join(configDirectory, "../..");
@@ -25,13 +26,6 @@ function parsePort(value, fallback) {
   return fallback;
 }
 
-function parseOrigins(value) {
-  return String(value || "http://localhost:5173")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-}
-
 function parseFeatureOverrides(value) {
   if (!value) return {};
   try {
@@ -43,31 +37,15 @@ function parseFeatureOverrides(value) {
   }
 }
 
-const nodeEnv = process.env.NODE_ENV || "development";
+const productionConfiguration = createProductionConfiguration(process.env);
+const nodeEnv = productionConfiguration.nodeEnv;
 const authHashSecret =
   process.env.AUTH_HASH_SECRET ||
   (nodeEnv === "production"
     ? null
     : "loadder-development-only-otp-secret");
 
-if (!authHashSecret) {
-  throw new Error("AUTH_HASH_SECRET is required in production.");
-}
-
-if (nodeEnv === "production" && process.env.AUTH_EXPOSE_DEV_OTP === "true") {
-  throw new Error("AUTH_EXPOSE_DEV_OTP must be disabled in production.");
-}
-
-if (nodeEnv === "production" && process.env.LOADDER_SEED_DEMO_DATA === "true") {
-  throw new Error("LOADDER_SEED_DEMO_DATA must be disabled in production.");
-}
-
-if (nodeEnv === "production") {
-  const origins = String(process.env.CLIENT_ORIGINS || "").split(",").map((x) => x.trim()).filter(Boolean);
-  if (!origins.length || origins.some((origin) => origin === "*" || !/^https:\/\//.test(origin))) {
-    throw new Error("CLIENT_ORIGINS must contain explicit HTTPS origins in production.");
-  }
-}
+if (nodeEnv === "production") assertBootReady(productionConfiguration);
 
 export const environment = Object.freeze({
   nodeEnv,
@@ -76,7 +54,8 @@ export const environment = Object.freeze({
     process.env.API_PORT || process.env.PORT,
     3001
   ),
-  clientOrigins: parseOrigins(process.env.CLIENT_ORIGINS),
+  clientOrigins: productionConfiguration.clientOrigins,
+  productionConfiguration,
   openAIConfigured: Boolean(process.env.OPENAI_API_KEY),
   cloudflareAIConfigured: Boolean(
     process.env.CLOUDFLARE_ACCOUNT_ID &&

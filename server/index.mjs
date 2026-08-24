@@ -598,10 +598,19 @@ app.use(
 );
 
 app.get("/api/health", (req, res) => {
+  const configuration = environment.productionConfiguration;
   res.json({
-    ok: true,
+    ok: configuration.bootReady,
     service: "Loadder API",
-    environment: environment.nodeEnv,
+    readiness: configuration.coreLaunchReady ? "ready" : configuration.bootReady ? "degraded" : "not_ready",
+    configuration: {
+      bootReady: configuration.bootReady,
+      coreLaunchReady: configuration.coreLaunchReady,
+      reasonCodes: [...configuration.requiredMissing, ...configuration.invalid, ...configuration.optionalUnavailable],
+      database: { configuredPath: configuration.database.configured, persistenceValidated: false },
+      providers: configuration.providers,
+      publishing: configuration.publishing,
+    },
     database: {
       status: "ready",
       engine: "SQLite",
@@ -610,14 +619,7 @@ app.get("/api/health", (req, res) => {
         name,
       })),
     },
-    ai: {
-      openaiConfigured: environment.openAIConfigured,
-      cloudflareConfigured: environment.cloudflareAIConfigured,
-      businessBrainConfigured: businessBrainService.readiness().configured,
-      contentTextGenerationConfigured: environment.openAIConfigured,
-      providerAvailability: "not-probed",
-      economy: aiEconomyService.readiness(),
-    },
+    ai: { status: environment.openAIConfigured ? "configured_not_probed" : "not_configured" },
     assets: {
       assetStorageConfigured: contentAssetStore.configured,
       assetUploadEnabled: contentAssetStore.uploadEnabled,
@@ -627,11 +629,7 @@ app.get("/api/health", (req, res) => {
     shipping: inventoryFulfillmentService.readiness(),
     returns: returnRefundService.readiness(),
     publishing: domainPublishingService.readiness(),
-    auth: {
-      mode: "persistent-session",
-      productionReady: false,
-      otpDelivery: "not-connected",
-    },
+    auth: { mode: "persistent-session", otpDelivery: configuration.providers.smsOtp },
     timestamp: new Date().toISOString(),
   });
 });
