@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
-import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { atomicWriteFile } from "../persistence/atomic-file-write.mjs";
 const esc = (v) =>
     String(v).replace(
       /[&<>"']/g,
@@ -83,12 +84,11 @@ export function createLandingPublisher({
     memory = new Map(),
     endpoint = `${api}/api/public/landing/events`;
   const persist = (path, html) => {
-    memory.set(path, html);
     if (staticDirectory) {
       const target = join(staticDirectory, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, html, { encoding: "utf8", mode: 0o644 });
+      atomicWriteFile(target, html);
     }
+    memory.set(path, html);
   };
   return Object.freeze({
     configured,

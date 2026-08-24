@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
+import { mkdirSync } from "node:fs";
 import { LEGACY_WORKSPACE_ID } from "./migrations/002_tenant_domain_data.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,6 +11,7 @@ const __dirname = path.dirname(__filename);
 const databasePath = process.env.DATABASE_PATH
   ? path.resolve(process.env.DATABASE_PATH)
   : path.join(__dirname, "loadder.sqlite");
+mkdirSync(path.dirname(databasePath), { recursive: true, mode: 0o750 });
 
 export const db = new Database(databasePath);
 

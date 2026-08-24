@@ -610,6 +610,7 @@ app.get("/api/health", (req, res) => {
       database: { configuredPath: configuration.database.configured, persistenceValidated: false },
       providers: configuration.providers,
       publishing: configuration.publishing,
+      persistence: { status: configuration.persistence.status, singleWritableInstanceRequired: true, deploymentValidated: configuration.persistence.deploymentValidated },
     },
     database: {
       status: "ready",

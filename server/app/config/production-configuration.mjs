@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createPersistenceContract } from "../persistence/persistence-contract.mjs";
 
 const PLACEHOLDER = /^(?:change[-_ ]?me|replace[-_ ]?me|your[-_ ]|example|secret|password|test|todo)/i;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
@@ -33,6 +34,7 @@ export function createProductionConfiguration(env = process.env) {
   const landingConfigured = Boolean(env.LANDING_STATIC_DIRECTORY && safeHttpsUrl(env.LANDING_PUBLIC_BASE_URL) && safeHttpsUrl(env.LANDING_PUBLIC_API_BASE_URL) && validSecret(env.LANDING_TRACKING_SECRET));
   const websiteConfigured = Boolean(env.PUBLIC_STATIC_DIRECTORY && safeHttpsUrl(env.PUBLIC_BASE_URL));
   const smsConfigured = Boolean(env.SMS_IR_API_KEY && env.SMS_IR_OTP_TEMPLATE_ID);
+  const persistence = createPersistenceContract(env);
 
   if (production) {
     if (!env.AUTH_HASH_SECRET) issue(requiredMissing, "CONFIG_AUTH_SECRET_MISSING"); else if (!authSecretValid) issue(invalid, "CONFIG_AUTH_SECRET_INVALID");
@@ -41,6 +43,10 @@ export function createProductionConfiguration(env = process.env) {
     if (env.AUTH_EXPOSE_DEV_OTP === "true") issue(invalid, "CONFIG_DEVELOPMENT_OTP_ENABLED");
     if (env.LOADDER_SEED_DEMO_DATA === "true") issue(invalid, "CONFIG_DEMO_DATA_ENABLED");
     if (!databaseExplicit) issue(requiredMissing, "CONFIG_DATABASE_PATH_MISSING");
+    for (const code of persistence.reasonCodes) {
+      if (code.endsWith("_NOT_CONFIGURED")) issue(optionalUnavailable, code);
+      else issue(invalid, code);
+    }
   }
   if (!openaiConfigured) issue(optionalUnavailable, "CONFIG_OPENAI_MISSING");
   if (!landingConfigured) issue(optionalUnavailable, "CONFIG_LANDING_PUBLISHING_INCOMPLETE");
@@ -50,13 +56,13 @@ export function createProductionConfiguration(env = process.env) {
 
   const bootReady = requiredMissing.length === 0 && invalid.length === 0;
   const smsOtpLiveValidated = false;
-  const coreLaunchReady = bootReady && openaiConfigured && landingConfigured && websiteConfigured && smsOtpLiveValidated;
+  const coreLaunchReady = bootReady && openaiConfigured && landingConfigured && websiteConfigured && persistence.deploymentValidated && smsOtpLiveValidated;
   return Object.freeze({
     nodeEnv, production, bootReady, coreLaunchReady,
     requiredMissing: Object.freeze(requiredMissing), invalid: Object.freeze(invalid), optionalUnavailable: Object.freeze(optionalUnavailable),
     clientOrigins: Object.freeze(origins), authSecretValid, database: Object.freeze({ configured: databaseExplicit, resolvedPath: databasePath, persistenceValidated: false }),
     providers: Object.freeze({ openai: openaiConfigured ? "CONFIGURED" : "NOT_CONFIGURED", smsOtp: smsConfigured ? "CODE_READY_LIVE_VALIDATION_PENDING" : "NOT_CONFIGURED" }),
-    publishing: Object.freeze({ landing: landingConfigured ? "CONFIGURED" : "NOT_CONFIGURED", website: websiteConfigured ? "CONFIGURED" : "NOT_CONFIGURED" }),
+    publishing: Object.freeze({ landing: landingConfigured ? "CONFIGURED" : "NOT_CONFIGURED", website: websiteConfigured ? "CONFIGURED" : "NOT_CONFIGURED" }), persistence,
   });
 }
 
