@@ -106,8 +106,20 @@ export function validateVisualPublicationPage(descriptors, { registry = visualCo
   return Object.freeze(validated);
 }
 
+const intensityOpacity = Object.freeze({ SUBTLE: ".14", BALANCED: ".22", STRONG: ".32" });
+const safeThemeColor = (designTokens, token) => {
+  const key = token === "SECONDARY" ? "secondaryColor" : token === "MUTED" ? "mutedColor" : "primaryColor";
+  const value = designTokens?.[key];
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : key === "secondaryColor" ? "#475569" : key === "mutedColor" ? "#94a3b8" : "#7c3aed";
+};
+const staticProps = (descriptor, options, defaults) => Object.freeze({ ...defaults, ...descriptor.props, accent: safeThemeColor(options.designTokens, descriptor.props.accentToken ?? defaults.accentToken), opacity: intensityOpacity[descriptor.props.intensity ?? defaults.intensity] });
+const staticResult = (className, css) => Object.freeze({ markup: `<div class="ld-visual ${className}" aria-hidden="true"></div>`, css });
+
 const STATIC_RENDERERS = Object.freeze({
-  "LOADDER_STATIC_DOT_FIELD:1": () => Object.freeze({ markup: '<div class="ld-visual ld-static-dot-field" aria-hidden="true"></div>', css: ".ld-static-dot-field{position:absolute;inset:0;pointer-events:none;background-color:#070512;background-image:radial-gradient(circle,rgba(139,92,246,.45) 1px,transparent 1.5px);background-size:24px 24px}" }),
+  "LOADDER_STATIC_DOT_FIELD:1": () => staticResult("ld-static-dot-field", ".ld-static-dot-field{position:absolute;inset:0;pointer-events:none;background-color:#070512;background-image:radial-gradient(circle,rgba(139,92,246,.45) 1px,transparent 1.5px);background-size:24px 24px}"),
+  "LOADDER_GRADIENT_FIELD:1": (descriptor, options) => { const p = staticProps(descriptor, options, { variant: "AURORA", intensity: "SUBTLE", accentToken: "PRIMARY" }), position = p.variant === "HALO" ? "50% 45%" : "15% 20%"; return staticResult(`ld-gradient-field ld-gradient-field-${p.variant.toLowerCase()}`, `.ld-gradient-field{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:${p.opacity};background:radial-gradient(ellipse at ${position},${p.accent} 0,transparent 62%),radial-gradient(ellipse at 85% 80%,${p.accent} 0,transparent 58%)}`); },
+  "LOADDER_GLOW_BANDS:1": (descriptor, options) => { const p = staticProps(descriptor, options, { orientation: "DIAGONAL", intensity: "SUBTLE", accentToken: "PRIMARY" }), angle = p.orientation === "HORIZONTAL" ? "0deg" : "-24deg"; return staticResult(`ld-glow-bands ld-glow-bands-${p.orientation.toLowerCase()}`, `.ld-glow-bands{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:${p.opacity};background:linear-gradient(${angle},transparent 0 24%,${p.accent} 24% 30%,transparent 30% 62%,${p.accent} 62% 68%,transparent 68% 100%)}`); },
+  "LOADDER_GEOMETRIC_PATTERN:1": (descriptor, options) => { const p = staticProps(descriptor, options, { pattern: "DIAMONDS", density: "SPARSE", intensity: "SUBTLE", accentToken: "PRIMARY" }), size = p.density === "DENSE" ? "20px" : p.density === "MEDIUM" ? "32px" : "48px", pattern = p.pattern === "CHEVRON" ? `linear-gradient(135deg,${p.accent} 12%,transparent 12.5% 87%,${p.accent} 87.5%)` : `linear-gradient(45deg,${p.accent} 25%,transparent 25% 75%,${p.accent} 75%),linear-gradient(45deg,${p.accent} 25%,transparent 25% 75%,${p.accent} 75%)`; return staticResult(`ld-geometric-pattern ld-geometric-pattern-${p.pattern.toLowerCase()}`, `.ld-geometric-pattern{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:${p.opacity};background-image:${pattern};background-position:0 0,calc(${size}/2) calc(${size}/2);background-size:${size} ${size}}`); },
 });
 
 export function renderStaticVisualPublication(descriptors, options = {}) {
@@ -115,7 +127,7 @@ export function renderStaticVisualPublication(descriptors, options = {}) {
   const rendered = validated.map(descriptor => {
     const renderer = STATIC_RENDERERS[`${descriptor.componentId}:${descriptor.componentVersion}`];
     if (!renderer) fail("VISUAL_RUNTIME_TIER_UNSUPPORTED");
-    return renderer(descriptor);
+    return renderer(descriptor, options);
   });
   const publication = Object.freeze({ contractVersion: VISUAL_PUBLISHER_CONTRACT_VERSION, descriptors: validated, markup: rendered.map(x => x.markup).join(""), css: rendered.map(x => x.css).join("\n"), csp: "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" });
   return Object.freeze({ ...publication, checksum: checksum(publication) });

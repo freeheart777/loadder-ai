@@ -140,7 +140,7 @@ test("Visual Component Admission Policy v1", async t => {
   });
 
   await t.test("registry is immutable, exact-versioned, contains no ThreeUI component, and exposes no latest", () => {
-    assert.equal(visualComponentRegistry.list().length, 2);
+    assert.equal(visualComponentRegistry.list().length, 5);
     assert.equal(visualComponentRegistry.get("LOADDER_DOT_MATRIX", 1).admission.state, "PILOT_ONLY");
     assert.equal(visualComponentRegistry.get("LOADDER_DOT_MATRIX", 2), null);
     assert.equal("latest" in visualComponentRegistry, false);

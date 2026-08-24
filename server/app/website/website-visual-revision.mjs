@@ -41,7 +41,7 @@ export function validateWebsiteVisualBindings(blueprint, bindings, { registry = 
 export function renderWebsiteVisualBindings(blueprint, bindings, options = {}) {
   const validated = validateWebsiteVisualBindings(blueprint, bindings, options);
   return Object.freeze(validated.map(binding => {
-    const publication = renderStaticVisualPublication([binding.descriptor], options);
+    const publication = renderStaticVisualPublication([binding.descriptor], { ...options, designTokens: blueprint.designTokens });
     const scope = `ld-visual-scope-${publication.checksum.slice(0, 16)}`;
     const scopedCss = publication.css.replaceAll(".ld-", `.${scope} .ld-`);
     return Object.freeze({ sectionId: binding.sectionId, descriptor: binding.descriptor, markup: `<div class="ld-visual-host ${scope}" data-loadder-visual-checksum="${publication.checksum}">${publication.markup}</div>`, css: `.${scope}{position:absolute;inset:0;pointer-events:none}.${scope} .ld-visual{position:absolute;inset:0}${scopedCss}`, checksum: publication.checksum });
