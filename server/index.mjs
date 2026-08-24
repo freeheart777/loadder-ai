@@ -17,6 +17,7 @@ import { createImprovementCycleRouter } from "./app/routes/improvement-cycles.mj
 import { createSystemConstraintRouter } from "./app/routes/system-constraint-core.mjs";
 import { createInternalTqmRouter } from "./app/routes/internal-tqm.mjs";
 import { createInternalTqmPdcaRouter } from "./app/routes/internal-tqm-pdca.mjs";
+import { createInternalTqmDogfoodRouter } from "./app/routes/internal-tqm-dogfood.mjs";
 import { createInternalQualitySource } from "./app/internal-quality/internal-quality-source.mjs";
 import { createAiOperationRegistry } from "./app/ai/ai-operation-registry.mjs";
 import { createOpenAiResponsesProvider } from "./app/ai/providers/openai-responses-provider.mjs";
@@ -135,6 +136,7 @@ import { createGrowthWorkflowService } from "./app/services/growth-workflow-serv
 import { createImprovementCycleService } from "./app/services/improvement-cycle-service.mjs";
 import { createSystemConstraintService } from "./app/services/system-constraint-service.mjs";
 import { createGovernedInternalTqmService } from "./app/services/internal-tqm-pdca-service.mjs";
+import { createInternalTqmDogfoodService } from "./app/services/internal-tqm-dogfood-service.mjs";
 import { createGrowthRateLimiter } from "./app/growth/growth-rate-limiter.mjs";
 import { createOnboardingService } from "./app/services/onboarding-service.mjs";
 import { createOperationMetrics } from "./app/observability/operation-metrics.mjs";
@@ -496,6 +498,7 @@ const websiteService = createWebsiteService({ repository: websiteRepository, con
 const growthWorkflowService = createGrowthWorkflowService({ repository: growthWorkflowRepository, contextRepository: businessContextRepository, provider: openAiResponsesProvider, economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createGrowthRateLimiter(), landingService, websiteService, contentGenerationService });
 const improvementCycleService = createImprovementCycleService({ repository: improvementCycleRepository });
 const internalTqmService = createGovernedInternalTqmService({ source: internalQualitySource, pdcaService: improvementCycleService });
+const internalTqmDogfoodService = createInternalTqmDogfoodService({ economyService: aiEconomyService, benchmarkRegistry: persianAiBenchmarkRegistry, databaseStatus: () => { const pages = db.pragma("page_count", { simple: true }), pageSize = db.pragma("page_size", { simple: true }); return { bytes: pages * pageSize, pages, pageSize }; } });
 const systemConstraintService = createSystemConstraintService({ repository: systemConstraintRepository });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
 const marketplaceCommerceService = createMarketplaceCommerceService({ repository: marketplaceCommerceRepository, registry: marketplaceProviderRegistry, publicUrlResolver: (catalog, product) => domainPublishingRepository.productUrl(catalog.id, product.id), assetUrlResolver: (assetId) => domainPublishingRepository.publicAssetUrl(assetId) });
@@ -688,6 +691,7 @@ app.use("/api", createImprovementCycleRouter({ service: improvementCycleService 
 app.use("/api", createSystemConstraintRouter({ service: systemConstraintService }));
 app.use("/api", createInternalTqmRouter({ service: internalTqmService }));
 app.use("/api", createInternalTqmPdcaRouter({ service: internalTqmService }));
+app.use("/api", createInternalTqmDogfoodRouter({ service: internalTqmDogfoodService }));
 app.use("/api", createAiEconomyRouter({ economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, budgetGovernor: aiBudgetGovernor, benchmarkRegistry: persianAiBenchmarkRegistry, patternRegistry: growthPatternRegistry, learnedPolicy: learnedIntelligencePolicy }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
 app.use("/api", createMarketplaceCommerceRouter({ marketplaceService: marketplaceCommerceService, bulkService: commerceBulkService, integrationHubService }));

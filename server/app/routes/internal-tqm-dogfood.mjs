@@ -1,0 +1,2 @@
+import express from"express";
+export function createInternalTqmDogfoodRouter({service}){const r=express.Router();r.get("/internal/quality/dogfood-baseline",(_q,s)=>s.json({success:true,...service.baseline()}));r.get("/internal/quality/dogfood-assumptions",(_q,s)=>s.json({success:true,...service.assumptions()}));r.get("/internal/quality/dogfood-constraints",(_q,s)=>s.json({success:true,...service.constraints()}));return r;}
