@@ -40,6 +40,7 @@ const AiEconomyPage = lazy(() => import("./pages/AiEconomyPage"));
 const ModelBenchmarkLabPage = lazy(() => import("./pages/ModelBenchmarkLabPage"));
 const ImprovementCyclesPage = lazy(() => import("./pages/ImprovementCyclesPage"));
 const ImprovementCycleDetailPage = lazy(() => import("./pages/ImprovementCycleDetailPage"));
+const VisualRuntimePilotPage = lazy(() => import("./pages/internal/VisualRuntimePilotPage"));
 
 export default function App() {
   return (
@@ -186,6 +187,7 @@ export default function App() {
             />
             <Route path="/dashboard/ai-economy" element={internalToolsEnabled ? <AiEconomyPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/ai-economy/benchmarks" element={internalToolsEnabled ? <ModelBenchmarkLabPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/internal/visual-pilot" element={internalToolsEnabled ? <VisualRuntimePilotPage /> : <Navigate to="/dashboard" replace />} />
           </Route>
 
         <Route
