@@ -502,7 +502,7 @@ const websiteService = createWebsiteService({ repository: websiteRepository, con
 const growthWorkflowService = createGrowthWorkflowService({ repository: growthWorkflowRepository, contextRepository: businessContextRepository, provider: openAiResponsesProvider, economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, rateLimiter: createGrowthRateLimiter(), landingService, websiteService, contentGenerationService });
 const improvementCycleService = createImprovementCycleService({ repository: improvementCycleRepository });
 const internalTqmService = createGovernedInternalTqmService({ source: internalQualitySource, pdcaService: improvementCycleService });
-const workflowOutcomeService = createWorkflowOutcomeService({ repository: workflowOutcomeRepository });
+const workflowOutcomeService = createWorkflowOutcomeService({ repository: workflowOutcomeRepository, originContext: { nodeEnv: environment.nodeEnv, seedDemoData: environment.seedDemoData } });
 const internalTqmDogfoodService = createInternalTqmDogfoodService({ economyService: aiEconomyService, benchmarkRegistry: persianAiBenchmarkRegistry, outcomeService: workflowOutcomeService, databaseStatus: () => { const pages = db.pragma("page_count", { simple: true }), pageSize = db.pragma("page_size", { simple: true }); return { bytes: pages * pageSize, pages, pageSize }; } });
 const systemConstraintService = createSystemConstraintService({ repository: systemConstraintRepository });
 const commerceCatalogService = createCommerceCatalogService({ repository: commerceCatalogRepository, assetRepository: contentAssetRepository, archetypeRegistry: storeArchetypeRegistry });
