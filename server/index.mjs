@@ -20,6 +20,8 @@ import { createInternalTqmPdcaRouter } from "./app/routes/internal-tqm-pdca.mjs"
 import { createInternalTqmDogfoodRouter } from "./app/routes/internal-tqm-dogfood.mjs";
 import { createInternalVisualComponentsRouter } from "./app/routes/internal-visual-components.mjs";
 import { visualComponentRegistry } from "./app/visual-components/visual-component-registry.mjs";
+import { createInternalVisualPublishingRouter } from "./app/routes/internal-visual-publishing.mjs";
+import { VISUAL_PUBLISHER_RUNTIME_V1, visualPublishingCompatibility } from "./app/visual-publishing/visual-publisher-contract.mjs";
 import { createWorkflowOutcomeRouter } from "./app/routes/workflow-outcomes.mjs";
 import { createInternalQualitySource } from "./app/internal-quality/internal-quality-source.mjs";
 import { createAiOperationRegistry } from "./app/ai/ai-operation-registry.mjs";
@@ -700,6 +702,7 @@ app.use("/api", createInternalTqmRouter({ service: internalTqmService }));
 app.use("/api", createInternalTqmPdcaRouter({ service: internalTqmService }));
 app.use("/api", createInternalTqmDogfoodRouter({ service: internalTqmDogfoodService }));
 app.use("/api", createInternalVisualComponentsRouter({ registry: visualComponentRegistry }));
+app.use("/api", createInternalVisualPublishingRouter({ contract: { policy: VISUAL_PUBLISHER_RUNTIME_V1, compatibility: visualPublishingCompatibility } }));
 app.use("/api", createWorkflowOutcomeRouter({ service: workflowOutcomeService }));
 app.use("/api", createAiEconomyRouter({ economyService: aiEconomyService, policyRegistry: aiOperationPolicyRegistry, budgetGovernor: aiBudgetGovernor, benchmarkRegistry: persianAiBenchmarkRegistry, patternRegistry: growthPatternRegistry, learnedPolicy: learnedIntelligencePolicy }));
 app.use("/api", createCommerceCatalogRouter({ service: commerceCatalogService }));
