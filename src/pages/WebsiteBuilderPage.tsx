@@ -16,6 +16,10 @@ import TrustedLandingRenderer, {
   type LandingBlueprint,
 } from "../components/landing/TrustedLandingRenderer";
 import VisualStyleSelector from "../components/website/VisualStyleSelector";
+import VisualRecommendationCard, {
+  type VisualCandidate,
+  type VisualRecommendation,
+} from "../components/website/VisualRecommendationCard";
 import { componentOptions, sectionFor } from "../lib/landingConversion";
 type Theme = LandingBlueprint["designTokens"];
 type Website = {
@@ -131,6 +135,12 @@ export default function WebsiteBuilderPage() {
     ),
     [visualCatalog, setVisualCatalog] = useState<VisualCatalog[]>([]),
     [activeRevision, setActiveRevision] = useState<Revision | null>(null),
+    [recommendation, setRecommendation] = useState<VisualRecommendation | null>(
+      null,
+    ),
+    [suggestedVisual, setSuggestedVisual] = useState<VisualCandidate | null>(
+      null,
+    ),
     [presetId, setPresetId] = useState("CORPORATE"),
     [name, setName] = useState("وب‌سایت جدید"),
     [slug, setSlug] = useState("business-site"),
@@ -142,7 +152,14 @@ export default function WebsiteBuilderPage() {
     [busy, setBusy] = useState(false),
     [readiness, setReadiness] = useState({
       websitePublicationConfigured: false,
-    });
+    }),
+    recommendationPageId = pages[selectedPage]?.id,
+    recommendationSectionId = blueprint?.sections[selectedSection]?.id,
+    currentRecommendation =
+      recommendation?.baseRevisionId === activeRevision?.id &&
+      recommendation?.sectionId === recommendationSectionId
+        ? recommendation
+        : null;
   useEffect(() => {
     void Promise.all([
       json("/api/websites"),
@@ -188,6 +205,26 @@ export default function WebsiteBuilderPage() {
       })
       .catch((e) => setMessage(e.message));
   }, [pages, selectedPage]);
+  useEffect(() => {
+    if (
+      !id ||
+      id === "new" ||
+      !recommendationPageId ||
+      !recommendationSectionId ||
+      !activeRevision
+    )
+      return;
+    let active = true;
+    void post(
+      `/api/websites/${id}/pages/${recommendationPageId}/sections/${recommendationSectionId}/visual-recommendation`,
+      { baseRevisionId: activeRevision.id },
+    )
+      .then((data) => active && setRecommendation(data.recommendation))
+      .catch(() => active && setRecommendation(null));
+    return () => {
+      active = false;
+    };
+  }, [id, recommendationPageId, recommendationSectionId, activeRevision]);
   async function create() {
     const preset = presets.find((x) => x.presetId === presetId),
       context = contexts.find((x) => x.status === "active") || contexts[0];
@@ -561,7 +598,10 @@ export default function WebsiteBuilderPage() {
                   {blueprint.sections.map((s, i) => (
                     <button
                       key={s.id}
-                      onClick={() => setSelectedSection(i)}
+                      onClick={() => {
+                        setSelectedSection(i);
+                        setSuggestedVisual(null);
+                      }}
                       className={`min-h-11 rounded-lg px-3 text-xs ${i === selectedSection ? "bg-violet-600" : "bg-white/5"}`}
                     >
                       {s.componentId}
@@ -620,10 +660,47 @@ export default function WebsiteBuilderPage() {
                       className="mt-2 min-h-28 w-full rounded-xl bg-black/20 p-3"
                     />
                   </label>
+                  <VisualRecommendationCard
+                    recommendation={currentRecommendation}
+                    busy={busy}
+                    onAccept={() => {
+                      if (!currentRecommendation) return;
+                      if (currentRecommendation.action === "REMOVE") {
+                        void changeVisual("REMOVE");
+                        return;
+                      }
+                      const candidate = currentRecommendation.candidate,
+                        item = visualCatalog.find(
+                          (entry) =>
+                            entry.componentId === candidate?.componentId &&
+                            entry.componentVersion ===
+                              candidate?.componentVersion,
+                        );
+                      if (candidate && item)
+                        void changeVisual(
+                          currentRecommendation.action === "REPLACE"
+                            ? "REPLACE"
+                            : "APPLY",
+                          item,
+                          candidate.props,
+                        );
+                    }}
+                    onAlternative={(candidate) => setSuggestedVisual(candidate)}
+                    onIgnore={() => setRecommendation(null)}
+                  />
                   <VisualStyleSelector
-                    key={`${section.id}:${blueprint.websiteVisualDescriptors?.find((item) => item.sectionId === section.id)?.descriptor.componentId || "none"}`}
+                    key={`${section.id}:${blueprint.websiteVisualDescriptors?.find((item) => item.sectionId === section.id)?.descriptor.componentId || "none"}:${suggestedVisual?.componentId || "manual"}`}
                     catalog={visualCatalog}
                     sectionType={section.componentId}
+                    suggested={
+                      suggestedVisual
+                        ? {
+                            componentId: suggestedVisual.componentId,
+                            componentVersion: suggestedVisual.componentVersion,
+                            props: suggestedVisual.props,
+                          }
+                        : undefined
+                    }
                     current={(() => {
                       const binding = blueprint.websiteVisualDescriptors?.find(
                         (item) => item.sectionId === section.id,

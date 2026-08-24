@@ -14,6 +14,7 @@ import {
   assertCustomerVisualSelection,
   customerVisualCatalog,
 } from "../website/website-visual-selection.mjs";
+import { recommendWebsiteVisual } from "../website/website-visual-recommendation.mjs";
 const roles = new Set(["owner", "admin", "member"]),
   types = new Set([
     "CORPORATE",
@@ -351,6 +352,40 @@ export function createWebsiteService({
       return {
         components: customerVisualCatalog({ registry: visualRegistry }),
       };
+    },
+    visualRecommendation(projectId, pageId, sectionId, input, actor) {
+      permission(actor);
+      const p = project(projectId),
+        pg = page(pageId);
+      if (
+        pg.websiteProjectId !== p.id ||
+        !strict(input, ["baseRevisionId"]) ||
+        typeof input.baseRevisionId !== "string"
+      )
+        fail("WEBSITE_INVALID");
+      if (pg.currentDraftBlueprintId !== input.baseRevisionId)
+        fail("VISUAL_REVISION_CONFLICT", 409);
+      const source = blueprint(input.baseRevisionId);
+      if (source.websitePageId !== pg.id)
+        fail("WEBSITE_BLUEPRINT_NOT_FOUND", 404);
+      try {
+        return {
+          recommendation: recommendWebsiteVisual({
+            websiteId: p.id,
+            pageId: pg.id,
+            sectionId,
+            baseRevisionId: source.id,
+            blueprint: source.blueprint,
+            registry: visualRegistry,
+            generatedAt: now().toISOString(),
+          }),
+        };
+      } catch (error) {
+        fail(
+          error?.code || "VISUAL_RECOMMENDATION_UNAVAILABLE",
+          error?.code ? 404 : 503,
+        );
+      }
     },
     changeSectionVisual(projectId, pageId, sectionId, input, actor, rawKey) {
       permission(actor);

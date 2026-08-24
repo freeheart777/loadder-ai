@@ -5,20 +5,16 @@ export function createWebsiteRouter({ service }) {
     actor = (req) => ({ userId: req.user.id, role: req.membership.role }),
     handle = (e, res) =>
       e instanceof WebsiteError
-        ? res
-            .status(e.status)
-            .json({
-              success: false,
-              code: e.code,
-              message: "Website operation could not be completed.",
-            })
-        : res
-            .status(500)
-            .json({
-              success: false,
-              code: "WEBSITE_INVALID",
-              message: "Website operation could not be completed.",
-            }),
+        ? res.status(e.status).json({
+            success: false,
+            code: e.code,
+            message: "Website operation could not be completed.",
+          })
+        : res.status(500).json({
+            success: false,
+            code: "WEBSITE_INVALID",
+            message: "Website operation could not be completed.",
+          }),
     run = (res, fn, status = 200) => {
       try {
         const x = fn();
@@ -82,6 +78,19 @@ export function createWebsiteRouter({ service }) {
         ),
       201,
     ),
+  );
+  r.post(
+    "/websites/:id/pages/:pageId/sections/:sectionId/visual-recommendation",
+    (q, s) =>
+      run(s, () =>
+        service.visualRecommendation(
+          q.params.id,
+          q.params.pageId,
+          q.params.sectionId,
+          q.body,
+          actor(q),
+        ),
+      ),
   );
   r.post("/website-pages/:id/blueprints", (q, s) =>
     run(

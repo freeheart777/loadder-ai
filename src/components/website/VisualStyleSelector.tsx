@@ -42,6 +42,7 @@ export default function VisualStyleSelector({
   catalog,
   sectionType,
   current,
+  suggested,
   busy,
   onApply,
   onRemove,
@@ -49,6 +50,7 @@ export default function VisualStyleSelector({
   catalog: CatalogItem[];
   sectionType: string;
   current: Selection;
+  suggested?: Selection;
   busy: boolean;
   onApply: (
     item: CatalogItem,
@@ -61,13 +63,18 @@ export default function VisualStyleSelector({
       item.allowedSectionTypes.includes(sectionType),
     ),
     selected =
+      choices.find((item) => item.componentId === suggested?.componentId) ||
       choices.find((item) => item.componentId === current?.componentId) ||
       choices[0] ||
       null;
   const initial = selected
     ? {
         ...selected.defaults,
-        ...(current?.componentId === selected.componentId ? current.props : {}),
+        ...(suggested?.componentId === selected.componentId
+          ? suggested.props
+          : current?.componentId === selected.componentId
+            ? current.props
+            : {}),
       }
     : {};
   const [componentId, setComponentId] = React.useState(
