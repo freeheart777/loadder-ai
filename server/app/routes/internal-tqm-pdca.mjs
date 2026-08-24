@@ -1,0 +1,2 @@
+import express from"express";import{InternalTqmError}from"../services/internal-tqm-service.mjs";
+export function createInternalTqmPdcaRouter({service}){const r=express.Router();r.post("/internal/quality/pdca-tests",(q,s)=>{try{return s.json({success:true,cycle:service.createPdcaTest(q.body,{userId:q.user.id,role:q.membership.role})});}catch(e){return s.status(e instanceof InternalTqmError?e.status:500).json({success:false,code:e instanceof InternalTqmError?e.code:"INTERNAL_TQM_ERROR"});}});return r;}
