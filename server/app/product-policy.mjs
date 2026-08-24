@@ -4,6 +4,8 @@ export const FEATURE_EXPOSURE = Object.freeze({
   DISABLED: "DISABLED",
 });
 
+import { CONTROLLED_LAUNCH_POLICY_VERSION, projectControlledLaunchMatrix } from "./controlled-launch-policy.mjs";
+
 export const FEATURE_KEYS = Object.freeze([
   "content_studio",
   "business_setup",
@@ -17,6 +19,16 @@ export const FEATURE_KEYS = Object.freeze([
   "execution",
   "experimental_ai",
   "development_tools",
+  "growth_workflow",
+  "website_builder",
+  "forms_crm",
+  "visual_static",
+  "commerce_catalog",
+  "custom_domains",
+  "commerce_transactions",
+  "marketplace_integrations",
+  "asset_upload",
+  "advanced_measurement",
 ]);
 
 const PRODUCTION_DEFAULTS = Object.freeze({
@@ -32,6 +44,16 @@ const PRODUCTION_DEFAULTS = Object.freeze({
   execution: FEATURE_EXPOSURE.DISABLED,
   experimental_ai: FEATURE_EXPOSURE.DISABLED,
   development_tools: FEATURE_EXPOSURE.DISABLED,
+  growth_workflow: FEATURE_EXPOSURE.CUSTOMER,
+  website_builder: FEATURE_EXPOSURE.CUSTOMER,
+  forms_crm: FEATURE_EXPOSURE.CUSTOMER,
+  visual_static: FEATURE_EXPOSURE.CUSTOMER,
+  commerce_catalog: FEATURE_EXPOSURE.DISABLED,
+  custom_domains: FEATURE_EXPOSURE.DISABLED,
+  commerce_transactions: FEATURE_EXPOSURE.DISABLED,
+  marketplace_integrations: FEATURE_EXPOSURE.DISABLED,
+  asset_upload: FEATURE_EXPOSURE.DISABLED,
+  advanced_measurement: FEATURE_EXPOSURE.DISABLED,
 });
 
 const DEVELOPMENT_DEFAULTS = Object.freeze({
@@ -43,13 +65,19 @@ const DEVELOPMENT_DEFAULTS = Object.freeze({
   legacy_messaging: FEATURE_EXPOSURE.INTERNAL,
   experimental_ai: FEATURE_EXPOSURE.INTERNAL,
   development_tools: FEATURE_EXPOSURE.INTERNAL,
+  commerce_catalog: FEATURE_EXPOSURE.INTERNAL,
+  custom_domains: FEATURE_EXPOSURE.INTERNAL,
+  commerce_transactions: FEATURE_EXPOSURE.INTERNAL,
+  marketplace_integrations: FEATURE_EXPOSURE.INTERNAL,
+  asset_upload: FEATURE_EXPOSURE.INTERNAL,
+  advanced_measurement: FEATURE_EXPOSURE.INTERNAL,
 });
 
 const TEST_DEFAULTS = Object.freeze(Object.fromEntries(
   FEATURE_KEYS.map((key) => [key, FEATURE_EXPOSURE.CUSTOMER])
 ));
 
-export function createProductPolicy({ nodeEnv = "development", overrides = {} } = {}) {
+export function createProductPolicy({ nodeEnv = "development", overrides = {}, dependencies = {} } = {}) {
   const defaults = nodeEnv === "production"
     ? PRODUCTION_DEFAULTS
     : nodeEnv === "test" ? TEST_DEFAULTS : DEVELOPMENT_DEFAULTS;
@@ -59,6 +87,8 @@ export function createProductPolicy({ nodeEnv = "development", overrides = {} } 
   if (invalid) throw new Error("PRODUCT_FEATURE_OVERRIDES contains an invalid exposure.");
   const features = Object.freeze({ ...defaults, ...overrides });
   return Object.freeze({
+    version: CONTROLLED_LAUNCH_POLICY_VERSION,
+    controlled: nodeEnv === "production",
     exposure(feature) {
       if (!FEATURE_KEYS.includes(feature)) return FEATURE_EXPOSURE.DISABLED;
       return features[feature];
@@ -67,6 +97,7 @@ export function createProductPolicy({ nodeEnv = "development", overrides = {} } 
     isInternal(feature) { return this.exposure(feature) === FEATURE_EXPOSURE.INTERNAL; },
     isDisabled(feature) { return this.exposure(feature) === FEATURE_EXPOSURE.DISABLED; },
     snapshot() { return { ...features }; },
+    matrix() { return projectControlledLaunchMatrix(dependencies); },
   });
 }
 

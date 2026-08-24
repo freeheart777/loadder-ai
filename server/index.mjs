@@ -7,6 +7,7 @@ import { createProductPolicy } from "./app/product-policy.mjs";
 import {
   assertLegacyOperationEnabled,
   createApiProductGate,
+  createPublicControlledLaunchGate,
   createInternalAccessMiddleware,
   createProductionOriginGuard,
 } from "./app/middleware/product-gating.mjs";
@@ -352,6 +353,12 @@ const app = express();
 const productPolicy = createProductPolicy({
   nodeEnv: environment.nodeEnv,
   overrides: environment.productFeatureOverrides,
+  dependencies: {
+    OPENAI: environment.openAIConfigured,
+    WEBSITE_PUBLISHING: environment.productionConfiguration.publishing.website === "CONFIGURED",
+    LANDING_PUBLISHING: environment.productionConfiguration.publishing.landing === "CONFIGURED",
+    ASSET_STORAGE: environment.productionConfiguration.providers.assetStorage?.ready === true,
+  },
 });
 const landingPublicOrigin = (() => { try { return new URL(environment.landing.publicBaseUrl).origin; } catch { return ""; } })();
 
@@ -611,6 +618,14 @@ app.get("/api/health", (req, res) => {
       providers: configuration.providers,
       publishing: configuration.publishing,
       persistence: { status: configuration.persistence.status, singleWritableInstanceRequired: true, deploymentValidated: configuration.persistence.deploymentValidated },
+      launchPolicy: {
+        version: productPolicy.version,
+        status: productPolicy.controlled ? "CONTROLLED_LAUNCH_POLICY_ACTIVE" : "DEVELOPMENT_POLICY_ACTIVE",
+        counts: productPolicy.matrix().reduce((counts, feature) => {
+          counts[feature.launchCategory] = (counts[feature.launchCategory] || 0) + 1;
+          return counts;
+        }, {}),
+      },
     },
     database: {
       status: "ready",
@@ -635,6 +650,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.use(createPublicControlledLaunchGate(productPolicy));
 app.use(createLandingPublicRouter({ service: landingCommercializationService, rateLimiter: createLandingPublicRateLimiter() }));
 app.use(createPublicFormsRouter({ service: secureFormsCrmService }));
 app.use(createCartCheckoutRouter({ service: cartCheckoutService }));

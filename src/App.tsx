@@ -11,7 +11,7 @@ import {
 
 import DemoModePreserver from "./components/DemoModePreserver";
 import { AuthProvider, RequireAuth } from "./lib/auth";
-import { internalToolsEnabled } from "./lib/productPolicy";
+import { controlledLaunchEnabled, internalToolsEnabled } from "./lib/productPolicy";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage"));
@@ -105,12 +105,12 @@ export default function App() {
         <Route path="/dashboard/websites" element={<WebsiteBuilderPage />} />
         <Route path="/dashboard/websites/new" element={<WebsiteBuilderPage />} />
         <Route path="/dashboard/websites/:id/edit" element={<WebsiteBuilderPage />} />
-        <Route path="/dashboard/catalog" element={<CommerceCatalogPage />} />
-        <Route path="/dashboard/integrations" element={<IntegrationHubPage />} />
-        <Route path="/dashboard/domains" element={<DomainManagementPage />} />
+        <Route path="/dashboard/catalog" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <CommerceCatalogPage />} />
+        <Route path="/dashboard/integrations" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <IntegrationHubPage />} />
+        <Route path="/dashboard/domains" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <DomainManagementPage />} />
         <Route path="/dashboard/forms" element={<FormBuilderPage />} />
-        <Route path="/store/cart" element={<CommerceCheckoutPage />} />
-        <Route path="/store/payment" element={<CommercePaymentPage />} />
+        <Route path="/store/cart" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <CommerceCheckoutPage />} />
+        <Route path="/store/payment" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <CommercePaymentPage />} />
 
         {/* مدیریت شبکه‌های اجتماعی */}
         <Route

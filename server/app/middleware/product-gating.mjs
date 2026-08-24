@@ -55,12 +55,33 @@ const exactMutation = new Map([
   ["/api/business-brain/analyze", "experimental_ai"],
 ]);
 
+const controlledLaunchRoutes = [
+  [/^\/api\/(business-profile|business-dna|brand-book|business-context|model-specifications|model-inputs)(?:\/|$)/, "business_setup", false],
+  [/^\/api\/growth(?:\/|$)/, "growth_workflow", false],
+  [/^\/api\/content\/(items|generations)(?:\/|$)|^\/api\/(creative-intents|creative-placements)(?:\/|$)/, "content_studio", false],
+  [/^\/api\/(websites|website-pages)(?:\/|$)/, "website_builder", false],
+  [/^\/api\/(forms|crm)(?:\/|$)/, "forms_crm", false],
+  [/^\/api\/content\/assets(?:\/|$)|^\/api\/content-assets(?:\/|$)/, "asset_upload", true],
+  [/^\/api\/commerce\/(catalogs|archetypes|products)(?:\/|$)/, "commerce_catalog", true],
+  [/^\/api\/(domains|domain-bindings)(?:\/|$)/, "custom_domains", true],
+  [/^\/api\/commerce\/(inventory|fulfillments|shipments|orders|shipping)(?:\/|$)/, "commerce_transactions", true],
+  [/^\/api\/commerce\/(marketplaces|integration-hub)(?:\/|$)|^\/api\/(connections|connector-definitions|integrations)(?:\/|$)/, "marketplace_integrations", true],
+  [/^\/api\/(attribution\/touches|distribution-contexts|performance\/observations)(?:\/|$)/, "advanced_measurement", true],
+  [/^\/api\/(forecasts|forecast-specifications|knowledge-|features|feature-set|evaluations|extraction-runs|imports|import-mappers|imported-facts|signals|observations|workflow-outcomes)(?:\/|$)/, "development_tools", true],
+];
+
+export const MEANINGFUL_PRODUCT_ROUTE_GROUPS = Object.freeze(controlledLaunchRoutes.map(([pattern, feature, internal]) => Object.freeze({ pattern: pattern.source, feature, internal })));
+
 export function classifyApiRequest(method, path) {
   const upper = String(method).toUpperCase();
   if (/^\/api\/onboarding(?:\/|$)/.test(path)) {
     return { feature: "business_setup", internal: false };
   }
   if (/^\/api\/landing(?:\/|$)/.test(path)) return { feature: "landing_builder", internal: false };
+  if (/^\/api\/integrations\/connections\/[^/]+\/account-identities(?:\/|$)/.test(path)) return { feature: "execution", internal: upper === "GET" };
+  for (const [pattern, feature, internal] of controlledLaunchRoutes) {
+    if (pattern.test(path)) return { feature, internal };
+  }
   if (upper === "POST" && /^\/api\/intelligence\/decisions\/[^/]+\/action-proposals$/.test(path)) {
     return { feature: "execution", internal: false };
   }
@@ -95,11 +116,34 @@ export function classifyApiRequest(method, path) {
 export function createApiProductGate(policy) {
   return (req, res, next) => {
     const rule = classifyApiRequest(req.method, req.path);
-    if (!rule) return next();
+    if (!rule) {
+      if (policy.controlled && String(req.path || "").startsWith("/api/")) {
+        return res.status(403).json({ success: false, code: "FEATURE_NOT_AVAILABLE_IN_CONTROLLED_LAUNCH", feature: "unclassified_product_route", message: "This operation is not available." });
+      }
+      return next();
+    }
     const exposure = policy.exposure(rule.feature);
     if (exposure === FEATURE_EXPOSURE.CUSTOMER) return next();
     if (rule.internal && exposure === FEATURE_EXPOSURE.INTERNAL && req.internalAccess === true) return next();
+    if (policy.controlled && ["asset_upload", "commerce_catalog", "custom_domains", "commerce_transactions", "marketplace_integrations", "advanced_measurement"].includes(rule.feature)) {
+      return res.status(403).json({ success: false, code: "FEATURE_NOT_AVAILABLE_IN_CONTROLLED_LAUNCH", feature: rule.feature, message: "This operation is not available." });
+    }
     return featureDisabled(res, rule.feature);
+  };
+}
+
+export function createPublicControlledLaunchGate(policy) {
+  return (req, res, next) => {
+    if (!policy.controlled) return next();
+    const path = String(req.path || "");
+    if (/^\/api\/public\/(landing|landings|forms)(?:\/|$)/.test(path)) return next();
+    if (/^\/api\/public\/commerce\/marketplaces(?:\/|$)/.test(path)) {
+      return res.status(403).json({ success: false, code: "FEATURE_NOT_AVAILABLE_IN_CONTROLLED_LAUNCH", feature: "marketplace_integrations", message: "This operation is not available." });
+    }
+    if (/^\/api\/public\/commerce(?:\/|$)|^\/api\/public\/hosts?(?:\/|$)/.test(path)) {
+      return res.status(403).json({ success: false, code: "FEATURE_NOT_AVAILABLE_IN_CONTROLLED_LAUNCH", feature: "commerce_transactions", message: "This operation is not available." });
+    }
+    return next();
   };
 }
 
