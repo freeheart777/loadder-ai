@@ -66,6 +66,7 @@ import { migration065SecureFormsCrmFoundation } from "./065_secure_forms_crm_fou
 import { migration066CrmIdentityConflicts } from "./066_crm_identity_conflicts.mjs";
 import { migration067AiNativeGrowthWorkflow } from "./067_ai_native_growth_workflow.mjs";
 import { migration068ContinuousImprovementPdca } from "./068_continuous_improvement_pdca.mjs";
+import { migration069CanonicalWorkflowIntents } from "./069_canonical_workflow_intents.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -136,4 +137,5 @@ export const migrations = [
   migration066CrmIdentityConflicts,
   migration067AiNativeGrowthWorkflow,
   migration068ContinuousImprovementPdca,
+  migration069CanonicalWorkflowIntents,
 ];
