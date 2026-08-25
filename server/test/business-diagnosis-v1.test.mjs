@@ -24,7 +24,9 @@ test("diagnosis intent is separated from build-my-business", () => {
 
 test("current-state audit covers the five declared business capability areas", () => {
   for (const id of ["website", "social", "content", "ads", "crm"]) assert.match(diagnosis, new RegExp(`id: "${id}"`));
-  for (const state of ["MISSING", "NEEDS_WORK", "HEALTHY", "UNKNOWN"]) assert.match(diagnosis, new RegExp(`"${state}"`));
+  for (const state of ["UNANSWERED", "MISSING", "NEEDS_WORK", "HEALTHY", "UNKNOWN"]) assert.match(diagnosis, new RegExp(`"${state}"`));
+  assert.match(diagnosis, /value !== "UNANSWERED"/);
+  assert.match(page, /«مطمئن نیستم» هم یک پاسخ معتبر است/);
   assert.match(page, /وضعیت واقعی کانال‌ها و زیرساخت‌ها/);
 });
 
