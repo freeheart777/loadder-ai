@@ -96,7 +96,7 @@ Store server secrets in a non-public, untracked environment file with restrictiv
 
 Optional hidden providers (`R2`, payment, shipping, marketplace, domains, uploads) remain unconfigured for the controlled launch. `LOADDER_INTERNAL_ACCESS_TOKEN` is secret and is not required for customer launch. Manual billing remains the commercial posture.
 
-SMS.ir variables are reserved for the separately isolated adapter: `SMS_IR_API_KEY` (`SECRET`), `SMS_IR_OTP_TEMPLATE_ID` (`PUBLIC_CONFIG`), `SMS_IR_OTP_PARAMETER` (`PUBLIC_CONFIG`), and `SMS_PROVIDER` (`OPERATIONAL_CONTROL`). Do not claim SMS readiness or add values until the adapter is restored and the live template test succeeds.
+The integrated SMS.ir Verify adapter uses `SMS_IR_API_KEY` (`SECRET`), `SMS_IR_OTP_TEMPLATE_ID` (`PUBLIC_CONFIG`), and `SMS_IR_OTP_PARAMETER` (`PUBLIC_CONFIG`, default `CODE`). The rejected template `850415` must not be used. Configure only an explicitly approved replacement template; environment presence remains `CODE_READY_LIVE_VALIDATION_PENDING` until a real OTP is received and verified through the canonical Auth flow.
 
 ## Frontend, API, cookies, and proxy routing
 
@@ -111,7 +111,7 @@ Proxy order is mandatory:
 
 Cache hashed frontend assets for a long duration; do not give `index.html` an immutable cache policy. Preserve the backend's bounded cache/CSP behavior for public artifacts. The reverse proxy must terminate HTTPS, preserve `Host` for public-host resolution, and add `X-Content-Type-Options: nosniff` and an appropriate `Referrer-Policy`. Add HSTS only after HTTPS is proven. Do not weaken the artifact CSP or add a frame policy that conflicts with the backend response.
 
-The application accepts JSON up to 2 MiB generally, 40 KiB for public forms, and 8 KiB for public landing events. Set the proxy body limit at or above legitimate application limits, not below them. Governed AI operations use a 25-second application timeout, so use a bounded proxy timeout with modest overhead (for example 35 seconds), never an unbounded timeout. WebSocket support is not required.
+The application accepts JSON up to 2 MiB generally, 40 KiB for public forms, and 8 KiB for public landing events. Set the proxy body limit at or above legitimate application limits, not below them. Governed Content AI uses a 25-second application timeout and Growth uses 40 seconds, so use a bounded proxy timeout with modest overhead above 40 seconds (for example 50 seconds), never an unbounded timeout. WebSocket support is not required.
 
 `LANDING_STATIC_DIRECTORY` contains direct Landing and Website renderer artifacts. `PUBLIC_STATIC_DIRECTORY` contains activated public/domain publication trees. The serving layer must map the configured HTTPS base URLs to the correct persistent root without exposing sibling database or backup directories. Current custom-domain TLS provisioning remains unavailable; use only the operator-controlled Loadder-owned publication hostname for initial smoke. Do not enable customer custom domains.
 
@@ -199,7 +199,7 @@ Execute only after a real HTTPS staging/production candidate exists:
 - Landing: create, publish, GET its public URL, verify 200 and expected checksum/content, then repeat after restart and redeploy.
 - Form/CRM: submit one bounded form from a published page, verify success and one CRM lead, and verify an idempotent retry does not duplicate state.
 - OpenAI: perform exactly one bounded Growth Strategy generation and one bounded Content generation. Record success/failure, latency, and normalized usage only; do not retain raw provider payloads.
-- SMS OTP: after restoring the isolated adapter and template approval, send one real OTP, receive it on a controlled phone, verify it, and confirm session creation. Then consider restricting the SMS.ir key to the stable production egress IP.
+- SMS OTP: after an explicitly approved replacement template is configured, send one real OTP, receive it on a controlled phone, verify it through the canonical Auth flow, and confirm session creation. Then consider restricting the SMS.ir key to the stable production egress IP.
 - Mobile: test 320, 375, 390/414, tablet, and desktop widths; use an actual phone before RC. Verify auth, dashboard drawer, workspace switching, logout, and all core launch routes.
 - Production E2E: auth -> onboarding -> Growth/Content -> Website/Landing publish -> public fetch -> form -> CRM, while hidden features remain denied.
 
@@ -230,4 +230,4 @@ For a small controlled cohort, begin with a general-purpose 2-vCPU class, roughl
 - [ ] OpenAI, SMS, publication, restart/redeploy/restore, mobile, and E2E smokes recorded.
 - [ ] Rollback revision and validated backup identified before traffic.
 
-Remaining external inputs are the selected server/volume, final hostnames and TLS, restricted production secrets, OpenAI key/live smoke, restored SMS.ir adapter/template/live smoke, publication routing, persistence drills, real-device validation, and production E2E. DNS and resource provisioning are intentionally outside this preparation phase.
+Remaining external inputs are the selected server/volume, final hostnames and TLS, restricted production secrets, production OpenAI configuration, an approved replacement SMS.ir template and live OTP smoke, publication routing, persistence drills, real-device validation, and production E2E. Growth and Content provider paths are already live-validated; DNS and resource provisioning are intentionally outside this preparation phase.
