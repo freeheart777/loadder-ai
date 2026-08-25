@@ -21,6 +21,7 @@ import { createBusinessProfileRouter } from "../app/routes/business-profile.mjs"
 import { createOnboardingRouter } from "../app/routes/onboarding.mjs";
 import { createWorkspaceRouter } from "../app/routes/workspaces.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { createBrandBookService } from "../app/services/brand-book-service.mjs";
 import { createBusinessContextService } from "../app/services/business-context-service.mjs";
 import { createBusinessDnaService } from "../app/services/business-dna-service.mjs";
@@ -45,7 +46,7 @@ test("MVP onboarding HTTP flow reuses domain APIs and is tenant-safe", async (t)
   db.pragma("foreign_keys = ON");
   runMigrations(db, [migration001Identity, migration004WorkspaceManagementAudit, migration005BusinessProfiles, migration006BusinessDnaVersions, migration007BusinessDnaImmutability, migration008BrandBookVersions, migration009BrandBookImmutability, migration010BusinessContextVersions, migration011BusinessContextImmutability, migration012BusinessContextLifecycleGuards]);
   const identities = createIdentityRepository(db);
-  const authService = createAuthService({ repository: identities, otpHashSecret: "onboarding-http-secret" });
+  const authService = createAuthService({ repository: identities, otpHashSecret: "onboarding-http-secret", otpDelivery: createDevelopmentOtpDelivery() });
   const profileService = createBusinessProfileService({ repository: createBusinessProfileRepository(db), auditRepository: identities });
   const dnaService = createBusinessDnaService({ repository: createBusinessDnaRepository(db), auditRepository: identities });
   const brandService = createBrandBookService({ repository: createBrandBookRepository(db), auditRepository: identities });

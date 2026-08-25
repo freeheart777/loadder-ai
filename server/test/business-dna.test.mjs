@@ -17,6 +17,7 @@ import { createBusinessDnaRouter } from "../app/routes/business-dna.mjs";
 import { createBusinessProfileRouter } from "../app/routes/business-profile.mjs";
 import { createWorkspaceRouter } from "../app/routes/workspaces.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { createBusinessDnaService } from "../app/services/business-dna-service.mjs";
 import { createBusinessProfileService } from "../app/services/business-profile-service.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
@@ -42,7 +43,7 @@ test("Phase 2B Business DNA persistence and versioning", async (t) => {
   runMigrations(db, migrationList);
 
   const identityRepository = createIdentityRepository(db);
-  const authService = createAuthService({ repository: identityRepository, otpHashSecret: "dna-test-secret" });
+  const authService = createAuthService({ repository: identityRepository, otpHashSecret: "dna-test-secret", otpDelivery: createDevelopmentOtpDelivery() });
   const profileService = createBusinessProfileService({
     repository: createBusinessProfileRepository(db),
     auditRepository: identityRepository,

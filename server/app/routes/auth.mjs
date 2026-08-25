@@ -41,19 +41,20 @@ export function createAuthRouter({
   }
 
   router.get("/status", (req, res) => {
+    const delivery = authService.deliveryReadiness();
     res.json({
       success: true,
       mode: "persistent-session",
-      productionReady: false,
-      otpDelivery: "not-connected",
+      productionReady: delivery.productionReady,
+      otpDelivery: delivery.state,
       developmentOtpExposed:
         nodeEnv !== "production" && exposeDevelopmentOtp,
     });
   });
 
-  router.post("/send-otp", sendOtpLimiter, (req, res) => {
+  router.post("/send-otp", sendOtpLimiter, async (req, res) => {
     try {
-      const result = authService.requestOtp(req.body || {});
+      const result = await authService.requestOtp(req.body || {});
       const response = {
         success: true,
         message: "کد تأیید ایجاد شد.",

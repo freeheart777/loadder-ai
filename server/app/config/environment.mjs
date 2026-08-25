@@ -37,6 +37,17 @@ function parseFeatureOverrides(value) {
   }
 }
 
+function parsePositiveInteger(value) {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseSmsParameter(value) {
+  const parameter = String(value || "CODE").trim();
+  return /^[A-Z][A-Z0-9_]{0,31}$/.test(parameter) ? parameter : null;
+}
+
 const productionConfiguration = createProductionConfiguration(process.env);
 const nodeEnv = productionConfiguration.nodeEnv;
 const authHashSecret =
@@ -69,6 +80,11 @@ export const environment = Object.freeze({
     nodeEnv !== "production" && process.env.LOADDER_SEED_DEMO_DATA !== "false",
   internalAccessToken: process.env.LOADDER_INTERNAL_ACCESS_TOKEN || "",
   productFeatureOverrides: parseFeatureOverrides(process.env.PRODUCT_FEATURE_OVERRIDES),
+  smsIrOtp: Object.freeze({
+    apiKey: process.env.SMS_IR_API_KEY || "",
+    templateId: parsePositiveInteger(process.env.SMS_IR_OTP_TEMPLATE_ID),
+    parameterName: parseSmsParameter(process.env.SMS_IR_OTP_PARAMETER),
+  }),
   contentAssetStorage: Object.freeze({
     provider: process.env.CONTENT_ASSET_STORAGE_PROVIDER || "unavailable",
     accountId: process.env.R2_ACCOUNT_ID || "",

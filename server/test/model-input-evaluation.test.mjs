@@ -34,6 +34,7 @@ import { createForecastRouter } from "../app/routes/forecasts.mjs";
 import { createWorkspaceRouter } from "../app/routes/workspaces.mjs";
 import { createCartAbandonmentSignalProducer } from "../app/signal-producers/cart-abandonment-signal-producer.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { createBrandBookService } from "../app/services/brand-book-service.mjs";
 import { createBusinessContextService } from "../app/services/business-context-service.mjs";
 import { createBusinessDnaService } from "../app/services/business-dna-service.mjs";
@@ -50,7 +51,7 @@ test("Phase 3D versioned Model Input and Evaluation foundation", async (t) => {
   db.exec("CREATE TABLE customers (id TEXT PRIMARY KEY, workspace_id TEXT); CREATE TABLE marketing_campaigns (id TEXT PRIMARY KEY, workspace_id TEXT);");
   const migrationList=migrations.filter(({version})=>![2,3].includes(version));runMigrations(db,migrationList);runMigrations(db,migrationList);
   let tick=Date.parse("2026-08-21T12:00:00.000Z");const now=()=>new Date(tick+=1000);
-  const identities=createIdentityRepository(db),auth=createAuthService({repository:identities,otpHashSecret:"model-test"});
+  const identities=createIdentityRepository(db),auth=createAuthService({repository:identities,otpHashSecret:"model-test",otpDelivery:createDevelopmentOtpDelivery()});
   const profiles=createBusinessProfileService({repository:createBusinessProfileRepository(db),auditRepository:identities,now});
   const dna=createBusinessDnaService({repository:createBusinessDnaRepository(db),auditRepository:identities,now});
   const brand=createBrandBookService({repository:createBrandBookRepository(db),auditRepository:identities,now});

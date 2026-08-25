@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { OtpDeliveryError } from "../auth/sms-ir-otp-delivery.mjs";
 
 export const SESSION_COOKIE_NAME = "loadder_session";
 
@@ -35,6 +36,7 @@ function workspaceNameFor(name) {
 export function createAuthService({
   repository,
   otpHashSecret,
+  otpDelivery,
   now = () => new Date(),
   otpTtlMs = 2 * 60 * 1000,
   sessionTtlMs = 30 * 24 * 60 * 60 * 1000,
@@ -42,6 +44,9 @@ export function createAuthService({
 }) {
   if (!otpHashSecret) {
     throw new Error("AUTH_HASH_SECRET is required for OTP hashing.");
+  }
+  if (!otpDelivery?.sendOtp || !otpDelivery?.readiness) {
+    throw new Error("OTP delivery provider is required.");
   }
 
   function hashOtp(mobile, code) {
@@ -65,7 +70,7 @@ export function createAuthService({
     };
   }
 
-  function requestOtp({ mobile: rawMobile, name: rawName }) {
+  async function requestOtp({ mobile: rawMobile, name: rawName }) {
     const mobile = normalizeMobile(rawMobile);
     const name = String(rawName || "").trim();
 
@@ -93,6 +98,27 @@ export function createAuthService({
       expiresAt: expiresAt.toISOString(),
       createdAt: createdAt.toISOString(),
     });
+
+    try {
+      await otpDelivery.sendOtp({ mobile, code });
+    } catch (error) {
+      repository.consumeOtpChallenge(challenge.id, now().toISOString());
+      if (error instanceof OtpDeliveryError) {
+        const rateLimited = error.code === "OTP_DELIVERY_RATE_LIMITED";
+        throw new AuthError(
+          rateLimited
+            ? "تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید."
+            : "ارسال کد ورود ممکن نشد. لطفاً کمی بعد دوباره تلاش کنید.",
+          rateLimited ? 429 : 503,
+          error.code,
+        );
+      }
+      throw new AuthError(
+        "ارسال کد ورود ممکن نشد. لطفاً کمی بعد دوباره تلاش کنید.",
+        503,
+        "OTP_DELIVERY_PROVIDER_ERROR",
+      );
+    }
 
     return { challenge, code };
   }
@@ -164,6 +190,8 @@ export function createAuthService({
       metadata: { method: "otp" },
       createdAt: currentTime.toISOString(),
     });
+
+    otpDelivery.markLiveValidated?.();
 
     return {
       ...identity,
@@ -292,5 +320,6 @@ export function createAuthService({
     revokeSession,
     switchWorkspace,
     sessionCookieOptions,
+    deliveryReadiness: () => otpDelivery.readiness(),
   };
 }

@@ -137,6 +137,7 @@ import { createPaymentOrderRepository } from "./app/repositories/payment-order-r
 import { createInventoryFulfillmentRepository } from "./app/repositories/inventory-fulfillment-repository.mjs";
 import { createReturnRefundRepository } from "./app/repositories/return-refund-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery, createSmsIrOtpDelivery } from "./app/auth/sms-ir-otp-delivery.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
 import { createBrandBookService } from "./app/services/brand-book-service.mjs";
@@ -438,9 +439,15 @@ const listeningRepository = createListeningRepository(db);
 const listeningIntelligenceRepository = createListeningIntelligenceRepository(db);
 const semanticFindingRepository = createSemanticFindingRepository(db);
 const intelligenceRecommendationRepository = createIntelligenceRecommendationRepository(db);
+const otpDelivery = environment.nodeEnv === "production"
+  ? createSmsIrOtpDelivery(environment.smsIrOtp)
+  : environment.smsIrOtp.apiKey
+    ? createSmsIrOtpDelivery(environment.smsIrOtp)
+    : createDevelopmentOtpDelivery();
 const authService = createAuthService({
   repository: identityRepository,
   otpHashSecret: environment.authHashSecret,
+  otpDelivery,
 });
 const businessProfileService = createBusinessProfileService({
   repository: businessProfileRepository,
@@ -606,6 +613,7 @@ app.use(
 
 app.get("/api/health", (req, res) => {
   const configuration = environment.productionConfiguration;
+  const authDelivery = authService.deliveryReadiness();
   res.json({
     ok: configuration.bootReady,
     service: "Loadder API",
@@ -645,7 +653,11 @@ app.get("/api/health", (req, res) => {
     shipping: inventoryFulfillmentService.readiness(),
     returns: returnRefundService.readiness(),
     publishing: domainPublishingService.readiness(),
-    auth: { mode: "persistent-session", otpDelivery: configuration.providers.smsOtp },
+    auth: {
+      mode: "persistent-session",
+      productionReady: authDelivery.productionReady,
+      otpDelivery: authDelivery.state,
+    },
     timestamp: new Date().toISOString(),
   });
 });

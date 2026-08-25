@@ -15,6 +15,7 @@ import { createFeatureValueRepository } from "../app/repositories/feature-value-
 import { createBusinessEventRepository } from "../app/repositories/business-event-repository.mjs";
 import { createIntelligenceRecordRepository } from "../app/repositories/intelligence-record-repository.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { createListeningService } from "../app/services/listening-service.mjs";
 import { createListeningEventMapperService } from "../app/services/listening-event-mapper-service.mjs";
 import { createListeningIntelligenceService } from "../app/services/listening-intelligence-service.mjs";
@@ -35,7 +36,7 @@ test("Phase 4C Web and Social Listening foundation", async (t) => {
   db.pragma("foreign_keys=ON"); db.exec("CREATE TABLE customers(id TEXT PRIMARY KEY,workspace_id TEXT);CREATE TABLE marketing_campaigns(id TEXT PRIMARY KEY,workspace_id TEXT);");
   const migrationList=migrations.filter(x=>![2,3].includes(x.version)); runMigrations(db,migrationList); runMigrations(db,migrationList);
   let ms=Date.parse("2026-08-23T05:00:00Z"); const now=()=>new Date(ms+=1000);
-  const identity=createIdentityRepository(db),auth=createAuthService({repository:identity,otpHashSecret:"listening-test",now}),repository=createListeningRepository(db),intelligence=createIntelligenceRecordRepository(db);
+ const identity=createIdentityRepository(db),auth=createAuthService({repository:identity,otpHashSecret:"listening-test",otpDelivery:createDevelopmentOtpDelivery(),now}),repository=createListeningRepository(db),intelligence=createIntelligenceRecordRepository(db);
   let contextId=null;const gateway={consume:()=>contextId?{state:"READY",contextVersionId:contextId,contextSchemaVersion:"business-context/v1"}:{state:"MISSING_CONTEXT"}};
   const listOperationMetrics=createOperationMetrics(),factual=createListeningFactualSignalProducer({contextGateway:gateway,repository:intelligence,now}),events=createBusinessEventService({repository:createBusinessEventRepository(db),eventRegistry:eventTypeRegistry,contextGateway:gateway,signalProducer:factual,now}),service=createListeningService({sourceRegistry:listeningSourceRegistry,repository,auditRepository:identity,now,operationMetrics:listOperationMetrics}),mapper=createListeningEventMapperService({registry:listeningEventMapperRegistry,repository,businessEventService:events,now});
   const intelligenceRepository=createListeningIntelligenceRepository(db),operationMetrics=createOperationMetrics(),featureRepository=createFeatureValueRepository(db);let rawRecordScans=0,featureBatchReads=0;const measuredRepository={...intelligenceRepository,records:(...args)=>{rawRecordScans+=1;return intelligenceRepository.records(...args)}},measuredFeatureRepository={...featureRepository,getByProducerKeys:(...args)=>{featureBatchReads+=1;return featureRepository.getByProducerKeys(...args)}};

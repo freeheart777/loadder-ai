@@ -159,11 +159,11 @@ test("production origin guard accepts exact origins and rejects foreign or missi
   assert.equal(formNext, true);
 });
 
-test("auth production response invariant remains code-free and health remains non-ready", () => {
+test("auth production response invariant remains code-free and readiness is provider-derived", () => {
   const source = readFileSync(new URL("../app/routes/auth.mjs", import.meta.url), "utf8");
   assert.match(source, /nodeEnv !== "production" && exposeDevelopmentOtp/);
-  assert.match(source, /productionReady: false/);
-  assert.match(source, /otpDelivery: "not-connected"/);
+  assert.match(source, /authService\.deliveryReadiness\(\)/);
+  assert.match(source, /productionReady: delivery\.productionReady/);
   assert.doesNotMatch(source, /console\.(log|info|warn).*result\.code/);
 });
 

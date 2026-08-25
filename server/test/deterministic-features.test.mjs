@@ -35,6 +35,7 @@ import { createIntelligenceDataRouter } from "../app/routes/intelligence-data.mj
 import { createWorkspaceRouter } from "../app/routes/workspaces.mjs";
 import { createCartAbandonmentSignalProducer } from "../app/signal-producers/cart-abandonment-signal-producer.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { createBrandBookService } from "../app/services/brand-book-service.mjs";
 import { createBusinessContextService } from "../app/services/business-context-service.mjs";
 import { createBusinessDnaService } from "../app/services/business-dna-service.mjs";
@@ -79,7 +80,7 @@ test("Phase 3C deterministic Feature foundation", async (t) => {
   let nowMs = Date.parse("2026-08-21T14:00:00.000Z");
   const now = () => new Date((nowMs += 1000));
   const identities = createIdentityRepository(db);
-  const authService = createAuthService({ repository: identities, otpHashSecret: "features-test-secret" });
+  const authService = createAuthService({ repository: identities, otpHashSecret: "features-test-secret", otpDelivery: createDevelopmentOtpDelivery() });
   const profileService = createBusinessProfileService({ repository: createBusinessProfileRepository(db), auditRepository: identities, now });
   const dnaService = createBusinessDnaService({ repository: createBusinessDnaRepository(db), auditRepository: identities, now });
   const brandService = createBrandBookService({ repository: createBrandBookRepository(db), auditRepository: identities, now });

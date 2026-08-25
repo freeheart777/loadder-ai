@@ -11,6 +11,7 @@ import { createRequireAuth, createRequireWorkspace } from "../app/middleware/aut
 import { createIdentityRepository } from "../app/repositories/identity-repository.mjs";
 import { createAuthRouter } from "../app/routes/auth.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { runMigrations } from "../db/migrate.mjs";
 import { migration001Identity } from "../db/migrations/001_identity.mjs";
 import { migration004WorkspaceManagementAudit } from "../db/migrations/004_workspace_management_audit.mjs";
@@ -31,6 +32,7 @@ test("Phase 1 identity, session, workspace, and protection flow", async (t) => {
   const authService = createAuthService({
     repository,
     otpHashSecret: "test-only-secret",
+    otpDelivery: createDevelopmentOtpDelivery(),
     now: () => new Date(nowMs),
   });
   const app = express();

@@ -15,6 +15,8 @@ function validSecret(value) {
   const secret = String(value || "");
   return secret.length >= 24 && !PLACEHOLDER.test(secret.trim());
 }
+function validSmsParameter(value) { return /^[A-Z][A-Z0-9_]{0,31}$/.test(String(value || "CODE").trim()); }
+function validSmsTemplateId(value) { const parsed = Number(value); return Number.isSafeInteger(parsed) && parsed > 0; }
 
 export function validateFrontendApiBase(value, { production = false } = {}) {
   if (!production && !value) return Object.freeze({ valid: true, value: "http://localhost:3001" });
@@ -33,7 +35,7 @@ export function createProductionConfiguration(env = process.env) {
   const openaiConfigured = Boolean(String(env.OPENAI_API_KEY || "").trim());
   const landingConfigured = Boolean(env.LANDING_STATIC_DIRECTORY && safeHttpsUrl(env.LANDING_PUBLIC_BASE_URL) && safeHttpsUrl(env.LANDING_PUBLIC_API_BASE_URL) && validSecret(env.LANDING_TRACKING_SECRET));
   const websiteConfigured = Boolean(env.PUBLIC_STATIC_DIRECTORY && safeHttpsUrl(env.PUBLIC_BASE_URL));
-  const smsConfigured = Boolean(env.SMS_IR_API_KEY && env.SMS_IR_OTP_TEMPLATE_ID);
+  const smsConfigured = Boolean(String(env.SMS_IR_API_KEY || "").trim()) && validSmsTemplateId(env.SMS_IR_OTP_TEMPLATE_ID) && validSmsParameter(env.SMS_IR_OTP_PARAMETER);
   const persistence = createPersistenceContract(env);
 
   if (production) {

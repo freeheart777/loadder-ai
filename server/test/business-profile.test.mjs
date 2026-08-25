@@ -15,6 +15,7 @@ import { createAuthRouter } from "../app/routes/auth.mjs";
 import { createBusinessProfileRouter } from "../app/routes/business-profile.mjs";
 import { createWorkspaceRouter } from "../app/routes/workspaces.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { createBusinessProfileService } from "../app/services/business-profile-service.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { runMigrations } from "../db/migrate.mjs";
@@ -38,6 +39,7 @@ test("Phase 2A business profile foundation", async (t) => {
   const authService = createAuthService({
     repository,
     otpHashSecret: "business-profile-test-secret",
+    otpDelivery: createDevelopmentOtpDelivery(),
   });
   const profileRepository = createBusinessProfileRepository(db);
   const businessProfileService = createBusinessProfileService({

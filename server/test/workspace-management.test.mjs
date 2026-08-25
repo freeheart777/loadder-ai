@@ -13,6 +13,7 @@ import { createIdentityRepository } from "../app/repositories/identity-repositor
 import { createAuthRouter } from "../app/routes/auth.mjs";
 import { createWorkspaceRouter } from "../app/routes/workspaces.mjs";
 import { createAuthService } from "../app/services/auth-service.mjs";
+import { createDevelopmentOtpDelivery } from "../app/auth/sms-ir-otp-delivery.mjs";
 import { assignLegacyWorkspaceOwner } from "../app/services/legacy-workspace-assignment.mjs";
 import { createWorkspaceRuntimeStore } from "../app/services/workspace-runtime-store.mjs";
 import { runMigrations } from "../db/migrate.mjs";
@@ -32,6 +33,7 @@ test("Phase 1C workspace management and tenant hardening", async (t) => {
   const authService = createAuthService({
     repository,
     otpHashSecret: "workspace-test-secret",
+    otpDelivery: createDevelopmentOtpDelivery(),
     now,
   });
   const app = express();
