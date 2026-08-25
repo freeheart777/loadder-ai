@@ -22,10 +22,12 @@ function service(provider, rateLimiter = createBusinessBrainRateLimiter()) {
 
 test("AI Integration Hardening v1", async (t) => {
   await t.test("operation registry is explicit versioned side-effect-free and model-configurable", () => {
-    const brain = policy.get("BUSINESS_BRAIN_ANALYSIS"), content = policy.get("CONTENT_TEXT_GENERATION");
+    const brain = policy.get("BUSINESS_BRAIN_ANALYSIS"), content = policy.get("CONTENT_TEXT_GENERATION"), growth = policy.get("GROWTH_STRATEGY_GENERATION");
     assert.equal(brain.model, "gpt-test-terra"); assert.equal(content.model, "gpt-test-luna");
+    assert.equal(growth.timeoutMs, 40_000); assert.equal(content.timeoutMs, 25_000);
     for (const item of policy.list()) { assert.equal(item.automaticRetries, 0); assert.equal(item.sideEffects, false); assert.equal(item.structuredOutput, true); }
     assert.throws(() => createAiOperationRegistry([{ ...brain, sideEffects: true }]), /invalid/);
+    assert.throws(() => createAiOperationRegistry([{ ...growth, timeoutMs: 40_001 }]), /invalid/);
   });
   await t.test("structured schema is strict at root and nested objects", () => {
     assert.equal(businessDnaJsonSchema.additionalProperties, false);

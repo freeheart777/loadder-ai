@@ -4,7 +4,7 @@ export const workflowIntentRecoveryPolicy=Object.freeze({
  id:"WORKFLOW_INTENT_RECOVERY_V1",
  version:1,
  workflowType:"GROWTH_STRATEGY",
- providerTimeoutMs:25_000,
+ providerTimeoutMs:40_000,
  activeThroughMs:2*MINUTE,
  orphanedAfterMs:15*MINUTE,
  rationale:Object.freeze(["ACTIVE_WINDOW_EXCEEDS_PROVIDER_TIMEOUT","AGING_WINDOW_ALLOWS_RESPONSE_PERSISTENCE_LAG","STALE_INTENT_REQUIRES_HUMAN_RECONCILIATION"]),
