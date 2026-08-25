@@ -87,7 +87,7 @@ test("MVP onboarding status and finalization", async (t) => {
   await t.test("finalize activates drafts and creates one fresh Context", () => runWithWorkspace("workspace-a", () => {
     const fixtureState = fixture(); const result = fixtureState.service.finalize({}, "u");
     assert.equal(result.onboarding.complete, true); assert.equal(result.reusedContext, false); assert.equal(fixtureState.contextCreates(), 1);
-    assert.equal(result.nextDestination, "/dashboard/content?template=instagram");
+    assert.equal(result.nextDestination, "/dashboard");
   }));
   await t.test("repeated finalize is idempotent and reuses exact fresh Context", () => runWithWorkspace("workspace-a", () => {
     const fixtureState = fixture(); fixtureState.service.finalize({}, "u"); const second = fixtureState.service.finalize({}, "u");

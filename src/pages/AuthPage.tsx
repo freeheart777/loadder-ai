@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { destinationForOnboarding, fetchOnboardingStatus } from "../lib/onboarding";
 
 import {
   ArrowLeft,
@@ -15,7 +14,6 @@ import {
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, loading: sessionLoading, refreshSession } = useAuth();
 
   const [name, setName] = useState("");
@@ -28,9 +26,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (!sessionLoading && user) {
-      void fetchOnboardingStatus().then((status) => {
-        navigate(destinationForOnboarding(status), { replace: true });
-      }).catch(() => navigate("/dashboard", { replace: true }));
+      navigate("/dashboard/intent", { replace: true });
     }
   }, [navigate, sessionLoading, user]);
 
@@ -106,11 +102,7 @@ export default function AuthPage() {
         throw new Error("نشست کاربری ایجاد نشد.");
       }
 
-      const requestedPath =
-        typeof location.state?.from === "string"
-          ? location.state.from
-          : destinationForOnboarding(await fetchOnboardingStatus());
-      navigate(requestedPath, { replace: true });
+      navigate("/dashboard/intent", { replace: true });
     } catch (requestError) {
       setError(
         requestError instanceof Error

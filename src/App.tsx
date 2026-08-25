@@ -26,6 +26,7 @@ const BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage"));
 const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
 const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+const IntentSelectionPage = lazy(() => import("./pages/IntentSelectionPage"));
 const LandingBuilderPage = lazy(() => import("./pages/LandingBuilderPage"));
 const WebsiteBuilderPage = lazy(() => import("./pages/WebsiteBuilderPage"));
 const CommerceCatalogPage = lazy(() => import("./pages/CommerceCatalogPage"));
@@ -70,6 +71,7 @@ export default function App() {
               path="/dashboard/onboarding"
               element={<OnboardingPage />}
             />
+            <Route path="/dashboard/intent" element={<IntentSelectionPage />} />
             <Route path="/dashboard/growth" element={<GrowthWorkflowPage />} />
 
         {/* داشبورد قدیمی - فقط برای بکاپ */}

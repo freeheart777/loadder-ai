@@ -271,11 +271,11 @@ export default function DashboardPage() {
           </div>
 
           <Link
-            to={!onboarding || onboarding.complete ? "/dashboard/content" : "/dashboard/onboarding"}
+            to="/dashboard/intent"
             className="flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-fuchsia-300/20 bg-gradient-to-l from-violet-500/20 to-fuchsia-500/15 px-3 py-2 text-xs sm:px-5 sm:py-3 sm:text-sm"
           >
             <Sparkle size={16} weight="bold" />
-            {!onboarding || onboarding.complete ? "تولید محتوا" : onboarding.contextStale ? "به‌روزرسانی شناخت کسب‌وکار" : "ادامه راه‌اندازی"}
+            انتخاب مسیر
           </Link>
         </header>
 

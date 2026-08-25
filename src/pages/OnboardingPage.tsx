@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AudienceStep } from "../components/onboarding/AudienceStep";
 import { BrandVoiceStep } from "../components/onboarding/BrandVoiceStep";
@@ -11,6 +11,7 @@ import type { BrandForm, BusinessForm, DnaForm, OnboardingStatus, StepId } from 
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { fetchOnboardingStatus } from "../lib/onboarding";
+import { safeReturnDestination } from "../lib/customerJourney";
 
 const titles = {
   BUSINESS: ["کسب‌وکار شما", "چند اطلاعات کوتاه برای شناخت بهتر کسب‌وکارتان وارد کنید."],
@@ -31,6 +32,8 @@ function cleanList(values: string[]) { return values.map((item) => item.trim()).
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = safeReturnDestination(searchParams.get("returnTo"));
   const { activeWorkspace } = useAuth();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
@@ -153,7 +156,7 @@ export default function OnboardingPage() {
 
   const finalize = async () => {
     setSaving(true); setRequestError("");
-    try { const response = await apiFetch("/api/onboarding/finalize", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); const data = await response.json(); if (!response.ok) throw new Error(data.message); setStatus(data.onboarding); navigate(data.nextDestination || "/dashboard/content?template=instagram"); }
+    try { const response = await apiFetch("/api/onboarding/finalize", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); const data = await response.json(); if (!response.ok) throw new Error(data.message); setStatus(data.onboarding); navigate(returnTo || data.nextDestination || "/dashboard"); }
     catch (error) { setRequestError(error instanceof Error ? error.message : "تکمیل راه‌اندازی انجام نشد."); }
     finally { setSaving(false); }
   };

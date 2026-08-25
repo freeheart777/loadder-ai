@@ -110,7 +110,7 @@ export function createOnboardingService({
       if (!onboarding.complete) {
         throw new OnboardingError("Onboarding could not be completed.", 500, "ONBOARDING_FINALIZATION_FAILED");
       }
-      return { onboarding, nextDestination: "/dashboard/content?template=instagram", reusedContext };
+      return { onboarding, nextDestination: "/dashboard", reusedContext };
     } catch (error) {
       errorCode = error.code || "ONBOARDING_FINALIZATION_FAILED";
       if (error instanceof OnboardingError) throw error;
