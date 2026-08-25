@@ -1,5 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
-import { useEffect, useState, type ElementType } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type ElementType } from "react";
 import WorkspaceSelector from "../components/WorkspaceSelector";
 import type { OnboardingStatus } from "../components/onboarding/types";
 import { useAuth } from "../lib/auth";
@@ -13,6 +13,9 @@ import {
   BookOpenText,
   Browsers,
   Brain,
+  List,
+  SignOut,
+  X,
 } from "@phosphor-icons/react";
 
 import { useStagger } from "../lib/animations/useStagger";
@@ -43,6 +46,34 @@ const tools: Tool[] = [
   { title: "صفحه فرود", icon: Browsers, status: "آماده", route: "/dashboard/landings" },
   { title: "وب‌سایت", icon: Browsers, status: "آماده", route: "/dashboard/websites" },
 ];
+
+const launchNavigation = [
+  { title: "صفحه اصلی", route: "/dashboard", icon: House },
+  { title: "راه‌اندازی کسب‌وکار", route: "/dashboard/onboarding", icon: BookOpenText },
+  { title: "استراتژی رشد", route: "/dashboard/growth", icon: Sparkle },
+  { title: "استودیوی محتوا", route: "/dashboard/content", icon: Sparkle },
+  { title: "کتابخانه محتوا", route: "/dashboard/library", icon: FolderOpen },
+  { title: "برند و کسب‌وکار", route: "/dashboard/business-brain", icon: Brain },
+  { title: "وب‌سایت", route: "/dashboard/websites", icon: Browsers },
+  { title: "صفحه فرود", route: "/dashboard/landings", icon: Browsers },
+  { title: "فرم‌ها", route: "/dashboard/forms", icon: BookOpenText },
+  { title: "مدیریت ارتباط با مشتری", route: "/dashboard/crm", icon: Brain },
+  { title: "چرخه‌های بهبود", route: "/dashboard/improvement", icon: Sparkle },
+] as const;
+
+function DashboardNavigation({ pathname, onboarding, onNavigate, onLogout }: { pathname: string; onboarding: OnboardingStatus | null; onNavigate?: () => void; onLogout: () => void }) {
+  return <>
+    <nav aria-label="ناوبری اصلی" className="space-y-1 overflow-y-auto">
+      {launchNavigation.map((item) => { const Icon = item.icon; const active = item.route === "/dashboard" ? pathname === item.route : pathname.startsWith(item.route); return <Link key={item.route} to={item.route} onClick={onNavigate} aria-current={active ? "page" : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 ${active ? "border border-violet-400/20 bg-violet-500/10 text-white" : "text-white/55 hover:bg-white/[0.04]"}`}><Icon size={20} weight={active ? "duotone" : "regular"}/>{item.title}</Link>; })}
+    </nav>
+    <div className="mt-auto rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
+      <div className="text-sm text-white/45">فضای کاری</div>
+      <div className="mt-2"><WorkspaceSelector /></div>
+      <div className="mt-4 text-sm text-white/40">{!onboarding ? "در حال بررسی راه‌اندازی…" : onboarding.complete ? "راه‌اندازی کامل" : onboarding.contextStale ? "شناخت کسب‌وکار نیازمند به‌روزرسانی" : "راه‌اندازی تکمیل نشده"}</div>
+      <button type="button" onClick={onLogout} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-sm text-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"><SignOut size={18}/>خروج از حساب</button>
+    </div>
+  </>;
+}
 
 function ToolCard({
   tool,
@@ -152,7 +183,11 @@ function ToolCard({
 
 export default function DashboardPage() {
   const location = useLocation();
-  const { activeWorkspace } = useAuth();
+  const navigate = useNavigate();
+  const { activeWorkspace, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [recentContent, setRecentContent] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
 
@@ -163,6 +198,22 @@ export default function DashboardPage() {
     return () => controller.abort();
   }, [activeWorkspace?.id]);
   useEffect(() => { const controller = new AbortController(); void apiFetch("/api/content/items?limit=3", { signal: controller.signal }).then(async (response) => { if (!response.ok) return; const data = await response.json(); setRecentContent(data.items || []); }).catch(() => undefined); return () => controller.abort(); }, [activeWorkspace?.id]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const close = () => setMobileMenuOpen(false);
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    const onResize = () => { if (window.matchMedia("(min-width: 1024px)").matches) close(); };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
+    requestAnimationFrame(() => drawerRef.current?.focus());
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", onResize); };
+  }, [mobileMenuOpen]);
+
+  const closeMobileMenu = () => { setMobileMenuOpen(false); requestAnimationFrame(() => menuButtonRef.current?.focus()); };
+  const signOut = async () => { setMobileMenuOpen(false); await logout(); navigate("/signup", { replace: true }); };
 
   const isDemo =
     new URLSearchParams(location.search).get("demo") === "1";
@@ -177,7 +228,7 @@ export default function DashboardPage() {
       dir="rtl"
       className="min-h-screen bg-[#050507] text-white"
     >
-      <aside className="fixed right-0 top-0 z-40 flex h-screen w-[260px] flex-col border-l border-white/[0.08] bg-black/60 p-5 backdrop-blur-2xl">
+      <aside className="fixed right-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-l border-white/[0.08] bg-black/60 p-5 backdrop-blur-2xl lg:flex">
         <div className="mb-10">
           <div
             dir="ltr"
@@ -191,59 +242,17 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <nav className="space-y-2">
-          <div className="flex items-center gap-3 rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3.5 text-sm">
-            <House
-              size={20}
-              weight="duotone"
-            />
-            صفحه اصلی
-          </div>
-
-          <Link
-            to="/dashboard/growth"
-            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
-          >
-            <Sparkle size={20} />
-            استراتژی رشد
-          </Link>
-          <Link
-            to="/dashboard/content"
-            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
-          >
-            <Sparkle size={20} />
-            استودیوی محتوا
-          </Link>
-          <Link to="/dashboard/library" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><FolderOpen size={20}/>کتابخانه محتوا</Link>
-          <Link
-            to="/dashboard/business-brain"
-            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"
-          >
-            <Brain size={20} />
-            برند و کسب‌وکار
-          </Link>
-        </nav>
-
-        <div className="mt-auto rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
-          <div className="text-sm text-white/45">
-            فضای کاری
-          </div>
-
-          <div className="mt-2">
-            <WorkspaceSelector />
-          </div>
-
-          <div className="mt-4 text-sm text-white/40">
-            {!onboarding ? "در حال بررسی راه‌اندازی…" : onboarding.complete ? "راه‌اندازی کامل" : onboarding.contextStale ? "شناخت کسب‌وکار نیازمند به‌روزرسانی" : "راه‌اندازی تکمیل نشده"}
-          </div>
-        </div>
+        <DashboardNavigation pathname={location.pathname} onboarding={onboarding} onLogout={() => void signOut()} />
       </aside>
 
-      <section className="mr-[260px] min-h-screen">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.06] bg-[#050507]/85 px-8 py-5 backdrop-blur-2xl">
-          <div>
+      {mobileMenuOpen && <div className="fixed inset-0 z-50 lg:hidden" role="presentation"><button type="button" className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-label="بستن منوی ناوبری" onClick={closeMobileMenu}/><aside ref={drawerRef} id="mobile-dashboard-navigation" tabIndex={-1} aria-label="منوی داشبورد" className="absolute inset-y-0 right-0 flex w-[min(88vw,320px)] flex-col border-l border-white/10 bg-[#07070b] p-4 shadow-2xl outline-none motion-safe:animate-in motion-safe:slide-in-from-right"><div className="mb-5 flex items-center justify-between"><div><div dir="ltr" className="text-left text-lg font-semibold">Loadder AI</div><p className="mt-1 text-xs text-white/45">مرکز کسب‌وکار</p></div><button type="button" onClick={closeMobileMenu} aria-label="بستن منو" className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"><X size={22}/></button></div><DashboardNavigation pathname={location.pathname} onboarding={onboarding} onNavigate={closeMobileMenu} onLogout={() => void signOut()} /></aside></div>}
+
+      <section className="min-h-screen w-full lg:mr-[260px] lg:w-[calc(100%-260px)]">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/[0.06] bg-[#050507]/85 px-4 py-3 backdrop-blur-2xl sm:px-6 lg:px-8 lg:py-5">
+          <button ref={menuButtonRef} type="button" aria-label="باز کردن منوی ناوبری" aria-expanded={mobileMenuOpen} aria-controls="mobile-dashboard-navigation" onClick={() => setMobileMenuOpen(true)} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 lg:hidden"><List size={24}/></button>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold">
+              <h1 className="truncate text-xl font-semibold sm:text-2xl">
                 داشبورد
               </h1>
 
@@ -254,7 +263,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <p className="mt-1 text-sm text-white/45">
+            <p className="mt-1 hidden truncate text-sm text-white/45 sm:block">
               {isDemo
                 ? `${business?.name} — نمای یکپارچه کسب‌وکار`
                 : "همه ابزارهای هوش مصنوعی کسب‌وکارت در یک جا"}
@@ -263,19 +272,19 @@ export default function DashboardPage() {
 
           <Link
             to={!onboarding || onboarding.complete ? "/dashboard/content" : "/dashboard/onboarding"}
-            className="flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-gradient-to-l from-violet-500/20 to-fuchsia-500/15 px-5 py-3 text-sm"
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-fuchsia-300/20 bg-gradient-to-l from-violet-500/20 to-fuchsia-500/15 px-3 py-2 text-xs sm:px-5 sm:py-3 sm:text-sm"
           >
             <Sparkle size={16} weight="bold" />
             {!onboarding || onboarding.complete ? "تولید محتوا" : onboarding.contextStale ? "به‌روزرسانی شناخت کسب‌وکار" : "ادامه راه‌اندازی"}
           </Link>
         </header>
 
-        <div className="p-8">
-          <section className="relative overflow-hidden rounded-[30px] border border-white/[0.08] bg-white/[0.035] p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
+          <section className="relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.035] p-5 sm:rounded-[30px] sm:p-8">
             <div className="pointer-events-none absolute -left-20 -top-20 h-[300px] w-[300px] rounded-full bg-violet-500/10 blur-[100px]" />
 
             <div className="relative z-10">
-              <h2 className="text-3xl font-semibold">
+              <h2 className="text-2xl font-semibold sm:text-3xl">
                 کسب‌وکارت را هوشمندتر مدیریت کن.
               </h2>
 
@@ -300,7 +309,7 @@ export default function DashboardPage() {
               </div>
 
               <span className="text-sm text-violet-300/70">
-                ۳ ابزار آماده
+                {tools.length.toLocaleString("fa-IR")} ابزار آماده
               </span>
             </div>
 
@@ -321,7 +330,7 @@ export default function DashboardPage() {
 
             <div
               data-stagger
-              className="mt-5 rounded-[26px] border border-white/[0.07] bg-white/[0.025] p-10 text-center"
+              className="mt-5 rounded-[26px] border border-white/[0.07] bg-white/[0.025] p-5 text-center sm:p-10"
             >
               {recentContent.length ? <div className="grid gap-3 text-right md:grid-cols-3">{recentContent.map((item) => <Link key={item.id} to={`/dashboard/library/${item.id}`} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><div className="font-medium">{item.title}</div><div className="mt-2 text-xs text-white/35">{new Date(item.updatedAt).toLocaleString("fa-IR")}</div><div className="mt-3 text-sm text-violet-300">ادامه ویرایش</div></Link>)}</div> : <><FolderOpen size={30} weight="duotone" className="mx-auto text-white/30"/><p className="mt-4 text-base text-white/50">هنوز محتوایی ذخیره نشده</p><Link to="/dashboard/content" className="mt-4 inline-block rounded-xl bg-violet-500/20 px-4 py-2 text-sm text-violet-200">ساخت محتوا</Link></>}
             </div>

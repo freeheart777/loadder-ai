@@ -178,7 +178,7 @@ test("production navigation contains only truthful customer tools", () => {
   assert.match(dashboard, /\/dashboard\/content/);
   assert.match(dashboard, /\/dashboard\/brand-book/);
   assert.match(dashboard, /\/dashboard\/business-brain/);
-  assert.doesNotMatch(dashboard, /iportals\.ir|\/dashboard\/(social|ads|crm|analytics|automation|predictive|kpi)/);
+  assert.doesNotMatch(dashboard, /iportals\.ir|\/dashboard\/(social|ads|analytics|automation|predictive|kpi)/);
 });
 
 test("route classifier is deterministic and does not accept client feature keys", () => {
