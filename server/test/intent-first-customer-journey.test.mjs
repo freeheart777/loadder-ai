@@ -25,6 +25,11 @@ test("direct services use only existing Website Landing and Content routes", () 
   for (const route of ["/dashboard/websites/new", "/dashboard/landings/new", "/dashboard/content"]) assert.match(app, new RegExp(route.replaceAll("/", "\\/")));
 });
 
+test("website new entry reaches WebsiteBuilderPage new mode instead of the empty listing", () => {
+  assert.match(app, /path="\/dashboard\/websites\/new" element=\{<Navigate to="\/dashboard\/websites\/new\/edit" replace \/>\}/);
+  assert.match(app, /path="\/dashboard\/websites\/:id\/edit" element=\{<WebsiteBuilderPage \/>\}/);
+});
+
 test("diagnosis and build-my-business reuse the existing business foundation", () => {
   assert.match(intent, /نمی‌دانم چه چیزی لازم دارم/);
   assert.match(intent, /می‌خواهم کسب‌وکارم را با لودر بسازم/);

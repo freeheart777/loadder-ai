@@ -107,7 +107,7 @@ export default function App() {
         <Route path="/dashboard/landings/:id" element={<LandingBuilderPage />} />
         <Route path="/dashboard/landings/:id/edit" element={<LandingBuilderPage />} />
         <Route path="/dashboard/websites" element={<WebsiteBuilderPage />} />
-        <Route path="/dashboard/websites/new" element={<WebsiteBuilderPage />} />
+        <Route path="/dashboard/websites/new" element={<Navigate to="/dashboard/websites/new/edit" replace />} />
         <Route path="/dashboard/websites/:id/edit" element={<WebsiteBuilderPage />} />
         <Route path="/dashboard/catalog" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <CommerceCatalogPage />} />
         <Route path="/dashboard/integrations" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <IntegrationHubPage />} />
