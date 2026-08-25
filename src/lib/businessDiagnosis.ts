@@ -4,7 +4,7 @@ import {
 } from "./customerJourney";
 
 export type DiagnosisAreaId = "website" | "social" | "content" | "ads" | "crm";
-export type DiagnosisAreaState = "UNKNOWN" | "MISSING" | "NEEDS_WORK" | "HEALTHY";
+export type DiagnosisAreaState = "UNANSWERED" | "UNKNOWN" | "MISSING" | "NEEDS_WORK" | "HEALTHY";
 export type DiagnosisGoal = "UNSURE" | "PRESENCE" | "LEADS" | "CONTENT" | "SALES";
 
 export type DiagnosisAnswers = Record<DiagnosisAreaId, DiagnosisAreaState>;
@@ -34,15 +34,15 @@ export const DIAGNOSIS_STATE_OPTIONS = Object.freeze([
 ] as const);
 
 export const EMPTY_DIAGNOSIS_ANSWERS: DiagnosisAnswers = Object.freeze({
-  website: "UNKNOWN",
-  social: "UNKNOWN",
-  content: "UNKNOWN",
-  ads: "UNKNOWN",
-  crm: "UNKNOWN",
+  website: "UNANSWERED",
+  social: "UNANSWERED",
+  content: "UNANSWERED",
+  ads: "UNANSWERED",
+  crm: "UNANSWERED",
 });
 
 export function diagnosisComplete(answers: DiagnosisAnswers) {
-  return Object.values(answers).every((value) => value !== "UNKNOWN");
+  return Object.values(answers).every((value) => value !== "UNANSWERED");
 }
 
 export function recommendDiagnosisNextSteps(
@@ -66,7 +66,7 @@ export function recommendDiagnosisNextSteps(
     });
   }
 
-  if (!websiteWeak && goal === "LEADS") {
+  if (!websiteWeak && answers.website === "HEALTHY" && goal === "LEADS") {
     recommendations.push({
       id: "landing",
       title: "ساخت مسیر جذب لید",
@@ -77,7 +77,7 @@ export function recommendDiagnosisNextSteps(
     });
   }
 
-  if (contentWeak && (goal === "CONTENT" || goal === "PRESENCE" || !websiteWeak)) {
+  if (contentWeak && (goal === "CONTENT" || goal === "PRESENCE" || answers.website === "HEALTHY")) {
     recommendations.push({
       id: "content",
       title: answers.content === "MISSING" ? "ایجاد پایه محتوایی" : "تقویت سیستم محتوا",
@@ -112,7 +112,7 @@ export function recommendDiagnosisNextSteps(
       id: "deeper-foundation",
       title: "بررسی عمیق‌تر کسب‌وکار",
       reason: goal === "UNSURE"
-        ? "زیرساخت‌های اصلی را بحرانی اعلام نکردی و هنوز هدف اصلی روشن نیست؛ مرحله منطقی بعدی تکمیل شناخت کسب‌وکار است."
+        ? "از پاسخ‌های فعلی هنوز یک اقدام مستقیم قطعی به‌دست نمی‌آید و هدف اصلی هم روشن نیست؛ مرحله منطقی بعدی تکمیل شناخت کسب‌وکار است."
         : "از پاسخ‌های فعلی یک اقدام مستقیم قطعی به‌دست نمی‌آید؛ برای پیشنهاد دقیق‌تر باید شناخت کسب‌وکار و هدف رشد کامل‌تر شود.",
       destination: BUSINESS_FOUNDATION_DESTINATION,
       actionLabel: "ادامه شناخت کسب‌وکار",
