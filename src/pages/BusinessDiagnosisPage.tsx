@@ -105,7 +105,7 @@ export default function BusinessDiagnosisPage() {
             <Sparkle size={24} className="mt-1 text-violet-300" />
             <div>
               <h2 className="text-xl font-bold">وضعیت واقعی کانال‌ها و زیرساخت‌ها</h2>
-              <p className="mt-1 text-sm leading-7 text-white/45">برای هر مورد همان چیزی را انتخاب کن که امروز واقعاً وجود دارد.</p>
+              <p className="mt-1 text-sm leading-7 text-white/45">برای هر مورد همان چیزی را انتخاب کن که امروز واقعاً می‌دانی؛ «مطمئن نیستم» هم یک پاسخ معتبر است.</p>
             </div>
           </div>
 
@@ -139,7 +139,7 @@ export default function BusinessDiagnosisPage() {
           {!complete && (
             <div className="mt-5 flex items-start gap-2 rounded-2xl border border-amber-300/15 bg-amber-500/[0.05] p-4 text-sm leading-7 text-amber-100/75">
               <WarningCircle size={19} className="mt-1 shrink-0" />
-              برای اینکه پیشنهاد مستقیم نشان داده شود، وضعیت همه پنج بخش را مشخص کن. «مطمئن نیستم» عمداً به‌عنوان پاسخ کامل محسوب نمی‌شود.
+              برای اینکه نتیجه نشان داده شود، برای هر پنج بخش یک پاسخ انتخاب کن. اگر اطلاعات دقیق نداری، «مطمئن نیستم» را انتخاب کن.
             </div>
           )}
 
@@ -159,7 +159,7 @@ export default function BusinessDiagnosisPage() {
             <div>
               <p className="text-sm text-emerald-300">نتیجه بر اساس پاسخ‌های ثبت‌شده</p>
               <h2 className="mt-1 text-2xl font-black">مرحله بعد پیشنهادی</h2>
-              <p className="mt-2 text-sm leading-7 text-white/45">این نتیجه تشخیص پزشکی، مالی یا تحلیل خودکار نیست؛ صرفاً تطبیق شفاف پاسخ‌های تو با سرویس‌های فعلی لودر است.</p>
+              <p className="mt-2 text-sm leading-7 text-white/45">این نتیجه تحلیل خودکار نیست؛ صرفاً تطبیق شفاف پاسخ‌های تو با سرویس‌های فعلی لودر است.</p>
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
