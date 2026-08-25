@@ -29,6 +29,7 @@ const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const IntentSelectionPage = lazy(() => import("./pages/IntentSelectionPage"));
 const LandingBuilderPage = lazy(() => import("./pages/LandingBuilderPage"));
 const WebsiteBuilderPage = lazy(() => import("./pages/WebsiteBuilderPage"));
+const WebsiteContextBuilderPage = lazy(() => import("./pages/WebsiteContextBuilderPage"));
 const CommerceCatalogPage = lazy(() => import("./pages/CommerceCatalogPage"));
 const CommerceCheckoutPage = lazy(() => import("./pages/CommerceCheckoutPage"));
 const CommercePaymentPage = lazy(() => import("./pages/CommercePaymentPage"));
@@ -105,7 +106,8 @@ export default function App() {
         <Route path="/dashboard/landings/:id" element={<LandingBuilderPage />} />
         <Route path="/dashboard/landings/:id/edit" element={<LandingBuilderPage />} />
         <Route path="/dashboard/websites" element={<WebsiteBuilderPage />} />
-        <Route path="/dashboard/websites/new" element={<WebsiteBuilderPage />} />
+        <Route path="/dashboard/websites/new" element={<WebsiteContextBuilderPage />} />
+        <Route path="/dashboard/websites/new/edit" element={<WebsiteBuilderPage />} />
         <Route path="/dashboard/websites/:id/edit" element={<WebsiteBuilderPage />} />
         <Route path="/dashboard/catalog" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <CommerceCatalogPage />} />
         <Route path="/dashboard/integrations" element={controlledLaunchEnabled ? <Navigate to="/dashboard" replace /> : <IntegrationHubPage />} />
