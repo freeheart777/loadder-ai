@@ -3,6 +3,7 @@ export const CUSTOMER_ROUTE_ALLOWLIST = Object.freeze([
   "/signup",
   "/dashboard",
   "/dashboard/intent",
+  "/dashboard/diagnosis",
   "/dashboard/content",
   "/dashboard/library",
   "/dashboard/brand-book",
