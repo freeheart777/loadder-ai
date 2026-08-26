@@ -6,10 +6,12 @@ export const DIRECT_SERVICE_DESTINATIONS = Object.freeze({
   CONTENT: "/dashboard/content",
 } as const);
 
+export const BUSINESS_DIAGNOSIS_DESTINATION = "/dashboard/diagnosis";
 export const BUSINESS_FOUNDATION_DESTINATION = "/dashboard/business-brain";
 
 const SAFE_RETURN_DESTINATIONS = new Set<string>([
   ...Object.values(DIRECT_SERVICE_DESTINATIONS),
+  BUSINESS_DIAGNOSIS_DESTINATION,
   BUSINESS_FOUNDATION_DESTINATION,
 ]);
 
