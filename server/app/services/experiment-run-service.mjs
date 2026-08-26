@@ -1,9 +1,7 @@
 const TERMINAL = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
 const TRANSITIONS = new Map([
-  ["PLANNED", "RUNNING"],
-  ["RUNNING", "COMPLETED"],
-  ["RUNNING", "FAILED"],
-  ["RUNNING", "CANCELLED"],
+  ["PLANNED", new Set(["RUNNING"])],
+  ["RUNNING", new Set(["COMPLETED", "FAILED", "CANCELLED"])],
 ]);
 
 export class ExperimentRunError extends Error {
@@ -62,9 +60,8 @@ export function createExperimentRunService({ repository, now = () => new Date() 
   function change(id, { contextVersionId, outcome, to }) {
     const run = getOrThrow(id);
     validateContext(run, contextVersionId);
-    if (run.status === to) return run;
     if (TERMINAL.has(run.status)) throw new ExperimentRunError("Experiment run is already terminal.", 409, "EXPERIMENT_RUN_TERMINAL");
-    if (TRANSITIONS.get(run.status) !== to) throw new ExperimentRunError(`Invalid experiment run transition: ${run.status} -> ${to}.`, 409, "EXPERIMENT_RUN_INVALID_TRANSITION");
+    if (!TRANSITIONS.get(run.status)?.has(to)) throw new ExperimentRunError(`Invalid experiment run transition: ${run.status} -> ${to}.`, 409, "EXPERIMENT_RUN_INVALID_TRANSITION");
     if (TERMINAL.has(to)) validateOutcome(outcome);
     const updated = repository.transition(id, { from: run.status, to, contextVersionId, now: timestamp(), outcome });
     if (!updated) throw new ExperimentRunError("Experiment run changed concurrently; retry with the current state.", 409, "EXPERIMENT_RUN_CONFLICT");
