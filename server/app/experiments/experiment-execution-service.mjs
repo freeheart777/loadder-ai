@@ -15,7 +15,7 @@ const requireText = (value, field) => {
   return value.trim();
 };
 
-export function createExperimentExecutionService({ experimentRepository, runService, hypothesisEngine, guardrails = [] }) {
+export function createExperimentExecutionService({ experimentRepository, runService, hypothesisEngine, executor, guardrails = [] }) {
   const getExperiment = (id) => {
     const experiment = experimentRepository.get(id);
     if (!experiment) throw new ExperimentExecutionError("Experiment not found.", 404, "EXPERIMENT_NOT_FOUND");
@@ -42,7 +42,7 @@ export function createExperimentExecutionService({ experimentRepository, runServ
       baselineValue: experiment.baselineValue ?? experiment.baseline_value ?? null,
       hypothesis,
       guardrails: [...guardrails],
-      executionMode: "MANUAL_RESULT_SUBMISSION",
+      executionMode: executor ? "INJECTED_EXECUTOR" : "MANUAL_RESULT_SUBMISSION",
     });
   }
 
@@ -65,5 +65,32 @@ export function createExperimentExecutionService({ experimentRepository, runServ
     return Object.freeze({ run, outcome });
   }
 
-  return Object.freeze({ plan, start, recordResult });
+  async function execute(experimentId, { input } = {}) {
+    if (typeof executor !== "function") {
+      throw new ExperimentExecutionError("An executor is required for automatic execution.", 501, "EXPERIMENT_EXECUTOR_NOT_CONFIGURED");
+    }
+
+    const planResult = plan(experimentId);
+    const run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId });
+    const startedRun = runService.start(run.id, { contextVersionId: planResult.contextVersionId });
+
+    try {
+      const result = await executor({ plan: planResult, run: startedRun, input });
+      return recordResult(startedRun.id, { contextVersionId: planResult.contextVersionId, result });
+    } catch (error) {
+      const outcome = {
+        executionError: {
+          name: error?.name ?? "Error",
+          message: error?.message ?? String(error),
+        },
+      };
+      const failedRun = runService.fail(startedRun.id, {
+        contextVersionId: planResult.contextVersionId,
+        outcome,
+      });
+      return Object.freeze({ run: failedRun, outcome });
+    }
+  }
+
+  return Object.freeze({ plan, start, recordResult, execute });
 }
