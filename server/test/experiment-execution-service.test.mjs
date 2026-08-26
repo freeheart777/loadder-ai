@@ -62,6 +62,49 @@ test("result recording completes only when guardrails pass and fails otherwise",
   assert.equal(failed.outcome.guardrailsPassed, false);
 });
 
+test("automatic execution invokes the executor with the pinned plan and records its result", async () => {
+  const f = fixture();
+  const executorCalls = [];
+  const service = createExperimentExecutionService({
+    experimentRepository: f.experimentRepository,
+    runService: f.runService,
+    guardrails: ["safe"],
+    executor: async ({ plan, run, input }) => {
+      executorCalls.push({ plan, runId: run.id, input });
+      return { safe: true, metric: input.metric };
+    },
+  });
+
+  const result = await service.execute("exp-1", { input: { metric: 0.21 } });
+  assert.equal(result.run.status, "COMPLETED");
+  assert.equal(result.outcome.result.metric, 0.21);
+  assert.equal(result.outcome.guardrailsPassed, true);
+  assert.equal(executorCalls[0].plan.contextVersionId, "ctx-1");
+  assert.deepEqual(executorCalls[0].input, { metric: 0.21 });
+  assert.deepEqual(f.calls.map((call) => call[0]), ["create", "start", "complete"]);
+});
+
+test("automatic execution fails the run when the executor throws", async () => {
+  const f = fixture();
+  const service = createExperimentExecutionService({
+    experimentRepository: f.experimentRepository,
+    runService: f.runService,
+    executor: async () => { throw new Error("provider unavailable"); },
+  });
+
+  const result = await service.execute("exp-1");
+  assert.equal(result.run.status, "FAILED");
+  assert.deepEqual(result.outcome.executionError, { name: "Error", message: "provider unavailable" });
+  assert.deepEqual(f.calls.map((call) => call[0]), ["create", "start", "fail"]);
+});
+
+test("automatic execution requires an executor", async () => {
+  const f = fixture();
+  const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService });
+  await assert.rejects(() => service.execute("exp-1"), (error) => error.code === "EXPERIMENT_EXECUTOR_NOT_CONFIGURED");
+  assert.deepEqual(f.calls, []);
+});
+
 test("missing experiments and non-object results are rejected", () => {
   const f = fixture();
   const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService });
