@@ -1,0 +1,71 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { createExperimentExecutionService } from "../app/experiments/experiment-execution-service.mjs";
+
+function fixture() {
+  const experiment = {
+    id: "exp-1",
+    workspaceId: "ws-1",
+    contextVersionId: "ctx-1",
+    hypothesis: "The treatment improves the target metric.",
+    objective: "Improve conversion",
+    successMetric: "conversion_rate",
+    baselineValue: 0.12,
+    treatmentDefinition: "Treatment A",
+  };
+  const calls = [];
+  let runNumber = 0;
+  const runs = new Map();
+  const experimentRepository = { get: (id) => id === experiment.id ? experiment : null };
+  const runService = {
+    create(input) { calls.push(["create", input]); const run = { id: `run-${++runNumber}`, status: "PLANNED" }; runs.set(run.id, run); return run; },
+    start(id, input) { calls.push(["start", id, input]); const run = runs.get(id); run.status = "RUNNING"; return run; },
+    complete(id, input) { calls.push(["complete", id, input]); const run = runs.get(id); run.status = "COMPLETED"; run.outcome = input.outcome; return run; },
+    fail(id, input) { calls.push(["fail", id, input]); const run = runs.get(id); run.status = "FAILED"; run.outcome = input.outcome; return run; },
+  };
+  return { experiment, experimentRepository, runService, calls };
+}
+
+test("execution planning pins context and does not execute providers", () => {
+  const f = fixture();
+  const hypothesisEngine = { fromExperiment: (experiment) => ({ statement: experiment.hypothesis, sourceExperimentId: experiment.id }) };
+  const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService, hypothesisEngine, guardrails: ["safe"] });
+
+  const plan = service.plan("exp-1");
+  assert.equal(plan.contextVersionId, "ctx-1");
+  assert.equal(plan.executionMode, "MANUAL_RESULT_SUBMISSION");
+  assert.deepEqual(plan.hypothesis, { statement: f.experiment.hypothesis, sourceExperimentId: "exp-1" });
+  assert.deepEqual(f.calls, []);
+});
+
+test("start creates and starts a run against the pinned context", () => {
+  const f = fixture();
+  const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService, guardrails: [] });
+  const result = service.start("exp-1");
+  assert.equal(result.run.status, "RUNNING");
+  assert.deepEqual(f.calls.map((call) => call[0]), ["create", "start"]);
+  assert.deepEqual(f.calls[0][1], { experimentId: "exp-1", contextVersionId: "ctx-1" });
+});
+
+test("result recording completes only when guardrails pass and fails otherwise", () => {
+  const f = fixture();
+  const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService, guardrails: ["safe"] });
+  const good = service.start("exp-1");
+  const completed = service.recordResult(good.run.id, { contextVersionId: "ctx-1", result: { safe: true, metric: 0.2 } });
+  assert.equal(completed.run.status, "COMPLETED");
+  assert.equal(completed.outcome.guardrailsPassed, true);
+
+  const bad = service.start("exp-1");
+  const failed = service.recordResult(bad.run.id, { contextVersionId: "ctx-1", result: { safe: false, metric: 0.05 } });
+  assert.equal(failed.run.status, "FAILED");
+  assert.equal(failed.outcome.guardrailsPassed, false);
+});
+
+test("missing experiments and non-object results are rejected", () => {
+  const f = fixture();
+  const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService });
+  assert.throws(() => service.plan("missing"), (error) => error.code === "EXPERIMENT_NOT_FOUND");
+  const started = service.start("exp-1");
+  assert.throws(() => service.recordResult(started.run.id, { contextVersionId: "ctx-1", result: [] }), /result must be a JSON object/);
+});
