@@ -74,9 +74,9 @@ export function createExperimentExecutionService({ experimentRepository, runServ
     const run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId });
     const startedRun = runService.start(run.id, { contextVersionId: planResult.contextVersionId });
 
+    let result;
     try {
-      const result = await executor({ plan: planResult, run: startedRun, input });
-      return recordResult(startedRun.id, { contextVersionId: planResult.contextVersionId, result });
+      result = await executor({ plan: planResult, run: startedRun, input });
     } catch (error) {
       const outcome = {
         executionError: {
@@ -90,6 +90,11 @@ export function createExperimentExecutionService({ experimentRepository, runServ
       });
       return Object.freeze({ run: failedRun, outcome });
     }
+
+    return recordResult(startedRun.id, {
+      contextVersionId: planResult.contextVersionId,
+      result,
+    });
   }
 
   return Object.freeze({ plan, start, recordResult, execute });
