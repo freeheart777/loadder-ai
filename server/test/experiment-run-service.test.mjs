@@ -48,3 +48,124 @@ test("experiment run lifecycle is state-safe, context-pinned, and tenant-scoped"
     assert.throws(() => service.create({ experimentId: "exp-1", contextVersionId: "ctx-1" }), (e) => e.code === "EXPERIMENT_NOT_FOUND");
   });
 });
+
+test("experiment run rejects invalid terminal outcomes", async () => {
+  const f = fixture();
+  const service = createExperimentRunService({
+    repository: f.repository,
+    now: () => new Date("2026-08-26T20:00:00.000Z"),
+  });
+
+  await runWithWorkspace("ws-1", async () => {
+    const run = service.create({
+      experimentId: "exp-1",
+      contextVersionId: "ctx-1",
+    });
+
+    service.start(run.id, { contextVersionId: "ctx-1" });
+
+    assert.throws(
+      () => service.complete(run.id, {
+        contextVersionId: "ctx-1",
+        outcome: null,
+      }),
+      (e) => e.code === "EXPERIMENT_RUN_ERROR",
+    );
+
+    assert.throws(
+      () => service.complete(run.id, {
+        contextVersionId: "ctx-1",
+        outcome: [],
+      }),
+      (e) => e.code === "EXPERIMENT_RUN_ERROR",
+    );
+
+    assert.throws(
+      () => service.complete(run.id, {
+        contextVersionId: "ctx-1",
+        outcome: "completed",
+      }),
+      (e) => e.code === "EXPERIMENT_RUN_ERROR",
+    );
+  });
+});
+
+test("experiment run rejects oversized outcomes", async () => {
+  const f = fixture();
+  const service = createExperimentRunService({
+    repository: f.repository,
+    now: () => new Date("2026-08-26T20:00:00.000Z"),
+  });
+
+  await runWithWorkspace("ws-1", async () => {
+    const run = service.create({
+      experimentId: "exp-1",
+      contextVersionId: "ctx-1",
+    });
+
+    service.start(run.id, { contextVersionId: "ctx-1" });
+
+    const oversized = {
+      payload: "x".repeat(32769),
+    };
+
+    assert.throws(
+      () => service.complete(run.id, {
+        contextVersionId: "ctx-1",
+        outcome: oversized,
+      }),
+      (e) => e.code === "EXPERIMENT_OUTCOME_TOO_LARGE" && e.status === 413,
+    );
+  });
+});
+
+test("experiment run requires pinned context for every lifecycle mutation", async () => {
+  const f = fixture();
+  const service = createExperimentRunService({
+    repository: f.repository,
+    now: () => new Date("2026-08-26T20:00:00.000Z"),
+  });
+
+  await runWithWorkspace("ws-1", async () => {
+    const run = service.create({
+      experimentId: "exp-1",
+      contextVersionId: "ctx-1",
+    });
+
+    assert.throws(
+      () => service.start(run.id, {}),
+      (e) => e.code === "EXPERIMENT_CONTEXT_MISMATCH",
+    );
+
+    assert.equal(
+      service.start(run.id, {
+        contextVersionId: "ctx-1",
+      }).status,
+      "RUNNING",
+    );
+
+    assert.throws(
+      () => service.complete(run.id, {}),
+      (e) => e.code === "EXPERIMENT_CONTEXT_MISMATCH",
+    );
+  });
+});
+
+test("experiment run rejects invalid creation context", async () => {
+  const f = fixture();
+
+  const service = createExperimentRunService({
+    repository: f.repository,
+    now: () => new Date("2026-08-26T20:00:00.000Z"),
+  });
+
+  await runWithWorkspace("ws-1", async () => {
+    assert.throws(
+      () => service.create({
+        experimentId: "exp-1",
+        contextVersionId: "ctx-other",
+      }),
+      (e) => e.code === "EXPERIMENT_CONTEXT_MISMATCH",
+    );
+  });
+});
