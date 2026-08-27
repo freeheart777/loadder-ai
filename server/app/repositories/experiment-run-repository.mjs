@@ -8,6 +8,7 @@ const mapRun = (row) => row && ({
   experimentId: row.experiment_id,
   contextVersionId: row.context_version_id,
   runNumber: row.run_number,
+  idempotencyKey: row.idempotency_key ?? null,
   status: row.status,
   startedAt: row.started_at,
   completedAt: row.completed_at,
@@ -19,21 +20,26 @@ const mapRun = (row) => row && ({
 export function createExperimentRunRepository(db) {
   const workspace = () => requireWorkspaceId();
   const get = (id) => mapRun(db.prepare("SELECT * FROM experiment_runs WHERE id=? AND workspace_id=?").get(id, workspace()));
+  const getByIdempotencyKey = (key) => key ? mapRun(db.prepare("SELECT * FROM experiment_runs WHERE idempotency_key=? AND workspace_id=?").get(key, workspace())) : null;
   const getExperiment = (id) => db.prepare("SELECT * FROM experiments WHERE id=? AND workspace_id=?").get(id, workspace());
 
-  function create({ experimentId, contextVersionId, now }) {
+  function create({ experimentId, contextVersionId, idempotencyKey = null, now }) {
     return db.transaction(() => {
       const workspaceId = workspace();
+      if (idempotencyKey) {
+        const existing = getByIdempotencyKey(idempotencyKey);
+        if (existing) return existing;
+      }
       const experiment = getExperiment(experimentId);
       if (!experiment) return null;
       const runNumber = (db.prepare("SELECT COALESCE(MAX(run_number),0)+1 n FROM experiment_runs WHERE workspace_id=? AND experiment_id=?").get(workspaceId, experimentId)).n;
       const id = crypto.randomUUID();
-      db.prepare("INSERT INTO experiment_runs(id,workspace_id,experiment_id,context_version_id,run_number,status,created_at,updated_at) VALUES(?,?,?,?,?,'PLANNED',?,?)").run(id, workspaceId, experimentId, contextVersionId, runNumber, now, now);
+      db.prepare("INSERT INTO experiment_runs(id,workspace_id,experiment_id,context_version_id,run_number,idempotency_key,status,created_at,updated_at) VALUES(?,?,?,?,?,?, 'PLANNED',?,?)").run(id, workspaceId, experimentId, contextVersionId, runNumber, idempotencyKey, now, now);
       return get(id);
     })();
   }
 
-  function list({ experimentId, status, limit, cursor }) {
+  function list({ experimentId, status, limit, cursor } = {}) {
     const clauses = ["workspace_id=?", "experiment_id=?"];
     const values = [workspace(), experimentId];
     if (status) { clauses.push("status=?"); values.push(status); }
@@ -55,5 +61,5 @@ export function createExperimentRunRepository(db) {
     return get(id);
   }
 
-  return Object.freeze({ create, list, get, transition, getExperiment });
+  return Object.freeze({ create, list, get, getByIdempotencyKey, transition, getExperiment });
 }
