@@ -37,45 +37,6 @@ import { migration036IntelligenceRecommendations } from "./036_intelligence_reco
 import { migration037HumanGovernance } from "./037_human_governance.mjs";
 import { migration038Experiments } from "./038_experiments.mjs";
 import { migration039ExperimentRuns } from "./039_experiment_runs.mjs";
-
-export const migrations = [
-  migration001Identity,
-  migration002TenantDomainData,
-  migration003TenantRelationshipGuards,
-  migration004WorkspaceManagementAudit,
-  migration005BusinessProfiles,
-  migration006BusinessDnaVersions,
-  migration007BusinessDnaImmutability,
-  migration008BrandBookVersions,
-  migration009BrandBookImmutability,
-  migration010BusinessContextVersions,
-  migration011BusinessContextImmutability,
-  migration012BusinessContextLifecycleGuards,
-  migration013BusinessContextUsage,
-  migration014BusinessEventsObservationsSignals,
-  migration015IntelligenceDataGuards,
-  migration016FeatureValues,
-  migration017FeatureValueGuards,
-  migration018ModelInputSnapshots,
-  migration019Evaluations,
-  migration020ModelEvaluationGuards,
-  migration021ForecastRecords,
-  migration022IntegrationFoundation,
-  migration023KnowledgeKpiFoundation,
-  migration024ForecastIntegrationGuards,
-  migration025KnowledgeCandidates,
-  migration026ParsingExtraction,
-  migration027FieldCandidatesReviews,
-  migration028ImportedFactEventMapping,
-  migration029Phase4bGuards,
-  migration030ListeningMonitors,
-  migration031ListeningCollectionRecords,
-  migration032ListeningEventLinks,
-  migration033ListeningGuards,
-  migration034ListeningIntelligence,
-  migration035SemanticFindings,
-  migration036IntelligenceRecommendations,
-  migration037HumanGovernance,
-  migration038Experiments,
-  migration039ExperimentRuns,
-];
+import { migration040ExperimentRunIdempotency } from "./040_experiment_run_idempotency.mjs";
+import { migration041ExperimentRunLeases } from "./041_experiment_run_leases.mjs";
+export const migrations = [migration001Identity,migration002TenantDomainData,migration003TenantRelationshipGuards,migration004WorkspaceManagementAudit,migration005BusinessProfiles,migration006BusinessDnaVersions,migration007BusinessDnaImmutability,migration008BrandBookVersions,migration009BrandBookImmutability,migration010BusinessContextVersions,migration011BusinessContextImmutability,migration012BusinessContextLifecycleGuards,migration013BusinessContextUsage,migration014BusinessEventsObservationsSignals,migration015IntelligenceDataGuards,migration016FeatureValues,migration017FeatureValueGuards,migration018ModelInputSnapshots,migration019Evaluations,migration020ModelEvaluationGuards,migration021ForecastRecords,migration022IntegrationFoundation,migration023KnowledgeKpiFoundation,migration024ForecastIntegrationGuards,migration025KnowledgeCandidates,migration026ParsingExtraction,migration027FieldCandidatesReviews,migration028ImportedFactEventMapping,migration029Phase4bGuards,migration030ListeningMonitors,migration031ListeningCollectionRecords,migration032ListeningEventLinks,migration033ListeningGuards,migration034ListeningIntelligence,migration035SemanticFindings,migration036IntelligenceRecommendations,migration037HumanGovernance,migration038Experiments,migration039ExperimentRuns,migration040ExperimentRunIdempotency,migration041ExperimentRunLeases];
