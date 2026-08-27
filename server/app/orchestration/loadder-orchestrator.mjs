@@ -9,10 +9,13 @@ export class OrchestratorError extends Error {
   }
 }
 
-export function createLoadderOrchestrator({ brain, skills, execution }) {
+export function createLoadderOrchestrator({ brain, skills, execution, audit = null }) {
   if (!brain?.get) throw new TypeError("brain must implement get");
   if (!skills?.resolve) throw new TypeError("skills must implement resolve");
   if (!execution?.run) throw new TypeError("execution must implement run");
+  if (audit !== null && typeof audit.record !== "function") throw new TypeError("audit must implement record");
+
+  const record = async (event) => audit?.record?.({ source: "loadder-orchestrator", ...event });
 
   return Object.freeze({
     async plan({ projectId, skillIds = [], input }) {
@@ -28,7 +31,15 @@ export function createLoadderOrchestrator({ brain, skills, execution }) {
     async run(request) {
       const plan = await this.plan(request);
       const executionId = request.executionId ?? randomUUID();
-      return execution.run({ executionId, projectId: plan.projectId, brainVersion: plan.brainVersion, skills: plan.skills.map(({ id, name }) => ({ id, name })), input: plan.input });
+      await record({ type: "execution.queued", executionId, projectId: plan.projectId, brainVersion: plan.brainVersion, skillIds: plan.skills.map(({ id }) => id) });
+      try {
+        const result = await execution.run({ executionId, projectId: plan.projectId, brainVersion: plan.brainVersion, skills: plan.skills.map(({ id, name }) => ({ id, name })), input: plan.input });
+        await record({ type: "execution.completed", executionId, projectId: plan.projectId });
+        return result;
+      } catch (error) {
+        await record({ type: "execution.failed", executionId, projectId: plan.projectId, error: error instanceof Error ? error.message : String(error) });
+        throw error;
+      }
     },
   });
 }
