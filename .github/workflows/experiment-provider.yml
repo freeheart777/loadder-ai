@@ -2,12 +2,13 @@ name: Experiment Provider
 
 on:
   push:
-    branches: [main, 'feat/**']
+    branches: [main, 'feat/**', 'fix/**']
   pull_request:
     paths:
       - 'server/app/experiments/**'
       - 'server/app/repositories/experiment-repository.mjs'
       - 'server/app/repositories/experiment-run-repository.mjs'
+      - 'server/app/routes/experiment-execution.mjs'
       - 'server/app/routes/human-governance.mjs'
       - 'server/app/services/experiment-run-service.mjs'
       - 'server/test/experiment-*.mjs'
