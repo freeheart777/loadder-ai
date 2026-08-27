@@ -27,13 +27,15 @@ test("retryable persisted executions resume from their attempt", async () => {
   assert.equal(calls, 1); assert.equal(result.attempt, 2); assert.equal(result.status, "completed");
 });
 
-test("invalid maxAttempts is rejected", () => {
-  assert.throws(() => createDurableExecution({ store: memoryStore(), provider: { execute: async () => null }, maxAttempts: 0 }), TypeError);
-});
-
-test("execution fails after bounded retries", async () => {
+test("failed executions remain terminal and idempotent", async () => {
   const store = memoryStore(); let calls = 0;
   const provider = { async execute() { calls += 1; throw new Error("down"); } };
-  await assert.rejects(() => createDurableExecution({ store, provider, maxAttempts: 2 }).run({ executionId: "e3" }), (error) => error instanceof DurableExecutionError && error.code === "EXECUTION_FAILED");
-  assert.equal(calls, 2); assert.equal(store.map.get("e3").status, "failed");
+  const runner = createDurableExecution({ store, provider, maxAttempts: 2 });
+  await assert.rejects(() => runner.run({ executionId: "e-failed" }), (error) => error instanceof DurableExecutionError && error.code === "EXECUTION_FAILED");
+  await assert.rejects(() => runner.run({ executionId: "e-failed" }), (error) => error instanceof DurableExecutionError && error.code === "EXECUTION_FAILED");
+  assert.equal(calls, 2); assert.equal(store.map.get("e-failed").status, "failed");
+});
+
+test("invalid maxAttempts is rejected", () => {
+  assert.throws(() => createDurableExecution({ store: memoryStore(), provider: { execute: async () => null }, maxAttempts: 0 }), TypeError);
 });
