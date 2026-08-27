@@ -7,12 +7,14 @@ on:
     paths:
       - 'server/app/experiments/**'
       - 'server/app/repositories/experiment-repository.mjs'
+      - 'server/app/repositories/experiment-run-repository.mjs'
       - 'server/app/routes/human-governance.mjs'
+      - 'server/app/services/experiment-run-service.mjs'
       - 'server/test/experiment-*.mjs'
       - '.github/workflows/experiment-provider.yml'
 
 jobs:
-  test-experiment-provider:
+  experiment-execution:
     runs-on: ubuntu-latest
     defaults:
       run:
