@@ -19,6 +19,18 @@ test("completed executions are idempotent", async () => {
   assert.equal(calls, 1);
 });
 
+test("retryable persisted executions resume from their attempt", async () => {
+  const store = memoryStore(); let calls = 0;
+  await store.save({ executionId: "e-resume", status: "retryable", attempt: 1 });
+  const provider = { async execute() { calls += 1; return { ok: true }; } };
+  const result = await createDurableExecution({ store, provider, maxAttempts: 3 }).run({ executionId: "e-resume" });
+  assert.equal(calls, 1); assert.equal(result.attempt, 2); assert.equal(result.status, "completed");
+});
+
+test("invalid maxAttempts is rejected", () => {
+  assert.throws(() => createDurableExecution({ store: memoryStore(), provider: { execute: async () => null }, maxAttempts: 0 }), TypeError);
+});
+
 test("execution fails after bounded retries", async () => {
   const store = memoryStore(); let calls = 0;
   const provider = { async execute() { calls += 1; throw new Error("down"); } };
