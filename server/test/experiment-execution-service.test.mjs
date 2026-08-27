@@ -4,16 +4,7 @@ import test from "node:test";
 import { createExperimentExecutionService } from "../app/experiments/experiment-execution-service.mjs";
 
 function fixture() {
-  const experiment = {
-    id: "exp-1",
-    workspaceId: "ws-1",
-    contextVersionId: "ctx-1",
-    hypothesis: "The treatment improves the target metric.",
-    objective: "Improve conversion",
-    successMetric: "conversion_rate",
-    baselineValue: 0.12,
-    treatmentDefinition: "Treatment A",
-  };
+  const experiment = { id: "exp-1", workspaceId: "ws-1", contextVersionId: "ctx-1", hypothesis: "The treatment improves the target metric.", objective: "Improve conversion", successMetric: "conversion_rate", baselineValue: 0.12, treatmentDefinition: "Treatment A" };
   const calls = [];
   let runNumber = 0;
   const runs = new Map();
@@ -52,11 +43,7 @@ test("start creates and starts a run against the pinned context", () => {
 test("idempotency key returns the existing run without executing twice", async () => {
   const f = fixture();
   let executions = 0;
-  const service = createExperimentExecutionService({
-    experimentRepository: f.experimentRepository,
-    runService: f.runService,
-    executor: async () => { executions += 1; return { safe: true, metric: 0.2 }; },
-  });
+  const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService, executor: async () => { executions += 1; return { safe: true, metric: 0.2 }; } });
   const first = await service.execute("exp-1", { idempotencyKey: "checkout-42", input: { prompt: "run" } });
   const second = await service.execute("exp-1", { idempotencyKey: "checkout-42", input: { prompt: "run" } });
   assert.equal(first.run.id, second.run.id);
@@ -64,12 +51,12 @@ test("idempotency key returns the existing run without executing twice", async (
   assert.deepEqual(f.calls.map((call) => call[0]), ["create", "start", "complete"]);
 });
 
-test("idempotency key cannot be reused for another experiment context", () => {
+test("idempotency key cannot be reused for another experiment context", async () => {
   const f = fixture();
   const existing = { id: "run-existing", status: "COMPLETED", experimentId: "other", contextVersionId: "ctx-other", outcome: {} };
   f.runService.getByIdempotencyKey = () => existing;
   const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService, executor: async () => ({ safe: true }) });
-  assert.rejects(() => service.execute("exp-1", { idempotencyKey: "shared-key" }), (error) => error.code === "EXPERIMENT_IDEMPOTENCY_CONFLICT");
+  await assert.rejects(() => service.execute("exp-1", { idempotencyKey: "shared-key" }), (error) => error.code === "EXPERIMENT_IDEMPOTENCY_CONFLICT");
 });
 
 test("result recording completes only when guardrails pass and fails otherwise", () => {
@@ -88,12 +75,7 @@ test("result recording completes only when guardrails pass and fails otherwise",
 test("automatic execution invokes the executor with the pinned plan and records its result", async () => {
   const f = fixture();
   const executorCalls = [];
-  const service = createExperimentExecutionService({
-    experimentRepository: f.experimentRepository,
-    runService: f.runService,
-    guardrails: ["safe"],
-    executor: async ({ plan, run, input }) => { executorCalls.push({ plan, runId: run.id, input }); return { safe: true, metric: input.metric }; },
-  });
+  const service = createExperimentExecutionService({ experimentRepository: f.experimentRepository, runService: f.runService, guardrails: ["safe"], executor: async ({ plan, run, input }) => { executorCalls.push({ plan, runId: run.id, input }); return { safe: true, metric: input.metric }; } });
   const result = await service.execute("exp-1", { input: { metric: 0.21 } });
   assert.equal(result.run.status, "COMPLETED");
   assert.equal(result.outcome.result.metric, 0.21);
