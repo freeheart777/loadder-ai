@@ -32,9 +32,10 @@ export function createExperimentRunRepository(db) {
       }
       const experiment = getExperiment(experimentId);
       if (!experiment) return null;
-      const runNumber = (db.prepare("SELECT COALESCE(MAX(run_number),0)+1 n FROM experiment_runs WHERE workspace_id=? AND experiment_id=?").get(workspaceId, experimentId)).n;
+      const runNumber = db.prepare("SELECT COALESCE(MAX(run_number),0)+1 n FROM experiment_runs WHERE workspace_id=? AND experiment_id=?").get(workspaceId, experimentId).n;
       const id = crypto.randomUUID();
-      db.prepare("INSERT INTO experiment_runs(id,workspace_id,experiment_id,context_version_id,run_number,idempotency_key,status,created_at,updated_at) VALUES(?,?,?,?,?,?, 'PLANNED',?,?)").run(id, workspaceId, experimentId, contextVersionId, runNumber, idempotencyKey, now, now);
+      const result = db.prepare("INSERT OR IGNORE INTO experiment_runs(id,workspace_id,experiment_id,context_version_id,run_number,idempotency_key,status,created_at,updated_at) VALUES(?,?,?,?,?,?, 'PLANNED',?,?)").run(id, workspaceId, experimentId, contextVersionId, runNumber, idempotencyKey, now, now);
+      if (result.changes !== 1 && idempotencyKey) return getByIdempotencyKey(idempotencyKey);
       return get(id);
     })();
   }
