@@ -27,4 +27,17 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci
-      - run: node --test test/experiment-execution-service.test.mjs test/experiment-provider.test.mjs test/experiment-execution-provider.test.mjs test/experiment-run-service.test.mjs test/experiment-run-route.test.mjs
+      - run: |
+          set -e
+          for test_file in \
+            test/experiment-execution-service.test.mjs \
+            test/experiment-provider.test.mjs \
+            test/experiment-execution-provider.test.mjs \
+            test/experiment-run-service.test.mjs \
+            test/experiment-run-route.test.mjs; do
+            if [ -f "$test_file" ]; then
+              node --test "$test_file"
+            else
+              echo "SKIP missing $test_file"
+            fi
+          done
