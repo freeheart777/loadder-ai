@@ -11,6 +11,7 @@ export function createDurableExecution({ store, provider, maxAttempts = 3, now =
       if (!request?.executionId) throw new DurableExecutionError("INVALID_EXECUTION", "executionId is required");
       const existing = await store.get(request.executionId);
       if (existing?.status === "completed") return existing;
+      if (existing?.status === "failed") throw new DurableExecutionError("EXECUTION_FAILED", "execution already failed", { executionId: request.executionId });
       let attempt = existing?.status === "retryable" ? existing.attempt : 0;
       while (attempt < maxAttempts) {
         attempt += 1;
