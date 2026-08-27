@@ -15,6 +15,13 @@ const requireText = (value, field) => {
   return value.trim();
 };
 
+const optionalIdempotencyKey = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const key = requireText(value, "idempotencyKey");
+  if (key.length > 200) throw new ExperimentExecutionError("idempotencyKey is too long.", 400, "EXPERIMENT_IDEMPOTENCY_KEY_INVALID");
+  return key;
+};
+
 export function createExperimentExecutionService({ experimentRepository, runService, hypothesisEngine, executor, guardrails = [] }) {
   const getExperiment = (id) => {
     const experiment = experimentRepository.get(id);
@@ -26,11 +33,7 @@ export function createExperimentExecutionService({ experimentRepository, runServ
     const experiment = getExperiment(experimentId);
     const hypothesis = hypothesisEngine?.fromExperiment
       ? hypothesisEngine.fromExperiment(experiment)
-      : {
-          statement: experiment.hypothesis,
-          sourceExperimentId: experiment.id,
-          confidence: null,
-        };
+      : { statement: experiment.hypothesis, sourceExperimentId: experiment.id, confidence: null };
 
     return Object.freeze({
       experimentId: experiment.id,
@@ -46,9 +49,17 @@ export function createExperimentExecutionService({ experimentRepository, runServ
     });
   }
 
-  function start(experimentId) {
+  function start(experimentId, { idempotencyKey } = {}) {
     const planResult = plan(experimentId);
-    const run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId });
+    const key = optionalIdempotencyKey(idempotencyKey);
+    const existing = key ? runService.getByIdempotencyKey?.(key) : null;
+    if (existing) {
+      if (existing.experimentId !== experimentId || existing.contextVersionId !== planResult.contextVersionId) {
+        throw new ExperimentExecutionError("Idempotency key is already bound to another experiment run.", 409, "EXPERIMENT_IDEMPOTENCY_CONFLICT");
+      }
+      return Object.freeze({ plan: planResult, run: existing });
+    }
+    const run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId, idempotencyKey: key });
     return Object.freeze({ plan: planResult, run: runService.start(run.id, { contextVersionId: planResult.contextVersionId }) });
   }
 
@@ -65,29 +76,30 @@ export function createExperimentExecutionService({ experimentRepository, runServ
     return Object.freeze({ run, outcome });
   }
 
-  async function execute(experimentId, { input } = {}) {
+  async function execute(experimentId, { input, idempotencyKey } = {}) {
     if (typeof executor !== "function") {
       throw new ExperimentExecutionError("An executor is required for automatic execution.", 501, "EXPERIMENT_EXECUTOR_NOT_CONFIGURED");
     }
 
     const planResult = plan(experimentId);
-    const run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId });
+    const key = optionalIdempotencyKey(idempotencyKey);
+    let run = key ? runService.getByIdempotencyKey?.(key) : null;
+    if (run) {
+      if (run.experimentId !== experimentId || run.contextVersionId !== planResult.contextVersionId) {
+        throw new ExperimentExecutionError("Idempotency key is already bound to another experiment run.", 409, "EXPERIMENT_IDEMPOTENCY_CONFLICT");
+      }
+      return Object.freeze({ run, outcome: run.outcome });
+    }
+
+    run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId, idempotencyKey: key });
     const startedRun = runService.start(run.id, { contextVersionId: planResult.contextVersionId });
 
     try {
       const result = await executor({ plan: planResult, run: startedRun, input });
       return recordResult(startedRun.id, { contextVersionId: planResult.contextVersionId, result });
     } catch (error) {
-      const outcome = {
-        executionError: {
-          name: error?.name ?? "Error",
-          message: error?.message ?? String(error),
-        },
-      };
-      const failedRun = runService.fail(startedRun.id, {
-        contextVersionId: planResult.contextVersionId,
-        outcome,
-      });
+      const outcome = { executionError: { name: error?.name ?? "Error", message: error?.message ?? String(error) } };
+      const failedRun = runService.fail(startedRun.id, { contextVersionId: planResult.contextVersionId, outcome });
       return Object.freeze({ run: failedRun, outcome });
     }
   }
