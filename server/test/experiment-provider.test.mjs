@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createOpenAICompatibleProvider, ExperimentProviderError } from "../app/experiments/providers/openai-compatible-provider.mjs";
+import { createExperimentProvider } from "../app/providers/experiment-provider.mjs";
 
 const plan = { objective: "Improve conversion", successMetric: "conversion_rate", treatmentDefinition: "Treatment A" };
 
@@ -26,4 +27,11 @@ test("provider rejects missing prompt before network call", async () => {
   const provider = createOpenAICompatibleProvider({ apiKey: "key", model: "model", fetchImpl: async () => { called = true; } });
   await assert.rejects(() => provider({ plan, input: {} }), (error) => error.code === "EXPERIMENT_PROVIDER_INPUT_ERROR");
   assert.equal(called, false);
+});
+
+test("execution provider wraps a concrete executor", async () => {
+  const provider = createExperimentProvider({ execute: async ({ input }) => ({ output: input }) });
+  assert.deepEqual(await provider.execute({ runId: "run-1", input: "hello" }), {
+    status: "completed", provider: "experiment", providerVersion: "1.0", result: { output: "hello" },
+  });
 });
