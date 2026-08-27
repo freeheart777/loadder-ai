@@ -5,11 +5,15 @@ const providers = new Map([
     id: "cloudflare",
     capabilities: ["chat"],
     run: runCloudflare,
+    health: () => Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
   }],
 ]);
 
 export function listProviders() {
-  return [...providers.values()].map(({ run, ...meta }) => ({ ...meta }));
+  return [...providers.values()].map(({ run, ...meta }) => ({
+    ...meta,
+    healthy: meta.health ? meta.health() : true,
+  }));
 }
 
 export function getProvider(provider = "cloudflare") {
@@ -22,6 +26,9 @@ export function resolveProvider({ provider = "cloudflare", capability = "chat" }
   const entry = getProvider(provider);
   if (!entry.capabilities.includes(capability)) {
     throw new Error(`Provider ${provider} does not support capability: ${capability}`);
+  }
+  if (entry.health && !entry.health()) {
+    throw new Error(`AI provider ${provider} is not configured or healthy`);
   }
   return entry;
 }
