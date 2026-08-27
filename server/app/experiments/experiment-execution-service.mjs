@@ -9,9 +9,7 @@ export class ExperimentExecutionError extends Error {
 }
 
 const requireText = (value, field) => {
-  if (typeof value !== "string" || !value.trim()) {
-    throw new ExperimentExecutionError(`${field} is required.`);
-  }
+  if (typeof value !== "string" || !value.trim()) throw new ExperimentExecutionError(`${field} is required.`);
   return value.trim();
 };
 
@@ -21,6 +19,12 @@ const optionalIdempotencyKey = (value) => {
   if (key.length > 200) throw new ExperimentExecutionError("idempotencyKey is too long.", 400, "EXPERIMENT_IDEMPOTENCY_KEY_INVALID");
   return key;
 };
+
+const runCreateOptions = (experimentId, contextVersionId, idempotencyKey) => ({
+  experimentId,
+  contextVersionId,
+  ...(idempotencyKey ? { idempotencyKey } : {}),
+});
 
 export function createExperimentExecutionService({ experimentRepository, runService, hypothesisEngine, executor, guardrails = [] }) {
   const getExperiment = (id) => {
@@ -34,7 +38,6 @@ export function createExperimentExecutionService({ experimentRepository, runServ
     const hypothesis = hypothesisEngine?.fromExperiment
       ? hypothesisEngine.fromExperiment(experiment)
       : { statement: experiment.hypothesis, sourceExperimentId: experiment.id, confidence: null };
-
     return Object.freeze({
       experimentId: experiment.id,
       workspaceId: experiment.workspaceId ?? experiment.workspace_id ?? null,
@@ -54,46 +57,34 @@ export function createExperimentExecutionService({ experimentRepository, runServ
     const key = optionalIdempotencyKey(idempotencyKey);
     const existing = key ? runService.getByIdempotencyKey?.(key) : null;
     if (existing) {
-      if (existing.experimentId !== experimentId || existing.contextVersionId !== planResult.contextVersionId) {
-        throw new ExperimentExecutionError("Idempotency key is already bound to another experiment run.", 409, "EXPERIMENT_IDEMPOTENCY_CONFLICT");
-      }
+      if (existing.experimentId !== experimentId || existing.contextVersionId !== planResult.contextVersionId) throw new ExperimentExecutionError("Idempotency key is already bound to another experiment run.", 409, "EXPERIMENT_IDEMPOTENCY_CONFLICT");
       return Object.freeze({ plan: planResult, run: existing });
     }
-    const run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId, idempotencyKey: key });
+    const run = runService.create(runCreateOptions(experimentId, planResult.contextVersionId, key));
     return Object.freeze({ plan: planResult, run: runService.start(run.id, { contextVersionId: planResult.contextVersionId }) });
   }
 
   function recordResult(runId, { contextVersionId, result }) {
-    if (result === null || typeof result !== "object" || Array.isArray(result)) {
-      throw new ExperimentExecutionError("result must be a JSON object.");
-    }
+    if (result === null || typeof result !== "object" || Array.isArray(result)) throw new ExperimentExecutionError("result must be a JSON object.");
     const checks = evaluateGuardrails(result, guardrails);
     const passed = checks.every((check) => check.passed);
     const outcome = { result, guardrails: checks, guardrailsPassed: passed };
-    const run = passed
-      ? runService.complete(runId, { contextVersionId, outcome })
-      : runService.fail(runId, { contextVersionId, outcome });
+    const run = passed ? runService.complete(runId, { contextVersionId, outcome }) : runService.fail(runId, { contextVersionId, outcome });
     return Object.freeze({ run, outcome });
   }
 
   async function execute(experimentId, { input, idempotencyKey } = {}) {
-    if (typeof executor !== "function") {
-      throw new ExperimentExecutionError("An executor is required for automatic execution.", 501, "EXPERIMENT_EXECUTOR_NOT_CONFIGURED");
-    }
-
+    if (typeof executor !== "function") throw new ExperimentExecutionError("An executor is required for automatic execution.", 501, "EXPERIMENT_EXECUTOR_NOT_CONFIGURED");
     const planResult = plan(experimentId);
     const key = optionalIdempotencyKey(idempotencyKey);
-    let run = key ? runService.getByIdempotencyKey?.(key) : null;
-    if (run) {
-      if (run.experimentId !== experimentId || run.contextVersionId !== planResult.contextVersionId) {
-        throw new ExperimentExecutionError("Idempotency key is already bound to another experiment run.", 409, "EXPERIMENT_IDEMPOTENCY_CONFLICT");
-      }
-      return Object.freeze({ run, outcome: run.outcome });
+    const existing = key ? runService.getByIdempotencyKey?.(key) : null;
+    if (existing) {
+      if (existing.experimentId !== experimentId || existing.contextVersionId !== planResult.contextVersionId) throw new ExperimentExecutionError("Idempotency key is already bound to another experiment run.", 409, "EXPERIMENT_IDEMPOTENCY_CONFLICT");
+      return Object.freeze({ run: existing, outcome: existing.outcome });
     }
 
-    run = runService.create({ experimentId, contextVersionId: planResult.contextVersionId, idempotencyKey: key });
+    const run = runService.create(runCreateOptions(experimentId, planResult.contextVersionId, key));
     const startedRun = runService.start(run.id, { contextVersionId: planResult.contextVersionId });
-
     try {
       const result = await executor({ plan: planResult, run: startedRun, input });
       return recordResult(startedRun.id, { contextVersionId: planResult.contextVersionId, result });
