@@ -1,6 +1,7 @@
-import { getProvider, listProviders, resolveProvider } from "./registry.js";
+import { getProvider, listProviders } from "./registry.js";
+import { routeProvider } from "./router.js";
 
-export { getProvider, listProviders, resolveProvider };
+export { getProvider, listProviders };
 
 export async function runAI({
   provider = "cloudflare",
@@ -10,7 +11,7 @@ export async function runAI({
   maxTokens,
   temperature,
 }) {
-  const entry = resolveProvider({ provider, capability });
+  const entry = routeProvider({ provider, capability });
 
   return entry.run({
     system,
