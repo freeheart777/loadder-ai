@@ -18,7 +18,7 @@ export function createHumanGovernanceRouter({service, experimentRunService: inje
     const provider=createOpenAICompatibleProvider({
       apiKey:process.env.OPENAI_API_KEY,
       baseUrl:process.env.OPENAI_BASE_URL||"https://api.openai.com/v1",
-      model:process.env.OPENAI_EXPERIMENT_MODEL||process.env.OPENAI_BUSINESS_BRAIN_MODEL||"gpt-5.6-terra",
+      model:process.env.OPENAI_EXPERIMENT_MODEL||process.env.OPENAI_BUSINESS_BRAIN_MODEL,
     });
     return createExperimentExecutionService({
       experimentRepository:createExperimentRepository(db),
@@ -42,7 +42,7 @@ export function createHumanGovernanceRouter({service, experimentRunService: inje
   router.post("/experiments/:experimentId/execute",async(req,res)=>{
     try{
       const executionService=createExecutionService();
-      if(!executionService)return res.status(501).json({success:false,code:"EXPERIMENT_EXECUTOR_NOT_CONFIGURED",message:"OPENAI_API_KEY is required for automatic experiment execution."});
+      if(!executionService)return res.status(501).json({success:false,code:"EXPERIMENT_EXECUTOR_NOT_CONFIGURED",message:"OPENAI_API_KEY and an experiment model are required for automatic experiment execution."});
       const result=await executionService.execute(req.params.experimentId,{input:req.body?.input??req.body?.prompt??{}});
       return res.status(result.run.status==="COMPLETED"?200:502).json({success:result.run.status==="COMPLETED",...result});
     }catch(error){return handleExecution(error,res);}
