@@ -37,6 +37,7 @@ import { migration036IntelligenceRecommendations } from "./036_intelligence_reco
 import { migration037HumanGovernance } from "./037_human_governance.mjs";
 import { migration038Experiments } from "./038_experiments.mjs";
 import { migration039ExperimentRuns } from "./039_experiment_runs.mjs";
+import { migration040ExperimentRunIdempotency } from "./040_experiment_run_idempotency.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -78,4 +79,5 @@ export const migrations = [
   migration037HumanGovernance,
   migration038Experiments,
   migration039ExperimentRuns,
+  migration040ExperimentRunIdempotency,
 ];
