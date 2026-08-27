@@ -1,22 +1,22 @@
-import { runCloudflare } from "./cloudflare.js";
+import { getProvider, listProviders } from "./registry.js";
+import { routeProvider } from "./router.js";
+
+export { getProvider, listProviders };
 
 export async function runAI({
   provider = "cloudflare",
+  capability = "chat",
   system,
   user,
   maxTokens,
   temperature,
 }) {
-  if (provider === "cloudflare") {
-    return runCloudflare({
-      system,
-      user,
-      maxTokens,
-      temperature,
-    });
-  }
+  const entry = routeProvider({ provider, capability });
 
-  throw new Error(
-    `Unsupported AI provider: ${provider}`
-  );
+  return entry.run({
+    system,
+    user,
+    maxTokens,
+    temperature,
+  });
 }
