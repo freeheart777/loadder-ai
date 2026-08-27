@@ -1,6 +1,7 @@
 export const migration041ExperimentRunLeases = {
   version: 41,
   name: "experiment_run_leases",
+
   up(db) {
     db.exec(`
       ALTER TABLE experiment_runs ADD COLUMN lease_token TEXT;
