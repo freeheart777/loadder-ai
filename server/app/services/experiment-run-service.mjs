@@ -41,13 +41,18 @@ export function createExperimentRunService({ repository, now = () => new Date() 
     return run;
   };
 
-  function create({ experimentId, contextVersionId }) {
+  function getByIdempotencyKey(idempotencyKey) {
+    if (!idempotencyKey) return null;
+    return repository.getByIdempotencyKey?.(idempotencyKey) ?? null;
+  }
+
+  function create({ experimentId, contextVersionId, idempotencyKey = null }) {
     if (!experimentId || !contextVersionId) throw new ExperimentRunError("experimentId and contextVersionId are required.");
     const experiment = repository.getExperiment(experimentId);
     if (!experiment) throw new ExperimentRunError("Experiment not found.", 404, "EXPERIMENT_NOT_FOUND");
     if (experiment.context_version_id !== contextVersionId) throw new ExperimentRunError("Context version does not match the experiment.", 409, "EXPERIMENT_CONTEXT_MISMATCH");
     if (experiment.status !== "READY" && experiment.status !== "RUNNING") throw new ExperimentRunError("Experiment is not ready to run.", 409, "EXPERIMENT_NOT_RUNNABLE");
-    const run = repository.create({ experimentId, contextVersionId, now: timestamp() });
+    const run = repository.create({ experimentId, contextVersionId, idempotencyKey, now: timestamp() });
     if (!run) throw new ExperimentRunError("Experiment not found.", 404, "EXPERIMENT_NOT_FOUND");
     return run;
   }
@@ -72,6 +77,7 @@ export function createExperimentRunService({ repository, now = () => new Date() 
     create,
     list,
     get: getOrThrow,
+    getByIdempotencyKey,
     start: (id, options) => change(id, { ...options, to: "RUNNING" }),
     complete: (id, options) => change(id, { ...options, to: "COMPLETED" }),
     fail: (id, options) => change(id, { ...options, to: "FAILED" }),
