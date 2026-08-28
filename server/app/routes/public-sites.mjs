@@ -1,7 +1,9 @@
+import crypto from "node:crypto";
 import express from "express";
 
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const normalizeHost = (value) => String(value ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
+const hashPreviewToken = (token) => crypto.createHash("sha256").update(String(token)).digest("hex");
 
 export const renderPublishedSite = (project, version, assets = []) => {
   const content = version?.content && typeof version.content === "object" ? version.content : {};
@@ -24,6 +26,19 @@ export function createPublicSitesRouter({ repository }) {
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     return res.set({ "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(published.project, published.version, published.assets));
   };
+  const sendPreview = (req, res, preview) => {
+    if (!preview) return res.status(404).send("Preview not found");
+    const etag = `W/\"preview-${preview.project.id}-${preview.project.updatedAt}\"`;
+    if (req.headers["if-none-match"] === etag) return res.status(304).end();
+    const draftVersion = { version: "draft", content: preview.project.content };
+    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets));
+  };
+  router.get("/preview/sites/:id", (req, res) => {
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    if (token.length < 32 || token.length > 128) return res.status(401).send("Preview token required");
+    try { return sendPreview(req, res, repository.getPreviewByToken(hashPreviewToken(token), req.params.id)); }
+    catch (error) { console.error("Preview site error:", error); return res.status(500).send("Unable to render preview"); }
+  });
   router.get("/sites/:id", (req, res) => {
     try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id)); }
     catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
