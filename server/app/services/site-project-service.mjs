@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { requireWorkspaceId } from "../tenant-context.mjs";
 
 const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
 const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
@@ -28,7 +29,7 @@ const validateAssetUrl = (value) => {
   return url;
 };
 
-export function createSiteProjectService({ repository, businessContextService, now = () => new Date() }) {
+export function createSiteProjectService({ repository, businessContextService, domainService, now = () => new Date() }) {
   const requireType = (siteType) => { if (!TYPES.has(siteType)) throw new SiteProjectError("siteType is invalid.", 400, "SITE_TYPE_INVALID"); return siteType; };
   function contextSeed() {
     const current = businessContextService?.getCurrent?.();
@@ -69,11 +70,23 @@ export function createSiteProjectService({ repository, businessContextService, n
     if (storageKey && storageKey.length > MAX_STORAGE_KEY) throw new SiteProjectError("storageKey is too long.", 400, "SITE_ASSET_STORAGE_KEY_INVALID");
     return repository.addAsset(id, { ...input, name: input.name.trim(), url, storageKey: storageKey || null, metadata: input.metadata ?? {}, now: now().toISOString() });
   }
+  function domains(id) { get(id); return domainService?.listByProject?.(requireWorkspaceId(), id) ?? []; }
+  function addDomain(id, domain) {
+    get(id);
+    if (!domainService) throw new SiteProjectError("Domain service is not configured.", 501, "SITE_DOMAIN_SERVICE_NOT_CONFIGURED");
+    try { return domainService.attach({ workspaceId: requireWorkspaceId(), siteProjectId: id, domain, now: now().toISOString() }); }
+    catch (error) { throw new SiteProjectError(error.message, error.status || 400, error.code || "SITE_DOMAIN_ERROR"); }
+  }
+  function removeDomain(id, domain) {
+    get(id);
+    if (!domainService) throw new SiteProjectError("Domain service is not configured.", 501, "SITE_DOMAIN_SERVICE_NOT_CONFIGURED");
+    return domainService.remove(requireWorkspaceId(), id, domain);
+  }
   function remove(id) { get(id); return repository.remove(id); }
   function removeAsset(projectId, assetId) {
     get(projectId);
     if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
     return true;
   }
-  return Object.freeze({ list, get, create, update, publish, versions, assets, addAsset, remove, removeAsset });
+  return Object.freeze({ list, get, create, update, publish, versions, assets, addAsset, domains, addDomain, removeDomain, remove, removeAsset });
 }
