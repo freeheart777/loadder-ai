@@ -7,6 +7,7 @@ const MAX_ASSET_NAME = 200;
 const MAX_ASSET_URL = 8 * 1024 * 1024;
 const MAX_STORAGE_KEY = 500;
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`;
+const hashPreviewToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
 export class SiteProjectError extends Error {
   constructor(message, status = 400, code = "SITE_PROJECT_ERROR") { super(message); this.status = status; this.code = code; }
@@ -82,11 +83,17 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!domainService) throw new SiteProjectError("Domain service is not configured.", 501, "SITE_DOMAIN_SERVICE_NOT_CONFIGURED");
     return domainService.remove(requireWorkspaceId(), id, domain);
   }
+  function createPreviewToken(id) {
+    get(id);
+    const token = crypto.randomBytes(32).toString("base64url");
+    if (!repository.createPreviewToken(id, hashPreviewToken(token))) throw new SiteProjectError("Unable to create preview token.", 500, "SITE_PREVIEW_TOKEN_CREATE_FAILED");
+    return token;
+  }
   function remove(id) { get(id); return repository.remove(id); }
   function removeAsset(projectId, assetId) {
     get(projectId);
     if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
     return true;
   }
-  return Object.freeze({ list, get, create, update, publish, versions, assets, addAsset, domains, addDomain, removeDomain, remove, removeAsset });
+  return Object.freeze({ list, get, create, update, publish, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, remove, removeAsset });
 }
