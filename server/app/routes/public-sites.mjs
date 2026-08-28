@@ -1,6 +1,7 @@
 import express from "express";
 
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+const normalizeHost = (value) => String(value ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
 
 export const renderPublishedSite = (project, version, assets = []) => {
   const content = version?.content && typeof version.content === "object" ? version.content : {};
@@ -17,17 +18,21 @@ export const renderPublishedSite = (project, version, assets = []) => {
 
 export function createPublicSitesRouter({ repository }) {
   const router = express.Router();
+  const sendPublished = (req, res, published) => {
+    if (!published) return res.status(404).send("Site not found");
+    const etag = `W/\"site-${published.version.id}\"`;
+    if (req.headers["if-none-match"] === etag) return res.status(304).end();
+    return res.set({ "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(published.project, published.version, published.assets));
+  };
   router.get("/sites/:id", (req, res) => {
-    try {
-      const published = repository.getPublishedPublic(req.params.id);
-      if (!published) return res.status(404).send("Site not found");
-      const etag = `W/\"site-${published.version.id}\"`;
-      if (req.headers["if-none-match"] === etag) return res.status(304).end();
-      return res.set({ "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(published.project, published.version, published.assets));
-    } catch (error) {
-      console.error("Public site error:", error);
-      return res.status(500).send("Unable to render site");
-    }
+    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id)); }
+    catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
+  });
+  router.get("/", (req, res, next) => {
+    const host = normalizeHost(req.headers.host);
+    if (!host || host === "localhost" || host === "127.0.0.1") return next();
+    try { return sendPublished(req, res, repository.getPublishedPublicByDomain(host)); }
+    catch (error) { console.error("Domain site error:", error); return res.status(500).send("Unable to render site"); }
   });
   return router;
 }
