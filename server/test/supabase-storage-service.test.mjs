@@ -23,8 +23,8 @@ test("storage service rejects traversal and can issue signed downloads", async (
   assert.equal(new URL(result.signedUrl).searchParams.get("token"),"xyz");
 });
 
-test("unconfigured storage fails closed", async () => {
+test("unconfigured storage fails closed", () => {
   const service=createSupabaseStorageService({projectUrl:null,serviceRoleKey:null});
   assert.equal(service.configured,false);
-  await assert.rejects(()=>service.createUploadUrl({workspaceId:"ws",siteProjectId:"p",filename:"x.png"}),(error)=>error.code==="SITE_STORAGE_NOT_CONFIGURED");
+  assert.throws(()=>service.createUploadUrl({workspaceId:"ws",siteProjectId:"p",filename:"x.png"}),(error)=>error.code==="SITE_STORAGE_NOT_CONFIGURED");
 });
