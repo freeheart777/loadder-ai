@@ -4,7 +4,7 @@ const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
 const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
 const MAX_ASSET_NAME = 200;
 const MAX_ASSET_URL = 8 * 1024 * 1024;
-const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`);
+const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`;
 
 export class SiteProjectError extends Error {
   constructor(message, status = 400, code = "SITE_PROJECT_ERROR") { super(message); this.status = status; this.code = code; }
@@ -31,16 +31,18 @@ export function createSiteProjectService({ repository, businessContextService, n
   const requireType = (siteType) => { if (!TYPES.has(siteType)) throw new SiteProjectError("siteType is invalid.", 400, "SITE_TYPE_INVALID"); return siteType; };
   function contextSeed() {
     const current = businessContextService?.getCurrent?.();
-    if (!current?.activeContext) throw new SiteProjectError("Business Context is required before creating a site.", 409, "BUSINESS_CONTEXT_REQUIRED");
+    if (!current?.activeContext) return null;
     if (current.isStale) throw new SiteProjectError("Business Context is stale. Refresh it before creating a site.", 409, "BUSINESS_CONTEXT_STALE");
     return current.activeContext;
   }
   function create({ name, siteType, slug, content = {} }) {
-    const context = contextSeed();
     if (typeof name !== "string" || !name.trim()) throw new SiteProjectError("name is required.");
     requireType(siteType);
+    const context = contextSeed();
     const cleanName = name.trim();
-    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context.id, content, now: now().toISOString() });
+    const generatedFrom = context ? "BUSINESS_CONTEXT" : "MANUAL";
+    const nextContent = { ...content, generatedFrom, ...(context ? { contextVersionId: context.id } : {}) };
+    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context?.id ?? null, content: nextContent, now: now().toISOString() });
   }
   function update(id, input = {}) {
     const current = repository.get(id);

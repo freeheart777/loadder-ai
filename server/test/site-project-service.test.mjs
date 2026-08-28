@@ -7,11 +7,42 @@ import { createSiteProjectRepository } from "../app/repositories/site-project-re
 import { createSiteProjectService } from "../app/services/site-project-service.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 
-test("site projects persist content/assets and publish state per workspace", () => {
+const createFixture = (getCurrent = () => ({ activeContext: { id: "ctx-1" }, isStale: false })) => {
   const db = new Database(":memory:");
   runMigrations(db, migrations);
   const repository = createSiteProjectRepository(db);
-  const service = createSiteProjectService({ repository, businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) }, now: () => new Date("2026-08-28T00:00:00.000Z") });
+  const service = createSiteProjectService({ repository, businessContextService: { getCurrent }, now: () => new Date("2026-08-28T00:00:00.000Z") });
+  return { db, service };
+};
+
+test("site projects can be created standalone without Business Context", () => {
+  const { db, service } = createFixture(() => ({ activeContext: null, isStale: false }));
+  const project = runWithWorkspace("ws-manual", () => service.create({ name: "Manual News", siteType: "NEWS", content: { headline: "Hello" } }));
+  assert.equal(project.contextVersionId, null);
+  assert.equal(project.content.generatedFrom, "MANUAL");
+  assert.equal(project.content.headline, "Hello");
+  assert.equal(project.status, "DRAFT");
+  assert.equal(runWithWorkspace("ws-manual", () => service.publish(project.id).status), "PUBLISHED");
+  db.close();
+});
+
+test("site projects use active Business Context when available", () => {
+  const { db, service } = createFixture();
+  const project = runWithWorkspace("ws-context", () => service.create({ name: "Context Store", siteType: "STORE", content: { hero: "Hello" } }));
+  assert.equal(project.contextVersionId, "ctx-1");
+  assert.equal(project.content.generatedFrom, "BUSINESS_CONTEXT");
+  assert.equal(project.content.contextVersionId, "ctx-1");
+  db.close();
+});
+
+test("site projects reject stale Business Context", () => {
+  const { db, service } = createFixture(() => ({ activeContext: { id: "ctx-1" }, isStale: true }));
+  assert.throws(() => runWithWorkspace("ws-stale", () => service.create({ name: "Blocked", siteType: "BUSINESS", content: { headline: "x" } })), (error) => error.code === "BUSINESS_CONTEXT_STALE");
+  db.close();
+});
+
+test("site projects persist content/assets and publish state per workspace", () => {
+  const { db, service } = createFixture();
   const project = runWithWorkspace("ws-1", () => service.create({ name: "My Store", siteType: "STORE", content: { hero: "Hello" } }));
   const otherProject = runWithWorkspace("ws-1", () => service.create({ name: "Other Store", siteType: "STORE", content: { hero: "Other" } }));
 
