@@ -23,9 +23,9 @@ const validateAssetUrl = (value) => {
   }
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("unsupported protocol");
+    if (parsed.protocol !== "https:") throw new Error("unsupported protocol");
   } catch {
-    throw new SiteProjectError("Asset url must be an HTTP(S) URL or supported image data URL.", 400, "SITE_ASSET_URL_INVALID");
+    throw new SiteProjectError("Asset url must be an HTTPS URL or supported image data URL.", 400, "SITE_ASSET_URL_INVALID");
   }
   return url;
 };
@@ -89,11 +89,12 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!repository.createPreviewToken(id, hashPreviewToken(token))) throw new SiteProjectError("Unable to create preview token.", 500, "SITE_PREVIEW_TOKEN_CREATE_FAILED");
     return token;
   }
+  function revokePreviewToken(id) { get(id); return repository.revokePreviewToken(id); }
   function remove(id) { get(id); return repository.remove(id); }
   function removeAsset(projectId, assetId) {
     get(projectId);
     if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
     return true;
   }
-  return Object.freeze({ list, get, create, update, publish, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, remove, removeAsset });
+  return Object.freeze({ list, get, create, update, publish, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
 }
