@@ -37,6 +37,13 @@ export function createSiteProjectRepository(db) {
     return mapProject(db.prepare("SELECT * FROM site_projects WHERE id=? AND workspace_id=?").get(id, workspace()));
   }
 
+  function getPublished(id) {
+    const project = mapProject(db.prepare("SELECT * FROM site_projects WHERE id=? AND status='PUBLISHED'").get(id));
+    if (!project) return null;
+    const assets = db.prepare("SELECT * FROM site_assets WHERE site_project_id=? AND workspace_id=? ORDER BY created_at DESC").all(project.id, project.workspaceId).map(mapAsset);
+    return { project, assets };
+  }
+
   function create({ name, siteType, slug, contextVersionId = null, content = {}, now }) {
     const id = crypto.randomUUID();
     db.prepare("INSERT INTO site_projects(id,workspace_id,context_version_id,name,site_type,slug,status,content_json,created_at,updated_at) VALUES(?,?,?,?,?,?, 'DRAFT',?,?,?)")
@@ -77,5 +84,5 @@ export function createSiteProjectRepository(db) {
     return db.prepare("DELETE FROM site_assets WHERE id=? AND site_project_id=? AND workspace_id=?").run(id, siteProjectId, workspace()).changes === 1;
   }
 
-  return Object.freeze({ list, get, create, update, publish, remove, listAssets, addAsset, removeAsset });
+  return Object.freeze({ list, get, getPublished, create, update, publish, remove, listAssets, addAsset, removeAsset });
 }
