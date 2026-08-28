@@ -30,12 +30,22 @@ test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "loadder-recommendation-")), path = join(dir, "recommendation.sqlite");
   copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
   const db = new Database(path); db.pragma("foreign_keys=ON");
-  if (db.prepare("SELECT 1 FROM schema_migrations WHERE version=37").get()) {
-    db.exec("DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard; DROP TRIGGER IF EXISTS trg_recommendation_reviews_update; DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete; DROP TRIGGER IF EXISTS trg_decision_records_insert_guard; DROP TRIGGER IF EXISTS trg_decision_records_update; DROP TRIGGER IF EXISTS trg_decision_records_delete; DROP TABLE IF EXISTS decision_records; DROP TABLE IF EXISTS recommendation_reviews; DELETE FROM schema_migrations WHERE version=37;");
-  }
-  if (db.prepare("SELECT 1 FROM schema_migrations WHERE version=36").get()) {
-    db.exec("DROP TRIGGER IF EXISTS trg_intelligence_recommendations_insert_guard; DROP TRIGGER IF EXISTS trg_intelligence_recommendations_update; DROP TRIGGER IF EXISTS trg_intelligence_recommendations_delete; DROP TABLE IF EXISTS intelligence_recommendations; DELETE FROM schema_migrations WHERE version=36;");
-  }
+  db.exec(`
+    DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard;
+    DROP TRIGGER IF EXISTS trg_recommendation_reviews_update;
+    DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete;
+    DROP TRIGGER IF EXISTS trg_decision_records_insert_guard;
+    DROP TRIGGER IF EXISTS trg_decision_records_update;
+    DROP TRIGGER IF EXISTS trg_decision_records_delete;
+    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_insert_guard;
+    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_update;
+    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_delete;
+    DROP TABLE IF EXISTS decision_records;
+    DROP TABLE IF EXISTS recommendation_reviews;
+    DROP TABLE IF EXISTS intelligence_recommendations;
+    DELETE FROM schema_migrations WHERE version >= 36;
+  `);
+
   const tableCountBefore = db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c;
   runMigrations(db, migrations.filter((migration) => migration.version <= 36));
   runMigrations(db, migrations.filter((migration) => migration.version <= 36));

@@ -18,7 +18,18 @@ import {encodeCursor} from "../app/query/cursor-pagination.mjs";
 const AT="2026-08-21T12:00:00.000Z",LATER="2026-08-21T13:00:00.000Z",sha="a".repeat(64);
 test("Phase 4G v1 Human Governance",async t=>{
  const dir=mkdtempSync(join(tmpdir(),"loadder-governance-")),path=join(dir,"governance.sqlite");copyFileSync(new URL("../db/loadder.sqlite",import.meta.url),path);const db=new Database(path);db.pragma("foreign_keys=ON");
- if(db.prepare("SELECT 1 FROM schema_migrations WHERE version=37").get())db.exec("DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard; DROP TRIGGER IF EXISTS trg_recommendation_reviews_update; DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete; DROP TRIGGER IF EXISTS trg_decision_records_insert_guard; DROP TRIGGER IF EXISTS trg_decision_records_update; DROP TRIGGER IF EXISTS trg_decision_records_delete; DROP TABLE IF EXISTS decision_records; DROP TABLE IF EXISTS recommendation_reviews; DELETE FROM schema_migrations WHERE version=37;");
+ db.exec(`
+  DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard;
+  DROP TRIGGER IF EXISTS trg_recommendation_reviews_update;
+  DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete;
+  DROP TRIGGER IF EXISTS trg_decision_records_insert_guard;
+  DROP TRIGGER IF EXISTS trg_decision_records_update;
+  DROP TRIGGER IF EXISTS trg_decision_records_delete;
+  DROP TABLE IF EXISTS decision_records;
+  DROP TABLE IF EXISTS recommendation_reviews;
+  DELETE FROM schema_migrations WHERE version >= 37;
+ `);
+
  const before=db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c;runMigrations(db);runMigrations(db);
  const setup=(wid)=>{db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at)VALUES(?,?,?,?,?)").run(wid,wid,wid,AT,AT);db.prepare("INSERT INTO business_profiles(id,workspace_id,name,status,created_at,updated_at)VALUES(?,?,?,?,?,?)").run(`p-${wid}`,wid,wid,"active",AT,AT);db.prepare("INSERT INTO business_dna_versions(id,workspace_id,business_profile_id,version_number,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(`d-${wid}`,wid,`p-${wid}`,1,"active",AT,AT);db.prepare("INSERT INTO brand_book_versions(id,workspace_id,business_profile_id,version_number,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(`b-${wid}`,wid,`p-${wid}`,1,"active",AT,AT);db.prepare("INSERT INTO business_context_versions(id,workspace_id,business_profile_id,business_dna_version_id,brand_book_version_id,version_number,status,context_schema_version,snapshot_json,source_manifest_json,created_at,activated_at)VALUES(?,?,?,?,?,1,'active','1.0','{}','{}',?,?)").run(`c-${wid}`,wid,`p-${wid}`,`d-${wid}`,`b-${wid}`,AT,AT);};setup("ga");setup("gb");
  const actor=(id,role,wid="ga")=>{db.prepare("INSERT INTO users(id,mobile,name,status,created_at,updated_at)VALUES(?,?,?,?,?,?)").run(id,`09${id.padEnd(9,"0").slice(0,9)}`,id,"active",AT,AT);const membershipId=`m-${id}-${wid}`;db.prepare("INSERT INTO workspace_memberships(id,workspace_id,user_id,role,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(membershipId,wid,id,role,"active",AT,AT);return{userId:id,membershipId,role};};const owner=actor("owner","owner"),admin=actor("admin","admin"),member=actor("member","member"),foreign=actor("foreign","owner","gb");
