@@ -1,11 +1,31 @@
 import crypto from "node:crypto";
 
 const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
-const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`;
+const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
+const MAX_ASSET_NAME = 200;
+const MAX_ASSET_URL = 8 * 1024 * 1024;
+const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`);
 
 export class SiteProjectError extends Error {
   constructor(message, status = 400, code = "SITE_PROJECT_ERROR") { super(message); this.status = status; this.code = code; }
 }
+
+const validateAssetUrl = (value) => {
+  if (typeof value !== "string" || !value.trim()) throw new SiteProjectError("Asset name and url are required.");
+  const url = value.trim();
+  if (url.length > MAX_ASSET_URL) throw new SiteProjectError("Asset payload is too large.", 413, "SITE_ASSET_TOO_LARGE");
+  if (url.startsWith("data:")) {
+    if (!/^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml);base64,/i.test(url)) throw new SiteProjectError("Only base64 image data URLs are supported.", 400, "SITE_ASSET_URL_INVALID");
+    return url;
+  }
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("unsupported protocol");
+  } catch {
+    throw new SiteProjectError("Asset url must be an HTTP(S) URL or supported image data URL.", 400, "SITE_ASSET_URL_INVALID");
+  }
+  return url;
+};
 
 export function createSiteProjectService({ repository, businessContextService, now = () => new Date() }) {
   const requireType = (siteType) => { if (!TYPES.has(siteType)) throw new SiteProjectError("siteType is invalid.", 400, "SITE_TYPE_INVALID"); return siteType; };
@@ -38,12 +58,18 @@ export function createSiteProjectService({ repository, businessContextService, n
   function get(id) { const project = repository.get(id); if (!project) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND"); return project; }
   function assets(id) { get(id); return repository.listAssets(id); }
   function addAsset(id, input) {
-    if (!input?.url || !input?.name) throw new SiteProjectError("Asset name and url are required.");
-    const asset = repository.addAsset(id, { ...input, now: now().toISOString() });
-    if (!asset) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND");
-    return asset;
+    get(id);
+    if (!ASSET_KINDS.has(input?.kind)) throw new SiteProjectError("Asset kind is invalid.", 400, "SITE_ASSET_KIND_INVALID");
+    if (typeof input?.name !== "string" || !input.name.trim()) throw new SiteProjectError("Asset name and url are required.");
+    if (input.name.trim().length > MAX_ASSET_NAME) throw new SiteProjectError("Asset name is too long.", 400, "SITE_ASSET_NAME_INVALID");
+    const url = validateAssetUrl(input.url);
+    return repository.addAsset(id, { ...input, name: input.name.trim(), url, now: now().toISOString() });
   }
   function remove(id) { get(id); return repository.remove(id); }
-  function removeAsset(id) { get(id); if (!repository.removeAsset(id)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND"); return true; }
+  function removeAsset(projectId, assetId) {
+    get(projectId);
+    if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
+    return true;
+  }
   return Object.freeze({ list, get, create, update, publish, assets, addAsset, remove, removeAsset });
 }

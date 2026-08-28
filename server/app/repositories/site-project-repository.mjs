@@ -73,8 +73,8 @@ export function createSiteProjectRepository(db) {
     return mapAsset(db.prepare("SELECT * FROM site_assets WHERE id=? AND workspace_id=?").get(id, workspace()));
   }
 
-  function removeAsset(id) {
-    return db.prepare("DELETE FROM site_assets WHERE id=? AND workspace_id=?").run(id, workspace()).changes === 1;
+  function removeAsset(siteProjectId, id) {
+    return db.prepare("DELETE FROM site_assets WHERE id=? AND site_project_id=? AND workspace_id=?").run(id, siteProjectId, workspace()).changes === 1;
   }
 
   return Object.freeze({ list, get, create, update, publish, remove, listAssets, addAsset, removeAsset });
