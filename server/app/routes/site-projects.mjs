@@ -16,6 +16,7 @@ export function createSiteProjectsRouter({ service }) {
   router.post("/site-projects/:id/domains", (req, res) => { try { return res.status(201).json({ success: true, domain: service.addDomain(req.params.id, req.body?.domain) }); } catch (e) { return handle(e, res); } });
   router.delete("/site-projects/:id/domains", (req, res) => { try { return res.json({ success: true, removed: service.removeDomain(req.params.id, req.body?.domain) }); } catch (e) { return handle(e, res); } });
   router.patch("/site-projects/:id", (req, res) => { try { return res.json({ success: true, project: service.update(req.params.id, req.body || {}) }); } catch (e) { return handle(e, res); } });
+  router.post("/site-projects/:id/preview-token", (req, res) => { try { const token = service.createPreviewToken(req.params.id); return res.status(201).json({ success: true, previewUrl: `/preview/sites/${encodeURIComponent(req.params.id)}?token=${encodeURIComponent(token)}` }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects/:id/publish", (req, res) => { try { return res.json({ success: true, project: service.publish(req.params.id) }); } catch (e) { return handle(e, res); } });
   router.delete("/site-projects/:id", (req, res) => { try { service.remove(req.params.id); return res.json({ success: true }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects/:id/assets", (req, res) => { try { return res.status(201).json({ success: true, asset: service.addAsset(req.params.id, req.body || {}) }); } catch (e) { return handle(e, res); } });
