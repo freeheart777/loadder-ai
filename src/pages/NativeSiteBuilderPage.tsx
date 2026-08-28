@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Briefcase, CalendarCheck, Newspaper, ShoppingBag, Sparkle, Stethoscope, Scales, ImageSquare, CheckCircle, UploadSimple, Trash, MagicWand } from "@phosphor-icons/react";
+import type { ChangeEvent } from "react";
+import { ArrowRight, Briefcase, Newspaper, ShoppingBag, Sparkle, Stethoscope, Scales, ImageSquare, CheckCircle, UploadSimple, Trash, MagicWand } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 
@@ -93,7 +94,7 @@ export default function NativeSiteBuilderPage() {
     });
   }
 
-  async function addFiles(event: React.ChangeEvent<HTMLInputElement>, kind: Asset["kind"]) {
+  async function addFiles(event: ChangeEvent<HTMLInputElement>, kind: Asset["kind"]) {
     const files = Array.from(event.target.files || []).slice(0, kind === "product" ? 12 : 3);
     if (!files.length) return;
     const accepted = files.filter((file) => file.type.startsWith("image/"));
