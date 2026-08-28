@@ -15,6 +15,6 @@ export function createSiteProjectsRouter({ service }) {
   router.post("/site-projects/:id/publish", (req, res) => { try { return res.json({ success: true, project: service.publish(req.params.id) }); } catch (e) { return handle(e, res); } });
   router.delete("/site-projects/:id", (req, res) => { try { service.remove(req.params.id); return res.json({ success: true }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects/:id/assets", (req, res) => { try { return res.status(201).json({ success: true, asset: service.addAsset(req.params.id, req.body || {}) }); } catch (e) { return handle(e, res); } });
-  router.delete("/site-projects/:id/assets/:assetId", (req, res) => { try { service.removeAsset(req.params.assetId); return res.json({ success: true }); } catch (e) { return handle(e, res); } });
+  router.delete("/site-projects/:id/assets/:assetId", (req, res) => { try { service.removeAsset(req.params.id, req.params.assetId); return res.json({ success: true }); } catch (e) { return handle(e, res); } });
   return router;
 }
