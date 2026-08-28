@@ -31,6 +31,7 @@ const AutomationPage = lazy(() => import("./pages/AutomationPage"));
 const BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage"));
 const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
 const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
+const NativeSiteBuilderPage = lazy(() => import("./pages/NativeSiteBuilderPage"));
 
 export default function App() {
   return (
@@ -39,129 +40,33 @@ export default function App() {
         <DemoModePreserver />
         <Suspense fallback={null}>
         <Routes>
-        {/* صفحه اصلی Loadder */}
-        <Route
-          path="/"
-          element={<OriginalLandingPage />}
-        />
-
-        <Route
-          path="/signup"
-          element={<AuthPage />}
-        />
+        <Route path="/" element={<OriginalLandingPage />} />
+        <Route path="/signup" element={<AuthPage />} />
 
           <Route element={<RequireAuth />}>
-            {/* داشبورد جدید */}
-            <Route
-              path="/dashboard"
-              element={<DashboardPage />}
-            />
-
-        {/* داشبورد قدیمی - فقط برای بکاپ */}
-        <Route
-          path="/legacy-dashboard"
-          element={<HomePage />}
-        />
-
-        {/* برند بوک */}
-        <Route
-          path="/dashboard/brand-book"
-          element={<BrandBookPage />}
-        />
-
-        {/* بیزنس پروپوزال */}
-        <Route
-          path="/dashboard/business-proposal"
-          element={<BusinessProposalPage />}
-        />
-
-        {/* استودیوی تولید محتوا */}
-        <Route
-          path="/dashboard/content"
-          element={<ContentStudioPage />}
-        />
-
-        {/* مدیریت شبکه‌های اجتماعی */}
-        <Route
-          path="/dashboard/social"
-          element={<SocialManagerPage />}
-        />
-
-        {/* مرکز تبلیغات */}
-        <Route
-          path="/dashboard/ads"
-          element={<AdsCenterPage />}
-        />
-
-        {/* مرکز فرماندهی مارکتینگ */}
-        <Route
-          path="/dashboard/marketing"
-          element={<MarketingPage />}
-        />
-
-        {/* ارتباط با مشتری */}
-        <Route
-          path="/dashboard/crm"
-          element={<CRMPage />}
-        />
-
-        {/* پروفایل 360 مشتری */}
-        <Route
-          path="/dashboard/crm/customer/:id"
-          element={<CustomerProfilePage />}
-        />
-
-        {/* تحلیل و گزارش */}
-        <Route
-          path="/dashboard/analytics"
-          element={<AnalyticsPage />}
-        />
-
-        {/* مرکز سنجش عملکرد */}
-        <Route
-          path="/dashboard/kpi"
-          element={<KPIPage />}
-        />
-
-        {/* پیش‌بینی آینده */}
-        <Route
-          path="/dashboard/predictive"
-          element={<PredictivePage />}
-        />
-
-        {/* اتوماسیون */}
-        <Route
-          path="/dashboard/automation"
-          element={<AutomationPage />}
-        />
-
-        {/* مغز هوشمند کسب‌وکار */}
-        <Route
-          path="/dashboard/business-brain"
-          element={<BusinessBrainPage />}
-        />
-
-        {/* هر مسیر اشتباه برگردد به داشبورد */}
-
-            <Route
-              path="/click-test"
-              element={<ClickTestPage />}
-            />
-            <Route
-              path="/intelligence"
-              element={<IntelligencePreviewPage />}
-            />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/legacy-dashboard" element={<HomePage />} />
+            <Route path="/dashboard/brand-book" element={<BrandBookPage />} />
+            <Route path="/dashboard/business-proposal" element={<BusinessProposalPage />} />
+            <Route path="/dashboard/content" element={<ContentStudioPage />} />
+            <Route path="/dashboard/social" element={<SocialManagerPage />} />
+            <Route path="/dashboard/ads" element={<AdsCenterPage />} />
+            <Route path="/dashboard/marketing" element={<MarketingPage />} />
+            <Route path="/dashboard/crm" element={<CRMPage />} />
+            <Route path="/dashboard/crm/customer/:id" element={<CustomerProfilePage />} />
+            <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+            <Route path="/dashboard/kpi" element={<KPIPage />} />
+            <Route path="/dashboard/predictive" element={<PredictivePage />} />
+            <Route path="/dashboard/automation" element={<AutomationPage />} />
+            <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
+            <Route path="/dashboard/websites" element={<NativeSiteBuilderPage />} />
+            <Route path="/dashboard/websites/new" element={<NativeSiteBuilderPage />} />
+            <Route path="/site-builder" element={<NativeSiteBuilderPage />} />
+            <Route path="/click-test" element={<ClickTestPage />} />
+            <Route path="/intelligence" element={<IntelligencePreviewPage />} />
           </Route>
 
-        <Route
-          path="*"
-          element={
-            <Navigate
-              to="/dashboard"
-              replace
-            />
-          }
-        />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         </Suspense>
       </AuthProvider>
