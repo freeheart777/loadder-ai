@@ -23,3 +23,14 @@ test("native builder is context-first and supports core website verticals", () =
   assert.match(page, /differentiators/);
   assert.match(page, /رزرو نوبت/);
 });
+
+test("native builder accepts manual visual assets and keeps a resumable draft", () => {
+  const page = read("../../src/pages/NativeSiteBuilderPage.tsx");
+  for (const kind of ["logo", "hero", "banner", "product"]) assert.match(page, new RegExp(`kind === \\"${kind}\\"|\\\"${kind}\\\"`));
+  assert.match(page, /type=\"file\"/);
+  assert.match(page, /image\//);
+  assert.match(page, /FileReader/);
+  assert.match(page, /localStorage/);
+  assert.match(page, /توضیحات تکمیلی/);
+  assert.match(page, /ساخت خودکار سایت/);
+});
