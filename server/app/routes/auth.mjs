@@ -6,6 +6,9 @@ import {
   SESSION_COOKIE_NAME,
 } from "../services/auth-service.mjs";
 import { getSessionToken } from "../middleware/auth.mjs";
+import { db } from "../../db/workspace-database.mjs";
+import { createSiteProjectRepository } from "../repositories/site-project-repository.mjs";
+import { renderPublishedSite } from "./public-sites.mjs";
 
 export function createAuthRouter({
   authService,
@@ -13,6 +16,7 @@ export function createAuthRouter({
   exposeDevelopmentOtp = false,
 }) {
   const router = express.Router();
+  const publicSiteRepository = createSiteProjectRepository(db);
   const sendOtpLimiter = rateLimit({
     windowMs: 60 * 1000,
     limit: 5,
@@ -49,6 +53,13 @@ export function createAuthRouter({
       developmentOtpExposed:
         nodeEnv !== "production" && exposeDevelopmentOtp,
     });
+  });
+
+  router.get("/sites/:id", (req, res) => {
+    const published = publicSiteRepository.getPublished(req.params.id);
+    if (!published) return res.status(404).send("Site not found");
+    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    return res.type("html").send(renderPublishedSite(published.project, published.assets));
   });
 
   router.post("/send-otp", sendOtpLimiter, (req, res) => {
