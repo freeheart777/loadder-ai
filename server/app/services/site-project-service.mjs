@@ -31,16 +31,18 @@ export function createSiteProjectService({ repository, businessContextService, n
   const requireType = (siteType) => { if (!TYPES.has(siteType)) throw new SiteProjectError("siteType is invalid.", 400, "SITE_TYPE_INVALID"); return siteType; };
   function contextSeed() {
     const current = businessContextService?.getCurrent?.();
-    if (!current?.activeContext) throw new SiteProjectError("Business Context is required before creating a site.", 409, "BUSINESS_CONTEXT_REQUIRED");
+    if (!current?.activeContext) return null;
     if (current.isStale) throw new SiteProjectError("Business Context is stale. Refresh it before creating a site.", 409, "BUSINESS_CONTEXT_STALE");
     return current.activeContext;
   }
   function create({ name, siteType, slug, content = {} }) {
-    const context = contextSeed();
     if (typeof name !== "string" || !name.trim()) throw new SiteProjectError("name is required.");
     requireType(siteType);
+    const context = contextSeed();
     const cleanName = name.trim();
-    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context.id, content, now: now().toISOString() });
+    const generatedFrom = context ? "BUSINESS_CONTEXT" : "MANUAL";
+    const nextContent = { ...content, generatedFrom, ...(context ? { contextVersionId: context.id } : {}) };
+    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context?.id ?? null, content: nextContent, now: now().toISOString() });
   }
   function update(id, input = {}) {
     const current = repository.get(id);
