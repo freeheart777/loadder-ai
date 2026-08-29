@@ -37,9 +37,9 @@ export default function App() {
       <Route path="/dashboard/crm" element={<CRMPage />} /><Route path="/dashboard/crm/customer/:id" element={<CustomerProfilePage />} />
       <Route path="/dashboard/analytics" element={<AnalyticsPage />} /><Route path="/dashboard/kpi" element={<KPIPage />} />
       <Route path="/dashboard/predictive" element={<PredictivePage />} /><Route path="/dashboard/automation" element={<AutomationPage />} />
-      <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} /><Route path="/dashboard/websites" element={<SiteProjectStudioPage />} />
-      <Route path="/dashboard/websites/studio" element={<VisualWebsiteStudioPage />} /><Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} /><Route path="/dashboard/websites/new" element={<SiteProjectStudioPage />} /><Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
-      <Route path="/site-builder" element={<SiteProjectStudioPage />} /><Route path="/click-test" element={<ClickTestPage />} /><Route path="/intelligence" element={<IntelligencePreviewPage />} />
+      <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} /><Route path="/dashboard/websites" element={<VisualWebsiteStudioPage />} />
+      <Route path="/dashboard/websites/studio" element={<VisualWebsiteStudioPage />} /><Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} /><Route path="/dashboard/websites/new" element={<VisualWebsiteStudioPage />} /><Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
+      <Route path="/site-builder" element={<VisualWebsiteStudioPage />} /><Route path="/site-builder/legacy" element={<SiteProjectStudioPage />} /><Route path="/click-test" element={<ClickTestPage />} /><Route path="/intelligence" element={<IntelligencePreviewPage />} />
     </Route><Route path="*" element={<Navigate to="/dashboard" replace />} />
   </Routes></Suspense></AuthProvider></BrowserRouter>;
 }
