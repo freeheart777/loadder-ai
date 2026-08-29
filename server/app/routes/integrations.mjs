@@ -1,5 +1,6 @@
 import express from "express";
 import { IntegrationError } from "../services/integration-service.mjs";
+import { createAcquisitionProviderRouter } from "./acquisition-providers.mjs";
 
 export function createIntegrationRouter({ service }) {
   const router = express.Router();
@@ -18,6 +19,8 @@ export function createIntegrationRouter({ service }) {
       message: "Integration operation failed.",
     });
   };
+
+  router.use(createAcquisitionProviderRouter());
 
   router.get("/connector-definitions", (req, res) => {
     try {
