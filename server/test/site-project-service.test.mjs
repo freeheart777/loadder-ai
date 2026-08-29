@@ -36,3 +36,26 @@ test("site projects persist content/assets and publish state per workspace", () 
   });
   db.close();
 });
+
+test("site project service rejects a repository record owned by another workspace", () => {
+  let updated = false;
+  let published = false;
+  const repository = {
+    get: () => ({ id: "site-foreign", workspaceId: "ws-2", content: { hero: "Secret" } }),
+    update: () => { updated = true; },
+    publish: () => { published = true; },
+  };
+  const service = createSiteProjectService({
+    repository,
+    businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) },
+  });
+
+  runWithWorkspace("ws-1", () => {
+    assert.throws(() => service.get("site-foreign"), (error) => error.code === "SITE_PROJECT_NOT_FOUND" && error.status === 404);
+    assert.throws(() => service.update("site-foreign", { name: "Hijack" }), (error) => error.code === "SITE_PROJECT_NOT_FOUND");
+    assert.throws(() => service.publish("site-foreign"), (error) => error.code === "SITE_PROJECT_NOT_FOUND");
+  });
+
+  assert.equal(updated, false);
+  assert.equal(published, false);
+});
