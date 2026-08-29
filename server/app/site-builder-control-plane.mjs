@@ -26,9 +26,10 @@ export function mountSiteBuilderControlPlane({ app, db, businessContextService, 
     storage: mediaStorage,
   });
 
-  app.use(basePath, createSiteProjectsRouter({ service: projectService }));
-  app.use(basePath, createSiteStorageRouter({ storage: createSupabaseStorageService(), siteService: projectService }));
-  app.use(basePath, createSiteMediaRouter({ service: mediaService }));
+  const mountPath = basePath || "/";
+  app.use(mountPath, createSiteProjectsRouter({ service: projectService }));
+  app.use(mountPath, createSiteStorageRouter({ storage: createSupabaseStorageService(), siteService: projectService }));
+  app.use(mountPath, createSiteMediaRouter({ service: mediaService }));
 
   return Object.freeze({ projectService, mediaService });
 }
