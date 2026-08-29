@@ -6,7 +6,13 @@ export function createSiteProjectsRouter({ service }) {
   const handle = (error, res) => {
     if (error instanceof SiteProjectError) return res.status(error.status).json({ success: false, message: error.message, code: error.code });
     console.error("Site project error:", error);
-    return res.status(500).json({ success: false, message: "Unable to process site project." });
+    const development = process.env.NODE_ENV !== "production";
+    return res.status(500).json({
+      success: false,
+      message: development && error instanceof Error ? error.message : "Unable to process site project.",
+      code: "SITE_PROJECT_INTERNAL_ERROR",
+      ...(development && error instanceof Error ? { details: error.stack } : {}),
+    });
   };
   router.get("/site-projects", (req, res) => { try { return res.json({ success: true, projects: service.list() }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects", (req, res) => { try { return res.status(201).json({ success: true, project: service.create(req.body || {}) }); } catch (e) { return handle(e, res); } });
