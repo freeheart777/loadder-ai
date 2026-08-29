@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
-import { runMigrations } from "../db/migrate.mjs";
-import { migrations } from "../db/migrations/index.mjs";
+import { createSiteTestDb } from "../test-helpers/site-test-db.mjs";
 import { createSiteProjectRepository } from "../app/repositories/site-project-repository.mjs";
 import { createSiteProjectService } from "../app/services/site-project-service.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 
 test("site projects persist content/assets and publish state per workspace", () => {
-  const db = new Database(":memory:");
-  runMigrations(db, migrations);
+  const db = createSiteTestDb();
   const repository = createSiteProjectRepository(db);
   const service = createSiteProjectService({ repository, businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) }, now: () => new Date("2026-08-28T00:00:00.000Z") });
   const project = runWithWorkspace("ws-1", () => service.create({ name: "My Store", siteType: "STORE", content: { hero: "Hello" } }));
@@ -35,4 +32,30 @@ test("site projects persist content/assets and publish state per workspace", () 
     assert.throws(() => service.removeAsset(project.id, otherProject.id), (error) => error.code === "SITE_PROJECT_NOT_FOUND");
   });
   db.close();
+});
+
+test("site project service rejects a repository record owned by another workspace", () => {
+  const foreignProject = { id: "project-a", workspaceId: "ws-a", content: { hero: "x" } };
+  let updated = false;
+  let published = false;
+  const service = createSiteProjectService({
+    repository: {
+      get: () => foreignProject,
+      update: () => { updated = true; return foreignProject; },
+      publish: () => { published = true; return foreignProject; },
+    },
+    businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx" }, isStale: false }) },
+  });
+
+  runWithWorkspace("ws-b", () => {
+    for (const operation of [
+      () => service.get(foreignProject.id),
+      () => service.update(foreignProject.id, { name: "stolen" }),
+      () => service.publish(foreignProject.id),
+    ]) {
+      assert.throws(operation, (error) => error.code === "SITE_PROJECT_NOT_FOUND" && error.status === 404);
+    }
+  });
+  assert.equal(updated, false);
+  assert.equal(published, false);
 });

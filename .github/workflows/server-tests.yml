@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, sprint-0-clean]
+    branches: [main, sprint-0-clean, "builder/**"]
 
 jobs:
   server-tests:

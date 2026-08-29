@@ -38,7 +38,7 @@ test("Phase 4G v1 Human Governance",async t=>{
  await t.test("migration is idempotent and adds exactly two tables",()=>{
   const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('recommendation_reviews','decision_records') ORDER BY name").all().map(r=>r.name);
   assert.deepEqual(tables,["decision_records","recommendation_reviews"]);
-  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(),{c:41,m:41});
+  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(),{c:46,m:46});
   runMigrations(db);
   runMigrations(db);
   const tablesAfter=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('recommendation_reviews','decision_records') ORDER BY name").all().map(r=>r.name);

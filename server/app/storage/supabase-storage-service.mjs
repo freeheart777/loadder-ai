@@ -31,7 +31,11 @@ const ttl = (value, max) => {
 
 export function createSupabaseStorageService({ projectUrl = process.env.SUPABASE_URL, serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY, bucket = process.env.SUPABASE_SITE_ASSET_BUCKET || DEFAULT_BUCKET, fetchImpl = globalThis.fetch } = {}) {
   if (!projectUrl || !serviceRoleKey) {
-    return Object.freeze({ configured: false, createUploadUrl() { throw new SiteStorageError("Supabase Storage is not configured.", 503, "SITE_STORAGE_NOT_CONFIGURED"); }, createDownloadUrl() { throw new SiteStorageError("Supabase Storage is not configured.", 503, "SITE_STORAGE_NOT_CONFIGURED"); } });
+    return Object.freeze({
+      configured: false,
+      async createUploadUrl() { throw new SiteStorageError("Supabase Storage is not configured.", 503, "SITE_STORAGE_NOT_CONFIGURED"); },
+      async createDownloadUrl() { throw new SiteStorageError("Supabase Storage is not configured.", 503, "SITE_STORAGE_NOT_CONFIGURED"); },
+    });
   }
   if (typeof fetchImpl !== "function") throw new TypeError("fetchImpl is required.");
   const base = `${String(projectUrl).replace(/\/+$/, "")}/storage/v1`;
