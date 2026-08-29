@@ -9,7 +9,7 @@ import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
 import { createSiteMediaRouter } from "./routes/site-media.mjs";
 
-export function mountSiteBuilderControlPlane({ app, db, businessContextService }) {
+export function mountSiteBuilderControlPlane({ app, db, businessContextService, basePath = "/api" }) {
   const projectRepository = createSiteProjectRepository(db);
   const domainService = createSiteDomainService(db);
   const projectService = createSiteProjectService({
@@ -26,9 +26,9 @@ export function mountSiteBuilderControlPlane({ app, db, businessContextService }
     storage: mediaStorage,
   });
 
-  app.use("/api", createSiteProjectsRouter({ service: projectService }));
-  app.use("/api", createSiteStorageRouter({ storage: createSupabaseStorageService(), siteService: projectService }));
-  app.use("/api", createSiteMediaRouter({ service: mediaService }));
+  app.use(basePath, createSiteProjectsRouter({ service: projectService }));
+  app.use(basePath, createSiteStorageRouter({ storage: createSupabaseStorageService(), siteService: projectService }));
+  app.use(basePath, createSiteMediaRouter({ service: mediaService }));
 
   return Object.freeze({ projectService, mediaService });
 }
