@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 
 const children = [
-  spawn(process.execPath, ["index.mjs"], { stdio: "inherit", env: process.env }),
+  spawn(process.execPath, ["--import", "./http-upload-limit-preload.mjs", "index.mjs"], { stdio: "inherit", env: process.env }),
   spawn(process.execPath, ["public-site-server.mjs"], { stdio: "inherit", env: process.env }),
 ];
 
