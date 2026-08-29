@@ -1,0 +1,202 @@
+/* Store Builder responsive preview.
+   The editor canvas changes width without changing the browser viewport,
+   so container queries are used instead of window media queries. */
+main[dir="rtl"].h-screen > div.grid > section.overflow-auto > div.mx-auto.bg-white.text-slate-900 {
+  container-type: inline-size;
+  container-name: store-preview;
+}
+
+@container store-preview (max-width: 520px) {
+  /* Store header */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > div:first-child {
+    display: grid !important;
+    grid-template-columns: 1fr auto auto !important;
+    gap: 8px !important;
+    padding: 12px !important;
+    align-items: center !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > div:first-child > b {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > div:first-child > div {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > div:first-child > button {
+    padding: 8px 9px !important;
+    border-radius: 10px !important;
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > div:nth-child(2) {
+    gap: 18px !important;
+    overflow-x: auto !important;
+    padding: 10px 12px !important;
+    white-space: nowrap !important;
+    scrollbar-width: none;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > div:nth-child(2)::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Every storefront section becomes edge-to-edge and compact on mobile. */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section {
+    padding: 14px !important;
+    border-radius: 0 !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section h2 {
+    font-size: 20px !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Hero: main creative first, two promos underneath. */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section > div.grid[style*="height"] {
+    height: auto !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section > div.grid[style*="height"] > div:first-child,
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section > div.relative.overflow-hidden.bg-slate-200 {
+    height: 230px !important;
+    min-height: 230px !important;
+    border-radius: 16px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section > div.grid[style*="height"] > div:nth-child(2) {
+    height: 108px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section .p-14 {
+    padding: 20px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section h1 {
+    font-size: 26px !important;
+    max-width: 80% !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section h1 + p {
+    margin-top: 8px !important;
+    font-size: 11px !important;
+    line-height: 1.8 !important;
+    max-width: 85% !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section h1 + p + button {
+    margin-top: 12px !important;
+    padding: 9px 14px !important;
+    border-radius: 9px !important;
+    font-size: 11px !important;
+  }
+
+  /* Trust and product grids: two-up like a native mobile storefront. */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5 > div {
+    min-width: 0 !important;
+  }
+
+  /* Category chips: compact 3-up. */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-6 > div {
+    padding: 12px 6px !important;
+    font-size: 10px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Amazing offers stays horizontally swipeable but shows almost two cards. */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all article {
+    min-width: 156px !important;
+    max-width: 156px !important;
+    padding: 9px !important;
+    border-radius: 14px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all article .aspect-square {
+    border-radius: 10px !important;
+  }
+
+  /* Product cards */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5 .group.relative.rounded-2xl {
+    padding: 9px !important;
+    border-radius: 14px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5 .group .min-h-10 {
+    min-height: 34px !important;
+    font-size: 10px !important;
+    line-height: 1.6 !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5 .group .text-sm.font-black {
+    font-size: 11px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5 .group .grid.grid-cols-2 {
+    gap: 5px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5 .group .grid.grid-cols-2 button {
+    padding: 6px 4px !important;
+    font-size: 8px !important;
+  }
+
+  /* Promotional banners stack. */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-2 {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-2 .min-h-52,
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-2 img.h-52,
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-2 .h-52 {
+    min-height: 124px !important;
+    height: 124px !important;
+  }
+
+  /* Footer: 2-column information blocks instead of 4 squeezed columns. */
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section:last-child .grid.grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 22px 14px !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section:last-child .grid.grid-cols-4 > div:first-child {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@container store-preview (min-width: 521px) and (max-width: 860px) {
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-5,
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all .grid.grid-cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .mx-auto.bg-white.text-slate-900.shadow-2xl.transition-all > section > div.grid[style*="height"] {
+    grid-template-columns: minmax(0, 1fr) 210px !important;
+  }
+}
