@@ -3,6 +3,10 @@ import OpenAI from "openai";
 
 import { executeAgentTask } from "../../ai/agent/executor.js";
 import { runCloudflare } from "../../ai/providers/cloudflare.js";
+import { db } from "../../db/database.mjs";
+import { createBusinessContextRepository } from "../repositories/business-context-repository.mjs";
+import { createBusinessContextService } from "../services/business-context-service.mjs";
+import { mountSiteBuilderControlPlane } from "../site-builder-control-plane.mjs";
 
 const router = express.Router();
 
@@ -188,6 +192,20 @@ router.post("/business-brain/analyze", async (req, res) => {
       error: "تحلیل Business Brain انجام نشد.",
     });
   }
+});
+
+// This router is mounted only after authentication, workspace membership,
+// and Workspace Context middleware in server/index.mjs. Mounting the builder
+// here keeps the runtime change isolated while preserving the full security chain.
+const siteBuilderBusinessContextService = createBusinessContextService({
+  repository: createBusinessContextRepository(db),
+  auditRepository: null,
+});
+mountSiteBuilderControlPlane({
+  app: router,
+  db,
+  businessContextService: siteBuilderBusinessContextService,
+  basePath: "/",
 });
 
 export default router;
