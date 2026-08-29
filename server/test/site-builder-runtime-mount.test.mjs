@@ -14,8 +14,9 @@ test("site builder control plane mounts project and media routes without a dupli
   const context = { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) };
   mountSiteBuilderControlPlane({ app, db, businessContextService: context, basePath: "/" });
 
-  const paths = app.router.stack
-    .filter((layer) => layer.name === "router")
+  const rootStack = app.router?.stack || app._router?.stack || [];
+  const paths = rootStack
+    .filter((layer) => layer.handle?.stack)
     .flatMap((layer) => layer.handle.stack)
     .map((layer) => layer.route?.path)
     .filter(Boolean);
