@@ -29,6 +29,8 @@ jobs:
         run: >-
           npx tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution bundler
           --jsx react-jsx --skipLibCheck --verbatimModuleSyntax true
-          src/pages/GoogleAdsSearchWizardPage.tsx src/pages/AdsCenterWithGoogleEntryPage.tsx
+          src/pages/GoogleAdsSearchWizardPage.tsx
+          src/pages/GoogleAdsConnectedWizardPage.tsx
+          src/pages/AdsCenterWithGoogleEntryPage.tsx
       - name: Build Vite bundle
         run: npx vite build
