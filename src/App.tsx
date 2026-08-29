@@ -24,6 +24,7 @@ const ClickTestPage = lazy(() => import("./pages/ClickTestPage"));
 const IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage"));
 const NativeSiteBuilderPage = lazy(() => import("./pages/NativeSiteBuilderPage"));
 const SiteProjectStudioPage = lazy(() => import("./pages/SiteProjectStudioPage"));
+const VisualWebsiteStudioPage = lazy(() => import("./pages/VisualWebsiteStudioPage"));
 const SiteOperationsDashboardPage = lazy(() => import("./pages/SiteOperationsDashboardPage"));
 export default function App() {
   return <BrowserRouter><AuthProvider><DemoModePreserver /><Suspense fallback={null}><Routes>
@@ -37,7 +38,7 @@ export default function App() {
       <Route path="/dashboard/analytics" element={<AnalyticsPage />} /><Route path="/dashboard/kpi" element={<KPIPage />} />
       <Route path="/dashboard/predictive" element={<PredictivePage />} /><Route path="/dashboard/automation" element={<AutomationPage />} />
       <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} /><Route path="/dashboard/websites" element={<SiteProjectStudioPage />} />
-      <Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} /><Route path="/dashboard/websites/new" element={<SiteProjectStudioPage />} /><Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
+      <Route path="/dashboard/websites/studio" element={<VisualWebsiteStudioPage />} /><Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} /><Route path="/dashboard/websites/new" element={<SiteProjectStudioPage />} /><Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
       <Route path="/site-builder" element={<SiteProjectStudioPage />} /><Route path="/click-test" element={<ClickTestPage />} /><Route path="/intelligence" element={<IntelligencePreviewPage />} />
     </Route><Route path="*" element={<Navigate to="/dashboard" replace />} />
   </Routes></Suspense></AuthProvider></BrowserRouter>;
