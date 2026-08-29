@@ -3,10 +3,7 @@ import OpenAI from "openai";
 
 import { executeAgentTask } from "../../ai/agent/executor.js";
 import { runCloudflare } from "../../ai/providers/cloudflare.js";
-import { db } from "../../db/database.mjs";
-import { createBusinessContextRepository } from "../repositories/business-context-repository.mjs";
-import { createBusinessContextService } from "../services/business-context-service.mjs";
-import { mountSiteBuilderControlPlane } from "../site-builder-control-plane.mjs";
+import siteBuilderRouter from "../../site-builder-runtime.mjs";
 
 const router = express.Router();
 
@@ -194,18 +191,8 @@ router.post("/business-brain/analyze", async (req, res) => {
   }
 });
 
-const siteBuilderBusinessContextService = createBusinessContextService({
-  repository: createBusinessContextRepository(db),
-  auditRepository: null,
-});
-
-// index.mjs mounts aiRouter at /api only after Auth -> Workspace Membership -> Workspace Context.
-// Builder routes inherit that chain and add Project Ownership before every project operation.
-mountSiteBuilderControlPlane({
-  app: router,
-  db,
-  businessContextService: siteBuilderBusinessContextService,
-  basePath: "/",
-});
+// index.mjs mounts aiRouter at /api after Auth -> Workspace Membership -> Workspace Context.
+// Site Builder inherits that chain and adds Project Ownership at its service boundary.
+router.use(siteBuilderRouter);
 
 export default router;
