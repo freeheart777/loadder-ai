@@ -6,6 +6,7 @@ import {tmpdir} from "node:os";
 import Database from "better-sqlite3";
 import express from "express";
 import {runMigrations} from "../db/migrate.mjs";
+import {migrations} from "../db/migrations/index.mjs";
 import {runWithWorkspace} from "../app/tenant-context.mjs";
 import {createIntelligenceRecommendationRepository} from "../app/repositories/intelligence-recommendation-repository.mjs";
 import {createHumanGovernanceRepository} from "../app/repositories/human-governance-repository.mjs";
@@ -38,7 +39,8 @@ test("Phase 4G v1 Human Governance",async t=>{
  await t.test("migration is idempotent and adds exactly two tables",()=>{
   const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('recommendation_reviews','decision_records') ORDER BY name").all().map(r=>r.name);
   assert.deepEqual(tables,["decision_records","recommendation_reviews"]);
-  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(),{c:47,m:47});
+  const latestMigrationVersion=Math.max(...migrations.map(migration=>migration.version));
+  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(),{c:migrations.length,m:latestMigrationVersion});
   runMigrations(db);
   runMigrations(db);
   const tablesAfter=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('recommendation_reviews','decision_records') ORDER BY name").all().map(r=>r.name);
