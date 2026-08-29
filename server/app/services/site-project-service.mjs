@@ -32,18 +32,18 @@ const validateAssetUrl = (value) => {
 
 export function createSiteProjectService({ repository, businessContextService, domainService, now = () => new Date() }) {
   const requireType = (siteType) => { if (!TYPES.has(siteType)) throw new SiteProjectError("siteType is invalid.", 400, "SITE_TYPE_INVALID"); return siteType; };
-  function contextSeed() {
+  function optionalContextSeed() {
     const current = businessContextService?.getCurrent?.();
-    if (!current?.activeContext) throw new SiteProjectError("Business Context is required before creating a site.", 409, "BUSINESS_CONTEXT_REQUIRED");
-    if (current.isStale) throw new SiteProjectError("Business Context is stale. Refresh it before creating a site.", 409, "BUSINESS_CONTEXT_STALE");
+    if (!current?.activeContext) return null;
+    if (current.isStale) return null;
     return current.activeContext;
   }
   function create({ name, siteType, slug, content = {} }) {
-    const context = contextSeed();
+    const context = optionalContextSeed();
     if (typeof name !== "string" || !name.trim()) throw new SiteProjectError("name is required.");
     requireType(siteType);
     const cleanName = name.trim();
-    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context.id, content, now: now().toISOString() });
+    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context?.id ?? null, content, now: now().toISOString() });
   }
   function get(id) {
     const workspaceId = requireWorkspaceId();
