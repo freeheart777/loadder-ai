@@ -30,6 +30,7 @@ const StoreWebsiteStudioPageV2 = lazy(() => import("./pages/StoreWebsiteStudioPa
 const StoreWebsiteStudioPageV3 = lazy(() => import("./pages/StoreWebsiteStudioPageV3"));
 const StoreWebsiteStudioPageV4 = lazy(() => import("./pages/StoreWebsiteStudioPageV4"));
 const StoreWebsiteStudioPageV5 = lazy(() => import("./pages/StoreWebsiteStudioPageV5"));
+const StoreWebsiteStudioPageV6 = lazy(() => import("./pages/StoreWebsiteStudioPageV6"));
 const StoreCommerceManagerPage = lazy(() => import("./pages/StoreCommerceManagerPage"));
 const StorefrontTestPage = lazy(() => import("./pages/StorefrontTestPage"));
 const SiteOperationsDashboardPage = lazy(() => import("./pages/SiteOperationsDashboardPage"));
@@ -44,10 +45,10 @@ export default function App() {
       <Route path="/dashboard/crm" element={<CRMPage />} /><Route path="/dashboard/crm/customer/:id" element={<CustomerProfilePage />} />
       <Route path="/dashboard/analytics" element={<AnalyticsPage />} /><Route path="/dashboard/kpi" element={<KPIPage />} />
       <Route path="/dashboard/predictive" element={<PredictivePage />} /><Route path="/dashboard/automation" element={<AutomationPage />} />
-      <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} /><Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV5 />} />
+      <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} /><Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV6 />} />
       <Route path="/dashboard/websites/commerce" element={<StoreCommerceManagerPage />} /><Route path="/dashboard/websites/storefront-test" element={<StorefrontTestPage />} />
-      <Route path="/dashboard/websites/studio" element={<StoreWebsiteStudioPageV5 />} /><Route path="/dashboard/websites/store-v1" element={<StoreWebsiteStudioPage />} /><Route path="/dashboard/websites/studio-v2" element={<StoreWebsiteStudioPageV2 />} /><Route path="/dashboard/websites/studio-v3" element={<StoreWebsiteStudioPageV3 />} /><Route path="/dashboard/websites/studio-v4" element={<StoreWebsiteStudioPageV4 />} /><Route path="/dashboard/websites/studio-legacy" element={<VisualWebsiteStudioPage />} /><Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} /><Route path="/dashboard/websites/new" element={<StoreWebsiteStudioPageV5 />} /><Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
-      <Route path="/site-builder" element={<StoreWebsiteStudioPageV5 />} /><Route path="/site-builder/legacy" element={<SiteProjectStudioPage />} /><Route path="/click-test" element={<ClickTestPage />} /><Route path="/intelligence" element={<IntelligencePreviewPage />} />
+      <Route path="/dashboard/websites/studio" element={<StoreWebsiteStudioPageV6 />} /><Route path="/dashboard/websites/store-v1" element={<StoreWebsiteStudioPage />} /><Route path="/dashboard/websites/studio-v2" element={<StoreWebsiteStudioPageV2 />} /><Route path="/dashboard/websites/studio-v3" element={<StoreWebsiteStudioPageV3 />} /><Route path="/dashboard/websites/studio-v4" element={<StoreWebsiteStudioPageV4 />} /><Route path="/dashboard/websites/studio-v5" element={<StoreWebsiteStudioPageV5 />} /><Route path="/dashboard/websites/studio-legacy" element={<VisualWebsiteStudioPage />} /><Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} /><Route path="/dashboard/websites/new" element={<StoreWebsiteStudioPageV6 />} /><Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
+      <Route path="/site-builder" element={<StoreWebsiteStudioPageV6 />} /><Route path="/site-builder/legacy" element={<SiteProjectStudioPage />} /><Route path="/click-test" element={<ClickTestPage />} /><Route path="/intelligence" element={<IntelligencePreviewPage />} />
     </Route><Route path="*" element={<Navigate to="/dashboard" replace />} />
   </Routes></Suspense></AuthProvider></BrowserRouter>;
 }
