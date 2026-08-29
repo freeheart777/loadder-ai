@@ -11,6 +11,7 @@ const BusinessProposalPage = lazy(() => import("./pages/BusinessProposalPage"));
 const ContentStudioPage = lazy(() => import("./pages/ContentStudioPage"));
 const SocialManagerPage = lazy(() => import("./pages/SocialManagerPage"));
 const AdsCenterPage = lazy(() => import("./pages/AdsCenterPage"));
+const GoogleAdsSearchWizardPage = lazy(() => import("./pages/GoogleAdsSearchWizardPage"));
 const MarketingPage = lazy(() => import("./pages/MarketingPage"));
 const CRMPage = lazy(() => import("./pages/CRMPage"));
 const CustomerProfilePage = lazy(() => import("./pages/CustomerProfilePage"));
@@ -31,7 +32,7 @@ export default function App() {
       <Route path="/dashboard" element={<DashboardPage />} /><Route path="/legacy-dashboard" element={<HomePage />} />
       <Route path="/dashboard/brand-book" element={<BrandBookPage />} /><Route path="/dashboard/business-proposal" element={<BusinessProposalPage />} />
       <Route path="/dashboard/content" element={<ContentStudioPage />} /><Route path="/dashboard/social" element={<SocialManagerPage />} />
-      <Route path="/dashboard/ads" element={<AdsCenterPage />} /><Route path="/dashboard/marketing" element={<MarketingPage />} />
+      <Route path="/dashboard/ads" element={<AdsCenterPage />} /><Route path="/dashboard/ads/google" element={<GoogleAdsSearchWizardPage />} /><Route path="/dashboard/marketing" element={<MarketingPage />} />
       <Route path="/dashboard/crm" element={<CRMPage />} /><Route path="/dashboard/crm/customer/:id" element={<CustomerProfilePage />} />
       <Route path="/dashboard/analytics" element={<AnalyticsPage />} /><Route path="/dashboard/kpi" element={<KPIPage />} />
       <Route path="/dashboard/predictive" element={<PredictivePage />} /><Route path="/dashboard/automation" element={<AutomationPage />} />
