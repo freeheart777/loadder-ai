@@ -8,6 +8,11 @@ export function createSiteTestDb() {
   db.exec(`
     CREATE TABLE workspaces(id TEXT PRIMARY KEY);
     CREATE TABLE business_context_versions(id TEXT PRIMARY KEY);
+    CREATE TABLE customers(
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT REFERENCES workspaces(id),
+      name TEXT NOT NULL DEFAULT 'Test Customer'
+    );
   `);
   db.prepare("INSERT INTO workspaces(id) VALUES (?), (?)").run("ws-1", "ws-2");
   db.prepare("INSERT INTO business_context_versions(id) VALUES (?)").run("ctx-1");
