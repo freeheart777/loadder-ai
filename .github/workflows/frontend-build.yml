@@ -28,7 +28,7 @@ jobs:
       - name: Typecheck targeted UI
         run: >-
           npx tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution bundler
-          --jsx react-jsx --skipLibCheck --verbatimModuleSyntax true
+          --jsx react-jsx --skipLibCheck --verbatimModuleSyntax true --types vite/client
           src/pages/GoogleAdsSearchWizardPage.tsx
           src/pages/GoogleAdsConnectedWizardPage.tsx
           src/pages/AdsCenterWithGoogleEntryPage.tsx
