@@ -127,6 +127,29 @@ textarea::placeholder {
   color: rgba(255, 255, 255, 0.3);
 }
 
+.input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+  padding: 11px 14px;
+  color: #ffffff;
+  outline: none;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.input:focus {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(10, 18, 40, 0.7);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+}
+
+select.input option {
+  background: #080d1d;
+  color: #ffffff;
+}
+
 
 /* =========================================
    LOADDER BACKGROUND
