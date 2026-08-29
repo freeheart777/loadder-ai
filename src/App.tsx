@@ -10,7 +10,7 @@ const BrandBookPage = lazy(() => import("./pages/BrandBookPage"));
 const BusinessProposalPage = lazy(() => import("./pages/BusinessProposalPage"));
 const ContentStudioPage = lazy(() => import("./pages/ContentStudioPage"));
 const SocialManagerPage = lazy(() => import("./pages/SocialManagerPage"));
-const AdsCenterPage = lazy(() => import("./pages/AdsCenterPage"));
+const AdsCenterPage = lazy(() => import("./pages/AdsCenterWithGoogleEntryPage"));
 const GoogleAdsSearchWizardPage = lazy(() => import("./pages/GoogleAdsSearchWizardPage"));
 const MarketingPage = lazy(() => import("./pages/MarketingPage"));
 const CRMPage = lazy(() => import("./pages/CRMPage"));
