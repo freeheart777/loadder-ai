@@ -194,12 +194,13 @@ router.post("/business-brain/analyze", async (req, res) => {
   }
 });
 
-// server/index.mjs mounts this router at /api only after authentication,
-// workspace membership and Workspace Context have been established.
 const siteBuilderBusinessContextService = createBusinessContextService({
   repository: createBusinessContextRepository(db),
   auditRepository: null,
 });
+
+// index.mjs mounts aiRouter at /api only after auth, membership and Workspace Context.
+// Builder routes are therefore /api/site-projects/... while inheriting that security chain.
 mountSiteBuilderControlPlane({
   app: router,
   db,
