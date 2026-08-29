@@ -55,11 +55,22 @@ export function createAuthRouter({
     });
   });
 
+  // Compatibility public-site route. This endpoint is intentionally public and
+  // therefore MUST NOT depend on tenant/workspace AsyncLocalStorage context.
   router.get("/sites/:id", (req, res) => {
-    const published = publicSiteRepository.getPublished(req.params.id);
-    if (!published) return res.status(404).send("Site not found");
-    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
-    return res.type("html").send(renderPublishedSite(published.project, published.assets));
+    try {
+      const published = publicSiteRepository.getPublishedPublic(req.params.id);
+      if (!published) return res.status(404).send("Site not found");
+      res.set({
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+      });
+      return res.type("html").send(renderPublishedSite(published.project, published.version, published.assets));
+    } catch (error) {
+      console.error("Published site error:", error);
+      return res.status(500).send("Unable to render site");
+    }
   });
 
   router.post("/send-otp", sendOtpLimiter, (req, res) => {
