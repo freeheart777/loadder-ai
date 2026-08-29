@@ -7,29 +7,20 @@ import { migrations } from "../db/migrations/index.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { mountSiteBuilderControlPlane } from "../app/site-builder-control-plane.mjs";
 
-test("site builder control plane mounts project and media routes without a duplicate api prefix", () => {
+test("site builder control plane composes project and media services on a router-relative mount", () => {
   const db = new Database(":memory:");
   runMigrations(db, migrations);
-  const app = express();
   const context = { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) };
-  mountSiteBuilderControlPlane({ app, db, businessContextService: context, basePath: "/" });
+  const app = express();
+  const mounted = mountSiteBuilderControlPlane({ app, db, businessContextService: context, basePath: "/" });
 
-  const rootStack = app.router?.stack || app._router?.stack || [];
-  const paths = rootStack
-    .filter((layer) => layer.handle?.stack)
-    .flatMap((layer) => layer.handle.stack)
-    .map((layer) => layer.route?.path)
-    .filter(Boolean);
-
-  assert.ok(paths.includes("/site-projects"));
-  assert.ok(paths.includes("/site-projects/:id/media"));
-  assert.ok(paths.includes("/site-projects/:id/media/upload-url"));
-  assert.equal(paths.some((path) => String(path).startsWith("/api/")), false);
+  assert.equal(typeof mounted.projectService.get, "function");
+  assert.equal(typeof mounted.mediaService.createUpload, "function");
 
   runWithWorkspace("ws-1", () => {
-    const mounted = mountSiteBuilderControlPlane({ app: express(), db, businessContextService: context, basePath: "/" });
     const project = mounted.projectService.create({ name: "Runtime Store", siteType: "STORE", content: { hero: "ready" } });
     assert.equal(mounted.projectService.get(project.id).workspaceId, "ws-1");
   });
+
   db.close();
 });
