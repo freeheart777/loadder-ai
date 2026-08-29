@@ -21,12 +21,12 @@ test("acquisition provider registry separates advertising and messaging executio
   assert.equal(smsIr.executionPolicy, "explicit_user_authorization");
 
   assert.deepEqual(
-    acquisitionProviderRegistry.list({ region: "IRAN" }).map((provider) => provider.providerId).sort(),
-    ["google_ads", "sms_ir"]
-  );
-  assert.deepEqual(
     acquisitionProviderRegistry.list({ category: "advertising" }).map((provider) => provider.providerId),
     ["google_ads"]
+  );
+  assert.deepEqual(
+    acquisitionProviderRegistry.list({ category: "messaging" }).map((provider) => provider.providerId),
+    ["sms_ir"]
   );
 });
 
