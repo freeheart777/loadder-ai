@@ -45,21 +45,24 @@ export function createSiteProjectService({ repository, businessContextService, d
     const cleanName = name.trim();
     return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context.id, content, now: now().toISOString() });
   }
+  function get(id) {
+    const workspaceId = requireWorkspaceId();
+    const project = repository.get(id);
+    if (!project || project.workspaceId !== workspaceId) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND");
+    return project;
+  }
   function update(id, input = {}) {
-    const current = repository.get(id);
-    if (!current) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND");
+    get(id);
     if (input.siteType !== undefined) requireType(input.siteType);
     return repository.update(id, { ...input, slug: input.slug ? slugify(input.slug) : undefined, now: now().toISOString() });
   }
   function publish(id) {
-    const current = repository.get(id);
-    if (!current) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND");
+    const current = get(id);
     if (!current.content || Object.keys(current.content).length === 0) throw new SiteProjectError("A site needs content before publishing.", 409, "SITE_CONTENT_REQUIRED");
     return repository.publish(id, now().toISOString());
   }
   function versions(id) { get(id); return repository.listPublishVersions(id); }
   function list() { return repository.list(); }
-  function get(id) { const project = repository.get(id); if (!project) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND"); return project; }
   function assets(id) { get(id); return repository.listAssets(id); }
   function addAsset(id, input) {
     get(id);
