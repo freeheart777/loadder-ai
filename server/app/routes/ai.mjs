@@ -199,8 +199,8 @@ const siteBuilderBusinessContextService = createBusinessContextService({
   auditRepository: null,
 });
 
-// index.mjs mounts aiRouter at /api only after auth, membership and Workspace Context.
-// Builder routes are therefore /api/site-projects/... while inheriting that security chain.
+// index.mjs mounts aiRouter at /api only after Auth -> Workspace Membership -> Workspace Context.
+// Builder routes inherit that chain and add Project Ownership before every project operation.
 mountSiteBuilderControlPlane({
   app: router,
   db,
