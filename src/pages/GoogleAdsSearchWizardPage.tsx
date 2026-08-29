@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -202,7 +202,7 @@ export default function GoogleAdsSearchWizardPage() {
           <section className="rounded-[28px] border border-white/[0.08] bg-[#080d1d]/66 p-6 lg:p-8">
             {step === 1 && <div className="space-y-5"><SectionTitle title="کمپین و بودجه" subtitle="نام کمپین، بودجه روزانه و استراتژی پیشنهاد قیمت" />
               <Field label="نام کمپین"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="مثلاً فروش تابستانه لودر" /></Field>
-              <Field label="بودجه روزانه"><div className="relative"><input inputMode="numeric" value={form.dailyBudget} onChange={(e) => setForm({ ...form, dailyBudget: e.target.value })} className="input pl-20" placeholder="مثلاً 500000" /><span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-white/35">واحد حساب</span></div></Field>
+              <Field label="بودجه روزانه"><div className="relative"><input inputMode="numeric" value={form.dailyBudget} onChange={(e) => setForm({ ...form, dailyBudget: e.target.value })} className="input pl-20" placeholder="مثلاً 500000" /><span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-white/35">واحد پول حساب</span></div></Field>
               <Field label="استراتژی پیشنهاد قیمت"><select value={form.biddingStrategy} onChange={(e) => setForm({ ...form, biddingStrategy: e.target.value as FormState["biddingStrategy"] })} className="input"><option value="MAXIMIZE_CLICKS">بیشترین کلیک</option><option value="MAXIMIZE_CONVERSIONS">بیشترین تبدیل</option></select></Field>
             </div>}
 
@@ -244,8 +244,8 @@ export default function GoogleAdsSearchWizardPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 block text-sm text-white/65">{label}</span>{children}</label>; }
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block"><span className="mb-2 block text-sm text-white/65">{label}</span>{children}</label>; }
 function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) { return <div><h3 className="text-xl font-bold">{title}</h3><p className="mt-2 text-sm leading-7 text-white/40">{subtitle}</p></div>; }
 function Stat({ label, value }: { label: string; value: string }) { return <div className="flex min-h-24 flex-col justify-center rounded-2xl border border-white/[0.07] bg-black/20 p-4"><div className="text-xl font-bold text-blue-200">{value}</div><div className="mt-1 text-xs text-white/35">{label}</div></div>; }
 function Review({ label, value }: { label: string; value: string }) { return <div className="flex items-start justify-between gap-5 rounded-2xl border border-white/[0.07] bg-black/20 p-4"><span className="text-sm text-white/40">{label}</span><span className="max-w-[70%] break-words text-left text-sm font-semibold">{value}</span></div>; }
-function Info({ children }: { children: React.ReactNode }) { return <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/[0.05] p-4 text-sm leading-7 text-cyan-100/70">{children}</div>; }
+function Info({ children }: { children: ReactNode }) { return <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/[0.05] p-4 text-sm leading-7 text-cyan-100/70">{children}</div>; }
