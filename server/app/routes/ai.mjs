@@ -194,9 +194,8 @@ router.post("/business-brain/analyze", async (req, res) => {
   }
 });
 
-// This router is mounted only after authentication, workspace membership,
-// and Workspace Context middleware in server/index.mjs. Mounting the builder
-// here keeps the runtime change isolated while preserving the full security chain.
+// server/index.mjs mounts this router at /api only after authentication,
+// workspace membership and Workspace Context have been established.
 const siteBuilderBusinessContextService = createBusinessContextService({
   repository: createBusinessContextRepository(db),
   auditRepository: null,
@@ -209,4 +208,3 @@ mountSiteBuilderControlPlane({
 });
 
 export default router;
-
