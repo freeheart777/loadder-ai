@@ -27,7 +27,7 @@ jobs:
         run: npm ci
       - name: Typecheck Google Ads UI
         run: >-
-          npx tsc --noEmit --target ES2023 --module ESNext --moduleResolution bundler
+          npx tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution bundler
           --jsx react-jsx --skipLibCheck --verbatimModuleSyntax true
           src/pages/GoogleAdsSearchWizardPage.tsx src/pages/AdsCenterWithGoogleEntryPage.tsx
       - name: Build Vite bundle
