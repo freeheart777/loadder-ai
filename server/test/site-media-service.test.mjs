@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
-import { runMigrations } from "../db/migrate.mjs";
-import { migrations } from "../db/migrations/index.mjs";
+import { createSiteTestDb } from "../test-helpers/site-test-db.mjs";
 import { createSiteProjectRepository } from "../app/repositories/site-project-repository.mjs";
 import { createSiteMediaRepository } from "../app/repositories/site-media-repository.mjs";
 import { createSiteProjectService } from "../app/services/site-project-service.mjs";
@@ -10,8 +8,7 @@ import { createSiteMediaService } from "../app/services/site-media-service.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 
 test("media upload is scoped to the owning workspace and project", async () => {
-  const db = new Database(":memory:");
-  runMigrations(db, migrations);
+  const db = createSiteTestDb();
   const projectService = createSiteProjectService({
     repository: createSiteProjectRepository(db),
     businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) },
