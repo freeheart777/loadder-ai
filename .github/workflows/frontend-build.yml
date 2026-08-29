@@ -25,12 +25,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Typecheck Google Ads UI
+      - name: Typecheck targeted UI
         run: >-
           npx tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution bundler
           --jsx react-jsx --skipLibCheck --verbatimModuleSyntax true
           src/pages/GoogleAdsSearchWizardPage.tsx
           src/pages/GoogleAdsConnectedWizardPage.tsx
           src/pages/AdsCenterWithGoogleEntryPage.tsx
+          src/pages/VisualWebsiteStudioPage.tsx
       - name: Build Vite bundle
         run: npx vite build
