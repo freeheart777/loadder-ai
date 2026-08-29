@@ -5,6 +5,7 @@ const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
 const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
 const MAX_ASSET_NAME = 200;
 const MAX_ASSET_URL = 8 * 1024 * 1024;
+const MAX_ASSET_BYTES = 3 * 1024 * 1024;
 const MAX_STORAGE_KEY = 500;
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`;
 const hashPreviewToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
@@ -13,12 +14,22 @@ export class SiteProjectError extends Error {
   constructor(message, status = 400, code = "SITE_PROJECT_ERROR") { super(message); this.status = status; this.code = code; }
 }
 
+const dataUrlBytes = (url) => {
+  const comma = url.indexOf(",");
+  if (comma < 0) return Infinity;
+  const payload = url.slice(comma + 1).replace(/\s/g, "");
+  if (!payload) return 0;
+  const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+  return Math.floor((payload.length * 3) / 4) - padding;
+};
+
 const validateAssetUrl = (value) => {
   if (typeof value !== "string" || !value.trim()) throw new SiteProjectError("Asset name and url are required.");
   const url = value.trim();
   if (url.length > MAX_ASSET_URL) throw new SiteProjectError("Asset payload is too large.", 413, "SITE_ASSET_TOO_LARGE");
   if (url.startsWith("data:")) {
     if (!/^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml);base64,/i.test(url)) throw new SiteProjectError("Only base64 image data URLs are supported.", 400, "SITE_ASSET_URL_INVALID");
+    if (dataUrlBytes(url) > MAX_ASSET_BYTES) throw new SiteProjectError("Image must be 3 MB or smaller.", 413, "SITE_ASSET_TOO_LARGE");
     return url;
   }
   try {
