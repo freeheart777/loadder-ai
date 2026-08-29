@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
-import Database from "better-sqlite3";
-import { runMigrations } from "../db/migrate.mjs";
-import { migrations } from "../db/migrations/index.mjs";
+import { createSiteTestDb } from "../test-helpers/site-test-db.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { mountSiteBuilderControlPlane } from "../app/site-builder-control-plane.mjs";
 
 test("site builder control plane composes tenant-safe project and media services", () => {
-  const db = new Database(":memory:");
-  runMigrations(db, migrations);
+  const db = createSiteTestDb();
   const context = { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) };
   const mounted = mountSiteBuilderControlPlane({ app: express(), db, businessContextService: context, basePath: "/" });
 
