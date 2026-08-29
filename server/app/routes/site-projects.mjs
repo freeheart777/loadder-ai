@@ -14,9 +14,24 @@ export function createSiteProjectsRouter({ service }) {
       ...(development && error instanceof Error ? { details: error.stack } : {}),
     });
   };
+  const optional = (loader, fallback, label) => {
+    try { return loader(); }
+    catch (error) { console.error(`Site project optional ${label} error:`, error); return fallback; }
+  };
   router.get("/site-projects", (req, res) => { try { return res.json({ success: true, projects: service.list() }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects", (req, res) => { try { return res.status(201).json({ success: true, project: service.create(req.body || {}) }); } catch (e) { return handle(e, res); } });
-  router.get("/site-projects/:id", (req, res) => { try { return res.json({ success: true, project: service.get(req.params.id), assets: service.assets(req.params.id), versions: service.versions(req.params.id), domains: service.domains(req.params.id) }); } catch (e) { return handle(e, res); } });
+  router.get("/site-projects/:id", (req, res) => {
+    try {
+      const project = service.get(req.params.id);
+      return res.json({
+        success: true,
+        project,
+        assets: optional(() => service.assets(req.params.id), [], "assets"),
+        versions: optional(() => service.versions(req.params.id), [], "versions"),
+        domains: optional(() => service.domains(req.params.id), [], "domains"),
+      });
+    } catch (e) { return handle(e, res); }
+  });
   router.get("/site-projects/:id/versions", (req, res) => { try { return res.json({ success: true, versions: service.versions(req.params.id) }); } catch (e) { return handle(e, res); } });
   router.get("/site-projects/:id/domains", (req, res) => { try { return res.json({ success: true, domains: service.domains(req.params.id) }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects/:id/domains", (req, res) => { try { return res.status(201).json({ success: true, domain: service.addDomain(req.params.id, req.body?.domain) }); } catch (e) { return handle(e, res); } });
