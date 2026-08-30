@@ -19,6 +19,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { apiFetch } from "../lib/api";
+import { productMainImage } from "../lib/productMedia";
 
 type PreviewMode = "desktop" | "tablet" | "mobile";
 type Panel = "design" | "sections" | null;
@@ -38,7 +39,8 @@ type Product = {
   currency: string;
   basePriceMinor: number;
   brand?: string | null;
-  variants?: Array<{ inventoryQuantity: number }>;
+  metadata?: { gallery?: string[] };
+  variants?: Array<{ inventoryQuantity: number; imageUrl?: string | null }>;
 };
 type Project = { id: string; name?: string; content: Record<string, any> };
 type DesignSettings = {
@@ -866,7 +868,15 @@ function ProductCard({
         boxShadow: `0 10px 30px rgba(15,23,42,${shadowAlpha})`,
       }}
     >
-      <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200" />
+      <div className="aspect-square overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
+        {productMainImage(product) ? (
+          <img
+            src={productMainImage(product)}
+            alt={product.name}
+            className="h-full w-full object-cover"
+          />
+        ) : null}
+      </div>
       <div className={mobile ? "p-3" : "p-4"}>
         <div className="truncate font-bold">{product.name}</div>
         {!mobile && product.brand ? (

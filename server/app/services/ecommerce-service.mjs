@@ -23,6 +23,26 @@ const nonNegativeInt = (value, field) => {
   if (!Number.isInteger(n) || n < 0) throw new EcommerceError(`${field} must be a non-negative integer.`, "INVALID_AMOUNT");
   return n;
 };
+const productImageUrl = (value, { nullable = false } = {}) => {
+  if (value == null || value === "") {
+    if (nullable) return null;
+    throw new EcommerceError("Product image URL is required.", "PRODUCT_IMAGE_URL_REQUIRED");
+  }
+  const url = String(value).trim();
+  if (url.length > 8 * 1024 * 1024) throw new EcommerceError("Product image URL is too large.", "PRODUCT_IMAGE_URL_TOO_LARGE", 413);
+  if (/^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml);base64,/i.test(url)) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:") return url;
+  } catch {}
+  throw new EcommerceError("Product image URL must use HTTPS or a supported image data URL.", "PRODUCT_IMAGE_URL_INVALID");
+};
+const productMetadata = (value, fallback = "{}") => {
+  const next = value === undefined ? json(fallback) : (value && typeof value === "object" && !Array.isArray(value) ? value : {});
+  if (next.gallery === undefined) return next;
+  if (!Array.isArray(next.gallery) || next.gallery.length > 12) throw new EcommerceError("Product gallery must contain at most 12 images.", "PRODUCT_GALLERY_INVALID");
+  return { ...next, gallery: [...new Set(next.gallery.map((url) => productImageUrl(url)))].slice(0, 12) };
+};
 
 export function createEcommerceService({ db }) {
   const workspaceId = () => requireWorkspaceId();
@@ -140,7 +160,7 @@ export function createEcommerceService({ db }) {
         featured: input.featured === undefined ? p.featured : (input.featured?1:0),
         seoTitle: input.seoTitle === undefined ? p.seo_title : input.seoTitle || null,
         seoDescription: input.seoDescription === undefined ? p.seo_description : input.seoDescription || null,
-        metadata: input.metadata === undefined ? p.metadata_json : JSON.stringify(input.metadata||{}),
+        metadata: input.metadata === undefined ? p.metadata_json : JSON.stringify(productMetadata(input.metadata)),
       };
       if (!next.name || !next.slug) throw new EcommerceError("Product name and slug are required.", "INVALID_PRODUCT");
       db.prepare(`UPDATE ecommerce_products SET name=?,slug=?,description=?,category=?,brand=?,status=?,currency=?,base_price_minor=?,compare_at_price_minor=?,featured=?,seo_title=?,seo_description=?,metadata_json=?,updated_at=? WHERE id=? AND workspace_id=?`)
@@ -154,6 +174,13 @@ export function createEcommerceService({ db }) {
       const stamp=now(), variantId=id("var");
       db.prepare(`INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,image_url,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(variantId,workspaceId(),productId,sku,String(input.title||"Variant"),input.priceMinor==null?null:nonNegativeInt(input.priceMinor,"priceMinor"),nonNegativeInt(input.inventoryQuantity,"inventoryQuantity"),input.inventoryPolicy||"DENY",JSON.stringify(input.options||{}),input.imageUrl||null,input.active===false?0:1,stamp,stamp);
+      return variantMap(requireVariant(variantId));
+    },
+    updateVariant(variantId, input = {}) {
+      const variant = requireVariant(variantId); requireSite(variant.site_project_id);
+      const imageUrl = input.imageUrl === undefined ? variant.image_url : productImageUrl(input.imageUrl, { nullable:true });
+      db.prepare("UPDATE ecommerce_variants SET image_url=?,updated_at=? WHERE id=? AND workspace_id=?")
+        .run(imageUrl,now(),variantId,workspaceId());
       return variantMap(requireVariant(variantId));
     },
     adjustInventory(variantId, delta) {

@@ -1,10 +1,221 @@
-import { useEffect,useMemo,useState } from "react";
-import { ArrowRight,ImageSquare,Package,ShoppingCartSimple,Star } from "@phosphor-icons/react";
-import { Link,useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  ImageSquare,
+  Package,
+  ShoppingCartSimple,
+  Star,
+} from "@phosphor-icons/react";
+import { Link, useParams } from "react-router-dom";
+import ProductMediaEditor, {
+  type EditableMediaProduct,
+} from "../components/commerce/ProductMediaEditor";
 import { apiFetch } from "../lib/api";
+import { productGallery } from "../lib/productMedia";
 
-type Variant={id:string;sku:string;title:string;priceMinor:number|null;inventoryQuantity:number;options:Record<string,string>;imageUrl?:string|null};
-type Product={id:string;name:string;slug:string;description?:string;status:string;currency:string;basePriceMinor:number;compareAtPriceMinor?:number|null;category?:string|null;brand?:string|null;featured?:boolean;seoTitle?:string|null;seoDescription?:string|null;metadata?:Record<string,unknown>;variants:Variant[]};
-async function read(r:Response){const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"خطا در دریافت محصول");return d}
-function fmt(minor:number,currency:string){const v=(minor||0)/100;if(currency==="IRT")return `${new Intl.NumberFormat("fa-IR").format(v)} تومان`;if(currency==="IRR")return `${new Intl.NumberFormat("fa-IR").format(v)} ریال`;return new Intl.NumberFormat("fa-IR",{style:"currency",currency:currency||"USD"}).format(v)}
-export default function StoreProductDetailPage(){const{id}=useParams(),[product,setProduct]=useState<Product|null>(null),[selected,setSelected]=useState<Variant|null>(null),[message,setMessage]=useState("");useEffect(()=>{if(!id)return;void(async()=>{try{const d=await read(await apiFetch(`/api/commerce/products/${id}`));setProduct(d.product);setSelected(d.product?.variants?.[0]||null)}catch(e){setMessage(e instanceof Error?e.message:"خطا")}})()},[id]);const gallery=useMemo(()=>{if(!product)return[];const meta=product.metadata||{};const extra=Array.isArray(meta.gallery)?meta.gallery.filter(x=>typeof x==="string") as string[]:[];return [...new Set([...(product.variants||[]).map(v=>v.imageUrl).filter(Boolean) as string[],...extra])]},[product]);if(message)return <main dir="rtl" className="min-h-screen bg-slate-50 p-8">{message}</main>;if(!product)return <main className="min-h-screen bg-slate-50"/>;const price=selected?.priceMinor??product.basePriceMinor;return <main dir="rtl" className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4"><Link to="/dashboard/websites/commerce" className="rounded-xl border p-2"><ArrowRight/></Link><b>پیش‌نمایش صفحه محصول</b><span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">{product.status}</span></div></header><div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 lg:grid-cols-2"><section><div className="grid aspect-square place-items-center overflow-hidden rounded-3xl border bg-white">{gallery[0]?<img src={gallery[0]} className="h-full w-full object-contain"/>:<ImageSquare size={70} className="text-slate-200"/>}</div>{gallery.length>1&&<div className="mt-3 grid grid-cols-5 gap-2">{gallery.slice(0,5).map((x,i)=><div key={`${x}-${i}`} className="aspect-square overflow-hidden rounded-xl border bg-white"><img src={x} className="h-full w-full object-cover"/></div>)}</div>}</section><section className="rounded-3xl border bg-white p-7 shadow-sm"><div className="flex items-center gap-2 text-xs text-slate-400"><span>{product.category||"بدون دسته"}</span><span>•</span><span>{product.brand||"بدون برند"}</span>{product.featured&&<span className="mr-auto flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700"><Star/> ویژه</span>}</div><h1 className="mt-4 text-3xl font-black">{product.name}</h1><p className="mt-4 leading-8 text-slate-500">{product.description||"برای این محصول هنوز توضیحاتی ثبت نشده است."}</p><div className="mt-6 flex items-end gap-3"><b className="text-2xl text-violet-700">{fmt(price,product.currency)}</b>{product.compareAtPriceMinor&&product.compareAtPriceMinor>price?<span className="text-sm text-slate-400 line-through">{fmt(product.compareAtPriceMinor,product.currency)}</span>:null}</div>{product.variants.length>1&&<div className="mt-7"><b className="text-sm">انتخاب تنوع</b><div className="mt-3 flex flex-wrap gap-2">{product.variants.map(v=><button key={v.id} onClick={()=>setSelected(v)} className={`rounded-xl border px-4 py-3 text-sm ${selected?.id===v.id?"border-violet-500 bg-violet-50 text-violet-800":"bg-white"}`}>{v.title}{Object.values(v.options||{}).length?` · ${Object.values(v.options).join(" / ")}`:""}</button>)}</div></div>}<div className="mt-6 flex items-center gap-2 text-sm text-slate-500"><Package/> {selected?.inventoryQuantity||0} عدد موجود</div><button disabled={!selected||selected.inventoryQuantity<1} className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 p-4 font-black text-white disabled:opacity-40"><ShoppingCartSimple/> افزودن به سبد خرید</button><div className="mt-6 rounded-2xl bg-slate-50 p-4 text-xs leading-7 text-slate-500"><b className="text-slate-700">SEO Preview</b><div>{product.seoTitle||product.name}</div><div className="truncate text-emerald-700">/{product.slug}</div><p>{product.seoDescription||product.description||"—"}</p></div></section></div></main>}
+type Variant = {
+  id: string;
+  sku: string;
+  title: string;
+  priceMinor: number | null;
+  inventoryQuantity: number;
+  options: Record<string, string>;
+  imageUrl?: string | null;
+};
+type Product = {
+  id: string;
+  siteProjectId: string;
+  name: string;
+  slug: string;
+  description?: string;
+  status: string;
+  currency: string;
+  basePriceMinor: number;
+  compareAtPriceMinor?: number | null;
+  category?: string | null;
+  brand?: string | null;
+  featured?: boolean;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  metadata?: Record<string, unknown>;
+  variants: Variant[];
+};
+async function read(r: Response) {
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.message || "خطا در دریافت محصول");
+  return d;
+}
+function fmt(minor: number, currency: string) {
+  const v = (minor || 0) / 100;
+  if (currency === "IRT")
+    return `${new Intl.NumberFormat("fa-IR").format(v)} تومان`;
+  if (currency === "IRR")
+    return `${new Intl.NumberFormat("fa-IR").format(v)} ریال`;
+  return new Intl.NumberFormat("fa-IR", {
+    style: "currency",
+    currency: currency || "USD",
+  }).format(v);
+}
+export default function StoreProductDetailPage() {
+  const { id } = useParams(),
+    [product, setProduct] = useState<Product | null>(null),
+    [selected, setSelected] = useState<Variant | null>(null),
+    [activeImage, setActiveImage] = useState(""),
+    [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!id) return;
+    void (async () => {
+      try {
+        const d = await read(await apiFetch(`/api/commerce/products/${id}`));
+        setProduct(d.product);
+        setSelected(d.product?.variants?.[0] || null);
+        setActiveImage(productGallery(d.product)[0] || "");
+      } catch (e) {
+        setMessage(e instanceof Error ? e.message : "خطا");
+      }
+    })();
+  }, [id]);
+  const gallery = useMemo(() => productGallery(product), [product]);
+  function acceptProduct(next: EditableMediaProduct) {
+    setProduct(next as Product);
+    setSelected(
+      (current) =>
+        (next.variants.find(
+          (variant) => variant.id === current?.id,
+        ) as Variant) ||
+        (next.variants[0] as Variant) ||
+        null,
+    );
+    setActiveImage(productGallery(next)[0] || "");
+  }
+  if (message)
+    return (
+      <main dir="rtl" className="min-h-screen bg-slate-50 p-8">
+        {message}
+      </main>
+    );
+  if (!product) return <main className="min-h-screen bg-slate-50" />;
+  const price = selected?.priceMinor ?? product.basePriceMinor;
+  return (
+    <main dir="rtl" className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+          <Link
+            to="/dashboard/websites/commerce"
+            className="rounded-xl border p-2"
+          >
+            <ArrowRight />
+          </Link>
+          <b>پیش‌نمایش صفحه محصول</b>
+          <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">
+            {product.status}
+          </span>
+        </div>
+      </header>
+      <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 lg:grid-cols-2">
+        <section>
+          <div className="grid aspect-square place-items-center overflow-hidden rounded-3xl border bg-white">
+            {activeImage ? (
+              <img
+                src={activeImage}
+                alt={product.name}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <ImageSquare size={70} className="text-slate-200" />
+            )}
+          </div>
+          {gallery.length > 1 && (
+            <div className="mt-3 grid grid-cols-5 gap-2">
+              {gallery.slice(0, 5).map((x, i) => (
+                <button
+                  type="button"
+                  key={`${x}-${i}`}
+                  onClick={() => setActiveImage(x)}
+                  className={`aspect-square overflow-hidden rounded-xl border bg-white ${activeImage === x ? "ring-2 ring-violet-500" : ""}`}
+                >
+                  <img
+                    src={x}
+                    alt={`${product.name} ${i + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="rounded-3xl border bg-white p-7 shadow-sm">
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span>{product.category || "بدون دسته"}</span>
+            <span>•</span>
+            <span>{product.brand || "بدون برند"}</span>
+            {product.featured && (
+              <span className="mr-auto flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                <Star /> ویژه
+              </span>
+            )}
+          </div>
+          <h1 className="mt-4 text-3xl font-black">{product.name}</h1>
+          <p className="mt-4 leading-8 text-slate-500">
+            {product.description ||
+              "برای این محصول هنوز توضیحاتی ثبت نشده است."}
+          </p>
+          <div className="mt-6 flex items-end gap-3">
+            <b className="text-2xl text-violet-700">
+              {fmt(price, product.currency)}
+            </b>
+            {product.compareAtPriceMinor &&
+            product.compareAtPriceMinor > price ? (
+              <span className="text-sm text-slate-400 line-through">
+                {fmt(product.compareAtPriceMinor, product.currency)}
+              </span>
+            ) : null}
+          </div>
+          {product.variants.length > 1 && (
+            <div className="mt-7">
+              <b className="text-sm">انتخاب تنوع</b>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {product.variants.map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => {
+                      setSelected(v);
+                      if (v.imageUrl) setActiveImage(v.imageUrl);
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-sm ${selected?.id === v.id ? "border-violet-500 bg-violet-50 text-violet-800" : "bg-white"}`}
+                  >
+                    {v.title}
+                    {Object.values(v.options || {}).length
+                      ? ` · ${Object.values(v.options).join(" / ")}`
+                      : ""}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mt-6 flex items-center gap-2 text-sm text-slate-500">
+            <Package /> {selected?.inventoryQuantity || 0} عدد موجود
+          </div>
+          <button
+            disabled={!selected || selected.inventoryQuantity < 1}
+            className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 p-4 font-black text-white disabled:opacity-40"
+          >
+            <ShoppingCartSimple /> افزودن به سبد خرید
+          </button>
+          <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-xs leading-7 text-slate-500">
+            <b className="text-slate-700">SEO Preview</b>
+            <div>{product.seoTitle || product.name}</div>
+            <div className="truncate text-emerald-700">/{product.slug}</div>
+            <p>{product.seoDescription || product.description || "—"}</p>
+          </div>
+        </section>
+      </div>
+      <div className="mx-auto max-w-6xl px-5 pb-12">
+        <ProductMediaEditor
+          product={product as EditableMediaProduct}
+          onProduct={acceptProduct}
+        />
+      </div>
+    </main>
+  );
+}

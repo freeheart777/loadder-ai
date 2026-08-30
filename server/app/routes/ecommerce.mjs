@@ -16,6 +16,7 @@ export function createEcommerceRouter({ service }) {
   router.get("/commerce/products/:productId", (req,res)=>run(res,()=>({product:service.getProduct(req.params.productId)})));
   router.patch("/commerce/products/:productId", (req,res)=>run(res,()=>({product:service.updateProduct(req.params.productId,req.body||{})})));
   router.post("/commerce/products/:productId/variants", (req,res)=>run(res,()=>({variant:service.addVariant(req.params.productId,req.body||{})}),201));
+  router.patch("/commerce/variants/:variantId", (req,res)=>run(res,()=>({variant:service.updateVariant(req.params.variantId,req.body||{})})));
   router.post("/commerce/variants/:variantId/inventory-adjustments", (req,res)=>run(res,()=>({variant:service.adjustInventory(req.params.variantId,req.body?.delta)})));
 
   router.post("/stores/:siteProjectId/carts", (req,res)=>run(res,()=>({cart:service.createCart(req.params.siteProjectId,req.body||{})}),201));

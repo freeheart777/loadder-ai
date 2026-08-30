@@ -71,3 +71,22 @@ test("commerce rejects non-store site projects and overselling", () => {
   });
   db.close();
 });
+
+test("commerce product media preserves ordered gallery and variant-specific image", () => {
+  const { db, store, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const product = service.createProduct(store.id, { name:"Media Product", basePriceMinor:1000, sku:"MEDIA-1", inventoryQuantity:1 });
+    const first = "https://cdn.example.test/products/front.webp";
+    const second = "https://cdn.example.test/products/side.webp";
+    const updated = service.updateProduct(product.id, { metadata:{ gallery:[first,second,first], mediaVersion:1 } });
+    assert.deepEqual(updated.metadata.gallery, [first,second]);
+    assert.equal(updated.metadata.mediaVersion, 1);
+    const variant = service.updateVariant(product.variants[0].id, { imageUrl:second });
+    assert.equal(variant.imageUrl, second);
+    assert.equal(service.getProduct(product.id).variants[0].imageUrl, second);
+    assert.throws(() => service.updateProduct(product.id, { metadata:{ gallery:["javascript:alert(1)"] } }), (error) => error.code === "PRODUCT_IMAGE_URL_INVALID");
+    assert.throws(() => service.updateVariant(product.variants[0].id, { imageUrl:"http://unsafe.example/image.jpg" }), (error) => error.code === "PRODUCT_IMAGE_URL_INVALID");
+    assert.equal(service.updateVariant(product.variants[0].id, { imageUrl:null }).imageUrl, null);
+  });
+  db.close();
+});
