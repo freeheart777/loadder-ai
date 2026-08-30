@@ -1,10 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-
-import {
-  AuthError,
-  SESSION_COOKIE_NAME,
-} from "../services/auth-service.mjs";
+import { AuthError, SESSION_COOKIE_NAME } from "../services/auth-service.mjs";
 import { getSessionToken } from "../middleware/auth.mjs";
 import { db } from "../../db/workspace-database.mjs";
 import { createSiteProjectRepository } from "../repositories/site-project-repository.mjs";
@@ -12,311 +8,40 @@ import { renderPublishedSite } from "./public-sites.mjs";
 import { createEcommerceService } from "../services/ecommerce-service.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
 
-export function createAuthRouter({
-  authService,
-  nodeEnv = "development",
-  exposeDevelopmentOtp = false,
-}) {
+export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false }) {
   const router = express.Router();
   const publicSiteRepository = createSiteProjectRepository(db);
   const ecommerceService = createEcommerceService({ db });
-  const sendOtpLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    limit: 5,
-    standardHeaders: "draft-8",
-    legacyHeaders: false,
-    message: {
-      success: false,
-      message: "تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید.",
-    },
-  });
+  const sendOtpLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message: { success:false, message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
+  const checkoutLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"درخواست‌های خرید زیاد است. کمی بعد دوباره تلاش کنید." } });
 
-  function handleAuthError(error, res) {
-    if (error instanceof AuthError) {
-      return res.status(error.status).json({
-        success: false,
-        message: error.message,
-        code: error.code,
-      });
-    }
+  function handleAuthError(error,res){ if(error instanceof AuthError)return res.status(error.status).json({success:false,message:error.message,code:error.code}); console.error("Authentication error:",error);return res.status(500).json({success:false,message:"خطای داخلی احراز هویت."}); }
+  function publicStore(siteProjectId){return db.prepare("SELECT id, workspace_id AS workspaceId, name, site_type AS siteType FROM site_projects WHERE id=? AND site_type='STORE'").get(siteProjectId)}
+  function cartRow(cartId){return db.prepare("SELECT id, workspace_id AS workspaceId, site_project_id AS siteProjectId FROM ecommerce_carts WHERE id=?").get(cartId)}
+  function publicProduct(product){if(!product||product.status!=="ACTIVE")return null;const gallery=Array.isArray(product.metadata?.gallery)?product.metadata.gallery.filter(x=>typeof x==="string").slice(0,12):[];return{id:product.id,siteProjectId:product.siteProjectId,name:product.name,slug:product.slug,description:product.description||"",category:product.category||null,brand:product.brand||null,currency:product.currency,basePriceMinor:product.basePriceMinor,compareAtPriceMinor:product.compareAtPriceMinor??null,featured:Boolean(product.featured),seoTitle:product.seoTitle||null,seoDescription:product.seoDescription||null,gallery,variants:(product.variants||[]).filter(v=>v.active).map(v=>({id:v.id,sku:v.sku,title:v.title,priceMinor:v.priceMinor,inventoryQuantity:v.inventoryQuantity,inventoryPolicy:v.inventoryPolicy,options:v.options||{},imageUrl:v.imageUrl||null}))}}
+  function storefrontError(error,res){console.error("Public storefront error:",error);const status=Number(error?.status)||500;return res.status(status>=400&&status<600?status:500).json({success:false,code:error?.code||"STOREFRONT_ERROR",message:status===500?"Unable to process storefront request.":error.message})}
 
-    console.error("Authentication error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "خطای داخلی احراز هویت.",
-    });
-  }
+  router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp}));
+  router.get("/sites/:id",(req,res)=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");res.set({"Cache-Control":"public, max-age=60, stale-while-revalidate=300","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin"});return res.type("html").send(renderPublishedSite(published.project,published.version,published.assets))}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}});
 
-  function publicStore(siteProjectId) {
-    return db.prepare(`
-      SELECT id, workspace_id AS workspaceId, name, site_type AS siteType
-      FROM site_projects
-      WHERE id=? AND site_type='STORE'
-    `).get(siteProjectId);
-  }
+  router.get("/storefront/:siteProjectId",(req,res)=>{try{const store=publicStore(req.params.siteProjectId);if(!store)return res.status(404).json({success:false,message:"Store not found."});const products=runWithWorkspace(store.workspaceId,()=>ecommerceService.listProducts(store.id)).map(publicProduct).filter(Boolean);return res.json({success:true,store:{id:store.id,name:store.name},categories:[...new Set(products.map(p=>p.category).filter(Boolean))],brands:[...new Set(products.map(p=>p.brand).filter(Boolean))],productCount:products.length})}catch(e){return storefrontError(e,res)}});
+  router.get("/storefront/:siteProjectId/products",(req,res)=>{try{const store=publicStore(req.params.siteProjectId);if(!store)return res.status(404).json({success:false,message:"Store not found."});const q=String(req.query.q||"").trim().toLocaleLowerCase("fa"),category=String(req.query.category||"").trim(),brand=String(req.query.brand||"").trim(),onlyInStock=String(req.query.inStock||"")==="1",onlyFeatured=String(req.query.featured||"")==="1",sort=String(req.query.sort||"newest");let products=runWithWorkspace(store.workspaceId,()=>ecommerceService.listProducts(store.id)).map(publicProduct).filter(Boolean);if(q)products=products.filter(p=>[p.name,p.description,p.category,p.brand,...p.variants.map(v=>v.sku)].filter(Boolean).join(" ").toLocaleLowerCase("fa").includes(q));if(category)products=products.filter(p=>p.category===category);if(brand)products=products.filter(p=>p.brand===brand);if(onlyFeatured)products=products.filter(p=>p.featured);if(onlyInStock)products=products.filter(p=>p.variants.some(v=>v.inventoryPolicy!=="DENY"||v.inventoryQuantity>0));if(sort==="price-asc")products.sort((a,b)=>a.basePriceMinor-b.basePriceMinor);if(sort==="price-desc")products.sort((a,b)=>b.basePriceMinor-a.basePriceMinor);return res.json({success:true,products})}catch(e){return storefrontError(e,res)}});
+  router.get("/storefront/:siteProjectId/products/:slug",(req,res)=>{try{const store=publicStore(req.params.siteProjectId);if(!store)return res.status(404).json({success:false,message:"Store not found."});const product=runWithWorkspace(store.workspaceId,()=>ecommerceService.listProducts(store.id)).map(publicProduct).find(x=>x?.slug===req.params.slug);if(!product)return res.status(404).json({success:false,message:"Product not found."});return res.json({success:true,store:{id:store.id,name:store.name},product})}catch(e){return storefrontError(e,res)}});
 
-  function publicProduct(product) {
-    if (!product || product.status !== "ACTIVE") return null;
-    const gallery = Array.isArray(product.metadata?.gallery)
-      ? product.metadata.gallery.filter((item) => typeof item === "string").slice(0, 12)
-      : [];
-    return {
-      id: product.id,
-      siteProjectId: product.siteProjectId,
-      name: product.name,
-      slug: product.slug,
-      description: product.description || "",
-      category: product.category || null,
-      brand: product.brand || null,
-      currency: product.currency,
-      basePriceMinor: product.basePriceMinor,
-      compareAtPriceMinor: product.compareAtPriceMinor ?? null,
-      featured: Boolean(product.featured),
-      seoTitle: product.seoTitle || null,
-      seoDescription: product.seoDescription || null,
-      gallery,
-      variants: (product.variants || [])
-        .filter((variant) => variant.active)
-        .map((variant) => ({
-          id: variant.id,
-          sku: variant.sku,
-          title: variant.title,
-          priceMinor: variant.priceMinor,
-          inventoryQuantity: variant.inventoryQuantity,
-          inventoryPolicy: variant.inventoryPolicy,
-          options: variant.options || {},
-          imageUrl: variant.imageUrl || null,
-        })),
-    };
-  }
+  router.post("/storefront/:siteProjectId/carts",(req,res)=>{try{const store=publicStore(req.params.siteProjectId);if(!store)return res.status(404).json({success:false,message:"Store not found."});const cart=runWithWorkspace(store.workspaceId,()=>ecommerceService.createCart(store.id,{email:req.body?.email||null,currency:req.body?.currency||"IRT"}));return res.status(201).json({success:true,cart})}catch(e){return storefrontError(e,res)}});
+  router.get("/storefront/carts/:cartId",(req,res)=>{try{const row=cartRow(req.params.cartId);if(!row)return res.status(404).json({success:false,message:"Cart not found."});const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.getCart(row.id));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
+  router.post("/storefront/carts/:cartId/items",(req,res)=>{try{const row=cartRow(req.params.cartId);if(!row)return res.status(404).json({success:false,message:"Cart not found."});const variant=db.prepare("SELECT v.id,p.status,p.site_project_id AS siteProjectId FROM ecommerce_variants v JOIN ecommerce_products p ON p.id=v.product_id WHERE v.id=? AND v.workspace_id=? AND p.workspace_id=?").get(req.body?.variantId,row.workspaceId,row.workspaceId);if(!variant||variant.status!=="ACTIVE"||variant.siteProjectId!==row.siteProjectId)return res.status(404).json({success:false,message:"Product variant not available."});const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.addCartItem(row.id,{variantId:variant.id,quantity:req.body?.quantity||1}));return res.status(201).json({success:true,cart})}catch(e){return storefrontError(e,res)}});
+  router.put("/storefront/carts/:cartId/items/:variantId",(req,res)=>{try{const row=cartRow(req.params.cartId);if(!row)return res.status(404).json({success:false,message:"Cart not found."});const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.setCartItemQuantity(row.id,req.params.variantId,req.body?.quantity));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
 
-  function storefrontError(error, res) {
-    console.error("Public storefront error:", error);
-    const status = Number(error?.status) || 500;
-    return res.status(status >= 400 && status < 600 ? status : 500).json({
-      success: false,
-      code: error?.code || "STOREFRONT_ERROR",
-      message: status === 500 ? "Unable to process storefront request." : error.message,
-    });
-  }
+  router.get("/storefront/:siteProjectId/checkout-options",(req,res)=>{try{const store=publicStore(req.params.siteProjectId);if(!store)return res.status(404).json({success:false,message:"Store not found."});const shipping=db.prepare("SELECT id,name,price_minor AS priceMinor,active FROM ecommerce_shipping_methods WHERE workspace_id=? AND site_project_id=? AND active=1 ORDER BY price_minor,name").all(store.workspaceId,store.id);return res.json({success:true,shippingMethods:shipping,paymentMethods:[{key:"manual",title:"پرداخت آزمایشی / هماهنگی با فروشگاه",enabled:true}]})}catch(e){return storefrontError(e,res)}});
+  router.post("/storefront/carts/:cartId/coupon",checkoutLimiter,(req,res)=>{try{const row=cartRow(req.params.cartId);if(!row)return res.status(404).json({success:false,message:"Cart not found."});const code=String(req.body?.code||"").trim().slice(0,64);const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.applyCoupon(row.id,code));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
+  router.post("/storefront/carts/:cartId/shipping",checkoutLimiter,(req,res)=>{try{const row=cartRow(req.params.cartId);if(!row)return res.status(404).json({success:false,message:"Cart not found."});const methodId=String(req.body?.shippingMethodId||"");const method=db.prepare("SELECT id FROM ecommerce_shipping_methods WHERE id=? AND workspace_id=? AND site_project_id=? AND active=1").get(methodId,row.workspaceId,row.siteProjectId);if(!method)return res.status(404).json({success:false,message:"Shipping method not available."});const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.setCartShipping(row.id,method.id));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
+  router.post("/storefront/carts/:cartId/checkout",checkoutLimiter,(req,res)=>{try{const row=cartRow(req.params.cartId);if(!row)return res.status(404).json({success:false,message:"Cart not found."});const email=String(req.body?.email||"").trim().slice(0,180),phone=String(req.body?.phone||"").trim().slice(0,32),fullName=String(req.body?.fullName||"").trim().slice(0,120);if(!fullName||!phone)return res.status(400).json({success:false,message:"نام و شماره موبایل الزامی است."});const address=req.body?.shippingAddress||{};const shippingAddress={fullName,phone,province:String(address.province||"").slice(0,80),city:String(address.city||"").slice(0,80),address:String(address.address||"").slice(0,500),postalCode:String(address.postalCode||"").slice(0,32),notes:String(address.notes||"").slice(0,500)};const order=runWithWorkspace(row.workspaceId,()=>ecommerceService.checkout(row.id,{email:email||null,paymentProvider:String(req.body?.paymentProvider||"manual").slice(0,40),shippingMethod:String(req.body?.shippingMethod||"").slice(0,120)||null,shippingAddress}));return res.status(201).json({success:true,order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
+  router.get("/storefront/orders/:orderId",(req,res)=>{try{const orderRow=db.prepare("SELECT id,workspace_id AS workspaceId FROM ecommerce_orders WHERE id=?").get(req.params.orderId);if(!orderRow)return res.status(404).json({success:false,message:"Order not found."});const order=runWithWorkspace(orderRow.workspaceId,()=>ecommerceService.getOrder(orderRow.id));return res.json({success:true,order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
 
-  router.get("/status", (req, res) => {
-    res.json({
-      success: true,
-      mode: "persistent-session",
-      productionReady: false,
-      otpDelivery: "not-connected",
-      developmentOtpExposed:
-        nodeEnv !== "production" && exposeDevelopmentOtp,
-    });
-  });
-
-  // Compatibility public-site route. This endpoint is intentionally public and
-  // therefore MUST NOT depend on tenant/workspace AsyncLocalStorage context.
-  router.get("/sites/:id", (req, res) => {
-    try {
-      const published = publicSiteRepository.getPublishedPublic(req.params.id);
-      if (!published) return res.status(404).send("Site not found");
-      res.set({
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "strict-origin-when-cross-origin",
-      });
-      return res.type("html").send(renderPublishedSite(published.project, published.version, published.assets));
-    } catch (error) {
-      console.error("Published site error:", error);
-      return res.status(500).send("Unable to render site");
-    }
-  });
-
-  // Public ecommerce surface. The store id is used only to resolve its owning
-  // workspace. Returned product data is explicitly whitelisted and only ACTIVE
-  // products/variants are exposed.
-  router.get("/storefront/:siteProjectId", (req, res) => {
-    try {
-      const store = publicStore(req.params.siteProjectId);
-      if (!store) return res.status(404).json({ success: false, message: "Store not found." });
-      const products = runWithWorkspace(store.workspaceId, () => ecommerceService.listProducts(store.id))
-        .map(publicProduct)
-        .filter(Boolean);
-      return res.json({
-        success: true,
-        store: { id: store.id, name: store.name },
-        categories: [...new Set(products.map((p) => p.category).filter(Boolean))],
-        brands: [...new Set(products.map((p) => p.brand).filter(Boolean))],
-        productCount: products.length,
-      });
-    } catch (error) {
-      return storefrontError(error, res);
-    }
-  });
-
-  router.get("/storefront/:siteProjectId/products", (req, res) => {
-    try {
-      const store = publicStore(req.params.siteProjectId);
-      if (!store) return res.status(404).json({ success: false, message: "Store not found." });
-      const q = String(req.query.q || "").trim().toLocaleLowerCase("fa");
-      const category = String(req.query.category || "").trim();
-      const brand = String(req.query.brand || "").trim();
-      const onlyInStock = String(req.query.inStock || "") === "1";
-      const onlyFeatured = String(req.query.featured || "") === "1";
-      const sort = String(req.query.sort || "newest");
-      let products = runWithWorkspace(store.workspaceId, () => ecommerceService.listProducts(store.id))
-        .map(publicProduct)
-        .filter(Boolean);
-      if (q) products = products.filter((p) => [p.name, p.description, p.category, p.brand, ...p.variants.map((v) => v.sku)].filter(Boolean).join(" ").toLocaleLowerCase("fa").includes(q));
-      if (category) products = products.filter((p) => p.category === category);
-      if (brand) products = products.filter((p) => p.brand === brand);
-      if (onlyFeatured) products = products.filter((p) => p.featured);
-      if (onlyInStock) products = products.filter((p) => p.variants.some((v) => v.inventoryPolicy !== "DENY" || v.inventoryQuantity > 0));
-      if (sort === "price-asc") products.sort((a, b) => a.basePriceMinor - b.basePriceMinor);
-      if (sort === "price-desc") products.sort((a, b) => b.basePriceMinor - a.basePriceMinor);
-      return res.json({ success: true, products });
-    } catch (error) {
-      return storefrontError(error, res);
-    }
-  });
-
-  router.get("/storefront/:siteProjectId/products/:slug", (req, res) => {
-    try {
-      const store = publicStore(req.params.siteProjectId);
-      if (!store) return res.status(404).json({ success: false, message: "Store not found." });
-      const product = runWithWorkspace(store.workspaceId, () => ecommerceService.listProducts(store.id))
-        .map(publicProduct)
-        .find((item) => item?.slug === req.params.slug);
-      if (!product) return res.status(404).json({ success: false, message: "Product not found." });
-      return res.json({ success: true, store: { id: store.id, name: store.name }, product });
-    } catch (error) {
-      return storefrontError(error, res);
-    }
-  });
-
-  router.post("/storefront/:siteProjectId/carts", (req, res) => {
-    try {
-      const store = publicStore(req.params.siteProjectId);
-      if (!store) return res.status(404).json({ success: false, message: "Store not found." });
-      const cart = runWithWorkspace(store.workspaceId, () => ecommerceService.createCart(store.id, {
-        email: req.body?.email || null,
-        currency: req.body?.currency || "IRT",
-      }));
-      return res.status(201).json({ success: true, cart });
-    } catch (error) {
-      return storefrontError(error, res);
-    }
-  });
-
-  router.get("/storefront/carts/:cartId", (req, res) => {
-    try {
-      const cartRow = db.prepare("SELECT id, workspace_id AS workspaceId FROM ecommerce_carts WHERE id=?").get(req.params.cartId);
-      if (!cartRow) return res.status(404).json({ success: false, message: "Cart not found." });
-      const cart = runWithWorkspace(cartRow.workspaceId, () => ecommerceService.getCart(cartRow.id));
-      return res.json({ success: true, cart });
-    } catch (error) {
-      return storefrontError(error, res);
-    }
-  });
-
-  router.post("/storefront/carts/:cartId/items", (req, res) => {
-    try {
-      const cartRow = db.prepare("SELECT id, workspace_id AS workspaceId, site_project_id AS siteProjectId FROM ecommerce_carts WHERE id=?").get(req.params.cartId);
-      if (!cartRow) return res.status(404).json({ success: false, message: "Cart not found." });
-      const variant = db.prepare(`
-        SELECT v.id, p.status, p.site_project_id AS siteProjectId
-        FROM ecommerce_variants v
-        JOIN ecommerce_products p ON p.id=v.product_id
-        WHERE v.id=? AND v.workspace_id=? AND p.workspace_id=?
-      `).get(req.body?.variantId, cartRow.workspaceId, cartRow.workspaceId);
-      if (!variant || variant.status !== "ACTIVE" || variant.siteProjectId !== cartRow.siteProjectId) {
-        return res.status(404).json({ success: false, message: "Product variant not available." });
-      }
-      const cart = runWithWorkspace(cartRow.workspaceId, () => ecommerceService.addCartItem(cartRow.id, {
-        variantId: variant.id,
-        quantity: req.body?.quantity || 1,
-      }));
-      return res.status(201).json({ success: true, cart });
-    } catch (error) {
-      return storefrontError(error, res);
-    }
-  });
-
-  router.put("/storefront/carts/:cartId/items/:variantId", (req, res) => {
-    try {
-      const cartRow = db.prepare("SELECT id, workspace_id AS workspaceId FROM ecommerce_carts WHERE id=?").get(req.params.cartId);
-      if (!cartRow) return res.status(404).json({ success: false, message: "Cart not found." });
-      const cart = runWithWorkspace(cartRow.workspaceId, () => ecommerceService.setCartItemQuantity(cartRow.id, req.params.variantId, req.body?.quantity));
-      return res.json({ success: true, cart });
-    } catch (error) {
-      return storefrontError(error, res);
-    }
-  });
-
-  router.post("/send-otp", sendOtpLimiter, (req, res) => {
-    try {
-      const result = authService.requestOtp(req.body || {});
-      const response = {
-        success: true,
-        message: "کد تأیید ایجاد شد.",
-        expiresAt: result.challenge.expiresAt,
-      };
-
-      if (nodeEnv !== "production" && exposeDevelopmentOtp) {
-        response.developmentOtp = result.code;
-      }
-
-      return res.json(response);
-    } catch (error) {
-      return handleAuthError(error, res);
-    }
-  });
-
-  router.post("/verify-otp", (req, res) => {
-    try {
-      const result = authService.verifyOtp(req.body || {});
-      res.cookie(
-        SESSION_COOKIE_NAME,
-        result.sessionToken,
-        authService.sessionCookieOptions(nodeEnv)
-      );
-
-      return res.json({
-        success: true,
-        user: result.user,
-        memberships: result.memberships,
-        activeWorkspace: result.activeWorkspace,
-      });
-    } catch (error) {
-      return handleAuthError(error, res);
-    }
-  });
-
-  router.get("/me", (req, res) => {
-    const identity = authService.resolveSession(getSessionToken(req));
-
-    if (!identity) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required.",
-      });
-    }
-
-    return res.json({
-      success: true,
-      user: identity.user,
-      memberships: identity.memberships,
-      activeWorkspace: identity.activeWorkspace,
-    });
-  });
-
-  router.post("/logout", (req, res) => {
-    authService.revokeSession(getSessionToken(req));
-    res.clearCookie(SESSION_COOKIE_NAME, {
-      httpOnly: true,
-      secure: nodeEnv === "production",
-      sameSite: "lax",
-      path: "/",
-    });
-    return res.json({ success: true });
-  });
-
+  router.post("/send-otp",sendOtpLimiter,(req,res)=>{try{const result=authService.requestOtp(req.body||{}),response={success:true,message:"کد تأیید ایجاد شد.",expiresAt:result.challenge.expiresAt};if(nodeEnv!=="production"&&exposeDevelopmentOtp)response.developmentOtp=result.code;return res.json(response)}catch(e){return handleAuthError(e,res)}});
+  router.post("/verify-otp",(req,res)=>{try{const result=authService.verifyOtp(req.body||{});res.cookie(SESSION_COOKIE_NAME,result.sessionToken,authService.sessionCookieOptions(nodeEnv));return res.json({success:true,user:result.user,memberships:result.memberships,activeWorkspace:result.activeWorkspace})}catch(e){return handleAuthError(e,res)}});
+  router.get("/me",(req,res)=>{const identity=authService.resolveSession(getSessionToken(req));if(!identity)return res.status(401).json({success:false,message:"Authentication required."});return res.json({success:true,user:identity.user,memberships:identity.memberships,activeWorkspace:identity.activeWorkspace})});
+  router.post("/logout",(req,res)=>{authService.revokeSession(getSessionToken(req));res.clearCookie(SESSION_COOKIE_NAME,{httpOnly:true,secure:nodeEnv==="production",sameSite:"lax",path:"/"});return res.json({success:true})});
   return router;
 }
