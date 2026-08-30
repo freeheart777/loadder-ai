@@ -26,7 +26,7 @@ const TYPES: Array<{ id: SiteType; title: string; description: string; icon: typ
 ];
 
 const text = (value: unknown, fallback: string) => typeof value === "string" && value.trim() ? value.trim() : fallback;
-const list = (value: unknown) => Array.isArray(value) ? value.filter((x): x is string => typeof x === "string" && x.trim()).slice(0, 8) : [];
+const list = (value: unknown) => Array.isArray(value) ? value.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 8) : [];
 const storageKey = (workspaceId: string, type: SiteType) => `loadder:native-site-builder:${workspaceId}:${type}`;
 
 export default function NativeSiteBuilderPage() {

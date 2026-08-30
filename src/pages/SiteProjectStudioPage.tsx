@@ -9,7 +9,7 @@ type Asset = { id: string; name: string; kind: string; url: string; altText?: st
 type ContextResponse = { activeContext?: { id: string; snapshot?: Snapshot } | null; isStale?: boolean };
 const TYPES = [{ id: "BUSINESS", label: "شرکتی" }, { id: "STORE", label: "فروشگاهی" }, { id: "NEWS", label: "خبری" }, { id: "LEGAL", label: "حقوقی" }, { id: "MEDICAL", label: "پزشکی" }];
 const text = (v: unknown, fallback = "") => typeof v === "string" && v.trim() ? v.trim() : fallback;
-const strings = (v: unknown) => Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim()).slice(0, 8) : [];
+const strings = (v: unknown) => Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 8) : [];
 const esc = (v: unknown) => String(v ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 
 export default function SiteProjectStudioPage() {
