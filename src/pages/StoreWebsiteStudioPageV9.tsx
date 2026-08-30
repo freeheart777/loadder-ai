@@ -6,7 +6,6 @@ import { apiFetch } from "../lib/api";
 
 type Project={id:string;content:Record<string,unknown>};
 type ManualProduct={id:string;title:string;description:string;price:string;buttonText:string;imageUrl:string};
-
 const seedProduct=(n:number):ManualProduct=>({id:`manual-product-${Date.now()}-${n}`,title:`محصول ${n}`,description:"توضیح کوتاه محصول را اینجا بنویسید.",price:"۰ تومان",buttonText:"افزودن به سبد",imageUrl:""});
 async function readJson(r:Response){const t=await r.text();return t?JSON.parse(t):{}}
 
@@ -15,7 +14,7 @@ export default function StoreWebsiteStudioPageV9(){
   const [items,setItems]=useState<ManualProduct[]>([seedProduct(1)]);
   const [target,setTarget]=useState<HTMLElement|null>(null);
   const [message,setMessage]=useState("");
-  const [open,setOpen]=useState(true);
+  const [open,setOpen]=useState(false);
   const fileRef=useRef<HTMLInputElement>(null);
   const pendingId=useRef<string|null>(null);
 
@@ -24,13 +23,13 @@ export default function StoreWebsiteStudioPageV9(){
     const locate=()=>{
       const canvas=[...document.querySelectorAll("section")].find(el=>el.className.includes("bg-[#252c38]"));
       const inner=canvas?.querySelector(":scope > div") as HTMLElement|null;
-      if(inner)setTarget(inner);
+      if(inner&&inner!==target)setTarget(inner);
     };
     locate();
     const observer=new MutationObserver(locate);
     observer.observe(document.body,{subtree:true,childList:true});
     return()=>observer.disconnect();
-  },[]);
+  },[target]);
 
   async function load(){
     try{
@@ -53,11 +52,9 @@ export default function StoreWebsiteStudioPageV9(){
       const r=await apiFetch(`/api/site-projects/${project.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({content:{...project.content,manualProductBlocksV9:items}})});
       const d=await readJson(r);
       if(!r.ok)throw new Error(d.message||"ذخیره نشد");
-      setProject(d.project);
-      setMessage("محصولات روی پروژه ذخیره شدند");
+      setProject(d.project);setMessage("محصولات روی پروژه ذخیره شدند");
     }catch(e){setMessage(e instanceof Error?e.message:"خطا در ذخیره")}
   }
-
   function add(){setItems(x=>[...x,seedProduct(x.length+1)])}
   function update(id:string,patch:Partial<ManualProduct>){setItems(x=>x.map(p=>p.id===id?{...p,...patch}:p))}
   function remove(id:string){setItems(x=>x.filter(p=>p.id!==id))}
@@ -69,11 +66,11 @@ export default function StoreWebsiteStudioPageV9(){
     if(pendingId.current)update(pendingId.current,{imageUrl:url});
   }
 
-  const preview=<section dir="rtl" className="border-t border-slate-200 bg-white px-8 py-10 text-slate-900">
-    <div className="mb-6 flex items-center justify-between"><div><div className="text-xs font-bold text-violet-600">Product Blocks</div><h2 className="mt-1 text-3xl font-black">محصولات انتخابی</h2></div><button onClick={add} className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white">+ افزودن محصول</button></div>
-    <div className="grid grid-cols-4 gap-4">{items.map(p=><article key={p.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <button onClick={()=>pick(p.id)} className="group grid aspect-square w-full place-items-center overflow-hidden bg-slate-100">{p.imageUrl?<img src={p.imageUrl} className="h-full w-full object-cover"/>:<span className="flex items-center gap-2 text-xs font-bold text-slate-400"><UploadSimple/> آپلود عکس محصول</span>}</button>
-      <div className="p-4"><h3 className="text-base font-black">{p.title}</h3><p className="mt-2 min-h-10 text-xs leading-5 text-slate-500">{p.description}</p><div className="mt-4 flex items-center justify-between gap-3"><b className="text-sm">{p.price}</b><button className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">{p.buttonText}</button></div></div>
+  const preview=<section dir="rtl" className="border-t border-slate-200 bg-white px-6 py-10 text-slate-900 sm:px-8">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3"><div><div className="text-xs font-bold text-violet-600">محصولات انتخابی</div><h2 className="mt-1 text-2xl font-black sm:text-3xl">ویترین محصولات</h2></div><button onClick={()=>{add();setOpen(true)}} className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white">+ افزودن محصول</button></div>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-4">{items.map(p=><article key={p.id} className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <button onClick={()=>{pick(p.id);setOpen(true)}} className="group grid aspect-square w-full place-items-center overflow-hidden bg-slate-100">{p.imageUrl?<img src={p.imageUrl} alt={p.title} className="h-full w-full object-cover"/>:<span className="flex items-center gap-2 text-xs font-bold text-slate-400"><UploadSimple/> آپلود عکس محصول</span>}</button>
+      <div className="p-4"><h3 className="truncate text-base font-black">{p.title}</h3><p className="mt-2 min-h-10 text-xs leading-5 text-slate-500">{p.description}</p><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><b className="text-sm">{p.price}</b><button className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">{p.buttonText}</button></div></div>
     </article>)}</div>
   </section>;
 
@@ -81,21 +78,21 @@ export default function StoreWebsiteStudioPageV9(){
     <StoreWebsiteStudioPageV8/>
     <input ref={fileRef} hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)void onFile(f);e.target.value=""}}/>
     {target&&createPortal(preview,target)}
-    <div dir="rtl" className="fixed left-5 top-20 z-[120] w-[330px] max-h-[calc(100vh-100px)] overflow-y-auto rounded-2xl border border-white/15 bg-[#101722]/98 text-white shadow-2xl">
-      <button onClick={()=>setOpen(v=>!v)} className="flex w-full items-center justify-between p-4 text-right"><div><div className="text-sm font-black">محصولات دستی</div><div className="mt-1 text-[10px] text-white/45">باکس استاندارد + عکس + متن + قیمت</div></div><span className="text-xs">{open?"بستن":"باز کردن"}</span></button>
-      {open&&<div className="border-t border-white/10 p-4">
-        <button onClick={add} className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 p-3 text-xs font-black"><Plus/> افزودن محصول</button>
+    {!open?<button onClick={()=>setOpen(true)} dir="rtl" className="fixed bottom-4 left-4 z-[120] rounded-xl border border-white/10 bg-[#101722]/95 px-4 py-3 text-xs font-black text-white shadow-lg">محصولات انتخابی · {items.length}</button>:
+    <div dir="rtl" className="fixed left-4 top-20 z-[120] w-[310px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-100px)] overflow-y-auto rounded-2xl border border-white/15 bg-[#101722]/98 text-white shadow-2xl">
+      <button onClick={()=>setOpen(false)} className="sticky top-0 z-10 flex w-full items-center justify-between border-b border-white/10 bg-[#101722] p-4 text-right"><div><div className="text-sm font-black">محصولات انتخابی</div><div className="mt-1 text-[10px] text-white/45">عکس، متن، قیمت و دکمه هر کارت</div></div><span className="text-xs text-white/50">بستن</span></button>
+      <div className="p-4"><button onClick={add} className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 p-3 text-xs font-black"><Plus/> افزودن محصول</button>
         <div className="mt-4 space-y-4">{items.map((p,i)=><div key={p.id} className="rounded-xl border border-white/10 p-3">
           <div className="flex items-center justify-between"><b className="text-xs">محصول {i+1}</b><button onClick={()=>remove(p.id)} className="text-red-400"><Trash/></button></div>
           <button onClick={()=>pick(p.id)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 p-3 text-xs"><UploadSimple/>{p.imageUrl?"تغییر عکس":"آپلود عکس"}</button>
           <input value={p.title} onChange={e=>update(p.id,{title:e.target.value})} placeholder="نام محصول" className="mt-3 w-full rounded-lg border border-white/10 bg-black/20 p-3 text-xs"/>
-          <textarea value={p.description} onChange={e=>update(p.id,{description:e.target.value})} placeholder="توضیح محصول" className="mt-2 w-full rounded-lg border border-white/10 bg-black/20 p-3 text-xs" rows={3}/>
+          <textarea value={p.description} onChange={e=>update(p.id,{description:e.target.value})} placeholder="توضیح محصول" className="mt-2 w-full resize-y rounded-lg border border-white/10 bg-black/20 p-3 text-xs" rows={3}/>
           <input value={p.price} onChange={e=>update(p.id,{price:e.target.value})} placeholder="قیمت" className="mt-2 w-full rounded-lg border border-white/10 bg-black/20 p-3 text-xs"/>
           <input value={p.buttonText} onChange={e=>update(p.id,{buttonText:e.target.value})} placeholder="متن دکمه" className="mt-2 w-full rounded-lg border border-white/10 bg-black/20 p-3 text-xs"/>
         </div>)}</div>
         <button onClick={()=>void save()} className="mt-4 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 p-3 text-xs font-black">ذخیره محصولات روی پروژه</button>
         {message&&<div className="mt-3 rounded-lg bg-white/5 p-3 text-[11px] leading-5">{message}</div>}
-      </div>}
-    </div>
+      </div>
+    </div>}
   </>;
 }
