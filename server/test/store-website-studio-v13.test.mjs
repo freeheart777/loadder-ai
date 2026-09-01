@@ -40,7 +40,7 @@ test("V16 is a true state-owned visual canvas with contextual selection", () => 
 });
 
 test("V16 supports responsive commerce pages and configurable product sections", () => {
-  assert.match(v16Types, /PageMode = "storefront" \| "cart" \| "checkout" \| "success"/);
+  assert.match(v16Types, /PageMode = "storefront" \| "collection" \| "product" \| "cart" \| "checkout" \| "success"/);
   assert.match(v16Types, /DeviceMode = "desktop" \| "tablet" \| "mobile"/);
   assert.match(v16Canvas, /props\.device==="tablet"\?"768px":"390px"/);
   assert.match(v16Canvas, /data-preview-device=\{props\.device\}/);
@@ -119,7 +119,7 @@ test("V14 is a non-destructive commerce bridge over standalone V13",()=>{
 
 test("V13 is standalone and has no DOM-driven canvas manipulation", () => {
   assert.doesNotMatch(v13, /StoreWebsiteStudioPageV1[012]/);
-  for (const forbidden of ["querySelector","MutationObserver","setTimeout","createPortal","document.","style.setProperty"]) assert.equal(v13.includes(forbidden), false, forbidden);
+  for(const forbidden of ["querySelector","MutationObserver","setTimeout","createPortal","document.","style.setProperty"]) assert.equal(v13.includes(forbidden), false, forbidden);
   assert.match(v13, /function PreviewContainer/);
   assert.match(v13, /data-preview-mode=\{mode\}/);
 });
