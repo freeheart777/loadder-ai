@@ -11,6 +11,9 @@ const StoreWebsiteStudioPageV14 = lazy(
 const StoreWebsiteStudioPageV15 = lazy(
   () => import("./pages/StoreWebsiteStudioPageV15"),
 );
+const StoreWebsiteStudioPageV16 = lazy(
+  () => import("./pages/StoreWebsiteStudioPageV16"),
+);
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -126,7 +129,7 @@ export default function App() {
               <Route path="/dashboard/predictive" element={<PredictivePage />} />
               <Route path="/dashboard/automation" element={<AutomationPage />} />
               <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
-              <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV15 />} />
+              <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/websites/quick-start" element={<StoreQuickStartPage />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
               <Route path="/dashboard/websites/admin" element={<StoreAdminDashboardPage />} />
@@ -134,7 +137,7 @@ export default function App() {
               <Route path="/dashboard/websites/commerce/operations" element={<StoreCatalogOperationsPage />} />
               <Route path="/dashboard/websites/commerce/product/:id" element={<StoreProductDetailPage />} />
               <Route path="/dashboard/websites/storefront-test" element={<StorefrontTestPage />} />
-              <Route path="/dashboard/websites/studio" element={<StoreWebsiteStudioPageV15 />} />
+              <Route path="/dashboard/websites/studio" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/websites/store-v1" element={<StoreWebsiteStudioPage />} />
               <Route path="/dashboard/websites/studio-v2" element={<StoreWebsiteStudioPageV2 />} />
               <Route path="/dashboard/websites/studio-v3" element={<StoreWebsiteStudioPageV3 />} />
@@ -150,11 +153,12 @@ export default function App() {
               <Route path="/dashboard/websites/studio-v13" element={<StoreWebsiteStudioPageV13 />} />
               <Route path="/dashboard/websites/studio-v14" element={<StoreWebsiteStudioPageV14 />} />
               <Route path="/dashboard/websites/studio-v15" element={<StoreWebsiteStudioPageV15 />} />
+              <Route path="/dashboard/websites/studio-v16" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/websites/studio-legacy" element={<VisualWebsiteStudioPage />} />
               <Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} />
               <Route path="/dashboard/websites/new" element={<StoreQuickStartPage />} />
               <Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
-              <Route path="/site-builder" element={<StoreWebsiteStudioPageV15 />} />
+              <Route path="/site-builder" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/site-builder/legacy" element={<SiteProjectStudioPage />} />
               <Route path="/click-test" element={<ClickTestPage />} />
               <Route path="/intelligence" element={<IntelligencePreviewPage />} />
