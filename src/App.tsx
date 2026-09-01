@@ -5,6 +5,9 @@ import { AuthProvider, RequireAuth } from "./lib/auth";
 const StoreWebsiteStudioPageV13 = lazy(
   () => import("./pages/StoreWebsiteStudioPageV13"),
 );
+const StoreWebsiteStudioPageV14 = lazy(
+  () => import("./pages/StoreWebsiteStudioPageV14"),
+);
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -98,181 +101,59 @@ export default function App() {
           <Routes>
             <Route path="/" element={<OriginalLandingPage />} />
             <Route path="/signup" element={<AuthPage />} />
-            <Route
-              path="/store/:siteProjectId"
-              element={<PublicStorefrontPage />}
-            />
-            <Route
-              path="/store/:siteProjectId/product/:slug"
-              element={<PublicProductPage />}
-            />
-            <Route
-              path="/store/:siteProjectId/cart"
-              element={<PublicCartPage />}
-            />
-            <Route
-              path="/store/:siteProjectId/checkout"
-              element={<PublicCheckoutPage />}
-            />
-            <Route
-              path="/store/:siteProjectId/order-success/:orderId"
-              element={<PublicOrderSuccessPage />}
-            />
+            <Route path="/store/:siteProjectId" element={<PublicStorefrontPage />} />
+            <Route path="/store/:siteProjectId/product/:slug" element={<PublicProductPage />} />
+            <Route path="/store/:siteProjectId/cart" element={<PublicCartPage />} />
+            <Route path="/store/:siteProjectId/checkout" element={<PublicCheckoutPage />} />
+            <Route path="/store/:siteProjectId/order-success/:orderId" element={<PublicOrderSuccessPage />} />
             <Route element={<RequireAuth />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/legacy-dashboard" element={<HomePage />} />
               <Route path="/dashboard/brand-book" element={<BrandBookPage />} />
-              <Route
-                path="/dashboard/business-proposal"
-                element={<BusinessProposalPage />}
-              />
-              <Route
-                path="/dashboard/content"
-                element={<ContentStudioPage />}
-              />
+              <Route path="/dashboard/business-proposal" element={<BusinessProposalPage />} />
+              <Route path="/dashboard/content" element={<ContentStudioPage />} />
               <Route path="/dashboard/social" element={<SocialManagerPage />} />
               <Route path="/dashboard/ads" element={<AdsCenterPage />} />
-              <Route
-                path="/dashboard/ads/google"
-                element={<GoogleAdsSearchWizardPage />}
-              />
+              <Route path="/dashboard/ads/google" element={<GoogleAdsSearchWizardPage />} />
               <Route path="/dashboard/marketing" element={<MarketingPage />} />
               <Route path="/dashboard/crm" element={<CRMPage />} />
-              <Route
-                path="/dashboard/crm/customer/:id"
-                element={<CustomerProfilePage />}
-              />
+              <Route path="/dashboard/crm/customer/:id" element={<CustomerProfilePage />} />
               <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
               <Route path="/dashboard/kpi" element={<KPIPage />} />
-              <Route
-                path="/dashboard/predictive"
-                element={<PredictivePage />}
-              />
-              <Route
-                path="/dashboard/automation"
-                element={<AutomationPage />}
-              />
-              <Route
-                path="/dashboard/business-brain"
-                element={<BusinessBrainPage />}
-              />
-              <Route
-                path="/dashboard/websites"
-                element={<StoreWebsiteStudioPageV13 />}
-              />
-              <Route
-                path="/dashboard/websites/quick-start"
-                element={<StoreQuickStartPage />}
-              />
-              <Route
-                path="/dashboard/websites/setup"
-                element={<StoreSetupWizardPage />}
-              />
-              <Route
-                path="/dashboard/websites/admin"
-                element={<StoreAdminDashboardPage />}
-              />
-              <Route
-                path="/dashboard/websites/commerce"
-                element={<StoreCommerceManagerPage />}
-              />
-              <Route
-                path="/dashboard/websites/commerce/operations"
-                element={<StoreCatalogOperationsPage />}
-              />
-              <Route
-                path="/dashboard/websites/commerce/product/:id"
-                element={<StoreProductDetailPage />}
-              />
-              <Route
-                path="/dashboard/websites/storefront-test"
-                element={<StorefrontTestPage />}
-              />
-              <Route
-                path="/dashboard/websites/studio"
-                element={<StoreWebsiteStudioPageV13 />}
-              />
-              <Route
-                path="/dashboard/websites/store-v1"
-                element={<StoreWebsiteStudioPage />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v2"
-                element={<StoreWebsiteStudioPageV2 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v3"
-                element={<StoreWebsiteStudioPageV3 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v4"
-                element={<StoreWebsiteStudioPageV4 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v5"
-                element={<StoreWebsiteStudioPageV5 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v6"
-                element={<StoreWebsiteStudioPageV6 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v7"
-                element={<StoreWebsiteStudioPageV7 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v8"
-                element={<StoreWebsiteStudioPageV8 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v9"
-                element={<StoreWebsiteStudioPageV9 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v10"
-                element={<StoreWebsiteStudioPageV10 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v11"
-                element={<StoreWebsiteStudioPageV11 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v12"
-                element={<StoreWebsiteStudioPageV12 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-v13"
-                element={<StoreWebsiteStudioPageV13 />}
-              />
-              <Route
-                path="/dashboard/websites/studio-legacy"
-                element={<VisualWebsiteStudioPage />}
-              />
-              <Route
-                path="/dashboard/websites/ai"
-                element={<NativeSiteBuilderPage />}
-              />
-              <Route
-                path="/dashboard/websites/new"
-                element={<StoreQuickStartPage />}
-              />
-              <Route
-                path="/dashboard/site-operations"
-                element={<SiteOperationsDashboardPage />}
-              />
-              <Route
-                path="/site-builder"
-                element={<StoreWebsiteStudioPageV13 />}
-              />
-              <Route
-                path="/site-builder/legacy"
-                element={<SiteProjectStudioPage />}
-              />
+              <Route path="/dashboard/predictive" element={<PredictivePage />} />
+              <Route path="/dashboard/automation" element={<AutomationPage />} />
+              <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
+              <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV14 />} />
+              <Route path="/dashboard/websites/quick-start" element={<StoreQuickStartPage />} />
+              <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
+              <Route path="/dashboard/websites/admin" element={<StoreAdminDashboardPage />} />
+              <Route path="/dashboard/websites/commerce" element={<StoreCommerceManagerPage />} />
+              <Route path="/dashboard/websites/commerce/operations" element={<StoreCatalogOperationsPage />} />
+              <Route path="/dashboard/websites/commerce/product/:id" element={<StoreProductDetailPage />} />
+              <Route path="/dashboard/websites/storefront-test" element={<StorefrontTestPage />} />
+              <Route path="/dashboard/websites/studio" element={<StoreWebsiteStudioPageV14 />} />
+              <Route path="/dashboard/websites/store-v1" element={<StoreWebsiteStudioPage />} />
+              <Route path="/dashboard/websites/studio-v2" element={<StoreWebsiteStudioPageV2 />} />
+              <Route path="/dashboard/websites/studio-v3" element={<StoreWebsiteStudioPageV3 />} />
+              <Route path="/dashboard/websites/studio-v4" element={<StoreWebsiteStudioPageV4 />} />
+              <Route path="/dashboard/websites/studio-v5" element={<StoreWebsiteStudioPageV5 />} />
+              <Route path="/dashboard/websites/studio-v6" element={<StoreWebsiteStudioPageV6 />} />
+              <Route path="/dashboard/websites/studio-v7" element={<StoreWebsiteStudioPageV7 />} />
+              <Route path="/dashboard/websites/studio-v8" element={<StoreWebsiteStudioPageV8 />} />
+              <Route path="/dashboard/websites/studio-v9" element={<StoreWebsiteStudioPageV9 />} />
+              <Route path="/dashboard/websites/studio-v10" element={<StoreWebsiteStudioPageV10 />} />
+              <Route path="/dashboard/websites/studio-v11" element={<StoreWebsiteStudioPageV11 />} />
+              <Route path="/dashboard/websites/studio-v12" element={<StoreWebsiteStudioPageV12 />} />
+              <Route path="/dashboard/websites/studio-v13" element={<StoreWebsiteStudioPageV13 />} />
+              <Route path="/dashboard/websites/studio-v14" element={<StoreWebsiteStudioPageV14 />} />
+              <Route path="/dashboard/websites/studio-legacy" element={<VisualWebsiteStudioPage />} />
+              <Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} />
+              <Route path="/dashboard/websites/new" element={<StoreQuickStartPage />} />
+              <Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
+              <Route path="/site-builder" element={<StoreWebsiteStudioPageV14 />} />
+              <Route path="/site-builder/legacy" element={<SiteProjectStudioPage />} />
               <Route path="/click-test" element={<ClickTestPage />} />
-              <Route
-                path="/intelligence"
-                element={<IntelligencePreviewPage />}
-              />
+              <Route path="/intelligence" element={<IntelligencePreviewPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
