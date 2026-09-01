@@ -27,8 +27,9 @@ test("main Store Studio routes use V16 while V13-V15 remain available", () => {
 test("V16 is a true state-owned visual canvas with contextual selection", () => {
   assert.match(v16, /Loadder Commerce Studio V16/);
   assert.match(v16Types, /selectedElement: Selection/);
-  assert.match(v16Canvas, /data-editor-element=\{type\}/);
-  assert.match(v16Canvas, /data-editor-selected=\{active \? "true" : "false"\}/);
+  assert.match(v16Canvas, /data-editor-element=\{interactive \? type : undefined\}/);
+  assert.match(v16Canvas, /data-editor-selected=\{interactive \? \(active \? "true" : "false"\) : undefined\}/);
+  assert.match(v16Canvas, /data-canvas-interactive=\{props\.interactive === false \? "false" : "true"\}/);
   const dynamicEvalToken = "ev" + "al(";
   for (const forbidden of ["querySelector", "MutationObserver", "createPortal", "document.", "style.setProperty", dynamicEvalToken])
     assert.equal(v16Source.includes(forbidden), false, forbidden);
