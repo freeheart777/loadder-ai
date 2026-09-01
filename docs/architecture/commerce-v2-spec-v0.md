@@ -6,7 +6,7 @@ This document defines behavior, not implementation.
 - `Money`: integer minor units plus ISO/provider-neutral currency code.
 - `Product`: sellable concept with slug, status, content, classification and metadata.
 - `Variant`: purchasable SKU with options, price override, inventory policy and lifecycle state.
-- `InventoryUnit`: available, reserved and committed quantities per variant/location.
+- `InventoryUnit`: on-hand, reserved and committed quantities per variant/location.
 - `Cart`: mutable collection of priced lines before order creation.
 - `Order`: immutable commercial snapshot created from a validated cart.
 - `Promotion`: rule set that can alter cart price when eligibility conditions are satisfied.
@@ -16,9 +16,45 @@ This document defines behavior, not implementation.
 - tenant/workspace ownership is mandatory on every write and every lookup.
 - a cart cannot contain variants from another store.
 - an inactive product or variant cannot enter a new cart.
-- inventory cannot become negative when policy is `DENY`.
+- inventory cannot oversell when policy is `DENY`.
 - order line prices are snapshots and never change when catalog prices later change.
 - promotion calculations are deterministic for identical inputs.
+- domain functions do not mutate their inputs.
+
+## Catalog / Variant v0
+### Product
+A product owns `workspaceId`, `storeId`, lifecycle status, slug, classification and metadata. IDs and ownership fields are immutable across updates.
+
+### Variant
+A variant owns a globally scoped SKU within its storage boundary, product ownership, option values, optional price override, lifecycle state and inventory policy.
+
+### Sellability
+A variant is sellable only when:
+- its product is `ACTIVE`;
+- the variant itself is active;
+- product, variant, workspace and store ownership agree.
+
+Cross-workspace, cross-store or cross-product relationships are rejected before pricing/cart operations.
+
+## Inventory Reservation v0
+Inventory is modeled per `(workspace, store, variant, location)`.
+
+`available = onHand - reserved - committed`
+
+### Operations
+- `reserve`: moves available capacity into `reserved` without reducing `onHand`.
+- `release`: decreases `reserved`.
+- `commit`: moves units from `reserved` to `committed`.
+- `adjustOnHand`: changes physical stock while preventing `onHand` from dropping below allocated stock.
+
+### Rules
+- quantity inputs are integers.
+- reservation/release/commit operations are deterministic and return new state rather than mutate input state.
+- `DENY` rejects reservations larger than available stock.
+- `ALLOW` permits backorder-style negative availability but never changes the original state.
+- release/commit cannot underflow an existing reservation.
+- initial inventory state may not have `reserved + committed > onHand`.
+- snapshots have stable ordering so persistence/event hashing is reproducible.
 
 ## Promotion v0
 ### Supported reward types
