@@ -12,6 +12,14 @@ test("site projects persist content/assets and publish state per workspace", () 
   const project = runWithWorkspace("ws-1", () => service.create({ name: "My Store", siteType: "STORE", content: { hero: "Hello" } }));
   const otherProject = runWithWorkspace("ws-1", () => service.create({ name: "Other Store", siteType: "STORE", content: { hero: "Other" } }));
 
+  assert.equal(project.content.hero, "Hello");
+  assert.equal(project.content.websitePlatform.schemaVersion, 1);
+  assert.equal(project.content.websitePlatform.archetype, "store");
+  assert.equal(project.content.websitePlatform.brandContext.businessName, "My Store");
+  assert.ok(project.content.websitePlatform.capabilities.includes("landing"));
+  assert.ok(project.content.websitePlatform.capabilities.includes("analytics"));
+  assert.ok(project.content.websitePlatform.capabilities.includes("ads"));
+
   runWithWorkspace("ws-1", () => {
     assert.equal(service.list().length, 2);
     const asset = service.addAsset(project.id, { kind: "product", name: "shoe.jpg", url: "https://cdn.example.test/shoe.jpg" });
@@ -31,6 +39,41 @@ test("site projects persist content/assets and publish state per workspace", () 
     assert.throws(() => service.get(project.id), (error) => error.code === "SITE_PROJECT_NOT_FOUND");
     assert.throws(() => service.removeAsset(project.id, otherProject.id), (error) => error.code === "SITE_PROJECT_NOT_FOUND");
   });
+  db.close();
+});
+
+test("site project content updates lazily add website platform without deleting legacy builder state", () => {
+  const db = createSiteTestDb();
+  const repository = createSiteProjectRepository(db);
+  const service = createSiteProjectService({ repository, businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) } });
+  const project = runWithWorkspace("ws-1", () => service.create({ name: "Clinic", siteType: "MEDICAL", content: { legacy: true } }));
+
+  const updated = runWithWorkspace("ws-1", () => service.update(project.id, {
+    content: { legacy: true, storeBuilderV16: { version: 16 } },
+  }));
+
+  assert.equal(updated.content.legacy, true);
+  assert.deepEqual(updated.content.storeBuilderV16, { version: 16 });
+  assert.equal(updated.content.websitePlatform.archetype, "doctor");
+  assert.ok(updated.content.websitePlatform.capabilities.includes("booking"));
+  assert.ok(updated.content.websitePlatform.capabilities.includes("landing"));
+  db.close();
+});
+
+test("site project service preserves an existing website platform definition", () => {
+  const db = createSiteTestDb();
+  const repository = createSiteProjectRepository(db);
+  const service = createSiteProjectService({ repository, businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) } });
+  const websitePlatform = {
+    schemaVersion: 1,
+    archetype: "catalog",
+    capabilities: ["catalog", "landing"],
+    pages: [{ id: "landing-1", slug: "campaign", title: "Campaign", kind: "landing", enabled: true }],
+    integrations: { analytics: [], ads: [] },
+    conversionGoals: [],
+  };
+  const project = runWithWorkspace("ws-1", () => service.create({ name: "Catalog", siteType: "BUSINESS", content: { websitePlatform } }));
+  assert.deepEqual(project.content.websitePlatform, websitePlatform);
   db.close();
 });
 

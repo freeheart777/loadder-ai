@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { ensureWebsitePlatformContent } from "./website-platform-definition.mjs";
 
 const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
 const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
@@ -54,7 +55,8 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (typeof name !== "string" || !name.trim()) throw new SiteProjectError("name is required.");
     requireType(siteType);
     const cleanName = name.trim();
-    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context?.id ?? null, content, now: now().toISOString() });
+    const normalizedContent = ensureWebsitePlatformContent(content, { siteType, name: cleanName });
+    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context?.id ?? null, content: normalizedContent, now: now().toISOString() });
   }
   function get(id) {
     const workspaceId = requireWorkspaceId();
@@ -63,9 +65,19 @@ export function createSiteProjectService({ repository, businessContextService, d
     return project;
   }
   function update(id, input = {}) {
-    get(id);
+    const current = get(id);
     if (input.siteType !== undefined) requireType(input.siteType);
-    return repository.update(id, { ...input, slug: input.slug ? slugify(input.slug) : undefined, now: now().toISOString() });
+    const nextSiteType = input.siteType ?? current.siteType;
+    const nextName = typeof input.name === "string" && input.name.trim() ? input.name.trim() : current.name;
+    const nextContent = input.content === undefined
+      ? undefined
+      : ensureWebsitePlatformContent(input.content, { siteType: nextSiteType, name: nextName });
+    return repository.update(id, {
+      ...input,
+      ...(nextContent === undefined ? {} : { content: nextContent }),
+      slug: input.slug ? slugify(input.slug) : undefined,
+      now: now().toISOString(),
+    });
   }
   function publish(id) {
     const current = get(id);
