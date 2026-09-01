@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, DotsSixVertical, Headset, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingCart, TextT, Truck, UserCircle } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingCart, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
 import { formatMoney, productView, productsForSection } from "./config";
 import type { DeviceMode, ElementType, PageMode, Product, ProductSettings, SectionConfig, Selection, StudioConfig } from "./types";
 
@@ -9,11 +9,15 @@ type CanvasProps = {
   device: DeviceMode;
   selected: Selection;
   select: (selection: Selection) => void;
+  onEditElement?: (selection: Selection) => void;
   interactive?: boolean;
   onAddProduct?: (sectionId: string) => void;
   onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void;
   onInsertSection?: (index: number, type: SectionConfig["type"]) => void;
   onReorderSection?: (fromId: string, toId: string) => void;
+  onMoveSection?: (id: string, delta: number) => void;
+  onDuplicateSection?: (id: string) => void;
+  onDeleteSection?: (id: string) => void;
   runtimePage?: PageMode;
   onRuntimePage?: (page: PageMode) => void;
 };
@@ -27,16 +31,39 @@ function editorLabel(type: ElementType) {
   return "بخش";
 }
 
-function EditorElement({ type, id, selected, onSelect, interactive = true, draggable = false, className = "", style, children, onDragStart, onDragOver, onDrop }: {
-  type: ElementType; id: string | null; selected: Selection; onSelect: (selection: Selection) => void; interactive?: boolean; draggable?: boolean; className?: string; style?: React.CSSProperties; children: React.ReactNode; onDragStart?: React.DragEventHandler<HTMLDivElement>; onDragOver?: React.DragEventHandler<HTMLDivElement>; onDrop?: React.DragEventHandler<HTMLDivElement>;
+function EditorElement({ type, id, selected, onSelect, onEdit, interactive = true, draggable = false, className = "", style, children, onDragStart, onDragOver, onDrop, onMoveUp, onMoveDown, onDuplicate, onDelete }: {
+  type: ElementType;
+  id: string | null;
+  selected: Selection;
+  onSelect: (selection: Selection) => void;
+  onEdit?: (selection: Selection) => void;
+  interactive?: boolean;
+  draggable?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+  onDragStart?: React.DragEventHandler<HTMLDivElement>;
+  onDragOver?: React.DragEventHandler<HTMLDivElement>;
+  onDrop?: React.DragEventHandler<HTMLDivElement>;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 }) {
   const active = interactive && selected.type === type && selected.id === id;
-  const selectSelf = () => onSelect({ type, id });
+  const selection = { type, id } as Selection;
+  const selectSelf = () => onSelect(selection);
+  const editSelf = () => (onEdit || onSelect)(selection);
+  const action = (fn?: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn?.(); };
   return <div role={interactive ? "button" : undefined} tabIndex={interactive ? 0 : undefined} data-editor-element={interactive ? type : undefined} data-editor-selected={interactive ? (active ? "true" : "false") : undefined} draggable={interactive && draggable} className={`relative outline-none transition ${interactive ? "cursor-pointer" : ""} ${active ? "z-10 ring-[3px] ring-emerald-400 ring-offset-2 ring-offset-slate-100" : interactive ? "hover:ring-2 hover:ring-violet-400/50" : ""} ${className}`} style={style} onDragStart={interactive ? onDragStart : undefined} onDragOver={interactive ? onDragOver : undefined} onDrop={interactive ? onDrop : undefined} onClick={interactive ? (e) => { e.stopPropagation(); selectSelf(); } : undefined} onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") selectSelf(); } : undefined}>
-    {active && <div className="absolute right-3 top-3 z-50 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 text-slate-700 shadow-2xl backdrop-blur" onClick={(e) => e.stopPropagation()}>
+    {active && <div className="absolute right-3 top-3 z-50 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 text-slate-700 shadow-2xl backdrop-blur" onClick={(e) => e.stopPropagation()}>
       <span className="px-2 text-[10px] font-black text-slate-400">{editorLabel(type)}</span>
-      <button type="button" onClick={selectSelf} className="flex min-h-8 items-center gap-1 rounded-xl bg-slate-950 px-2.5 text-[10px] font-black text-white"><PencilSimple size={13}/> {type === "hero" || type === "banner" ? "تغییر" : "ویرایش"}</button>
-      {draggable && <span className="flex min-h-8 items-center gap-1 rounded-xl bg-slate-100 px-2.5 text-[10px] font-bold text-slate-500"><DotsSixVertical size={13}/> بکشید</span>}
+      <button type="button" onClick={action(editSelf)} className="flex min-h-8 items-center gap-1 rounded-xl bg-slate-950 px-2.5 text-[10px] font-black text-white"><PencilSimple size={13}/> {type === "hero" || type === "banner" ? "تغییر" : "ویرایش"}</button>
+      {onMoveUp && <button type="button" title="بالاتر" onClick={action(onMoveUp)} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 hover:bg-slate-200"><ArrowUp size={13}/></button>}
+      {onMoveDown && <button type="button" title="پایین‌تر" onClick={action(onMoveDown)} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 hover:bg-slate-200"><ArrowDown size={13}/></button>}
+      {onDuplicate && <button type="button" title="کپی" onClick={action(onDuplicate)} className="grid h-8 w-8 place-items-center rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100"><CopySimple size={13}/></button>}
+      {onDelete && <button type="button" title="حذف" onClick={action(onDelete)} className="grid h-8 w-8 place-items-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100"><Trash size={13}/></button>}
+      {draggable && <span className="flex min-h-8 items-center gap-1 rounded-xl bg-slate-100 px-2 text-[10px] font-bold text-slate-500"><DotsSixVertical size={13}/> بکشید</span>}
     </div>}
     {children}
   </div>;
@@ -55,7 +82,7 @@ function InsertBetween({ index, onInsert }: { index: number; onInsert?: CanvasPr
 function Header(props: CanvasProps) {
   const { config, device, selected, select, interactive = true, onRuntimePage } = props;
   const mobile = device === "mobile";
-  return <EditorElement type="header" id="header" selected={selected} onSelect={select} interactive={interactive} className={config.header.sticky ? "sticky top-0 z-20" : ""} style={{ background: config.header.backgroundColor, color: config.header.textColor }}>
+  return <EditorElement type="header" id="header" selected={selected} onSelect={select} onEdit={props.onEditElement} interactive={interactive} className={config.header.sticky ? "sticky top-0 z-20" : ""} style={{ background: config.header.backgroundColor, color: config.header.textColor }}>
     <div className="bg-slate-950 px-4 py-2 text-center text-[10px] font-bold text-white/75">ارسال سریع · پشتیبانی خرید · تجربه امن</div>
     <div className="mx-auto flex min-h-20 items-center gap-3 px-5" style={{ maxWidth: config.design.containerWidth }}>
       <div className="flex items-center gap-3">{config.header.logoUrl ? <img src={config.header.logoUrl} alt="لوگو" className="h-11 w-11 rounded-xl object-cover" /> : <div className="grid h-11 w-11 place-items-center rounded-xl bg-slate-900 font-black text-white">L</div>}<div><b className="block">{config.header.storeName}</b><span className="text-[10px] text-slate-400">فروشگاه آنلاین</span></div></div>
@@ -70,7 +97,7 @@ function Hero(props: CanvasProps) {
   const { config, device, selected, select, interactive = true } = props;
   if (!config.hero.enabled) return null;
   const mobile = device === "mobile";
-  return <EditorElement type="hero" id="hero" selected={selected} onSelect={select} interactive={interactive} className="overflow-hidden" style={{ background: config.hero.backgroundColor, color: config.hero.textColor }}>
+  return <EditorElement type="hero" id="hero" selected={selected} onSelect={select} onEdit={props.onEditElement} interactive={interactive} className="overflow-hidden" style={{ background: config.hero.backgroundColor, color: config.hero.textColor }}>
     <div className={`mx-auto grid ${mobile ? "grid-cols-1" : "grid-cols-[1.05fr_.95fr]"}`} style={{ maxWidth: config.design.containerWidth, minHeight: mobile ? 420 : Math.max(380, config.hero.height) }}>
       <div className="flex items-center p-8 sm:p-12"><div className="max-w-xl" style={{ textAlign: config.hero.alignment }}><span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-black">{config.hero.eyebrow}</span><h2 className="mt-5 font-black leading-[1.15]" style={{ fontSize: mobile ? 36 : 54 * config.design.headingScale / 100 }}>{config.hero.title}</h2><p className="mt-5 text-sm leading-8 opacity-75">{config.hero.subtitle}</p><a href={config.hero.ctaHref || "#products"} onClick={interactive ? (e) => e.preventDefault() : undefined} className="mt-7 inline-flex min-h-12 items-center px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{config.hero.ctaLabel}</a></div></div>
       <div className="min-h-72 bg-slate-100">{config.hero.imageUrl ? <img src={config.hero.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full min-h-80 place-items-center text-center text-slate-400"><div><ImageSquare size={62} className="mx-auto"/><b className="mt-3 block">برای تغییر تصویر کلیک کنید</b><span className="text-xs">Media Library</span></div></div>}</div>
@@ -80,9 +107,9 @@ function Hero(props: CanvasProps) {
 
 function TrustStrip({ config }: { config: StudioConfig }) { const items = [[Truck,"ارسال سریع"],[ShieldCheck,"پرداخت امن"],[CheckCircle,"ضمانت خرید"],[Headset,"پشتیبانی"]] as const; return <div className="border-y border-slate-100 bg-white"><div className="mx-auto grid grid-cols-2 gap-3 px-5 py-5 md:grid-cols-4" style={{ maxWidth: config.design.containerWidth }}>{items.map(([Icon,label]) => <div key={label} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><span style={{color:config.design.primaryColor}}><Icon size={22}/></span><b className="text-xs text-slate-800">{label}</b></div>)}</div></div>; }
 
-function ProductCard({ product, settings, config, selected, select, sectionId, interactive, onReorderProduct, onRuntimePage }: { product: Product; settings: ProductSettings; config: StudioConfig; selected: Selection; select: CanvasProps["select"]; sectionId: string; interactive: boolean; onReorderProduct?: CanvasProps["onReorderProduct"]; onRuntimePage?: CanvasProps["onRuntimePage"] }) {
+function ProductCard({ product, settings, config, selected, select, sectionId, interactive, onReorderProduct, onRuntimePage, onEditElement }: { product: Product; settings: ProductSettings; config: StudioConfig; selected: Selection; select: CanvasProps["select"]; sectionId: string; interactive: boolean; onReorderProduct?: CanvasProps["onReorderProduct"]; onRuntimePage?: CanvasProps["onRuntimePage"]; onEditElement?: CanvasProps["onEditElement"] }) {
   const view = productView(product, config); const inventory = (product.variants || []).reduce((s,v)=>s+Number(v.inventoryQuantity||0),0);
-  return <EditorElement type="product-card" id={product.id} selected={selected} onSelect={select} interactive={interactive} draggable className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" onDragStart={(e)=>{e.dataTransfer.setData("text/loadder-product-id",product.id);}} onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>{e.preventDefault();e.stopPropagation();const from=e.dataTransfer.getData("text/loadder-product-id");if(from)onReorderProduct?.(sectionId,from,product.id);}}>
+  return <EditorElement type="product-card" id={product.id} selected={selected} onSelect={select} onEdit={onEditElement} interactive={interactive} draggable className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" onDragStart={(e)=>{e.dataTransfer.setData("text/loadder-product-id",product.id);}} onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>{e.preventDefault();e.stopPropagation();const from=e.dataTransfer.getData("text/loadder-product-id");if(from)onReorderProduct?.(sectionId,from,product.id);}}>
     {interactive && <span className="absolute left-2 top-2 z-20 grid h-8 w-8 place-items-center rounded-xl bg-slate-950/70 text-white"><DotsSixVertical/></span>}
     <div className="aspect-square bg-slate-50">{view.imageUrl ? <img src={view.imageUrl} alt={view.title} className="h-full w-full object-contain p-3"/> : <div className="grid h-full place-items-center text-slate-300"><Package size={48}/></div>}</div>
     <div className="p-4"><span className="text-[10px] text-slate-400">{product.brand || product.category || "محصول"}</span><b className="mt-1 block text-sm text-slate-900">{view.title}</b>{settings.showStock && <span className="mt-2 block text-[10px] text-emerald-600">{inventory>0?`${inventory} عدد موجود`:"ناموجود"}</span>}<div className="mt-4 flex items-center justify-between gap-2"><strong className="text-sm" style={{color:config.design.primaryColor}}>{formatMoney(view.regularPriceMinor,product.currency)}</strong></div>{settings.showCartButton && <button type="button" onClick={!interactive?()=>onRuntimePage?.("cart"):undefined} className="mt-3 min-h-11 w-full text-xs font-black text-white" style={{background:config.design.primaryColor,borderRadius:config.design.buttonRadius}}>{view.ctaLabel || config.commerce.cartButtonLabel}</button>}</div>
@@ -91,7 +118,7 @@ function ProductCard({ product, settings, config, selected, select, sectionId, i
 
 function SectionShell({ section, index, props, children }: { section: SectionConfig; index: number; props: CanvasProps; children: React.ReactNode }) {
   const type: ElementType = section.type === "banner" ? "banner" : section.type === "trust" ? "trust" : "section";
-  return <><InsertBetween index={index} onInsert={props.interactive === false ? undefined : props.onInsertSection}/><EditorElement type={type} id={section.id} selected={props.selected} onSelect={props.select} interactive={props.interactive !== false} draggable className="group/section" onDragStart={(e)=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/loadder-section-id",section.id);}} onDragOver={(e)=>{if(e.dataTransfer.types.includes("text/loadder-section-id")){e.preventDefault();e.dataTransfer.dropEffect="move";}}} onDrop={(e)=>{const from=e.dataTransfer.getData("text/loadder-section-id");if(from){e.preventDefault();e.stopPropagation();props.onReorderSection?.(from,section.id);}}}>
+  return <><InsertBetween index={index} onInsert={props.interactive === false ? undefined : props.onInsertSection}/><EditorElement type={type} id={section.id} selected={props.selected} onSelect={props.select} onEdit={props.onEditElement} interactive={props.interactive !== false} draggable className="group/section" onMoveUp={() => props.onMoveSection?.(section.id,-1)} onMoveDown={() => props.onMoveSection?.(section.id,1)} onDuplicate={() => props.onDuplicateSection?.(section.id)} onDelete={() => props.onDeleteSection?.(section.id)} onDragStart={(e)=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/loadder-section-id",section.id);}} onDragOver={(e)=>{if(e.dataTransfer.types.includes("text/loadder-section-id")){e.preventDefault();e.dataTransfer.dropEffect="move";}}} onDrop={(e)=>{const from=e.dataTransfer.getData("text/loadder-section-id");if(from){e.preventDefault();e.stopPropagation();props.onReorderSection?.(from,section.id);}}}>
     {children}
   </EditorElement></>;
 }
@@ -100,7 +127,7 @@ function StorefrontCanvas(props: CanvasProps) {
   const visible = props.config.sections.filter(s=>s.enabled);
   return <div className="min-h-full bg-slate-50" style={{color:props.config.design.textColor}}><Header {...props}/><Hero {...props}/><TrustStrip config={props.config}/>{visible.map((section,index)=>{
     if(section.type==="spacer") return <SectionShell key={section.id} section={section} index={index} props={props}><div style={{height:section.spacingTop+section.spacingBottom}}/></SectionShell>;
-    if(section.type==="products") { const settings=section.productSettings!; const source=productsForSection(props.products,settings); const shown=(source.length?source:settings.source==="manual"?[]:props.products).slice(0,12); const columns=props.device==="mobile"?settings.columnsMobile:props.device==="tablet"?settings.columnsTablet:settings.columnsDesktop; return <SectionShell key={section.id} section={section} index={index} props={props}><section id="products" className="mx-auto px-5 py-10" style={{maxWidth:props.config.design.containerWidth}}><div className="mb-6"><span className="text-[10px] font-black" style={{color:props.config.design.primaryColor}}>منتخب فروشگاه</span><h3 className="mt-2 text-2xl font-black text-slate-900">{section.title}</h3><p className="mt-2 text-xs text-slate-400">{section.subtitle}</p></div><div className="grid gap-4" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}}>{shown.map(p=><ProductCard key={p.id} product={p} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId={section.id} interactive={props.interactive!==false} onReorderProduct={props.onReorderProduct} onRuntimePage={props.onRuntimePage}/>)}{props.interactive!==false && <button type="button" onClick={(e)=>{e.stopPropagation();props.onAddProduct?.(section.id);}} className="grid min-h-64 place-items-center rounded-3xl border-2 border-dashed border-violet-300 bg-violet-50 text-violet-700"><span><Plus size={32} className="mx-auto"/><b className="mt-2 block">افزودن محصول</b><small>از کاتالوگ</small></span></button>}</div></section></SectionShell>; }
+    if(section.type==="products") { const settings=section.productSettings!; const source=productsForSection(props.products,settings); const shown=(source.length?source:settings.source==="manual"?[]:props.products).slice(0,12); const columns=props.device==="mobile"?settings.columnsMobile:props.device==="tablet"?settings.columnsTablet:settings.columnsDesktop; return <SectionShell key={section.id} section={section} index={index} props={props}><section id="products" className="mx-auto px-5 py-10" style={{maxWidth:props.config.design.containerWidth}}><div className="mb-6"><span className="text-[10px] font-black" style={{color:props.config.design.primaryColor}}>منتخب فروشگاه</span><h3 className="mt-2 text-2xl font-black text-slate-900">{section.title}</h3><p className="mt-2 text-xs text-slate-400">{section.subtitle}</p></div><div className="grid gap-4" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}}>{shown.map(p=><ProductCard key={p.id} product={p} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId={section.id} interactive={props.interactive!==false} onReorderProduct={props.onReorderProduct} onRuntimePage={props.onRuntimePage} onEditElement={props.onEditElement}/>)}{props.interactive!==false && <button type="button" onClick={(e)=>{e.stopPropagation();props.onAddProduct?.(section.id);}} className="grid min-h-64 place-items-center rounded-3xl border-2 border-dashed border-violet-300 bg-violet-50 text-violet-700"><span><Plus size={32} className="mx-auto"/><b className="mt-2 block">افزودن محصول</b><small>از کاتالوگ</small></span></button>}</div></section></SectionShell>; }
     if(section.type==="banner") return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="grid overflow-hidden rounded-[28px] md:grid-cols-2" style={{background:section.backgroundColor,color:section.textColor}}><div className="p-8"><h3 className="text-2xl font-black">{section.title}</h3><p className="mt-3 text-sm opacity-70">{section.subtitle}</p></div><div className="min-h-48 bg-white/10">{section.imageUrl?<img src={section.imageUrl} alt="" className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-sm opacity-50">برای انتخاب تصویر کلیک کنید</div>}</div></div></section></SectionShell>;
     return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="rounded-[28px] border bg-white p-7"><h3 className="text-xl font-black text-slate-900">{section.title}</h3><p className="mt-3 text-sm text-slate-500">{section.subtitle}</p></div></section></SectionShell>;
   })}<InsertBetween index={visible.length} onInsert={props.interactive===false?undefined:props.onInsertSection}/><footer className="mt-8 bg-slate-950 text-white"><div className="mx-auto grid gap-8 px-5 py-10 md:grid-cols-3" style={{maxWidth:props.config.design.containerWidth}}><div><b>{props.config.header.storeName}</b><p className="mt-3 text-xs text-white/45">خرید ساده، سریع و مطمئن.</p></div><div><b>راهنمای خرید</b><p className="mt-3 text-xs text-white/45">ارسال · بازگشت · سوالات متداول</p></div><div><b>پشتیبانی</b><p className="mt-3 text-xs text-white/45">پیگیری سفارش · تماس</p></div></div></footer></div>;

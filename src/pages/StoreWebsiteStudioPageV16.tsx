@@ -5,7 +5,7 @@ import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
 import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
 import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
-import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
+import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, Selection, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { apiFetch } from "../lib/api";
 
 type Project = { id: string; name?: string; content: Record<string, any> };
@@ -51,7 +51,7 @@ export default function StoreWebsiteStudioPageV16() {
   const [pickerSectionId, setPickerSectionId] = useState<string | null>(null);
   const [mediaTarget, setMediaTarget] = useState<MediaTarget | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
 
   useEffect(() => {
     const c = new AbortController();
@@ -93,6 +93,10 @@ export default function StoreWebsiteStudioPageV16() {
     patchCommerce: (p) => setConfig((c) => ({ ...c, commerce: { ...c.commerce, ...p } })),
   }), []);
 
+  function selectCanvasElement(selectedElement: Selection) {
+    setConfig((cur) => ({ ...cur, selectedElement }));
+  }
+
   function patchProductSection(sectionId: string, updater: (s: ProductSettings) => ProductSettings) {
     setConfig((c) => ({ ...c, sections: c.sections.map((s) => s.id === sectionId && s.type === "products" && s.productSettings ? { ...s, productSettings: updater(s.productSettings) } : s) }));
   }
@@ -103,7 +107,7 @@ export default function StoreWebsiteStudioPageV16() {
       return s.productIds.includes(productId) ? s : { ...s, productIds: [...s.productIds, productId].slice(0, 12) };
     });
     setPickerSectionId(null);
-    actions.select({ type: "product-card", id: productId });
+    selectCanvasElement({ type: "product-card", id: productId });
     setMessage("محصول به بخش اضافه شد.");
   }
 
@@ -147,7 +151,6 @@ export default function StoreWebsiteStudioPageV16() {
       return { ...c, sections, selectedElement: { type: type === "banner" ? "banner" : type === "trust" ? "trust" : "section", id: section.id } };
     });
     setTab("context");
-    setInspectorOpen(true);
     if (type === "banner") setMediaTarget({ kind: "banner", sectionId: section.id });
     if (type === "products") setMessage("بخش محصولات اضافه شد؛ از + داخل آن محصول انتخاب کنید.");
   }
@@ -161,10 +164,16 @@ export default function StoreWebsiteStudioPageV16() {
       const copy = { ...src, id: `${src.type}-${crypto.randomUUID()}`, title: `${src.title} (کپی)`, productSettings: src.productSettings ? { ...src.productSettings, productIds: [...src.productSettings.productIds] } : undefined };
       const sections = [...c.sections];
       sections.splice(i + 1, 0, copy);
-      return { ...c, sections };
+      const type = copy.type === "banner" ? "banner" : copy.type === "trust" ? "trust" : "section";
+      return { ...c, sections, selectedElement: { type, id: copy.id } };
     });
+    setMessage("بخش کپی شد.");
   }
-  function deleteSection(id: string) { setConfig((c) => ({ ...c, sections: c.sections.filter((s) => s.id !== id), selectedElement: { type: "hero", id: "hero" } })); }
+  function deleteSection(id: string) {
+    setConfig((c) => ({ ...c, sections: c.sections.filter((s) => s.id !== id), selectedElement: { type: "hero", id: "hero" } }));
+    setInspectorOpen(false);
+    setMessage("بخش حذف شد.");
+  }
   function addDiscountSection() {
     const section = newSection("products");
     section.title = "تخفیف‌های ویژه";
@@ -228,7 +237,7 @@ export default function StoreWebsiteStudioPageV16() {
       <StudioToolbar device={device} page={config.activePage} busy={busy || !project} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} />
     </header>
 
-    <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_320px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
+    <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
       <section className="order-2 min-h-0 overflow-auto bg-[#dfe5ec] p-3 lg:order-1 lg:p-5">
         <div className="sticky top-2 z-40 mx-auto mb-3 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-white/15 bg-[#111827]/92 p-1.5 shadow-xl backdrop-blur">
           <button onClick={() => setMediaTarget({ kind: "hero" })} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><ImageSquare size={16} /> عکس اصلی</button>
@@ -236,15 +245,16 @@ export default function StoreWebsiteStudioPageV16() {
           <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
           <button onClick={() => setMediaTarget({ kind: "logo" })} className="rounded-xl px-3 py-2 text-[11px] font-bold text-emerald-200 hover:bg-emerald-400/10"><UploadSimple size={16} /> لوگو</button>
         </div>
-        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={config} products={products} device={device} selected={config.selectedElement} select={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} />}
+        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={config} products={products} device={device} selected={config.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} />}
       </section>
 
       <aside className={`order-1 min-h-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+        <div className="border-b border-white/10 px-4 py-3"><b className="text-xs">تنظیمات دقیق</b><p className="mt-1 text-[10px] text-white/35">برای کارهای معمول از ابزار روی خود سایت استفاده کنید.</p></div>
         <InspectorPanel {...inspectorProps} tab={tab} onTab={setTab} />
       </aside>
 
       <button type="button" onClick={() => setInspectorOpen((v) => !v)} aria-label={inspectorOpen ? "بستن پنل ویرایش" : "باز کردن پنل ویرایش"} className="absolute left-3 top-3 z-50 hidden h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-700 shadow-lg lg:flex">
-        {inspectorOpen ? <CaretLeft size={15} /> : <CaretRight size={15} />}{inspectorOpen ? "بستن تنظیمات" : "تنظیمات"}
+        {inspectorOpen ? <CaretLeft size={15} /> : <CaretRight size={15} />}{inspectorOpen ? "بستن تنظیمات" : "تنظیمات دقیق"}
       </button>
     </div>
 
