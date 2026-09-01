@@ -60,9 +60,9 @@ test("V16 reads real catalog and media while keeping visual overrides separate",
 });
 
 test("V16 persists only storeBuilderV16 and preserves legacy configuration", () => {
-  assert.match(v16, /const storeBuilderV16:StudioConfig=\{\.\.\.config,version:16\}/);
-  assert.match(v16, /const content=\{\.\.\.project\.content,storeBuilderV16\}/);
-  assert.match(v16, /method:"PATCH"/);
+  assert.match(v16, /const\s+storeBuilderV16\s*:\s*StudioConfig\s*=\s*\{\s*\.\.\.config\s*,\s*version\s*:\s*16\s*\}/);
+  assert.match(v16, /const\s+content\s*=\s*\{\s*\.\.\.project\.content\s*,\s*storeBuilderV16\s*\}/);
+  assert.match(v16, /method\s*:\s*"PATCH"/);
   for (const legacy of ["storeBuilderV15", "storeBuilderV14", "storeBuilderV13", "storeBuilderV11"])
     assert.match(v16Config, new RegExp(legacy));
   assert.match(v16Types, /version: 16/);
