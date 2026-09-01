@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, DotsSixVertical, Headset, ImageSquare, MagnifyingGlass, Package, Plus, ShieldCheck, ShoppingCart, TextT, Truck, UserCircle } from "@phosphor-icons/react";
+import { CheckCircle, DotsSixVertical, Headset, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingCart, TextT, Truck, UserCircle } from "@phosphor-icons/react";
 import { formatMoney, productView, productsForSection } from "./config";
 import type { DeviceMode, ElementType, PageMode, Product, ProductSettings, SectionConfig, Selection, StudioConfig } from "./types";
 
@@ -18,12 +18,26 @@ type CanvasProps = {
   onRuntimePage?: (page: PageMode) => void;
 };
 
+function editorLabel(type: ElementType) {
+  if (type === "hero") return "بنر اصلی";
+  if (type === "header") return "هدر";
+  if (type === "product-card") return "محصول";
+  if (type === "banner") return "بنر";
+  if (type === "trust") return "مزیت‌ها";
+  return "بخش";
+}
+
 function EditorElement({ type, id, selected, onSelect, interactive = true, draggable = false, className = "", style, children, onDragStart, onDragOver, onDrop }: {
   type: ElementType; id: string | null; selected: Selection; onSelect: (selection: Selection) => void; interactive?: boolean; draggable?: boolean; className?: string; style?: React.CSSProperties; children: React.ReactNode; onDragStart?: React.DragEventHandler<HTMLDivElement>; onDragOver?: React.DragEventHandler<HTMLDivElement>; onDrop?: React.DragEventHandler<HTMLDivElement>;
 }) {
   const active = interactive && selected.type === type && selected.id === id;
-  return <div role={interactive ? "button" : undefined} tabIndex={interactive ? 0 : undefined} data-editor-element={interactive ? type : undefined} data-editor-selected={interactive ? (active ? "true" : "false") : undefined} draggable={interactive && draggable} className={`relative outline-none transition ${interactive ? "cursor-pointer" : ""} ${active ? "z-10 ring-[3px] ring-emerald-400 ring-offset-2 ring-offset-slate-100" : interactive ? "hover:ring-2 hover:ring-violet-400/50" : ""} ${className}`} style={style} onDragStart={interactive ? onDragStart : undefined} onDragOver={interactive ? onDragOver : undefined} onDrop={interactive ? onDrop : undefined} onClick={interactive ? (e) => { e.stopPropagation(); onSelect({ type, id }); } : undefined} onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") onSelect({ type, id }); } : undefined}>
-    {active && <span className="pointer-events-none absolute right-3 top-3 z-40 rounded-full bg-emerald-400 px-3 py-1 text-[10px] font-black text-slate-950 shadow-lg">ویرایش</span>}
+  const selectSelf = () => onSelect({ type, id });
+  return <div role={interactive ? "button" : undefined} tabIndex={interactive ? 0 : undefined} data-editor-element={interactive ? type : undefined} data-editor-selected={interactive ? (active ? "true" : "false") : undefined} draggable={interactive && draggable} className={`relative outline-none transition ${interactive ? "cursor-pointer" : ""} ${active ? "z-10 ring-[3px] ring-emerald-400 ring-offset-2 ring-offset-slate-100" : interactive ? "hover:ring-2 hover:ring-violet-400/50" : ""} ${className}`} style={style} onDragStart={interactive ? onDragStart : undefined} onDragOver={interactive ? onDragOver : undefined} onDrop={interactive ? onDrop : undefined} onClick={interactive ? (e) => { e.stopPropagation(); selectSelf(); } : undefined} onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") selectSelf(); } : undefined}>
+    {active && <div className="absolute right-3 top-3 z-50 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 text-slate-700 shadow-2xl backdrop-blur" onClick={(e) => e.stopPropagation()}>
+      <span className="px-2 text-[10px] font-black text-slate-400">{editorLabel(type)}</span>
+      <button type="button" onClick={selectSelf} className="flex min-h-8 items-center gap-1 rounded-xl bg-slate-950 px-2.5 text-[10px] font-black text-white"><PencilSimple size={13}/> {type === "hero" || type === "banner" ? "تغییر" : "ویرایش"}</button>
+      {draggable && <span className="flex min-h-8 items-center gap-1 rounded-xl bg-slate-100 px-2.5 text-[10px] font-bold text-slate-500"><DotsSixVertical size={13}/> بکشید</span>}
+    </div>}
     {children}
   </div>;
 }
@@ -78,7 +92,6 @@ function ProductCard({ product, settings, config, selected, select, sectionId, i
 function SectionShell({ section, index, props, children }: { section: SectionConfig; index: number; props: CanvasProps; children: React.ReactNode }) {
   const type: ElementType = section.type === "banner" ? "banner" : section.type === "trust" ? "trust" : "section";
   return <><InsertBetween index={index} onInsert={props.interactive === false ? undefined : props.onInsertSection}/><EditorElement type={type} id={section.id} selected={props.selected} onSelect={props.select} interactive={props.interactive !== false} draggable className="group/section" onDragStart={(e)=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/loadder-section-id",section.id);}} onDragOver={(e)=>{if(e.dataTransfer.types.includes("text/loadder-section-id")){e.preventDefault();e.dataTransfer.dropEffect="move";}}} onDrop={(e)=>{const from=e.dataTransfer.getData("text/loadder-section-id");if(from){e.preventDefault();e.stopPropagation();props.onReorderSection?.(from,section.id);}}}>
-    {props.interactive !== false && <div className="pointer-events-none absolute left-3 top-3 z-30 flex items-center gap-1 rounded-xl bg-slate-950/80 px-2 py-1 text-[9px] font-bold text-white opacity-0 transition group-hover/section:opacity-100"><DotsSixVertical/> برای جابه‌جایی بکشید</div>}
     {children}
   </EditorElement></>;
 }
