@@ -28,7 +28,8 @@ test("main Store Studio routes use canonical V16 and legacy URLs cannot surface 
 });
 
 test("V16 is a true state-owned visual canvas with contextual selection", () => {
-  assert.match(v16, /Loadder Commerce Studio V16/);
+  assert.match(v16, /data-studio-version="16"/);
+  assert.match(v16, /LOADDER VISUAL STUDIO/);
   assert.match(v16Types, /selectedElement: Selection/);
   assert.match(v16Canvas, /data-editor-element=\{interactive \? type : undefined\}/);
   assert.match(v16Canvas, /data-editor-selected=\{interactive \? \(active \? "true" : "false"\) : undefined\}/);
@@ -41,7 +42,8 @@ test("V16 is a true state-owned visual canvas with contextual selection", () => 
 test("V16 supports responsive commerce pages and configurable product sections", () => {
   assert.match(v16Types, /PageMode = "storefront" \| "cart" \| "checkout" \| "success"/);
   assert.match(v16Types, /DeviceMode = "desktop" \| "tablet" \| "mobile"/);
-  assert.match(v16Canvas, /"768px" : "390px"/);
+  assert.match(v16Canvas, /props\.device==="tablet"\?"768px":"390px"/);
+  assert.match(v16Canvas, /data-preview-device=\{props\.device\}/);
   for (const field of ["columnsDesktop", "columnsTablet", "columnsMobile", "productIds", "cardStyle", "imageRatio", "showPromotionBadge", "showCartButton"])
     assert.match(v16Source, new RegExp(field));
 });
@@ -58,7 +60,9 @@ test("V16 reads real catalog and media while keeping visual overrides separate",
 });
 
 test("V16 persists only storeBuilderV16 and preserves legacy configuration", () => {
-  assert.match(v16, /const content = \{ \.\.\.project\.content, storeBuilderV16 \}/);
+  assert.match(v16, /const storeBuilderV16:StudioConfig=\{\.\.\.config,version:16\}/);
+  assert.match(v16, /const content=\{\.\.\.project\.content,storeBuilderV16\}/);
+  assert.match(v16, /method:"PATCH"/);
   for (const legacy of ["storeBuilderV15", "storeBuilderV14", "storeBuilderV13", "storeBuilderV11"])
     assert.match(v16Config, new RegExp(legacy));
   assert.match(v16Types, /version: 16/);
