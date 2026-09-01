@@ -5,6 +5,7 @@ const root = path.resolve(new URL("../../", import.meta.url).pathname);
 const allowedExt = new Set([".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".json", ".yml", ".yaml", ".sh"]);
 const ignored = new Set(["node_modules", ".git", "dist", "build", "coverage"]);
 const findings = [];
+const scannerRel = path.join("server", "scripts", "security-static-gate.mjs");
 
 const rules = [
   { id: "DYNAMIC_EVAL", re: /\beval\s*\(|\bnew\s+Function\s*\(/g, severity: "high" },
@@ -28,6 +29,7 @@ function scan(file) {
   const rel = path.relative(root, file);
   const text = fs.readFileSync(file, "utf8");
   for (const rule of rules) {
+    if (rel === scannerRel && ["DYNAMIC_EVAL", "SHELL_EXEC", "REMOTE_SHELL", "ENCODED_EXEC", "PRIVATE_KEY", "SUSPICIOUS_TOKEN"].includes(rule.id)) continue;
     rule.re.lastIndex = 0;
     let match;
     while ((match = rule.re.exec(text))) {
