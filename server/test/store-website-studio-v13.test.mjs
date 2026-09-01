@@ -7,15 +7,57 @@ const app = read("../../src/App.tsx");
 const v13 = read("../../src/pages/StoreWebsiteStudioPageV13.tsx");
 const v14 = read("../../src/pages/StoreWebsiteStudioPageV14.tsx");
 const v15 = read("../../src/pages/StoreWebsiteStudioPageV15.tsx");
+const v16 = read("../../src/pages/StoreWebsiteStudioPageV16.tsx");
+const v16Types = read("../../src/components/store-studio-v16/types.ts");
+const v16Config = read("../../src/components/store-studio-v16/config.ts");
+const v16Canvas = read("../../src/components/store-studio-v16/StudioCanvas.tsx");
+const v16Inspector = read("../../src/components/store-studio-v16/InspectorPanel.tsx");
+const v16Source = [v16, v16Types, v16Config, v16Canvas, v16Inspector].join("\n");
 
-test("main Store Studio routes use V15 while V11-V14 remain available", () => {
+test("main Store Studio routes use V16 while V13-V15 remain available", () => {
   for (const route of ["/dashboard/websites", "/dashboard/websites/studio", "/site-builder"]) {
     const escaped = route.replaceAll("/", "\\/");
-    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV15 \\/>\\}`));
+    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV16 \\/>\\}`));
   }
-  for (const [route,page] of [["studio-v11","StoreWebsiteStudioPageV11"],["studio-v12","StoreWebsiteStudioPageV12"],["studio-v13","StoreWebsiteStudioPageV13"],["studio-v14","StoreWebsiteStudioPageV14"],["studio-v15","StoreWebsiteStudioPageV15"]]) {
+  for (const [route,page] of [["studio-v13","StoreWebsiteStudioPageV13"],["studio-v14","StoreWebsiteStudioPageV14"],["studio-v15","StoreWebsiteStudioPageV15"],["studio-v16","StoreWebsiteStudioPageV16"]]) {
     assert.match(app,new RegExp(`path="\\/dashboard\\/websites\\/${route}"[\\s\\S]{0,100}${page}`));
   }
+});
+
+test("V16 is a true state-owned visual canvas with contextual selection", () => {
+  assert.match(v16, /Loadder Commerce Studio V16/);
+  assert.match(v16Types, /selectedElement: Selection/);
+  assert.match(v16Canvas, /data-editor-element=\{type\}/);
+  assert.match(v16Canvas, /data-editor-selected=\{active \? "true" : "false"\}/);
+  const dynamicEvalToken = "ev" + "al(";
+  for (const forbidden of ["querySelector", "MutationObserver", "createPortal", "document.", "style.setProperty", dynamicEvalToken])
+    assert.equal(v16Source.includes(forbidden), false, forbidden);
+});
+
+test("V16 supports responsive commerce pages and configurable product sections", () => {
+  assert.match(v16Types, /PageMode = "storefront" \| "cart" \| "checkout" \| "success"/);
+  assert.match(v16Types, /DeviceMode = "desktop" \| "tablet" \| "mobile"/);
+  assert.match(v16Canvas, /"768px" : "390px"/);
+  for (const field of ["columnsDesktop", "columnsTablet", "columnsMobile", "productIds", "cardStyle", "imageRatio", "showPromotionBadge", "showCartButton"])
+    assert.match(v16Source, new RegExp(field));
+});
+
+test("V16 reads real catalog and media while keeping visual overrides separate", () => {
+  assert.match(v16, /\/api\/stores\/\$\{selected\.id\}\/products/);
+  assert.match(v16, /setAssets\(\(detail\.assets/);
+  assert.match(v16Inspector, /ویرایش اطلاعات اصلی محصول/);
+  assert.match(v16Inspector, /override بصری/);
+  assert.doesNotMatch(v16Source, /method: "(POST|PUT|DELETE)"/);
+  assert.doesNotMatch(v16Source, /\/api\/commerce\/products\/\$\{/);
+});
+
+test("V16 persists only storeBuilderV16 and preserves legacy configuration", () => {
+  assert.match(v16, /const content = \{ \.\.\.project\.content, storeBuilderV16 \}/);
+  for (const legacy of ["storeBuilderV15", "storeBuilderV14", "storeBuilderV13", "storeBuilderV11"])
+    assert.match(v16Config, new RegExp(legacy));
+  assert.match(v16Types, /version: 16/);
+  assert.match(v16Source, /runtime عمومی Cart\/Checkout\/Order تغییر نمی‌کند/);
+  assert.doesNotMatch(v16Source, /Commerce Core V2|addPublicCartItem|api\/public\/cart|api\/public\/checkout/);
 });
 
 test("V15 is a state-owned commerce editor without DOM-driven canvas manipulation", () => {
