@@ -11,6 +11,34 @@ import type {
   StudioConfig,
 } from "./types";
 
+const fallbackHeroVisual = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#eef2ff"/>
+      <stop offset="1" stop-color="#ddd6fe"/>
+    </linearGradient>
+    <linearGradient id="p" x1="0" x2="1">
+      <stop offset="0" stop-color="#6d5dfc"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#g)"/>
+  <circle cx="980" cy="130" r="210" fill="#ffffff" opacity=".55"/>
+  <circle cx="170" cy="760" r="240" fill="#ffffff" opacity=".38"/>
+  <rect x="215" y="155" width="770" height="560" rx="54" fill="#ffffff" opacity=".94"/>
+  <rect x="285" y="225" width="300" height="390" rx="34" fill="#f8fafc"/>
+  <rect x="640" y="245" width="270" height="28" rx="14" fill="#cbd5e1"/>
+  <rect x="640" y="300" width="210" height="22" rx="11" fill="#e2e8f0"/>
+  <rect x="640" y="365" width="190" height="46" rx="23" fill="url(#p)"/>
+  <rect x="640" y="445" width="245" height="18" rx="9" fill="#e2e8f0"/>
+  <rect x="640" y="486" width="195" height="18" rx="9" fill="#e2e8f0"/>
+  <rect x="640" y="545" width="230" height="62" rx="20" fill="#111827"/>
+  <rect x="345" y="300" width="180" height="230" rx="32" fill="url(#p)" opacity=".94"/>
+  <circle cx="435" cy="385" r="46" fill="#ffffff" opacity=".85"/>
+  <rect x="385" y="458" width="100" height="18" rx="9" fill="#ffffff" opacity=".8"/>
+</svg>`)} `;
+
 export const defaultProductSettings: ProductSettings = {
   source: "featured",
   productIds: [],
@@ -31,19 +59,19 @@ export const designDefaults: DesignConfig = {
   fontFamily: "Vazirmatn",
   primaryColor: "#6d5dfc",
   secondaryColor: "#f59e0b",
-  textColor: "#111827",
+  textColor: "#0f172a",
   mutedTextColor: "#64748b",
   backgroundColor: "#f8fafc",
   surfaceColor: "#ffffff",
-  containerWidth: 1180,
-  sectionSpacing: 48,
-  globalRadius: 24,
-  cardRadius: 20,
-  buttonRadius: 14,
+  containerWidth: 1240,
+  sectionSpacing: 32,
+  globalRadius: 20,
+  cardRadius: 18,
+  buttonRadius: 12,
   headingScale: 100,
   bodyScale: 100,
-  cardShadowStrength: 14,
-  borderStrength: 8,
+  cardShadowStrength: 10,
+  borderStrength: 6,
 };
 
 export const headerDefaults: HeaderConfig = {
@@ -53,24 +81,24 @@ export const headerDefaults: HeaderConfig = {
   showAccount: true,
   showCart: true,
   sticky: false,
-  height: 72,
+  height: 68,
   backgroundColor: "#ffffff",
-  textColor: "#111827",
+  textColor: "#0f172a",
 };
 
 export const heroDefaults: HeroConfig = {
   enabled: true,
   layout: "split",
-  eyebrow: "انتخاب تازه این هفته",
+  eyebrow: "پیشنهادهای منتخب این هفته",
   title: "خریدی ساده، سریع و مطمئن",
-  subtitle: "محصولات منتخب را با تجربه‌ای حرفه‌ای و سازگار با موبایل کشف کنید.",
+  subtitle: "محصولات منتخب را با تجربه‌ای حرفه‌ای، شفاف و سازگار با موبایل کشف کنید.",
   ctaLabel: "مشاهده محصولات",
   ctaHref: "#products",
-  imageUrl: "",
-  backgroundColor: "#111827",
+  imageUrl: fallbackHeroVisual,
+  backgroundColor: "#0f172a",
   textColor: "#ffffff",
-  overlayOpacity: 34,
-  height: 460,
+  overlayOpacity: 28,
+  height: 340,
   alignment: "right",
 };
 
@@ -92,11 +120,11 @@ export const sectionDefaults: SectionConfig[] = [
     type: "products",
     enabled: true,
     title: "محصولات منتخب",
-    subtitle: "انتخاب‌هایی برای امروز",
+    subtitle: "انتخاب‌های پیشنهادی برای امروز",
     backgroundColor: "#f8fafc",
-    textColor: "#111827",
-    spacingTop: 48,
-    spacingBottom: 48,
+    textColor: "#0f172a",
+    spacingTop: 28,
+    spacingBottom: 36,
     productSettings: defaultProductSettings,
   },
   {
@@ -108,8 +136,8 @@ export const sectionDefaults: SectionConfig[] = [
     ctaLabel: "شروع خرید",
     backgroundColor: "#6d5dfc",
     textColor: "#ffffff",
-    spacingTop: 36,
-    spacingBottom: 36,
+    spacingTop: 28,
+    spacingBottom: 28,
   },
   {
     id: "trust-main",
@@ -118,9 +146,9 @@ export const sectionDefaults: SectionConfig[] = [
     title: "خرید مطمئن",
     subtitle: "پرداخت امن · پشتیبانی · ارسال قابل پیگیری",
     backgroundColor: "#ffffff",
-    textColor: "#111827",
-    spacingTop: 32,
-    spacingBottom: 32,
+    textColor: "#0f172a",
+    spacingTop: 24,
+    spacingBottom: 24,
   },
 ];
 
@@ -147,6 +175,23 @@ function legacySections(content: Record<string, any>): SectionConfig[] {
   });
 }
 
+function modernizeSections(sections: SectionConfig[]) {
+  return sections.map((section) => ({
+    ...section,
+    spacingTop: Math.min(Number(section.spacingTop ?? 32), section.type === "products" ? 32 : 36),
+    spacingBottom: Math.min(Number(section.spacingBottom ?? 32), 36),
+    ...(section.type === "products"
+      ? {
+          productSettings: {
+            ...defaultProductSettings,
+            ...(section.productSettings || {}),
+            columnsDesktop: Math.max(3, Math.min(4, Number(section.productSettings?.columnsDesktop || 4))),
+          },
+        }
+      : {}),
+  }));
+}
+
 export function restoreConfig(content: Record<string, any>): StudioConfig {
   const v11 = content.storeBuilderV11 || {};
   const v13 = content.storeBuilderV13 || {};
@@ -156,6 +201,9 @@ export function restoreConfig(content: Record<string, any>): StudioConfig {
   const oldDesign = v13.design || v15.design || {};
   const oldCommerce = v15.commerce || v14.commerce || {};
   const oldV11Design = v11.design || {};
+  const restoredSections = Array.isArray(v16.sections) ? v16.sections : legacySections(content);
+  const storedHero = v16.hero || {};
+
   return {
     version: 16,
     activePage: ["storefront", "cart", "checkout", "success"].includes(v16.activePage) ? v16.activePage : (v15.previewMode || "storefront"),
@@ -173,10 +221,20 @@ export function restoreConfig(content: Record<string, any>): StudioConfig {
       bodyScale: oldDesign.typographyScale ?? oldV11Design.textScale ?? designDefaults.bodyScale,
       cardShadowStrength: oldDesign.cardShadowStrength ?? designDefaults.cardShadowStrength,
       ...v16.design,
+      containerWidth: Math.max(1120, Number(v16.design?.containerWidth || designDefaults.containerWidth)),
     },
-    header: { ...headerDefaults, ...v16.header },
-    hero: { ...heroDefaults, ...v16.hero },
-    sections: Array.isArray(v16.sections) ? v16.sections : legacySections(content),
+    header: {
+      ...headerDefaults,
+      ...v16.header,
+      height: Math.min(Number(v16.header?.height || headerDefaults.height), 72),
+    },
+    hero: {
+      ...heroDefaults,
+      ...storedHero,
+      imageUrl: storedHero.imageUrl || heroDefaults.imageUrl,
+      height: Math.min(Number(storedHero.height || heroDefaults.height), 360),
+    },
+    sections: modernizeSections(restoredSections),
     commerce: {
       ...commerceDefaults,
       ...oldCommerce,
