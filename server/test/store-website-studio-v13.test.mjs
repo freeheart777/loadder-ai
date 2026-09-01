@@ -6,15 +6,54 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const app = read("../../src/App.tsx");
 const v13 = read("../../src/pages/StoreWebsiteStudioPageV13.tsx");
 const v14 = read("../../src/pages/StoreWebsiteStudioPageV14.tsx");
+const v15 = read("../../src/pages/StoreWebsiteStudioPageV15.tsx");
 
-test("main Store Studio routes use V14 while V11-V13 remain available", () => {
+test("main Store Studio routes use V15 while V11-V14 remain available", () => {
   for (const route of ["/dashboard/websites", "/dashboard/websites/studio", "/site-builder"]) {
     const escaped = route.replaceAll("/", "\\/");
-    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV14 \\/>\\}`));
+    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV15 \\/>\\}`));
   }
-  for (const [route,page] of [["studio-v11","StoreWebsiteStudioPageV11"],["studio-v12","StoreWebsiteStudioPageV12"],["studio-v13","StoreWebsiteStudioPageV13"],["studio-v14","StoreWebsiteStudioPageV14"]]) {
+  for (const [route,page] of [["studio-v11","StoreWebsiteStudioPageV11"],["studio-v12","StoreWebsiteStudioPageV12"],["studio-v13","StoreWebsiteStudioPageV13"],["studio-v14","StoreWebsiteStudioPageV14"],["studio-v15","StoreWebsiteStudioPageV15"]]) {
     assert.match(app,new RegExp(`path="\\/dashboard\\/websites\\/${route}"[\\s\\S]{0,100}${page}`));
   }
+});
+
+test("V15 is a state-owned commerce editor without DOM-driven canvas manipulation", () => {
+  assert.match(v15, /Loadder Commerce Studio V15/);
+  assert.doesNotMatch(v15, /StoreWebsiteStudioPageV1[234]/);
+  for (const forbidden of ["querySelector", "MutationObserver", "createPortal", "document.", "style.setProperty"])
+    assert.equal(v15.includes(forbidden), false, forbidden);
+  assert.match(v15, /type DeviceMode="desktop"\|"tablet"\|"mobile"/);
+  assert.match(v15, /type CommercePreviewMode="storefront"\|"cart"\|"checkout"\|"success"/);
+  assert.match(v15, /data-preview-device=\{device\}/);
+});
+
+test("V15 exposes direct product and checkout-copy editing", () => {
+  for (const field of [
+    "selectedProductId",
+    "title",
+    "regularPriceMinor",
+    "compareAtPriceMinor",
+    "promotionBadge",
+    "promotionBadgeText",
+    "cartButtonLabel",
+    "shippingLabel",
+    "freeShippingThresholdMinor",
+    "checkoutButtonLabel",
+    "orderSuccessTitle",
+  ]) assert.match(v15, new RegExp(field));
+});
+
+test("V15 persists backward-compatible configuration without replacing commerce runtime", () => {
+  assert.match(v15, /const content=\{\.\.\.project\.content,storeBuilderV15:\{version:15,commerce,design,sections,previewMode\}\}/);
+  assert.match(v15, /content\.storeBuilderV14\?\.commerce/);
+  assert.match(v15, /content\.storeBuilderV11\?\.sections/);
+  assert.match(v15, /Runtime عمومی Cart\/Checkout\/Order بدون تغییر باقی می‌ماند/);
+  assert.doesNotMatch(v15, /api\/public\/storefront|api\/public\/cart|Commerce Core V2|addPublicCartItem/);
+  const writes = [...v15.matchAll(/apiFetch\(`([^`]+)`?,\{method:"(POST|PUT|PATCH|DELETE)"/g)];
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0][2], "PATCH");
+  assert.match(writes[0][1], /^\/api\/site-projects\//);
 });
 
 test("V14 is a non-destructive commerce bridge over standalone V13",()=>{
