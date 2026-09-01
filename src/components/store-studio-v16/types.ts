@@ -1,5 +1,5 @@
 export type DeviceMode = "desktop" | "tablet" | "mobile";
-export type PageMode = "storefront" | "cart" | "checkout" | "success";
+export type PageMode = "storefront" | "collection" | "product" | "cart" | "checkout" | "success";
 export type ElementType =
   | "header"
   | "hero"
@@ -33,12 +33,7 @@ export type Product = {
   }>;
 };
 
-export type MediaAsset = {
-  id: string;
-  name: string;
-  url: string;
-  kind?: string;
-};
+export type MediaAsset = { id: string; name: string; url: string; kind?: string };
 
 export type ProductOverride = {
   title?: string;
