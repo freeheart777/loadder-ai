@@ -26,6 +26,7 @@ export default function StudioToolbar({
   busy,
   onDevice,
   onPage,
+  onPreview,
   onSave,
 }: {
   device: DeviceMode;
@@ -33,6 +34,7 @@ export default function StudioToolbar({
   busy: boolean;
   onDevice: (device: DeviceMode) => void;
   onPage: (page: PageMode) => void;
+  onPreview: () => void;
   onSave: () => void;
 }) {
   return (
@@ -65,8 +67,8 @@ export default function StudioToolbar({
       </nav>
       <button
         type="button"
-        className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-bold text-white/70"
-        onClick={() => onPage("storefront")}
+        className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-bold text-white/70 hover:bg-white/5"
+        onClick={onPreview}
       >
         <Eye /> پیش‌نمایش فروشگاه
       </button>
