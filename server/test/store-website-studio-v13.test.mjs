@@ -51,8 +51,10 @@ test("V16 reads real catalog and media while keeping visual overrides separate",
   assert.match(v16, /setAssets\(\(detail\.assets/);
   assert.match(v16Inspector, /ویرایش اطلاعات اصلی محصول/);
   assert.match(v16Inspector, /override بصری/);
-  assert.doesNotMatch(v16Source, /method: "(POST|PUT|DELETE)"/);
+  assert.match(v16, /\/media\/upload-url/);
+  assert.match(v16, /\/media\/complete/);
   assert.doesNotMatch(v16Source, /\/api\/commerce\/products\/\$\{/);
+  assert.doesNotMatch(v16Source, /api\/public\/cart|api\/public\/checkout|addPublicCartItem|Commerce Core V2/);
 });
 
 test("V16 persists only storeBuilderV16 and preserves legacy configuration", () => {
@@ -87,7 +89,7 @@ test("V15 exposes direct product and checkout-copy editing", () => {
     "freeShippingThresholdMinor",
     "checkoutButtonLabel",
     "orderSuccessTitle",
-  ]) assert.match(v15, new RegExp(field));
+  ]) assert.match(v15,new RegExp(field));
 });
 
 test("V15 persists backward-compatible configuration without replacing commerce runtime", () => {
@@ -129,8 +131,8 @@ test("preview modes and responsive storefront layouts are explicit React branche
 });
 
 test("all V13 design controls are state-owned and applied to preview", () => {
-  for (const field of ["fontFamily","primaryColor","textColor","backgroundColor","typographyScale","borderRadius","sectionSpacing","heroOverlayIntensity","headingSize","bodyTextSize","buttonRadius","cardShadowStrength"]) assert.match(v13, new RegExp(field));
-  for (const label of ["دسکتاپ","تبلت","موبایل","طراحی","بخش‌ها","پیش‌نمایش فروشگاه"]) assert.match(v13, new RegExp(label));
+  for (const field of ["fontFamily","primaryColor","textColor","backgroundColor","typographyScale","borderRadius","sectionSpacing","heroOverlayIntensity","headingSize","bodyTextSize","buttonRadius","cardShadowStrength"]) assert.match(v13,new RegExp(field));
+  for (const label of ["دسکتاپ","تبلت","موبایل","طراحی","بخش‌ها","پیش‌نمایش فروشگاه"]) assert.match(v13,new RegExp(label));
 });
 
 test("V11 content and commerce data remain backward-compatible on load and save", () => {
