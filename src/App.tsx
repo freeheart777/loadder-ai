@@ -150,10 +150,13 @@ export default function App() {
               <Route path="/dashboard/websites/studio-v10" element={<StoreWebsiteStudioPageV10 />} />
               <Route path="/dashboard/websites/studio-v11" element={<StoreWebsiteStudioPageV11 />} />
               <Route path="/dashboard/websites/studio-v12" element={<StoreWebsiteStudioPageV12 />} />
-              <Route path="/dashboard/websites/studio-v13" element={<StoreWebsiteStudioPageV13 />} />
-              <Route path="/dashboard/websites/studio-v14" element={<StoreWebsiteStudioPageV14 />} />
-              <Route path="/dashboard/websites/studio-v15" element={<StoreWebsiteStudioPageV15 />} />
-              <Route path="/dashboard/websites/studio-v16" element={<StoreWebsiteStudioPageV16 />} />
+              <Route path="/dashboard/websites/studio-v13" element={<Navigate to="/dashboard/websites" replace />} />
+              <Route path="/dashboard/websites/studio-v14" element={<Navigate to="/dashboard/websites" replace />} />
+              <Route path="/dashboard/websites/studio-v15" element={<Navigate to="/dashboard/websites" replace />} />
+              <Route path="/dashboard/websites/studio-v16" element={<Navigate to="/dashboard/websites" replace />} />
+              <Route path="/dashboard/websites/fallback/v13" element={<StoreWebsiteStudioPageV13 />} />
+              <Route path="/dashboard/websites/fallback/v14" element={<StoreWebsiteStudioPageV14 />} />
+              <Route path="/dashboard/websites/fallback/v15" element={<StoreWebsiteStudioPageV15 />} />
               <Route path="/dashboard/websites/studio-legacy" element={<VisualWebsiteStudioPage />} />
               <Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} />
               <Route path="/dashboard/websites/new" element={<StoreQuickStartPage />} />
