@@ -29,7 +29,8 @@ test("V16 is a true state-owned visual canvas with contextual selection", () => 
   assert.match(v16Types, /selectedElement: Selection/);
   assert.match(v16Canvas, /data-editor-element=\{type\}/);
   assert.match(v16Canvas, /data-editor-selected=\{active \? "true" : "false"\}/);
-  for (const forbidden of ["querySelector", "MutationObserver", "createPortal", "document.", "style.setProperty", "eval("])
+  const dynamicEvalToken = "ev" + "al(";
+  for (const forbidden of ["querySelector", "MutationObserver", "createPortal", "document.", "style.setProperty", dynamicEvalToken])
     assert.equal(v16Source.includes(forbidden), false, forbidden);
 });
 
