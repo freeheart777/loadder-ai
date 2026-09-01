@@ -319,3 +319,88 @@ select.input option {
     font-size: 14px;
   }
 }
+
+/* =========================================================
+   LOADDER COMMERCE STUDIO — VISUAL EDITOR CHROME
+   The canvas should feel like an editor, not an admin form.
+========================================================= */
+
+[data-studio-version="16"] [data-editor-element] {
+  isolation: isolate;
+  transition:
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    filter 140ms ease;
+}
+
+[data-studio-version="16"] [data-editor-element]:hover {
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.82),
+    0 0 0 4px rgba(139, 92, 246, 0.10),
+    0 18px 52px rgba(15, 23, 42, 0.10);
+}
+
+[data-studio-version="16"] [data-editor-selected="true"] {
+  box-shadow:
+    0 0 0 2px #34d399,
+    0 0 0 6px rgba(52, 211, 153, 0.14),
+    0 24px 70px rgba(15, 23, 42, 0.18) !important;
+}
+
+[data-studio-version="16"] [data-editor-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  z-index: 9998;
+  pointer-events: none;
+  border: 1px dashed rgba(52, 211, 153, 0.48);
+  border-radius: 10px;
+}
+
+[data-studio-version="16"] [data-editor-element="product-card"] {
+  cursor: grab !important;
+}
+
+[data-studio-version="16"] [data-editor-element="product-card"]:active {
+  cursor: grabbing !important;
+  transform: scale(.985);
+  filter: saturate(.92);
+}
+
+[data-studio-version="16"] section.order-2 {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(139, 92, 246, .13), transparent 28%),
+    radial-gradient(circle at 82% 16%, rgba(52, 211, 153, .08), transparent 24%),
+    linear-gradient(180deg, #202936 0%, #141b26 100%);
+}
+
+[data-studio-version="16"] section.order-2 > div:last-child:not([role]) {
+  box-shadow:
+    0 2px 0 rgba(255,255,255,.7) inset,
+    0 28px 90px rgba(0,0,0,.34);
+}
+
+[data-studio-version="16"] button[class*="border-dashed"] {
+  position: relative;
+  overflow: hidden;
+}
+
+[data-studio-version="16"] button[class*="border-dashed"]::before {
+  content: "+";
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, .12);
+  color: rgb(109 40 217);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+[data-studio-version="16"] select {
+  color-scheme: dark;
+}
