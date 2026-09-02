@@ -10,6 +10,33 @@ import { apiFetch } from "../lib/api";
 
 type Project = { id: string; name?: string; content: Record<string, any> };
 type MediaTarget = { kind: "hero" } | { kind: "banner"; sectionId: string } | { kind: "logo" };
+type ProductDraft = {
+  name: string;
+  basePriceMinor: string;
+  compareAtPriceMinor: string;
+  inventoryQuantity: string;
+  category: string;
+  brand: string;
+  description: string;
+  seoTitle: string;
+  seoDescription: string;
+  geoDescription: string;
+  imageUrl: string;
+};
+
+const emptyProductDraft: ProductDraft = {
+  name: "",
+  basePriceMinor: "",
+  compareAtPriceMinor: "",
+  inventoryQuantity: "0",
+  category: "",
+  brand: "",
+  description: "",
+  seoTitle: "",
+  seoDescription: "",
+  geoDescription: "",
+  imageUrl: "",
+};
 
 async function read(response: Response) {
   const data = await response.json().catch(() => ({}));
@@ -49,6 +76,9 @@ export default function StoreWebsiteStudioPageV16() {
   const [message, setMessage] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pickerSectionId, setPickerSectionId] = useState<string | null>(null);
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  const [productBusy, setProductBusy] = useState(false);
+  const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
   const [mediaTarget, setMediaTarget] = useState<MediaTarget | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -107,8 +137,64 @@ export default function StoreWebsiteStudioPageV16() {
       return s.productIds.includes(productId) ? s : { ...s, productIds: [...s.productIds, productId].slice(0, 12) };
     });
     setPickerSectionId(null);
+    setCreateProductOpen(false);
     selectCanvasElement({ type: "product-card", id: productId });
     setMessage("محصول به بخش اضافه شد.");
+  }
+
+  async function createProductInCatalog() {
+    if (!project || !pickerSectionId || productBusy) return;
+    const name = productDraft.name.trim();
+    const basePriceMinor = Number(productDraft.basePriceMinor);
+    const inventoryQuantity = Number(productDraft.inventoryQuantity || 0);
+    const compareAtPriceMinor = productDraft.compareAtPriceMinor.trim() === "" ? null : Number(productDraft.compareAtPriceMinor);
+    if (!name) return setMessage("نام محصول را وارد کنید.");
+    if (!Number.isInteger(basePriceMinor) || basePriceMinor < 0) return setMessage("قیمت محصول معتبر نیست.");
+    if (!Number.isInteger(inventoryQuantity) || inventoryQuantity < 0) return setMessage("موجودی محصول معتبر نیست.");
+    if (compareAtPriceMinor !== null && (!Number.isInteger(compareAtPriceMinor) || compareAtPriceMinor < 0)) return setMessage("قیمت قبل از تخفیف معتبر نیست.");
+
+    setProductBusy(true);
+    try {
+      const payload = {
+        name,
+        basePriceMinor,
+        compareAtPriceMinor,
+        inventoryQuantity,
+        currency: "IRR",
+        status: "ACTIVE",
+        category: productDraft.category.trim() || null,
+        brand: productDraft.brand.trim() || null,
+        description: productDraft.description.trim(),
+        seoTitle: productDraft.seoTitle.trim() || null,
+        seoDescription: productDraft.seoDescription.trim() || null,
+        imageUrl: productDraft.imageUrl.trim() || null,
+        metadata: {
+          geoDescription: productDraft.geoDescription.trim(),
+          contentMode: productDraft.geoDescription.trim() && (productDraft.seoTitle.trim() || productDraft.seoDescription.trim()) ? "HYBRID" : productDraft.geoDescription.trim() ? "GEO" : "SEO",
+        },
+      };
+      const out = await read(await apiFetch(`/api/stores/${project.id}/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }));
+      const product = out.product as Product;
+      const nextProducts = [product, ...products.filter((p) => p.id !== product.id)];
+      setProducts(nextProducts);
+      patchProductSection(pickerSectionId, (raw) => {
+        const s = normalizeManual(raw, nextProducts);
+        return s.productIds.includes(product.id) ? s : { ...s, productIds: [...s.productIds, product.id].slice(0, 12) };
+      });
+      selectCanvasElement({ type: "product-card", id: product.id });
+      setProductDraft(emptyProductDraft);
+      setCreateProductOpen(false);
+      setPickerSectionId(null);
+      setMessage("محصول ساخته شد و روی فروشگاه قرار گرفت.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "ساخت محصول ناموفق بود.");
+    } finally {
+      setProductBusy(false);
+    }
   }
 
   function reorderProduct(sectionId: string, fromId: string, toId: string) {
@@ -156,6 +242,7 @@ export default function StoreWebsiteStudioPageV16() {
   }
 
   function addSection(type: SectionConfig["type"]) { insertSection(config.sections.length, type); }
+
   function duplicateSection(id: string) {
     setConfig((c) => {
       const i = c.sections.findIndex((s) => s.id === id);
@@ -169,11 +256,13 @@ export default function StoreWebsiteStudioPageV16() {
     });
     setMessage("بخش کپی شد.");
   }
+
   function deleteSection(id: string) {
     setConfig((c) => ({ ...c, sections: c.sections.filter((s) => s.id !== id), selectedElement: { type: "hero", id: "hero" } }));
     setInspectorOpen(false);
     setMessage("بخش حذف شد.");
   }
+
   function addDiscountSection() {
     const section = newSection("products");
     section.title = "تخفیف‌های ویژه";
@@ -260,7 +349,52 @@ export default function StoreWebsiteStudioPageV16() {
 
     {previewOpen && <div className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] items-center justify-between"><b>پیش‌نمایش Draft</b><button onClick={() => setPreviewOpen(false)} className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={config.selectedElement} select={() => undefined} interactive={false} /></div>}
 
-    {pickerSectionId && <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-4"><div className="max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-3xl bg-[#0d1622]"><div className="flex items-center justify-between border-b border-white/10 p-4"><div><h2 className="font-black">افزودن محصول</h2><p className="text-xs text-white/40">روی کالا بزنید؛ همان لحظه وارد این بخش می‌شود.</p></div><button onClick={() => setPickerSectionId(null)}><X /></button></div><div className="grid max-h-[65vh] gap-3 overflow-auto p-4 sm:grid-cols-2">{products.map((p) => { const added = pickerSettings?.productIds.includes(p.id) ?? false; return <button key={p.id} onClick={() => addProduct(pickerSectionId, p.id)} className={`flex items-center gap-3 rounded-2xl border p-3 text-right ${added ? "border-emerald-400/40 bg-emerald-400/10" : "border-white/10 bg-white/[.03]"}`}><div className="h-14 w-14 rounded-xl bg-white/5" /><div className="flex-1"><b>{p.name}</b><span className="block text-[10px] text-white/35">{p.brand || p.category || "محصول"}</span></div><span className="text-[10px]">{added ? "اضافه شده" : "انتخاب"}</span></button>; })}</div></div></div>}
+    {pickerSectionId && <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-4">
+      <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 p-4">
+          <div><h2 className="font-black">{createProductOpen ? "ساخت محصول جدید" : "افزودن محصول"}</h2><p className="text-xs text-white/40">{createProductOpen ? "اطلاعات پایه را وارد کنید؛ محصول همان لحظه روی فروشگاه می‌آید." : "از کاتالوگ انتخاب کنید یا همین‌جا محصول جدید بسازید."}</p></div>
+          <button onClick={() => { setPickerSectionId(null); setCreateProductOpen(false); }}><X /></button>
+        </div>
+
+        {!createProductOpen ? <>
+          <div className="border-b border-white/10 p-4">
+            <button type="button" onClick={() => setCreateProductOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm font-black text-emerald-200 hover:bg-emerald-400/15"><Plus size={18} /> ساخت محصول جدید</button>
+          </div>
+          <div className="grid max-h-[60vh] gap-3 overflow-auto p-4 sm:grid-cols-2">
+            {products.length === 0 && <div className="col-span-full rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-white/45">هنوز محصولی ندارید. «ساخت محصول جدید» را بزنید.</div>}
+            {products.map((p) => {
+              const added = pickerSettings?.productIds.includes(p.id) ?? false;
+              return <button key={p.id} onClick={() => addProduct(pickerSectionId, p.id)} className={`flex items-center gap-3 rounded-2xl border p-3 text-right ${added ? "border-emerald-400/40 bg-emerald-400/10" : "border-white/10 bg-white/[.03]"}`}>
+                <div className="h-14 w-14 overflow-hidden rounded-xl bg-white/5">{p.variants?.[0]?.imageUrl ? <img src={p.variants[0].imageUrl} alt="" className="h-full w-full object-cover" /> : null}</div>
+                <div className="flex-1"><b>{p.name}</b><span className="block text-[10px] text-white/35">{p.brand || p.category || "محصول"}</span></div>
+                <span className="text-[10px]">{added ? "اضافه شده" : "انتخاب"}</span>
+              </button>;
+            })}
+          </div>
+        </> : <form className="grid max-h-[72vh] gap-4 overflow-auto p-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); void createProductInCatalog(); }}>
+          <label className="grid gap-1 text-xs font-bold">نام محصول<input value={productDraft.name} onChange={(e) => setProductDraft((d) => ({ ...d, name: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="مثلاً سرم آبرسان" /></label>
+          <label className="grid gap-1 text-xs font-bold">قیمت<input inputMode="numeric" value={productDraft.basePriceMinor} onChange={(e) => setProductDraft((d) => ({ ...d, basePriceMinor: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="مثلاً 450000" /></label>
+          <label className="grid gap-1 text-xs font-bold">قیمت قبل از تخفیف<input inputMode="numeric" value={productDraft.compareAtPriceMinor} onChange={(e) => setProductDraft((d) => ({ ...d, compareAtPriceMinor: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="اختیاری" /></label>
+          <label className="grid gap-1 text-xs font-bold">موجودی<input inputMode="numeric" value={productDraft.inventoryQuantity} onChange={(e) => setProductDraft((d) => ({ ...d, inventoryQuantity: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
+          <label className="grid gap-1 text-xs font-bold">دسته‌بندی<input value={productDraft.category} onChange={(e) => setProductDraft((d) => ({ ...d, category: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
+          <label className="grid gap-1 text-xs font-bold">برند<input value={productDraft.brand} onChange={(e) => setProductDraft((d) => ({ ...d, brand: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
+          <label className="grid gap-1 text-xs font-bold sm:col-span-2">آدرس تصویر<input value={productDraft.imageUrl} onChange={(e) => setProductDraft((d) => ({ ...d, imageUrl: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="https://..." /></label>
+          <label className="grid gap-1 text-xs font-bold sm:col-span-2">توضیحات محصول<textarea value={productDraft.description} onChange={(e) => setProductDraft((d) => ({ ...d, description: e.target.value }))} className="min-h-24 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
+          <div className="rounded-2xl border border-white/10 bg-white/[.03] p-3 sm:col-span-2">
+            <div className="mb-3"><b className="text-sm">SEO + GEO</b><p className="mt-1 text-[10px] text-white/40">می‌توانید فقط SEO، فقط GEO یا هر دو را با هم وارد کنید.</p></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-bold">عنوان SEO<input value={productDraft.seoTitle} onChange={(e) => setProductDraft((d) => ({ ...d, seoTitle: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
+              <label className="grid gap-1 text-xs font-bold">توضیح SEO<input value={productDraft.seoDescription} onChange={(e) => setProductDraft((d) => ({ ...d, seoDescription: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
+              <label className="grid gap-1 text-xs font-bold sm:col-span-2">توضیح GEO برای موتورهای AI<textarea value={productDraft.geoDescription} onChange={(e) => setProductDraft((d) => ({ ...d, geoDescription: e.target.value }))} className="min-h-24 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="محصول برای چه کسی مناسب است، چه مسئله‌ای را حل می‌کند و مزیت اصلی آن چیست؟" /></label>
+            </div>
+          </div>
+          <div className="flex gap-2 sm:col-span-2">
+            <button type="button" onClick={() => setCreateProductOpen(false)} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-bold">بازگشت به کاتالوگ</button>
+            <button type="submit" disabled={productBusy} className="flex-1 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 disabled:opacity-50">{productBusy ? "در حال ساخت…" : "ساخت و افزودن به فروشگاه"}</button>
+          </div>
+        </form>}
+      </div>
+    </div>}
 
     {mediaTarget && <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/80 p-4"><div className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622]"><div className="flex items-center justify-between border-b border-white/10 p-4"><h2 className="font-black">انتخاب تصویر</h2><button onClick={() => setMediaTarget(null)}><X /></button></div><div className="p-4"><label className="flex min-h-16 cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-emerald-400/30 bg-emerald-400/5 text-sm font-black text-emerald-200"><UploadSimple />{mediaBusy ? "در حال آپلود…" : "آپلود تصویر جدید"}<input type="file" accept="image/*" className="hidden" disabled={mediaBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadMedia(f); e.currentTarget.value = ""; }} /></label></div><div className="grid max-h-[58vh] grid-cols-2 gap-3 overflow-auto p-4 sm:grid-cols-4">{assets.map((a) => <button key={a.id} onClick={() => applyMedia(a.url)} className="overflow-hidden rounded-2xl border border-white/10"><img src={a.url} alt={a.name} className="aspect-[4/3] w-full object-cover" /><div className="truncate p-2 text-xs">{a.name}</div></button>)}</div></div></div>}
 
