@@ -14,6 +14,11 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
   const remoteConfigured = Boolean(baseUrl && serviceRoleKey);
   const localRoot = path.resolve(env.SITE_MEDIA_LOCAL_DIR || path.join(process.cwd(), "server", "data", "site-media"));
   const localUploads = new Map();
+  const localApiBaseUrl = String(
+    env.SITE_MEDIA_LOCAL_API_BASE_URL ||
+    env.API_PUBLIC_URL ||
+    `http://localhost:${env.API_PORT || env.PORT || 3001}`
+  ).replace(/\/$/, "");
 
   function safeStorageKey(storageKey) {
     const key = String(storageKey || "").replace(/\\/g, "/").replace(/^\/+/, "");
@@ -29,7 +34,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
     if (!remoteConfigured) {
       const token = crypto.randomUUID();
       localUploads.set(token, { path: storagePath, expiresAt: Date.now() + 2 * 60 * 60 * 1000 });
-      return { bucket: "local", path: storagePath, token, signedUrl: `/api/site-media-local/upload/${token}`, local: true };
+      return { bucket: "local", path: storagePath, token, signedUrl: `${localApiBaseUrl}/api/site-media-local/upload/${token}`, local: true };
     }
 
     const response = await fetchImpl(`${baseUrl}/storage/v1/object/upload/sign/${encodeURIComponent(bucket)}/${storagePath}`, {
@@ -71,7 +76,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
 
   function publicAssetUrl(storageKey) {
     const key = safeStorageKey(storageKey);
-    if (!remoteConfigured) return `/api/site-media-local/object/${Buffer.from(key, "utf8").toString("base64url")}`;
+    if (!remoteConfigured) return `${localApiBaseUrl}/api/site-media-local/object/${Buffer.from(key, "utf8").toString("base64url")}`;
     return `${baseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${key}`;
   }
 
