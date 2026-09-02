@@ -13,6 +13,22 @@ export function createSiteMediaRouter({ service }) {
     return res.status(500).json({ success: false, message: "Unable to process site media." });
   };
 
+  router.put("/site-media-local/upload/:token", express.raw({ type: () => true, limit: "25mb" }), async (req, res) => {
+    try {
+      const uploaded = await service.acceptLocalUpload(req.params.token, req.body);
+      return res.status(201).json({ success: true, uploaded });
+    } catch (error) { return handle(error, res); }
+  });
+
+  router.get("/site-media-local/object/:key", async (req, res) => {
+    try {
+      const asset = await service.readLocalAsset(req.params.key);
+      res.type(asset.fileName);
+      res.set("Cache-Control", "public, max-age=3600");
+      return res.send(asset.body);
+    } catch (error) { return handle(error, res); }
+  });
+
   router.get("/site-projects/:id/media", (req, res) => {
     try { return res.json({ success: true, media: service.list(req.params.id) }); }
     catch (error) { return handle(error, res); }
