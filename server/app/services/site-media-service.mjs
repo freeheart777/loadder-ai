@@ -44,6 +44,14 @@ export function createSiteMediaService({ repository, siteProjectService, storage
     return { ...upload, assetType, mimeType, sizeBytes };
   }
 
+  async function acceptLocalUpload(token, body) {
+    return storage.acceptLocalUpload(token, body);
+  }
+
+  async function readLocalAsset(encodedKey) {
+    return storage.readLocalAsset(encodedKey);
+  }
+
   function completeUpload(siteProjectId, input = {}) {
     const project = siteProjectService.get(siteProjectId);
     const workspaceId = requireWorkspaceId();
@@ -78,5 +86,5 @@ export function createSiteMediaService({ repository, siteProjectService, storage
     return repository.remove(siteProjectId, mediaId);
   }
 
-  return Object.freeze({ createUpload, completeUpload, list, remove });
+  return Object.freeze({ createUpload, acceptLocalUpload, readLocalAsset, completeUpload, list, remove });
 }
