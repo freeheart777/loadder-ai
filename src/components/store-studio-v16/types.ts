@@ -19,6 +19,9 @@ export type Product = {
   id: string;
   name: string;
   slug?: string;
+  description?: string;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
   brand?: string | null;
   category?: string | null;
   featured?: boolean;
@@ -26,7 +29,7 @@ export type Product = {
   currency: string;
   basePriceMinor: number;
   compareAtPriceMinor?: number | null;
-  metadata?: { gallery?: string[] };
+  metadata?: { gallery?: string[]; geoDescription?: string; contentMode?: "SEO" | "GEO" | "HYBRID"; [key: string]: unknown };
   variants?: Array<{ id?: string; title?: string; inventoryQuantity: number; imageUrl?: string | null }>;
 };
 
