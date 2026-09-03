@@ -2,6 +2,17 @@ name: Frontend Build
 
 on:
   pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - "tailwind.config.*"
+      - ".github/workflows/frontend-build.yml"
+  push:
+    branches: [main]
     paths:
       - "src/**"
       - "package.json"
@@ -25,7 +36,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Typecheck targeted UI
+      - name: Typecheck critical UI paths
         run: >-
           npx tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution bundler
           --jsx react-jsx --skipLibCheck --verbatimModuleSyntax true --types vite/client
@@ -33,5 +44,10 @@ jobs:
           src/pages/GoogleAdsConnectedWizardPage.tsx
           src/pages/AdsCenterWithGoogleEntryPage.tsx
           src/pages/VisualWebsiteStudioPage.tsx
+          src/pages/StoreCommerceManagerPage.tsx
+          src/pages/StoreProductDetailPage.tsx
+          src/components/commerce/ProductMediaEditor.tsx
+          src/lib/siteMediaUpload.ts
+          src/lib/productMedia.ts
       - name: Build Vite bundle
         run: npx vite build
