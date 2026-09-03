@@ -313,7 +313,7 @@ export default function StoreWebsiteStudioPageV16() {
       }));
       const upload = created.upload;
       if (!upload?.signedUrl || !upload?.path) throw new Error("آدرس آپلود معتبر دریافت نشد.");
-      const uploaded = await fetch(upload.signedUrl, { method: "PUT", headers: { "Content-Type": mimeType }, body: file, credentials: upload.signedUrl.startsWith("/") ? "include" : "omit" });
+      const uploaded = await fetch(upload.signedUrl, { method: "PUT", headers: { "Content-Type": mimeType }, body: file, credentials: upload.local ? "include" : "omit" });
       if (!uploaded.ok) throw new Error(`آپلود فایل ناموفق بود (HTTP ${uploaded.status})`);
       const completed = await read(await apiFetch(`/api/site-projects/${project.id}/media/complete`, {
         method: "POST",
