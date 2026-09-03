@@ -10,7 +10,7 @@ import {
   UploadSimple,
 } from "@phosphor-icons/react";
 
-import { apiFetch } from "../../lib/api";
+import { API_BASE_URL, apiFetch } from "../../lib/api";
 import { isSafeProductImageUrl } from "../../lib/productMedia";
 
 type Asset = {
@@ -83,6 +83,7 @@ export default function ProductMediaEditor({ product, onProduct }: {
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -98,6 +99,7 @@ export default function ProductMediaEditor({ product, onProduct }: {
     featured: Boolean(product.featured),
   }));
   const gallery = galleryOf(product);
+  const fileInputId = `product-media-files-${product.id}`;
 
   useEffect(() => {
     setForm({
@@ -111,6 +113,8 @@ export default function ProductMediaEditor({ product, onProduct }: {
       compareAtPriceMinor: product.compareAtPriceMinor ?? "",
       featured: Boolean(product.featured),
     });
+    setSelectedFiles([]);
+    if (fileInput.current) fileInput.current.value = "";
   }, [product.id]);
 
   async function refreshMedia(signal?: AbortSignal) {
@@ -161,8 +165,12 @@ export default function ProductMediaEditor({ product, onProduct }: {
     }));
 
     const upload = created.upload;
-    const put = await fetch(upload.signedUrl, {
+    if (!upload?.signedUrl || !upload?.path) throw new Error("آدرس آپلود از سرور دریافت نشد.");
+    const signedUrl = String(upload.signedUrl);
+    const directTargetsLoadderApi = signedUrl === API_BASE_URL || signedUrl.startsWith(`${API_BASE_URL}/`);
+    const put = await fetch(signedUrl, {
       method: "PUT",
+      credentials: directTargetsLoadderApi ? "include" : "omit",
       headers: { "Content-Type": file.type || "image/jpeg" },
       body: file,
     });
@@ -182,12 +190,14 @@ export default function ProductMediaEditor({ product, onProduct }: {
         metadata: { name: file.name, productId: product.id, role: "product-gallery" },
       }),
     }));
+    if (!completed.media?.url) throw new Error("فایل آپلود شد اما آدرس رسانه ثبت نشد.");
     return completed.media as Asset;
   }
 
   async function uploadFiles(files: File[]) {
     if (!files.length || busy) return;
     setBusy(true);
+    setMessage("آپلود شروع شد…");
     try {
       const room = Math.max(0, 12 - gallery.length);
       const selected = files.slice(0, room);
@@ -196,6 +206,8 @@ export default function ProductMediaEditor({ product, onProduct }: {
       for (const file of selected) uploaded.push(await uploadOne(file));
       await saveGallery([...gallery, ...uploaded.map((asset) => asset.url)], `${uploaded.length} تصویر با موفقیت آپلود و به محصول متصل شد.`);
       await refreshMedia();
+      setSelectedFiles([]);
+      if (fileInput.current) fileInput.current.value = "";
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "آپلود تصویر ناموفق بود");
     } finally {
@@ -272,15 +284,29 @@ export default function ProductMediaEditor({ product, onProduct }: {
   return <div className="space-y-6">
     <section className="rounded-3xl border bg-white p-4 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="text-xl font-black">تصاویر محصول</h2><p className="mt-1 text-xs leading-6 text-slate-500">تصویر اول، تصویر اصلی کارت محصول است. حذف از گالری فایل Media Library را پاک نمی‌کند.</p></div>
-        <button type="button" disabled={busy || gallery.length >= 12} onClick={() => fileInput.current?.click()} className="flex min-h-11 items-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-black text-white disabled:opacity-40"><UploadSimple />{busy ? "در حال آپلود…" : "آپلود از دستگاه"}</button>
-        <input ref={fileInput} hidden multiple type="file" accept="image/*" onChange={(event) => { void uploadFiles(Array.from(event.target.files || [])); event.target.value = ""; }} />
+        <div><h2 className="text-xl font-black">تصاویر محصول</h2><p className="mt-1 text-xs leading-6 text-slate-500">اول تصویر را انتخاب کن، سپس دکمه آپلود را بزن. وضعیت آپلود همین‌جا نمایش داده می‌شود.</p></div>
+        <label htmlFor={fileInputId} aria-disabled={busy || gallery.length >= 12} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-4 text-sm font-black ${busy || gallery.length >= 12 ? "pointer-events-none opacity-40" : "bg-white text-violet-700"}`}><ImageSquare />انتخاب تصویر</label>
+        <input ref={fileInput} id={fileInputId} className="sr-only" multiple type="file" accept="image/*" disabled={busy || gallery.length >= 12} onChange={(event) => {
+          const files = Array.from(event.target.files || []);
+          setSelectedFiles(files);
+          setMessage(files.length ? `${files.length} تصویر انتخاب شد. حالا «آپلود تصویر انتخاب‌شده» را بزن.` : "تصویری انتخاب نشد.");
+        }} />
       </div>
+
+      {selectedFiles.length > 0 && <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0"><b className="block text-sm text-violet-900">{selectedFiles.length} تصویر آماده آپلود</b><p className="mt-1 max-w-xl truncate text-xs text-violet-700">{selectedFiles.map((file) => file.name).join("، ")}</p></div>
+          <button type="button" disabled={busy} onClick={() => void uploadFiles(selectedFiles)} className="flex min-h-11 items-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-black text-white disabled:opacity-40"><UploadSimple />{busy ? "در حال آپلود…" : "آپلود تصویر انتخاب‌شده"}</button>
+        </div>
+      </div>}
+
+      {message && <div role="status" aria-live="polite" className="mt-3 rounded-xl bg-slate-900 px-3 py-2 text-xs leading-6 text-white">{message}</div>}
+
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <label className="flex min-h-11 flex-1 items-center gap-2 rounded-xl border px-3"><LinkSimple className="shrink-0 text-slate-400" /><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://… گزینه ثانویه افزودن تصویر" className="min-w-0 flex-1 outline-none" dir="ltr" /></label>
         <button type="button" disabled={busy || !url.trim()} onClick={() => void addUrl()} className="min-h-11 rounded-xl border px-4 text-sm font-bold disabled:opacity-40">افزودن از URL</button>
       </div>
-      {gallery.length ? <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{gallery.map((image, index) => <article key={`${image}-${index}`} className={`overflow-hidden rounded-2xl border bg-white ${index === 0 ? "ring-2 ring-violet-500" : ""}`}><div className="relative aspect-square bg-slate-100"><img src={image} alt={`${product.name} ${index + 1}`} className="h-full w-full object-cover" />{index === 0 && <span className="absolute right-2 top-2 rounded-full bg-violet-600 px-2 py-1 text-[10px] font-black text-white">تصویر اصلی</span>}</div><div className="grid grid-cols-4 gap-1 p-2"><button type="button" disabled={index === 0 || busy} onClick={() => setMain(index)} aria-label="تنظیم به‌عنوان تصویر اصلی" className="grid min-h-10 place-items-center rounded-lg border disabled:opacity-30"><Star /></button><button type="button" disabled={index === 0 || busy} onClick={() => move(index, -1)} aria-label="انتقال تصویر به قبل" className="grid min-h-10 place-items-center rounded-lg border disabled:opacity-30"><ArrowRight /></button><button type="button" disabled={index === gallery.length - 1 || busy} onClick={() => move(index, 1)} aria-label="انتقال تصویر به بعد" className="grid min-h-10 place-items-center rounded-lg border disabled:opacity-30"><ArrowLeft /></button><button type="button" disabled={busy} onClick={() => remove(index)} aria-label="حذف تصویر از محصول" className="grid min-h-10 place-items-center rounded-lg border text-rose-600"><Trash /></button></div></article>)}</div> : <button type="button" disabled={busy} onClick={() => fileInput.current?.click()} className="mt-5 grid min-h-40 w-full place-items-center rounded-2xl border-2 border-dashed text-sm text-slate-400"><span><ImageSquare className="mx-auto mb-2" size={32} />اولین تصویر محصول را اضافه کن</span></button>}
+      {gallery.length ? <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{gallery.map((image, index) => <article key={`${image}-${index}`} className={`overflow-hidden rounded-2xl border bg-white ${index === 0 ? "ring-2 ring-violet-500" : ""}`}><div className="relative aspect-square bg-slate-100"><img src={image} alt={`${product.name} ${index + 1}`} className="h-full w-full object-cover" />{index === 0 && <span className="absolute right-2 top-2 rounded-full bg-violet-600 px-2 py-1 text-[10px] font-black text-white">تصویر اصلی</span>}</div><div className="grid grid-cols-4 gap-1 p-2"><button type="button" disabled={index === 0 || busy} onClick={() => setMain(index)} aria-label="تنظیم به‌عنوان تصویر اصلی" className="grid min-h-10 place-items-center rounded-lg border disabled:opacity-30"><Star /></button><button type="button" disabled={index === 0 || busy} onClick={() => move(index, -1)} aria-label="انتقال تصویر به قبل" className="grid min-h-10 place-items-center rounded-lg border disabled:opacity-30"><ArrowRight /></button><button type="button" disabled={index === gallery.length - 1 || busy} onClick={() => move(index, 1)} aria-label="انتقال تصویر به بعد" className="grid min-h-10 place-items-center rounded-lg border disabled:opacity-30"><ArrowLeft /></button><button type="button" disabled={busy} onClick={() => remove(index)} aria-label="حذف تصویر از محصول" className="grid min-h-10 place-items-center rounded-lg border text-rose-600"><Trash /></button></div></article>)}</div> : <label htmlFor={fileInputId} className="mt-5 grid min-h-40 w-full cursor-pointer place-items-center rounded-2xl border-2 border-dashed text-sm text-slate-400"><span><ImageSquare className="mx-auto mb-2" size={32} />اولین تصویر محصول را انتخاب کن</span></label>}
     </section>
 
     <section className="rounded-3xl border bg-white p-4 shadow-sm sm:p-6">
@@ -307,7 +333,6 @@ export default function ProductMediaEditor({ product, onProduct }: {
       <label className="mt-4 block text-sm text-slate-600">توضیحات<textarea rows={5} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-2 w-full rounded-xl border p-3 leading-7" /></label>
       <button type="button" disabled={busy || !form.name.trim() || !form.slug.trim()} onClick={() => void saveDetails()} className="mt-4 min-h-11 w-full rounded-xl bg-slate-900 px-5 font-black text-white disabled:opacity-40 sm:w-auto">ذخیره تغییرات محصول</button>
     </section>
-    {message && <div role="status" className="sticky bottom-3 rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm text-white shadow-xl">{message}</div>}
   </div>;
 }
 
