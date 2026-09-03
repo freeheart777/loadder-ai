@@ -78,7 +78,6 @@ const HomePage = lazy(() => import("./pages/HomePage")),
     () => import("./pages/StoreWebsiteStudioPageV12"),
   ),
   StoreSetupWizardPage = lazy(() => import("./pages/StoreSetupWizardPage")),
-  StoreQuickStartPage = lazy(() => import("./pages/StoreQuickStartPage")),
   StoreAdminDashboardPage = lazy(
     () => import("./pages/StoreAdminDashboardPage"),
   ),
@@ -130,7 +129,7 @@ export default function App() {
               <Route path="/dashboard/automation" element={<AutomationPage />} />
               <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
               <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV16 />} />
-              <Route path="/dashboard/websites/quick-start" element={<StoreQuickStartPage />} />
+              <Route path="/dashboard/websites/quick-start" element={<Navigate to="/dashboard/websites" replace />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
               <Route path="/dashboard/websites/admin" element={<StoreAdminDashboardPage />} />
               <Route path="/dashboard/websites/commerce" element={<StoreCommerceManagerPage />} />
@@ -159,7 +158,7 @@ export default function App() {
               <Route path="/dashboard/websites/fallback/v15" element={<StoreWebsiteStudioPageV15 />} />
               <Route path="/dashboard/websites/studio-legacy" element={<VisualWebsiteStudioPage />} />
               <Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} />
-              <Route path="/dashboard/websites/new" element={<StoreQuickStartPage />} />
+              <Route path="/dashboard/websites/new" element={<Navigate to="/dashboard/websites" replace />} />
               <Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
               <Route path="/site-builder" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/site-builder/legacy" element={<SiteProjectStudioPage />} />
