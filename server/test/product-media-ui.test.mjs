@@ -25,12 +25,21 @@ test("active product editor retains URL, Media Library, and variant editing comp
 test("active product media editor uses canonical storage without Base64", () => {
   assert.match(editor, /\/media\/upload-url/);
   assert.match(editor, /\/media\/complete/);
-  assert.match(editor, /fetch\(upload\.signedUrl/);
+  assert.match(editor, /fetch\(signedUrl/);
+  assert.match(editor, /credentials: directTargetsLoadderApi \? "include" : "omit"/);
   assert.match(editor, /const setMain/);
   assert.match(editor, /const remove/);
   assert.match(editor, /تصویر اصلی/);
   assert.match(editor, /فایل در Media Library باقی ماند/);
   assert.doesNotMatch(editor, /readAsDataURL|FileReader/);
+});
+
+test("product upload requires an explicit visible confirmation after file selection", () => {
+  assert.match(editor, /const \[selectedFiles, setSelectedFiles\] = useState<File\[]>\(\[\]\)/);
+  assert.match(editor, /انتخاب تصویر/);
+  assert.match(editor, /آپلود تصویر انتخاب‌شده/);
+  assert.match(editor, /onClick=\{\(\) => void uploadFiles\(selectedFiles\)\}/);
+  assert.match(editor, /aria-live="polite"/);
 });
 
 test("product detail renders the proven storage-backed ProductMediaEditor", () => {
