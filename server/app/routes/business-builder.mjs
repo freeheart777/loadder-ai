@@ -8,11 +8,18 @@ import { getCommercialBuilderCatalog } from "../business-builder/commercial-cata
 import { LOADDER_EDITOR_CAPABILITIES } from "../business-builder/editor-patch.mjs";
 import { navigateLoadder } from "../business-builder/navigator.mjs";
 import { createBusinessBuilderRateLimiter } from "../business-builder/business-builder-rate-limit.mjs";
+import { createOperationsDashboardService } from "../business-builder/operations-dashboard.mjs";
+import { requireWorkspaceId } from "../tenant-context.mjs";
 import { createBusinessBuilderRepository } from "../repositories/business-builder-repository.mjs";
 
 export function createBusinessBuilderRouter({ service = loadderBusinessBuilderService, projects = null, previewAdapter = null, database = db } = {}) {
-  const router = express.Router(),writeLimit=createBusinessBuilderRateLimiter("write");
+  const router = express.Router(),writeLimit=createBusinessBuilderRateLimiter("write"),ops=createOperationsDashboardService(database);
+  const adminMembership=userId=>userId?database.prepare("SELECT role,status FROM workspace_memberships WHERE workspace_id=? AND user_id=?").get(requireWorkspaceId(),userId):null;
+  const isAdmin=req=>{const m=adminMembership(req.user?.id);return m?.status==="active"&&(m.role==="owner"||m.role==="admin");};
   router.get("/business-builder/catalog",(req,res)=>res.json({success:true,...getCommercialBuilderCatalog(),editor:LOADDER_EDITOR_CAPABILITIES}));
+  router.get("/business-builder/operations",(req,res)=>res.json({success:true,summary:ops.workspaceSummary()}));
+  router.get("/business-builder/admin",(req,res)=>isAdmin(req)?res.json({success:true,...ops.adminSummary()}):res.status(403).json({success:false,code:"ADMIN_FORBIDDEN"}));
+  router.get("/business-builder/projects/:id/operations",(req,res)=>{const data=ops.projectSummary(req.params.id);return data?res.json({success:true,...data}):res.status(404).json({success:false,code:"PROJECT_NOT_FOUND"});});
   router.post("/business-builder/navigator",(req,res)=>{const project=req.body?.projectId&&projects?projects.getProject(req.body.projectId):null;return res.json({success:true,guidance:navigateLoadder({goal:req.body?.goal||"",screen:req.body?.screen||"builder",project})});});
   router.post("/business-builder/preview",writeLimit,(req,res)=>{try{const intent=String(req.body?.intent||"").trim();if(!intent)return res.status(400).json({success:false,code:"BUSINESS_INTENT_REQUIRED"});return res.status(201).json({success:true,preview:service.preview({intent,name:req.body?.name,locale:req.body?.locale||"fa-IR"})});}catch(error){return res.status(400).json({success:false,code:error?.code||"BUSINESS_BUILDER_PREVIEW_FAILED",message:error?.message});}});
   if(!projects)return router;
