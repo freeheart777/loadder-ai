@@ -13,7 +13,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
   const bucket = env.SITE_MEDIA_BUCKET || "site-media";
   const remoteConfigured = Boolean(baseUrl && serviceRoleKey);
   const localRoot = path.resolve(env.SITE_MEDIA_LOCAL_DIR || path.join(process.cwd(), "server", "data", "site-media"));
-  const localUploads = new Map();
+  const pendingUploads = new Map();
   const localApiBaseUrl = String(
     env.SITE_MEDIA_LOCAL_API_BASE_URL ||
     env.API_PUBLIC_URL ||
@@ -23,51 +23,76 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
 
   function safeStorageKey(storageKey) {
     const key = String(storageKey || "").replace(/\\/g, "/").replace(/^\/+/, "");
-    if (!key || key.includes("..")) throw new SiteMediaStorageError("Invalid local media path.", "SITE_MEDIA_LOCAL_PATH_INVALID", 400);
+    if (!key || key.includes("..")) throw new SiteMediaStorageError("Invalid media path.", "SITE_MEDIA_PATH_INVALID", 400);
     return key;
   }
 
-  async function signedUpload({ workspaceId, siteProjectId, assetType, fileName, upsert = false }) {
+  /**
+   * Poka-Yoke upload contract:
+   * The browser NEVER talks directly to Supabase Storage. Every upload goes to
+   * Loadder's own API first, so CORS, auth/session and provider-specific signed
+   * URL behavior cannot diverge between Hero, Banner, Product and Gallery.
+   */
+  async function signedUpload({ workspaceId, siteProjectId, assetType, fileName, mimeType = "application/octet-stream" }) {
     if (!workspaceId || !siteProjectId || !assetType || !fileName) throw new SiteMediaStorageError("workspaceId, siteProjectId, assetType and fileName are required.", "SITE_MEDIA_UPLOAD_INPUT_INVALID", 400);
     const safeName = String(fileName).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, "-");
     const storagePath = `${workspaceId}/${siteProjectId}/${assetType}/${crypto.randomUUID()}-${safeName}`;
-
-    if (!remoteConfigured) {
-      const token = crypto.randomUUID();
-      localUploads.set(token, { path: storagePath, expiresAt: Date.now() + 2 * 60 * 60 * 1000 });
-      return { bucket: "local", path: storagePath, token, signedUrl: `${localApiBaseUrl}/api/site-media-local/upload/${token}`, local: true };
-    }
-
-    const headers = { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey, "Content-Type": "application/json" };
-    if (upsert) headers["x-upsert"] = "true";
-    const response = await fetchImpl(`${storageApiBaseUrl}/object/upload/sign/${encodeURIComponent(bucket)}/${storagePath}`, {
-      method: "POST", headers, body: JSON.stringify({})
+    const token = crypto.randomUUID();
+    pendingUploads.set(token, {
+      path: storagePath,
+      mimeType: String(mimeType || "application/octet-stream"),
+      expiresAt: Date.now() + 2 * 60 * 60 * 1000,
     });
-    if (!response.ok) throw new SiteMediaStorageError("Unable to create signed upload URL.", "SITE_MEDIA_SIGNED_UPLOAD_FAILED", 502);
-    const payload = await response.json();
-    const returnedUrl = String(payload.url || "").trim();
-    const signedUrl = returnedUrl
-      ? (/^https?:\/\//i.test(returnedUrl)
-        ? returnedUrl
-        : `${storageApiBaseUrl}${returnedUrl.startsWith("/") ? "" : "/"}${returnedUrl}`)
-      : `${storageApiBaseUrl}/object/upload/sign/${encodeURIComponent(bucket)}/${storagePath}?token=${encodeURIComponent(payload.token)}`;
-    return { bucket, path: storagePath, token: payload.token, signedUrl };
+    return {
+      bucket: remoteConfigured ? bucket : "local",
+      path: storagePath,
+      token,
+      signedUrl: `${localApiBaseUrl}/api/site-media-local/upload/${token}`,
+      local: true,
+      proxied: true,
+    };
   }
 
   async function acceptLocalUpload(token, body) {
-    const pending = localUploads.get(String(token || ""));
+    const keyToken = String(token || "");
+    const pending = pendingUploads.get(keyToken);
     if (!pending || pending.expiresAt < Date.now()) {
-      localUploads.delete(String(token || ""));
-      throw new SiteMediaStorageError("Local upload token is invalid or expired.", "SITE_MEDIA_LOCAL_TOKEN_INVALID", 403);
+      pendingUploads.delete(keyToken);
+      throw new SiteMediaStorageError("Upload token is invalid or expired.", "SITE_MEDIA_UPLOAD_TOKEN_INVALID", 403);
     }
-    if (!Buffer.isBuffer(body) || body.length === 0) throw new SiteMediaStorageError("Uploaded file is empty.", "SITE_MEDIA_LOCAL_BODY_EMPTY", 400);
+    if (!Buffer.isBuffer(body) || body.length === 0) throw new SiteMediaStorageError("Uploaded file is empty.", "SITE_MEDIA_BODY_EMPTY", 400);
     const key = safeStorageKey(pending.path);
-    const target = path.resolve(localRoot, key);
-    if (!target.startsWith(`${localRoot}${path.sep}`)) throw new SiteMediaStorageError("Invalid local media path.", "SITE_MEDIA_LOCAL_PATH_INVALID", 400);
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, body);
-    localUploads.delete(String(token || ""));
-    return { path: key, sizeBytes: body.length };
+
+    try {
+      if (remoteConfigured) {
+        const response = await fetchImpl(`${storageApiBaseUrl}/object/${encodeURIComponent(bucket)}/${key}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+            "Content-Type": pending.mimeType,
+            "x-upsert": "false",
+          },
+          body,
+        });
+        if (!response.ok) {
+          const detail = await response.text().catch(() => "");
+          throw new SiteMediaStorageError(
+            `Unable to store media${detail ? `: ${detail.slice(0, 180)}` : "."}`,
+            "SITE_MEDIA_PROVIDER_UPLOAD_FAILED",
+            502,
+          );
+        }
+      } else {
+        const target = path.resolve(localRoot, key);
+        if (!target.startsWith(`${localRoot}${path.sep}`)) throw new SiteMediaStorageError("Invalid local media path.", "SITE_MEDIA_LOCAL_PATH_INVALID", 400);
+        await fs.mkdir(path.dirname(target), { recursive: true });
+        await fs.writeFile(target, body);
+      }
+      return { path: key, sizeBytes: body.length };
+    } finally {
+      pendingUploads.delete(keyToken);
+    }
   }
 
   async function readLocalAsset(encodedKey) {
