@@ -50,6 +50,34 @@ This is a permanent engineering constitution for Loadder. It adapts proven Japan
 - Runtime validates persisted contracts before execution.
 - Deploy validates artifacts and health before promotion.
 
+## 11. Fast Gate -> Develop -> Full Gate -> Release
+CI protects quality but must not become development waste.
+
+### Fast Gate — development feedback
+Run the smallest deterministic checks that can reject a broken change quickly:
+- syntax/import smoke for changed critical modules;
+- targeted unit/contract/regression tests;
+- targeted TypeScript/type checks for changed UI;
+- static secret/backdoor scan;
+- deterministic builder token budget (`0` AI tokens for supported deterministic builds).
+
+Fast Gate should avoid reinstalling/auditing the entire world when the changed surface does not require it. Target: useful feedback in a few minutes, not tens of minutes.
+
+### Full Gate — release evidence
+Before merge/release/production promotion, run the complete evidence set:
+- full Server Tests;
+- full Frontend Build;
+- full Security Supply Chain audit;
+- tenant-isolation and authorization tests;
+- Backup/Restore Drill;
+- production readiness / canary / rollback checks;
+- relevant performance and cost budgets.
+
+### Stop-the-line semantics
+- A red Fast Gate blocks further work on the affected surface until understood.
+- A slow/queued Full Gate does not prohibit reversible, isolated development on a separate safe surface, but nothing may be called merge-ready/release-ready until the exact release SHA passes Full Gate.
+- Never treat a green result from an older SHA as evidence for a newer SHA.
+
 ## Definition of Done — mandatory
 A Loadder capability is Done only when all applicable checks pass:
 1. Real user path works end to end; no mock success.
@@ -60,11 +88,11 @@ A Loadder capability is Done only when all applicable checks pass:
 6. Logs/metrics make abnormal behavior visible.
 7. Restore/rollback exists where change is destructive or production-facing.
 8. Unit/regression/integration coverage exists.
-9. Server Tests, Frontend Build and Security Supply Chain are green on current head.
+9. Exact release SHA passes the Full Gate before merge/release.
 10. Cost/token impact is understood; deterministic alternatives were considered first.
 
 ## Stop-the-line rule
-If a required CI/security/isolation/recovery gate fails, do not expand feature surface until the failure is understood and fixed. New functionality must not hide an existing red gate.
+If a required security/isolation/recovery/integrity gate fails, do not expand the affected feature surface until the failure is understood and fixed. New functionality must not hide an existing red gate.
 
 ## Builder-specific law
 `ENGINE BUILDS, AI GUIDES.`
