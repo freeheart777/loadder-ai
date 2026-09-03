@@ -34,6 +34,15 @@ test("workflow runtime executes declared deterministic actions", async () => {
   assert.equal(state.outputs[1].output.ok, true);
 });
 
+test("compiler-generated workflows execute without external handlers", async () => {
+  const runtime = new LoadderWorkflowRuntime();
+  assert.ok(definition.workflows.length > 0);
+  for (const workflow of definition.workflows) {
+    const state = await runtime.execute({ definition, workflowId: workflow.id, input: { smoke: true } });
+    assert.equal(state.status, "completed");
+  }
+});
+
 test("export and import preserve Loadder-owned application contract", () => {
   const ui = renderLoadderApp(definition);
   const bundle = materializeLoadderSourceBundle({ definition, ui });
