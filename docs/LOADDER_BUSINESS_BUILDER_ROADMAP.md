@@ -1,6 +1,6 @@
 # Loadder Business Builder — Canonical Roadmap
 
-> This document is the repository source of truth for the Loadder-owned Business Builder / Business Operator platform. Update it when architecture, gates, ownership boundaries, or milestone status changes.
+> This document is the repository source of truth for the Loadder-owned Business Builder / Business Operator platform. Update it when architecture, gates, ownership boundaries, cost model, or milestone status changes.
 
 ## North Star
 
@@ -10,6 +10,33 @@ Core loop:
 
 `Business Intent -> Business Compiler -> App Definition -> Live Runtime -> Intelligence -> Recommended Action -> Human Approval -> Execution -> Outcome -> Business Brain`
 
+## Lean commercial architecture principles
+
+These are non-negotiable design constraints for commercialization:
+
+1. **Operational completeness over feature count.** No UI-only or mock-success feature can be marked done; every user-facing capability must have a tested path through API, service, persistence/runtime and recovery behavior.
+2. **Token efficiency by default.** Prefer deterministic compilers, reusable blueprints, validated patches, cached plans and small task-specific prompts before general full-app regeneration. AI should modify deltas rather than regenerate stable application structure.
+3. **Cheap model routing.** High-cost reasoning models are reserved for tasks that need them; routine classification, patching, validation and summarization should use cheaper or local models where quality gates allow.
+4. **No token spend for deterministic work.** CRUD schema generation, renderer output, versioning, migration, routing, validation, KPI calculations and many workflow decisions should remain code-driven.
+5. **Lean runtime.** Generated business apps should share a multi-tenant control plane/runtime instead of requiring a dedicated server/container per small tenant by default.
+6. **Scale on demand.** Workers, build sandboxes and heavy AI execution should be ephemeral/queue-driven and scale to zero or low idle capacity where infrastructure permits.
+7. **Database efficiency.** SQLite is acceptable for local/dev/small deployments; PostgreSQL is the production scale target. Avoid unnecessary service sprawl.
+8. **Infrastructure independence.** Critical operation must not require one cloud vendor. Adapters may target managed services, but self-hosted migration paths must exist.
+9. **Security before convenience.** Workspace isolation, server-side authorization, validation, secrets isolation, idempotency, audit and rate limits are release gates, not later polish.
+10. **Small deployable surface.** Prefer one web application, one API/control plane, PostgreSQL, object storage and queue/worker capability before introducing additional infrastructure.
+11. **Observability with cost accounting.** Track AI tokens/cost, build compute, storage, DB load, errors and latency per workspace/app so gross margin is measurable.
+12. **Simple operations.** A production Loadder install must be reproducible from documented configuration, support backup/restore and have health checks and safe rollback.
+
+### Cost target philosophy
+
+The platform must be profitable at low tenant usage. Idle customers should cost close to storage/database overhead rather than dedicated compute. Dedicated isolated compute is reserved for builds, risky execution, enterprise isolation requirements or sustained workloads.
+
+### Token minimization sequence
+
+`Intent -> deterministic domain detection -> blueprint composition -> compact AI delta only when needed -> schema validation -> deterministic rendering/runtime`
+
+Never use an LLM merely to reproduce data structures or UI that Loadder can generate deterministically.
+
 ## Non-negotiable ownership rules
 
 1. `LoadderAppDefinition` is the source of truth for generated applications.
@@ -18,7 +45,7 @@ Core loop:
 4. Open-source components may accelerate implementation, but upstream disappearance must not stop production Loadder applications.
 5. Production actions require explicit governance, auditability, idempotency, and rollback where applicable.
 6. Tenant/workspace isolation is mandatory at every persistence and execution boundary.
-7. Production deployment remains blocked until a Loadder-owned deploy adapter passes canary, health-check, rollback, security, and recovery gates.
+7. Production deployment remains blocked until a Loadder-owned deploy adapter passes canary, health-check, rollback, security, recovery and cost-observability gates.
 
 ## Current completed foundation
 
@@ -59,8 +86,11 @@ Goal: make the existing platform safe to trust before adding broad feature surfa
 - [ ] Provider outage and timeout tests
 - [ ] Rate limiting / abuse limits for runtime and Copilot endpoints
 - [ ] Backup/restore verification for Business Builder state
+- [ ] Token/cost accounting per workspace/app/task
+- [ ] Performance baseline for common CRUD/runtime endpoints
+- [ ] Cold-start and low-idle-cost deployment profile
 
-Exit gate: Server Tests + Frontend Build + Security Gate green, isolation tests green, no ungoverned external action path.
+Exit gate: Server Tests + Frontend Build + Security Gate green, isolation tests green, no ungoverned external action path, and measurable runtime/AI cost for critical flows.
 
 ## Phase 2 — Business Operator
 
@@ -97,6 +127,7 @@ Each vertical must ship with:
 - alerts
 - recommended governed actions
 - regression fixtures
+- token budget / deterministic generation coverage
 
 ## Phase 4 — Production runtime and deployment
 
@@ -111,8 +142,11 @@ Each vertical must ship with:
 - [ ] Deployment history
 - [ ] Multi-region recovery design
 - [ ] Observability: logs, metrics, traces, cost accounting
+- [ ] Reference low-cost single-node deployment
+- [ ] Scale-out deployment profile
+- [ ] Backup + restore drill
 
-Exit gate: deployment can fail safely without affecting control plane or unrelated tenants.
+Exit gate: deployment can fail safely without affecting control plane or unrelated tenants, and baseline infrastructure cost is documented for small, medium and scaled installations.
 
 ## Phase 5 — Scale / enterprise
 
@@ -141,6 +175,7 @@ Exit gate: deployment can fail safely without affecting control plane or unrelat
 
 Every feature must answer **yes** to all applicable checks:
 
+- Operational: does the real UI reach a real backend/runtime path without mocks?
 - Ownership: can Loadder operate without the upstream project/vendor?
 - Security: is workspace/tenant isolation enforced server-side?
 - Validation: is untrusted client input validated against persisted contracts?
@@ -149,6 +184,9 @@ Every feature must answer **yes** to all applicable checks:
 - Audit: can we reconstruct who/what/when/why?
 - Recovery: what happens after process crash or provider outage?
 - Portability: can project state still be exported/restored?
+- Efficiency: could deterministic code or a cached/reusable block replace this LLM call?
+- Cost: can we attribute token/compute/storage cost to the workspace/app?
+- Performance: is the common path acceptably fast under the target deployment profile?
 - Tests: unit + regression + integration coverage added?
 - CI: Server Tests + Frontend Build + Security Supply Chain green?
 
@@ -158,7 +196,7 @@ Every feature must answer **yes** to all applicable checks:
 LOADDER CONTROL PLANE
   Business Brain
       |
-  Business Compiler
+  Business Compiler (deterministic-first)
       |
   Loadder App Definition
       |
@@ -167,7 +205,7 @@ LOADDER CONTROL PLANE
   Persisted Version
       |
 LOADDER APPLICATION RUNTIME
-  CRUD + Relations + Workflows
+  Shared CRUD + Relations + Workflows
       |
   Vertical Intelligence
       |
@@ -177,12 +215,28 @@ LOADDER APPLICATION RUNTIME
       |
   Approval Center
       |
-  Replaceable Executors
+  Replaceable Executors / Ephemeral Workers
       |
   Outcome Ledger
       |
   Feedback -> Business Brain
 ```
+
+## Reference production topology goal
+
+```text
+Reverse Proxy / TLS
+        |
+Loadder Web + API (1-2 small instances)
+        |
+PostgreSQL + Object Storage
+        |
+Queue (only when needed)
+        |
+Ephemeral Worker Pool for builds / heavy AI / risky execution
+```
+
+Do not require Kubernetes, dedicated per-tenant containers, or many always-on microservices for the default commercial installation. Add orchestration complexity only when scale proves it necessary.
 
 ## Merge policy
 
@@ -190,4 +244,4 @@ The Business Builder foundation PR stays Draft while the current head has incomp
 
 ## Documentation rule
 
-When a milestone materially changes, update this file in the same PR/commit series. This document is the long-lived project memory for the Business Builder architecture and roadmap.
+When a milestone materially changes, update this file in the same PR/commit series. This document is the long-lived project memory for the Business Builder architecture, cost discipline and roadmap.
