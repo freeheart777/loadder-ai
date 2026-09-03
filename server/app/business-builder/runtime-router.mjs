@@ -3,63 +3,16 @@ import { LoadderDataRuntime } from "./data-adapter.mjs";
 import { LoadderSqliteDataAdapter } from "./sqlite-data-adapter.mjs";
 import { LoadderWorkflowRuntime } from "./workflow-runtime.mjs";
 import { LoadderRuntimeCopilot } from "./runtime-copilot.mjs";
+import { buildVerticalIntelligence } from "./vertical-intelligence.mjs";
 
 export function createBusinessAppRuntimeRouter({ db, projects }) {
-  const router = express.Router();
-  const adapter = new LoadderSqliteDataAdapter(db);
-  const dataRuntime = new LoadderDataRuntime({ adapter });
-  const workflowRuntime = new LoadderWorkflowRuntime();
-  const copilot = new LoadderRuntimeCopilot({ dataAdapter: adapter });
-
-  function activeVersion(projectId){
-    const project=projects.getProject(projectId);
-    if(!project?.activeVersionId)return null;
-    return project.versions.find(v=>v.id===project.activeVersionId)||null;
-  }
-
-  async function execute(req,res,action){
-    try{
-      const version=activeVersion(req.params.id);
-      if(!version) return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});
-      const result=await dataRuntime.execute({definition:version.definition,action,entityId:req.params.entityId,recordId:req.params.recordId||null,payload:req.body||{},query:req.query||{}});
-      if(action==="list"){
-        const total=await adapter.count({appId:version.definition.id,entityId:req.params.entityId,query:req.query||{}});
-        return res.json({success:true,records:result,total,result});
-      }
-      if(action==="create")return res.status(201).json({success:true,record:result,result});
-      return res.json({success:true,record:action==="delete"?undefined:result,result});
-    }catch(error){return res.status(400).json({success:false,code:error?.code||"RUNTIME_DATA_FAILED",message:error?.message});}
-  }
-
-  router.get("/business-builder/projects/:id/data/:entityId",(req,res)=>execute(req,res,"list"));
-  router.get("/business-builder/projects/:id/data/:entityId/:recordId",(req,res)=>execute(req,res,"get"));
-  router.post("/business-builder/projects/:id/data/:entityId",(req,res)=>execute(req,res,"create"));
-  router.patch("/business-builder/projects/:id/data/:entityId/:recordId",(req,res)=>execute(req,res,"update"));
-  router.delete("/business-builder/projects/:id/data/:entityId/:recordId",(req,res)=>execute(req,res,"delete"));
-
-  router.post("/business-builder/projects/:id/workflows/:workflowId/run",async(req,res)=>{
-    try{
-      const version=activeVersion(req.params.id);
-      if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});
-      const result=await workflowRuntime.execute({definition:version.definition,workflowId:req.params.workflowId,input:req.body||{},context:{projectId:req.params.id,userId:req.user?.id||null}});
-      return res.status(201).json({success:true,result});
-    }catch(error){return res.status(400).json({success:false,code:error?.code||"WORKFLOW_RUN_FAILED",message:error?.message});}
-  });
-
-  router.post("/business-builder/projects/:id/copilot",async(req,res)=>{
-    try{
-      const version=activeVersion(req.params.id);
-      if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});
-      const result=await copilot.summarize({definition:version.definition,projectId:req.params.id,message:req.body?.message||"",context:{userId:req.user?.id||null}});
-      return res.json({success:true,result});
-    }catch(error){return res.status(400).json({success:false,code:error?.code||"COPILOT_FAILED",message:error?.message});}
-  });
-
-  router.get("/business-builder/projects/:id/deployment-readiness",(req,res)=>{
-    const version=activeVersion(req.params.id);
-    if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});
-    const approved=projects.canDeployProduction(req.params.id);
-    return res.json({success:true,readiness:{versionId:version.id,approved,providerConfigured:false,canaryPercent:5,healthCheckRequired:true,rollbackSupported:true,status:approved?"adapter-required":"approval-required"}});
-  });
-  return router;
+  const router=express.Router(),adapter=new LoadderSqliteDataAdapter(db),dataRuntime=new LoadderDataRuntime({adapter}),workflowRuntime=new LoadderWorkflowRuntime(),copilot=new LoadderRuntimeCopilot({dataAdapter:adapter});
+  function activeVersion(projectId){const project=projects.getProject(projectId);if(!project?.activeVersionId)return null;return project.versions.find(v=>v.id===project.activeVersionId)||null;}
+  async function snapshot(definition){const out={};for(const entity of definition.entities)out[entity.id]=await adapter.list({appId:definition.id,entityId:entity.id,query:{limit:100}});return out;}
+  async function execute(req,res,action){try{const version=activeVersion(req.params.id);if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});const result=await dataRuntime.execute({definition:version.definition,action,entityId:req.params.entityId,recordId:req.params.recordId||null,payload:req.body||{},query:req.query||{}});if(action==="list"){const total=await adapter.count({appId:version.definition.id,entityId:req.params.entityId,query:req.query||{}});return res.json({success:true,records:result,total,result});}if(action==="create")return res.status(201).json({success:true,record:result,result});return res.json({success:true,record:action==="delete"?undefined:result,result});}catch(error){return res.status(400).json({success:false,code:error?.code||"RUNTIME_DATA_FAILED",message:error?.message});}}
+  router.get("/business-builder/projects/:id/data/:entityId",(req,res)=>execute(req,res,"list"));router.get("/business-builder/projects/:id/data/:entityId/:recordId",(req,res)=>execute(req,res,"get"));router.post("/business-builder/projects/:id/data/:entityId",(req,res)=>execute(req,res,"create"));router.patch("/business-builder/projects/:id/data/:entityId/:recordId",(req,res)=>execute(req,res,"update"));router.delete("/business-builder/projects/:id/data/:entityId/:recordId",(req,res)=>execute(req,res,"delete"));
+  router.get("/business-builder/projects/:id/intelligence",async(req,res)=>{try{const version=activeVersion(req.params.id);if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});return res.json({success:true,intelligence:buildVerticalIntelligence({definition:version.definition,snapshot:await snapshot(version.definition)})});}catch(error){return res.status(400).json({success:false,code:"INTELLIGENCE_FAILED",message:error?.message});}});
+  router.post("/business-builder/projects/:id/workflows/:workflowId/run",async(req,res)=>{try{const version=activeVersion(req.params.id);if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});const result=await workflowRuntime.execute({definition:version.definition,workflowId:req.params.workflowId,input:req.body||{},context:{projectId:req.params.id,userId:req.user?.id||null}});return res.status(201).json({success:true,result});}catch(error){return res.status(400).json({success:false,code:error?.code||"WORKFLOW_RUN_FAILED",message:error?.message});}});
+  router.post("/business-builder/projects/:id/copilot",async(req,res)=>{try{const version=activeVersion(req.params.id);if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});return res.json({success:true,result:await copilot.summarize({definition:version.definition,projectId:req.params.id,message:req.body?.message||"",context:{userId:req.user?.id||null}})});}catch(error){return res.status(400).json({success:false,code:error?.code||"COPILOT_FAILED",message:error?.message});}});
+  router.get("/business-builder/projects/:id/deployment-readiness",(req,res)=>{const version=activeVersion(req.params.id);if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});const approved=projects.canDeployProduction(req.params.id);return res.json({success:true,readiness:{versionId:version.id,approved,providerConfigured:false,canaryPercent:5,healthCheckRequired:true,rollbackSupported:true,status:approved?"adapter-required":"approval-required"}});});return router;
 }
