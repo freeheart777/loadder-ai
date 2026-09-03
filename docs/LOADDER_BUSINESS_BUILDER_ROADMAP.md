@@ -8,172 +8,87 @@ Loadder is an AI Business Operating System where **ENGINE BUILDS, AI GUIDES**.
 `User Goal -> Navigator -> Deterministic Engine -> App Definition -> Runtime -> Intelligence -> Governed Action -> Approval -> Execution -> Outcome`
 
 ## Permanent engineering law
-All work follows LES: Kaizen, Jidoka, Poka-Yoke, Genchi Genbutsu, Standard Work, Andon, Heijunka, waste elimination, Five Whys and quality-at-source.
+All work follows LES. Development model: `FAST GATE -> DEVELOP -> FULL GATE -> RELEASE`. No newer SHA inherits an older SHA's green evidence.
 
-### Development/release gate model
-`FAST GATE -> DEVELOP -> FULL GATE -> RELEASE`
-
-Fast Gate gives targeted feedback on the Business Builder surface and is allowed to cancel stale runs on the same branch. Full Gate remains mandatory on the exact release SHA for merge/release/production. A queued Full Gate does not freeze unrelated reversible development, but no newer SHA inherits an older SHA's green evidence.
-
-### Definition of Done
-No UI-only/mock-success capability is Done. A feature must prove its real UI/API/service/persistence-or-runtime path, define failure/retry behavior, add regression/integration coverage, and pass the exact release SHA Full Gate before merge/release.
-
-## Core doctrine — ENGINE BUILDS, AI GUIDES
-- Deterministic Loadder code/blueprints/contracts build supported applications.
-- AI is optional for normal build/run/edit/restore/export operation.
-- AI navigates, teaches, reviews, proposes safe deltas and explains.
-- Deterministic/catalog/rule/cached paths are checked before any LLM call.
-- Deterministic build token budget is **zero**.
-- AI outage degrades guidance, not supported applications.
-- Minimal UX: `چی می‌خوای بسازی؟ -> بساز -> ادیت -> استفاده -> انتشار`.
-
-## Lean commercial principles
-1. Operational completeness over feature count.
-2. No token spend for deterministic work.
-3. Shared multi-tenant runtime; no dedicated always-on compute for small idle tenants by default.
-4. PostgreSQL + Object Storage production baseline; avoid service sprawl.
-5. Queue/ephemeral workers only for bursty work.
-6. Provider-independent critical contracts.
-7. Security, idempotency, audit, rate limits and recovery are release gates.
-8. No default Kubernetes, host Docker socket, privileged runtime or host networking.
-9. Cost, tokens, errors and latency attributable per workspace/app/task.
-10. Dated GitHub snapshots + encrypted off-primary database backups + verified restore drills.
+## Core doctrine
+- Deterministic Loadder code builds supported applications; deterministic build token budget is **zero**.
+- AI navigates, teaches, reviews and proposes; AI outage must not break supported apps.
+- Minimal UX remains: `چی می‌خوای بسازی؟ -> بساز -> ادیت -> استفاده -> انتشار`.
+- No UI-only/mock-success capability is Done.
 
 ## Completed foundation
-- [x] Deterministic Persian/English compiler
-- [x] Loadder App Definition + validation
-- [x] CRM / Inventory / Booking / Project / Approval / Customer Portal / Logistics / Agency blueprints
-- [x] UI contract + RTL renderer
-- [x] Versioned Visual Editor patch path; rename/hide/theme controls
-- [x] Portable bundle; persistence; immutable versions; restore/export/import
-- [x] SQLite workspace-scoped CRUD runtime + references/search/pagination
-- [x] Workflow runtime + runtime Copilot fallback
-- [x] Live generated-app route
-- [x] Vertical intelligence for CRM/Inventory/Booking
-- [x] Governed action drafts
-- [x] Action Ledger + idempotency
-- [x] Append-only ordered Action History
-- [x] Approval Center UI + real workspace membership RBAC
-- [x] Publish Center UI + explicit blocker backend
-- [x] Deployment canary/health/rollback contracts
-- [x] Commercial catalog
-- [x] Zero-token deterministic Navigator
-- [x] LES permanent engineering law
-- [x] AI-offline commercial acceptance
-- [x] Low-cost production runbook
-- [x] Feature-branch exact-head Server/Frontend/Security Full Gates
-- [x] Business Builder targeted Fast Gate with stale-run cancellation
-- [x] Dated GitHub architecture/recovery snapshot
+- [x] Deterministic Persian/English compiler + eight commercial blueprints
+- [x] App Definition, RTL UI contract, Visual Editor, immutable versions, export/import
+- [x] SQLite runtime + PostgreSQL production adapter/schema/integration foundation
+- [x] Workflow runtime, intelligence, Action Ledger, append-only ordered history
+- [x] Approval Center RBAC + Publish Center blockers
+- [x] Zero-token Navigator + AI-offline acceptance
+- [x] Backup/Restore Drill foundation
+- [x] Fast Gate + exact-head Full Gates
+- [x] Low-cost production profile and recovery snapshots
 
-## Phase A — Quality hardening (ACTIVE)
-- [x] LES Fast Gate / Full Gate development model codified and automated for Business Builder
-- [x] Approval Center UI
-- [~] Action Ledger recommendation -> approval -> execution -> outcome; external executors pending
-- [~] Idempotency on mutating operator/executor paths
-- [x] Immutable action audit trail
-- [x] Owner/Admin approval RBAC; finer per-app/per-action RBAC pending
-- [~] Cross-tenant isolation coverage extended to records/approvals/actions
+## Phase A — Quality hardening
 - [x] Bounded transient retry + PostgreSQL recovery health contract
-- [~] Corrupt payload/malformed definition tests
+- [x] Builder/operator rate limiting + distributed-store injection contract
+- [x] Deployment artifact integrity + canary/rollback contracts
+- [x] Tenant-scoped deployment history persistence foundation
+- [x] Isolated worker execution policy rejects privileged/host capabilities
+- [x] Workspace/project cost + latency telemetry contract with zero-token assertion
+- [~] Cross-tenant isolation coverage extended; continue across new production stores
 - [ ] Provider outage/timeout suite across external services
-- [x] Builder/operator rate limiting wired; distributed-store injection contract added
-- [x] Database Backup/Restore Drill foundation
-- [x] Performance/cost budget contract including zero-token deterministic build
-- [x] Deterministic AI-offline acceptance
+- [ ] Fine-grained per-app/per-action RBAC
 
 ## Phase B — Minimal Product Studio
-- [x] Minimal `چی می‌خوای بسازی؟` entry
-- [x] Commercial catalog from backend
-- [x] Visual editor side panel
-- [x] Zero-token next-step Navigator
-- [~] Block reorder validated backend; Studio drag/drop UX pending
-- [~] Field visibility controls; full page visibility pending
+- [x] Minimal build entry, backend catalog, Visual Editor, Navigator, Approval Center, Publish Center
+- [~] Block reorder backend complete; drag/drop UX pending
+- [~] Field visibility complete; full page visibility pending
 - [ ] Navigation/page rename UX polish
 - [ ] Mobile/responsive acceptance suite
-- [x] Publish Center with readiness blockers and next-action guidance
 
 ## Phase C — AI Navigator
-- [x] Deterministic fallback guidance foundation
+- [x] Deterministic fallback guidance
 - [ ] Context-aware screen guidance
-- [ ] Natural language -> validated editor patch
-- [ ] Natural language -> validated workflow proposal
+- [ ] Natural language -> validated editor/workflow patches
 - [ ] Error explanation/remediation
-- [ ] Explicit AI token budget/cache routing policy
+- [ ] Explicit AI cache/routing policy
 
 ## Phase D — Vertical expansion
-Logistics + Agency deterministic foundations complete. Next: Real Estate -> Retail/Distribution -> Construction -> HR -> Procurement -> Support -> Lightweight ERP.
-Every vertical ships as deterministic blueprints + fixtures + roles + workflows + KPIs + alerts + governed actions.
+Next: Real Estate -> Retail/Distribution -> Construction -> HR -> Procurement -> Support -> Lightweight ERP. Every vertical must ship deterministic blueprints + fixtures + roles + workflows + KPIs + governed actions.
 
 ## Phase E — Production runtime/deployment
-- [x] Provider-neutral PostgreSQL runtime adapter foundation
-- [x] Provider-neutral PostgreSQL pool/runtime provider + bounded reconnect health
-- [x] PostgreSQL runtime schema + SQLite->PostgreSQL deterministic mapping contract
-- [x] Real PostgreSQL 16 service integration workflow for schema + tenant/JSONB verification
-- [x] Provider-neutral secrets resolver + composable external/env backend chain
-- [x] Provider-neutral distributed rate-limit store contract
-- [x] Production deploy adapter with SHA-256 artifact integrity verification
-- [x] Fail-closed canary release controller + automatic rollback contract
-- [~] Fail-closed production smoke evaluator; real environment wiring pending
-- [ ] Isolated ephemeral worker implementation
-- [ ] Deployment history persistence
-- [x] SQLite database backup/restore drill foundation; production PostgreSQL drill pending
-- [x] Reference low-cost single-node profile documented and codified
-- [x] Performance/cost budget contract
-- [ ] Real benchmark telemetry and per-workspace cost accounting
+- [x] PostgreSQL adapter, pool provider, schema mapping and real PostgreSQL 16 CI integration
+- [x] Composable secret backend chain
+- [x] Distributed rate-limit store contract
+- [x] Production deploy adapter with SHA-256 verification
+- [x] Canary controller + automatic rollback contract
+- [x] Deployment history persistence foundation
+- [x] Isolated worker execution contract/policy foundation
+- [x] Cost/latency/token telemetry contract
+- [x] Production operations Release Drill workflow foundation
+- [~] Production smoke evaluator; real environment wiring pending
+- [ ] Production PostgreSQL backup/restore drill
+- [ ] Real external secret backend integration
+- [ ] Real distributed limiter backend integration
+- [ ] Real deploy provider integration
+- [ ] Real benchmark telemetry persistence/dashboard
 
-## Current production-release seven-step checkpoint — 2026-09-04
-1. Real PostgreSQL 16 CI integration applies the canonical schema and verifies tenant-aware JSONB behavior.
-2. PostgreSQL health/recovery uses bounded retry only for explicit transient failures.
-3. Secrets can resolve through replaceable external backends with environment fallback and fail-closed required keys.
-4. Rate limiting supports a provider-neutral distributed atomic store instead of process-local memory only.
-5. The real Builder rate-limit factory accepts injected distributed stores without changing route policy.
-6. Production deployment verifies artifact SHA-256 before handing it to a provider adapter.
-7. Canary release retries health checks and automatically rolls back unhealthy deployments.
+## Current five-step production-operations checkpoint — 2026-09-04
+1. Deployment History is persisted and tenant-scoped via migration 054.
+2. Worker execution has bounded payload/time and rejects docker-socket, privileged and host-network capabilities.
+3. Cost telemetry attributes latency/tokens/compute/storage to workspace/project/operation and enforces zero-token deterministic operations.
+4. Regression tests cover tenant deployment history, worker isolation and deterministic cost telemetry.
+5. A Production Operations Release Drill workflow runs hardening, release, operations and backup/restore acceptance together before release.
 
-Regression/acceptance coverage: `server/test/business-builder-production-release-hardening.test.mjs`. Exact release SHA still requires Full Gate before merge/release.
-
-## Phase F — Native / enterprise / ecosystem
-- [ ] Shared Native Renderer
-- [ ] iOS build/sign/TestFlight/App Store gates
-- [ ] Android build/sign gates
-- [ ] SSO/SCIM, RBAC/ABAC, retention/audit export
-- [ ] App Store / Agent Store / signed templates / safe integration SDK
-
-## Canonical architecture
-```text
-MINIMAL PRODUCT EXPERIENCE
-  User Goal
-    -> Zero-token Navigator / optional AI guide
-    -> Deterministic Catalog + Blueprints + Rules
-    -> Business Compiler
-    -> Loadder App Definition
-    -> UI/Data/Workflow Contracts
-    -> Immutable Version
-    -> Shared Runtime (SQLite dev / PostgreSQL production target)
-    -> Intelligence
-    -> Governed Action Ledger
-    -> Append-only Action Events
-    -> Human Approval
-    -> Replaceable Executor
-    -> Outcome
-```
-
-## Reference production topology
+## Canonical production topology
 ```text
 Reverse Proxy/TLS
-  -> Loadder Web + API (1 small instance baseline; scale to 2+ when measured)
+  -> Loadder Web + API (small shared instances)
   -> PostgreSQL
   -> Object Storage
-  -> Queue only when bursty work requires it
-  -> Ephemeral workers for builds/heavy AI/risky execution
+  -> Distributed limiter/queue only when measured need exists
+  -> Ephemeral isolated workers for builds/heavy AI/risky execution
 ```
-No default Kubernetes or per-tenant always-on container requirement.
+No default Kubernetes, per-tenant always-on compute, host Docker socket, privileged runtime or host networking.
 
 ## Recovery memory
-- Canonical roadmap: this file.
-- Engineering constitution: `docs/LOADDER_ENGINEERING_SYSTEM.md`.
-- Dated immutable-style checkpoints: `docs/backups/LOADDER_BUSINESS_BUILDER_SNAPSHOT_*.md`.
-- Git snapshots are architecture/recovery memory, not substitutes for encrypted production database/object-storage backups.
-
-## Documentation rule
-Material architecture/quality changes update this roadmap and, when appropriate, create a new dated snapshot. Historical snapshots are never overwritten.
+Canonical roadmap: this file. Engineering constitution: `docs/LOADDER_ENGINEERING_SYSTEM.md`. Dated checkpoints: `docs/backups/LOADDER_BUSINESS_BUILDER_SNAPSHOT_*.md`. Git memory never substitutes for encrypted production DB/object backups.
