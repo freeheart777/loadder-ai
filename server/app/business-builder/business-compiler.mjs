@@ -41,7 +41,7 @@ function workflowDefinition(id) {
   return {
     id,
     name: id.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "),
-    steps: [{ id: "start", type: "trigger" }, { id: "complete", type: "action" }],
+    steps: [{ id: "start", type: "trigger" }, { id: "complete", type: "complete" }],
   };
 }
 
