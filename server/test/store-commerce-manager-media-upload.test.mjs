@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
-const manager = read("../../src/pages/StoreCommerceManagerPage.tsx");
+const managerGate = read("../../src/pages/StoreCommerceManagerPage.tsx");
+const manager = read("../../src/pages/StoreCommerceManagerPageCore.tsx");
 const uploader = read("../../src/lib/siteMediaUpload.ts");
 
 test("product creator uses canonical binary Media Storage instead of Base64 project assets", () => {
+  assert.match(managerGate, /ensureActiveStoreProject/);
   assert.match(manager, /uploadSiteMedia/);
   assert.doesNotMatch(manager, /readAsDataURL|FileReader/);
   assert.doesNotMatch(manager, /\/site-projects\/\$\{project\.id\}\/assets/);

@@ -44,9 +44,13 @@ jobs:
           src/pages/GoogleAdsConnectedWizardPage.tsx
           src/pages/AdsCenterWithGoogleEntryPage.tsx
           src/pages/VisualWebsiteStudioPage.tsx
+          src/pages/StoreWebsiteStudioPageV16.tsx
+          src/pages/StoreWebsiteStudioPageV16Core.tsx
           src/pages/StoreCommerceManagerPage.tsx
+          src/pages/StoreCommerceManagerPageCore.tsx
           src/pages/StoreProductDetailPage.tsx
           src/components/commerce/ProductMediaEditor.tsx
+          src/lib/activeStoreProject.ts
           src/lib/siteMediaUpload.ts
           src/lib/productMedia.ts
       - name: Build Vite bundle
