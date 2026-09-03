@@ -26,6 +26,12 @@ export function createBusinessBuilderRouter({ service = loadderBusinessBuilderSe
     const project = projects.getProject(req.params.id);
     return project ? res.json({ success: true, project }) : res.status(404).json({ success: false, code: "PROJECT_NOT_FOUND" });
   });
+  router.get("/business-builder/projects/:id/export", (req, res) => {
+    const exported = projects.exportProject(req.params.id);
+    if (!exported) return res.status(404).json({ success: false, code: "PROJECT_NOT_FOUND" });
+    res.setHeader("Content-Disposition", `attachment; filename="loadder-${req.params.id}.json"`);
+    return res.json(exported);
+  });
   router.post("/business-builder/projects", (req, res) => {
     try {
       const intent = String(req.body?.intent || "").trim();
