@@ -18,7 +18,7 @@ test("Store Studio is gated behind a readable persistent STORE project", () => {
 
   assert.match(helper, /siteType:\s*"STORE"/);
   assert.match(helper, /method:\s*"POST"/);
-  assert.match(helper, /\/api\/site-projects\/\$\{project\.id\}/);
+  assert.match(helper, /\/api\/site-projects\/\$\{projectId\}/);
 });
 
 test("Commerce manager uses the same active-store identity contract", () => {
@@ -28,14 +28,18 @@ test("Commerce manager uses the same active-store identity contract", () => {
   assert.match(wrapper, /<StoreCommerceManagerPageCore/);
 });
 
-test("all active website builder entry routes converge on gated V16", () => {
+test("all website builder entry routes converge on one canonical gated V16", () => {
   const app = read("src/App.tsx");
+  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites" replace \/>/);
   assert.match(app, /path="\/dashboard\/websites" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
-  assert.match(app, /path="\/dashboard\/websites\/studio" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
-  assert.match(app, /path="\/site-builder" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
-  for (const duplicate of ["/dashboard/websites/new", "/dashboard/websites/quick-start"]) {
-    const escaped = duplicate.replaceAll("/", "\\/");
-    assert.match(app, new RegExp(`path="${escaped}"[\\s\\S]{0,100}<Navigate to="\\/dashboard\\/websites" replace \\/>`));
+  for (const route of [
+    "/dashboard/websites/new",
+    "/dashboard/websites/quick-start",
+    "/dashboard/websites/studio",
+    "/site-builder",
+  ]) {
+    const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(app, new RegExp(`path="${escaped}" element=\\{canonicalBuilder\\}`));
   }
   assert.doesNotMatch(app, /StoreQuickStartPage/);
 });
