@@ -58,7 +58,16 @@ export function createBusinessBuilderRepository(db) {
     const id = crypto.randomUUID(), createdAt = now(), expiresAt = new Date(Date.now() + ttlMinutes * 60000).toISOString();
     db.prepare(`INSERT INTO business_builder_preview_sessions (id, project_id, version_id, workspace_id, status, preview_url, runtime_adapter, expires_at, created_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?)`)
       .run(id, projectId, versionId, workspaceId(), previewUrl, runtimeAdapter, expiresAt, createdAt);
-    return mapPreview(db.prepare("SELECT * FROM business_builder_preview_sessions WHERE id=? AND workspace_id=?").get(id, workspaceId()));
+    return getPreviewSession(id);
+  }
+  function getPreviewSession(id) {
+    const row = db.prepare("SELECT * FROM business_builder_preview_sessions WHERE id=? AND workspace_id=?").get(id, workspaceId());
+    const session = mapPreview(row);
+    if (session && Date.parse(session.expiresAt) <= Date.now() && session.status === "active") {
+      db.prepare("UPDATE business_builder_preview_sessions SET status='expired' WHERE id=? AND workspace_id=?").run(id, workspaceId());
+      return { ...session, status: "expired" };
+    }
+    return session;
   }
   function recordApproval({ projectId, versionId, stage, decision, decidedBy = null, note = null }) {
     const id = crypto.randomUUID(), timestamp = now();
@@ -71,5 +80,5 @@ export function createBusinessBuilderRepository(db) {
     return row ? { id: row.id, decision: row.decision, stage: row.stage, note: row.note, createdAt: row.created_at } : null;
   }
 
-  return { listProjects, getProject, createProject, updateProject, createVersion, getVersion, listVersions, getActiveVersion, createPreviewSession, recordApproval, latestApproval };
+  return { listProjects, getProject, createProject, updateProject, createVersion, getVersion, listVersions, getActiveVersion, createPreviewSession, getPreviewSession, recordApproval, latestApproval };
 }
