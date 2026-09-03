@@ -6,11 +6,11 @@ import path from "node:path";
 const root = path.resolve(process.cwd(), "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 
-test("Store Studio is gated behind active persistent STORE project", () => {
+test("Store Studio is gated behind a readable persistent STORE project", () => {
   const wrapper = read("src/pages/StoreWebsiteStudioPageV16.tsx");
   const helper = read("src/lib/activeStoreProject.ts");
 
-  assert.match(wrapper, /ensureActiveStoreProject\(\)/);
+  assert.match(wrapper, /loadActiveStoreProject\(\)/);
   assert.match(wrapper, /state === "ready"/);
   assert.match(wrapper, /<StoreWebsiteStudioPageV16Core/);
   assert.match(wrapper, /data-store-project-gate/);
@@ -18,10 +18,10 @@ test("Store Studio is gated behind active persistent STORE project", () => {
 
   assert.match(helper, /siteType:\s*"STORE"/);
   assert.match(helper, /method:\s*"POST"/);
-  assert.match(helper, /\/api\/site-projects/);
+  assert.match(helper, /\/api\/site-projects\/\$\{project\.id\}/);
 });
 
-test("Commerce manager uses the same active-store gate", () => {
+test("Commerce manager uses the same active-store identity contract", () => {
   const wrapper = read("src/pages/StoreCommerceManagerPage.tsx");
   assert.match(wrapper, /ensureActiveStoreProject\(\)/);
   assert.match(wrapper, /state === "ready"/);
