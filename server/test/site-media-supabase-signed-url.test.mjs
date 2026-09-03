@@ -27,7 +27,7 @@ test("remote site media never exposes a Supabase signed upload URL to the browse
 
   assert.equal(storage.remoteConfigured, true);
   assert.equal(calls.length, 0, "allocating an upload must not call Supabase from the browser flow");
-  assert.match(upload.signedUrl, /^http:\/\/localhost:3001\/api\/site-media-local\/upload\//);
+  assert.match(upload.signedUrl, /^http:\/\/localhost:3001\/api\/site-media-upload\//);
   assert.equal(upload.local, true);
   assert.equal(upload.proxied, true);
   assert.doesNotMatch(upload.signedUrl, /supabase|storage\/v1/i);
