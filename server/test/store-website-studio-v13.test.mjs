@@ -20,7 +20,7 @@ test("main Store Studio routes use canonical gated V16 and legacy URLs cannot su
     const escaped = route.replaceAll("/", "\\/");
     assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV16 \\/>\\}`));
   }
-  assert.match(v16Gate, /ensureActiveStoreProject/);
+  assert.match(v16Gate, /loadActiveStoreProject/);
   assert.match(v16Gate, /state === "ready"/);
   assert.match(v16Gate, /StoreWebsiteStudioPageV16Core/);
   for (const route of ["studio-v13", "studio-v14", "studio-v15", "studio-v16"]) {
