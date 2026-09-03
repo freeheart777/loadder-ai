@@ -73,10 +73,10 @@ No UI-only/mock-success capability is Done. A feature must prove its real UI/API
 - [x] Immutable action audit trail
 - [x] Owner/Admin approval RBAC; finer per-app/per-action RBAC pending
 - [~] Cross-tenant isolation coverage extended to records/approvals/actions
-- [~] Bounded transient retry policy foundation added; restart/retry integration suite pending
+- [x] Bounded transient retry + PostgreSQL recovery health contract
 - [~] Corrupt payload/malformed definition tests
-- [ ] Provider outage/timeout suite
-- [x] Builder/operator write rate-limit policy wired to real routes; distributed store/abuse telemetry pending
+- [ ] Provider outage/timeout suite across external services
+- [x] Builder/operator rate limiting wired; distributed-store injection contract added
 - [x] Database Backup/Restore Drill foundation
 - [x] Performance/cost budget contract including zero-token deterministic build
 - [x] Deterministic AI-offline acceptance
@@ -105,29 +105,32 @@ Logistics + Agency deterministic foundations complete. Next: Real Estate -> Reta
 Every vertical ships as deterministic blueprints + fixtures + roles + workflows + KPIs + alerts + governed actions.
 
 ## Phase E — Production runtime/deployment
-- [~] Provider-neutral PostgreSQL runtime adapter foundation added
-- [x] Provider-neutral PostgreSQL pool/runtime provider contract + health probe
+- [x] Provider-neutral PostgreSQL runtime adapter foundation
+- [x] Provider-neutral PostgreSQL pool/runtime provider + bounded reconnect health
 - [x] PostgreSQL runtime schema + SQLite->PostgreSQL deterministic mapping contract
-- [~] Provider-neutral secrets resolver + fail-closed required-secret validation foundation; external secrets backend pending
-- [ ] Loadder production deploy adapter
+- [x] Real PostgreSQL 16 service integration workflow for schema + tenant/JSONB verification
+- [x] Provider-neutral secrets resolver + composable external/env backend chain
+- [x] Provider-neutral distributed rate-limit store contract
+- [x] Production deploy adapter with SHA-256 artifact integrity verification
+- [x] Fail-closed canary release controller + automatic rollback contract
+- [~] Fail-closed production smoke evaluator; real environment wiring pending
 - [ ] Isolated ephemeral worker implementation
-- [ ] Artifact checksums/signing
-- [~] Fail-closed production smoke evaluator added; real environment integration pending
-- [ ] Synthetic smoke + canary + automatic rollback against real environment
-- [ ] Deployment history
+- [ ] Deployment history persistence
 - [x] SQLite database backup/restore drill foundation; production PostgreSQL drill pending
 - [x] Reference low-cost single-node profile documented and codified
 - [x] Performance/cost budget contract
 - [ ] Real benchmark telemetry and per-workspace cost accounting
 
-## Current production-hardening five-step checkpoint
-1. PostgreSQL runtime/pool provider contract with health probe and bounded pool configuration.
-2. Provider-neutral secrets resolver with required-secret fail-closed validation.
-3. Scoped Builder/operator rate limiting wired to mutating and operator endpoints.
-4. Bounded exponential retry policy for explicitly transient failures only.
-5. Fail-closed production smoke evaluator covering DB, secrets, publish readiness and backup health.
+## Current production-release seven-step checkpoint — 2026-09-04
+1. Real PostgreSQL 16 CI integration applies the canonical schema and verifies tenant-aware JSONB behavior.
+2. PostgreSQL health/recovery uses bounded retry only for explicit transient failures.
+3. Secrets can resolve through replaceable external backends with environment fallback and fail-closed required keys.
+4. Rate limiting supports a provider-neutral distributed atomic store instead of process-local memory only.
+5. The real Builder rate-limit factory accepts injected distributed stores without changing route policy.
+6. Production deployment verifies artifact SHA-256 before handing it to a provider adapter.
+7. Canary release retries health checks and automatically rolls back unhealthy deployments.
 
-All five have contract/regression coverage under `server/test/business-builder-production-hardening.test.mjs`. Exact release SHA still requires Full Gate before merge/release.
+Regression/acceptance coverage: `server/test/business-builder-production-release-hardening.test.mjs`. Exact release SHA still requires Full Gate before merge/release.
 
 ## Phase F — Native / enterprise / ecosystem
 - [ ] Shared Native Renderer
