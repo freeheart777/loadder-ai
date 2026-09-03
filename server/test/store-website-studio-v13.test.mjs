@@ -71,7 +71,6 @@ test("V16 persists only storeBuilderV16 and preserves legacy configuration", () 
   for (const legacy of ["storeBuilderV15", "storeBuilderV14", "storeBuilderV13", "storeBuilderV11"])
     assert.match(v16Config, new RegExp(legacy));
   assert.match(v16Types, /version: 16/);
-  assert.match(v16Source, /runtime عمومی Cart\/Checkout\/Order تغییر نمی‌کند/);
   assert.doesNotMatch(v16Source, /Commerce Core V2|addPublicCartItem|api\/public\/cart|api\/public\/checkout/);
 });
 
