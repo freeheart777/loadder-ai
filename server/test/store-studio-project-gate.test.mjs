@@ -28,7 +28,14 @@ test("Commerce manager uses the same active-store identity contract", () => {
   assert.match(wrapper, /<StoreCommerceManagerPageCore/);
 });
 
-test("active application route points to the gated V16 entry", () => {
+test("all active website builder entry routes converge on gated V16", () => {
   const app = read("src/App.tsx");
   assert.match(app, /path="\/dashboard\/websites" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
+  assert.match(app, /path="\/dashboard\/websites\/studio" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
+  assert.match(app, /path="\/site-builder" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
+  for (const duplicate of ["/dashboard/websites/new", "/dashboard/websites/quick-start"]) {
+    const escaped = duplicate.replaceAll("/", "\\/");
+    assert.match(app, new RegExp(`path="${escaped}"[\\s\\S]{0,100}<Navigate to="\\/dashboard\\/websites" replace \\/>`));
+  }
+  assert.doesNotMatch(app, /StoreQuickStartPage/);
 });
