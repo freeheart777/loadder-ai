@@ -34,12 +34,16 @@ All work follows LES. Development model: `FAST GATE -> DEVELOP -> FULL GATE -> R
 - [x] Tenant-scoped deployment history persistence foundation
 - [x] Isolated worker execution policy rejects privileged/host capabilities
 - [x] Workspace/project cost + latency telemetry contract with zero-token assertion
+- [x] Tenant-scoped operations dashboard aggregation + regression coverage
+- [x] Owner/Admin-only Business Builder admin summary endpoint
 - [~] Cross-tenant isolation coverage extended; continue across new production stores
 - [ ] Provider outage/timeout suite across external services
 - [ ] Fine-grained per-app/per-action RBAC
 
 ## Phase B — Minimal Product Studio
 - [x] Minimal build entry, backend catalog, Visual Editor, Navigator, Approval Center, Publish Center
+- [x] Business Builder Operations Dashboard route/UI
+- [x] Business Builder Admin Console route/UI with Owner/Admin server enforcement
 - [~] Block reorder backend complete; drag/drop UX pending
 - [~] Field visibility complete; full page visibility pending
 - [ ] Navigation/page rename UX polish
@@ -70,14 +74,14 @@ Next: Real Estate -> Retail/Distribution -> Construction -> HR -> Procurement ->
 - [ ] Real external secret backend integration
 - [ ] Real distributed limiter backend integration
 - [ ] Real deploy provider integration
-- [ ] Real benchmark telemetry persistence/dashboard
+- [ ] Persisted telemetry dashboard and admin health controls
 
-## Current five-step production-operations checkpoint — 2026-09-04
-1. Deployment History is persisted and tenant-scoped via migration 054.
-2. Worker execution has bounded payload/time and rejects docker-socket, privileged and host-network capabilities.
-3. Cost telemetry attributes latency/tokens/compute/storage to workspace/project/operation and enforces zero-token deterministic operations.
-4. Regression tests cover tenant deployment history, worker isolation and deterministic cost telemetry.
-5. A Production Operations Release Drill workflow runs hardening, release, operations and backup/restore acceptance together before release.
+## Dashboard/Admin operating model
+### User Dashboard
+Shows only current workspace operational truth: app count, deployments, failed deployments, pending approvals/actions, runtime records and active members. Project operations can expose recent deployments/actions without exposing another tenant.
+
+### Admin Console
+Owner/Admin-only server-enforced surface for workspace membership, deployment history, failure reasons, canary state and future cost/security/health controls. Client-side hiding is never the authorization boundary.
 
 ## Canonical production topology
 ```text
