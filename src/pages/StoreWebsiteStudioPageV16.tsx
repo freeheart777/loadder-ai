@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import StoreWebsiteStudioPageV16Core from "./StoreWebsiteStudioPageV16Core";
-import { ensureActiveStoreProject } from "../lib/activeStoreProject";
+import { loadActiveStoreProject } from "../lib/activeStoreProject";
 
 type GateState = "loading" | "ready" | "error";
 
@@ -13,7 +13,7 @@ export default function StoreWebsiteStudioPageV16() {
     let active = true;
     setState("loading");
     setError("");
-    void ensureActiveStoreProject()
+    void loadActiveStoreProject()
       .then(() => { if (active) setState("ready"); })
       .catch((cause) => {
         if (!active) return;
@@ -32,7 +32,7 @@ export default function StoreWebsiteStudioPageV16() {
           <>
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-400/20 border-t-emerald-300" />
             <h1 className="mt-5 text-lg font-black">در حال آماده‌سازی پروژه فروشگاه…</h1>
-            <p className="mt-2 text-sm leading-7 text-white/45">ویرایش تا زمانی که پروژه واقعی و قابل ذخیره آماده نشده باشد فعال نمی‌شود.</p>
+            <p className="mt-2 text-sm leading-7 text-white/45">ویرایش تا زمانی که پروژه واقعی، قابل خواندن و قابل ذخیره آماده نشده باشد فعال نمی‌شود.</p>
           </>
         ) : (
           <>
