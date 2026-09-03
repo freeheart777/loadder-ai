@@ -2,18 +2,10 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DemoModePreserver from "./components/DemoModePreserver";
 import { AuthProvider, RequireAuth } from "./lib/auth";
-const StoreWebsiteStudioPageV13 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV13"),
-);
-const StoreWebsiteStudioPageV14 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV14"),
-);
-const StoreWebsiteStudioPageV15 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV15"),
-);
-const StoreWebsiteStudioPageV16 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV16"),
-);
+const StoreWebsiteStudioPageV13 = lazy(() => import("./pages/StoreWebsiteStudioPageV13"));
+const StoreWebsiteStudioPageV14 = lazy(() => import("./pages/StoreWebsiteStudioPageV14"));
+const StoreWebsiteStudioPageV15 = lazy(() => import("./pages/StoreWebsiteStudioPageV15"));
+const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -23,9 +15,7 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   ContentStudioPage = lazy(() => import("./pages/ContentStudioPage")),
   SocialManagerPage = lazy(() => import("./pages/SocialManagerPage")),
   AdsCenterPage = lazy(() => import("./pages/AdsCenterWithGoogleEntryPage")),
-  GoogleAdsSearchWizardPage = lazy(
-    () => import("./pages/GoogleAdsConnectedWizardPage"),
-  ),
+  GoogleAdsSearchWizardPage = lazy(() => import("./pages/GoogleAdsConnectedWizardPage")),
   MarketingPage = lazy(() => import("./pages/MarketingPage")),
   CRMPage = lazy(() => import("./pages/CRMPage")),
   CustomerProfilePage = lazy(() => import("./pages/CustomerProfilePage")),
@@ -35,60 +25,29 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   AutomationPage = lazy(() => import("./pages/AutomationPage")),
   BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage")),
   BusinessBuilderPage = lazy(() => import("./pages/BusinessBuilderPage")),
+  GeneratedBusinessAppPage = lazy(() => import("./pages/GeneratedBusinessAppPage")),
   ClickTestPage = lazy(() => import("./pages/ClickTestPage")),
-  IntelligencePreviewPage = lazy(
-    () => import("./pages/IntelligencePreviewPage"),
-  ),
+  IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage")),
   NativeSiteBuilderPage = lazy(() => import("./pages/NativeSiteBuilderPage")),
   SiteProjectStudioPage = lazy(() => import("./pages/SiteProjectStudioPage")),
-  VisualWebsiteStudioPage = lazy(
-    () => import("./pages/VisualWebsiteStudioPage"),
-  ),
+  VisualWebsiteStudioPage = lazy(() => import("./pages/VisualWebsiteStudioPage")),
   StoreWebsiteStudioPage = lazy(() => import("./pages/StoreWebsiteStudioPage")),
-  StoreWebsiteStudioPageV2 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV2"),
-  ),
-  StoreWebsiteStudioPageV3 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV3"),
-  ),
-  StoreWebsiteStudioPageV4 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV4"),
-  ),
-  StoreWebsiteStudioPageV5 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV5"),
-  ),
-  StoreWebsiteStudioPageV6 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV6"),
-  ),
-  StoreWebsiteStudioPageV7 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV7"),
-  ),
-  StoreWebsiteStudioPageV8 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV8"),
-  ),
-  StoreWebsiteStudioPageV9 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV9"),
-  ),
-  StoreWebsiteStudioPageV10 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV10"),
-  ),
-  StoreWebsiteStudioPageV11 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV11"),
-  ),
-  StoreWebsiteStudioPageV12 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV12"),
-  ),
+  StoreWebsiteStudioPageV2 = lazy(() => import("./pages/StoreWebsiteStudioPageV2")),
+  StoreWebsiteStudioPageV3 = lazy(() => import("./pages/StoreWebsiteStudioPageV3")),
+  StoreWebsiteStudioPageV4 = lazy(() => import("./pages/StoreWebsiteStudioPageV4")),
+  StoreWebsiteStudioPageV5 = lazy(() => import("./pages/StoreWebsiteStudioPageV5")),
+  StoreWebsiteStudioPageV6 = lazy(() => import("./pages/StoreWebsiteStudioPageV6")),
+  StoreWebsiteStudioPageV7 = lazy(() => import("./pages/StoreWebsiteStudioPageV7")),
+  StoreWebsiteStudioPageV8 = lazy(() => import("./pages/StoreWebsiteStudioPageV8")),
+  StoreWebsiteStudioPageV9 = lazy(() => import("./pages/StoreWebsiteStudioPageV9")),
+  StoreWebsiteStudioPageV10 = lazy(() => import("./pages/StoreWebsiteStudioPageV10")),
+  StoreWebsiteStudioPageV11 = lazy(() => import("./pages/StoreWebsiteStudioPageV11")),
+  StoreWebsiteStudioPageV12 = lazy(() => import("./pages/StoreWebsiteStudioPageV12")),
   StoreSetupWizardPage = lazy(() => import("./pages/StoreSetupWizardPage")),
   StoreQuickStartPage = lazy(() => import("./pages/StoreQuickStartPage")),
-  StoreAdminDashboardPage = lazy(
-    () => import("./pages/StoreAdminDashboardPage"),
-  ),
-  StoreCommerceManagerPage = lazy(
-    () => import("./pages/StoreCommerceManagerPage"),
-  ),
-  StoreCatalogOperationsPage = lazy(
-    () => import("./pages/StoreCatalogOperationsPage"),
-  ),
+  StoreAdminDashboardPage = lazy(() => import("./pages/StoreAdminDashboardPage")),
+  StoreCommerceManagerPage = lazy(() => import("./pages/StoreCommerceManagerPage")),
+  StoreCatalogOperationsPage = lazy(() => import("./pages/StoreCatalogOperationsPage")),
   StoreProductDetailPage = lazy(() => import("./pages/StoreProductDetailPage")),
   StorefrontTestPage = lazy(() => import("./pages/StorefrontTestPage")),
   PublicStorefrontPage = lazy(() => import("./pages/PublicStorefrontPage")),
@@ -96,9 +55,7 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   PublicCartPage = lazy(() => import("./pages/PublicCartPage")),
   PublicCheckoutPage = lazy(() => import("./pages/PublicCheckoutPage")),
   PublicOrderSuccessPage = lazy(() => import("./pages/PublicOrderSuccessPage")),
-  SiteOperationsDashboardPage = lazy(
-    () => import("./pages/SiteOperationsDashboardPage"),
-  );
+  SiteOperationsDashboardPage = lazy(() => import("./pages/SiteOperationsDashboardPage"));
 export default function App() {
   return (
     <BrowserRouter>
@@ -131,6 +88,7 @@ export default function App() {
               <Route path="/dashboard/automation" element={<AutomationPage />} />
               <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
               <Route path="/dashboard/business-builder" element={<BusinessBuilderPage />} />
+              <Route path="/dashboard/business-builder/apps/:projectId" element={<GeneratedBusinessAppPage />} />
               <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/websites/quick-start" element={<StoreQuickStartPage />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
