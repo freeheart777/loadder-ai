@@ -13,12 +13,17 @@ export function createSiteMediaRouter({ service }) {
     return res.status(500).json({ success: false, message: "Unable to process site media." });
   };
 
-  router.put("/site-media-local/upload/:token", express.raw({ type: () => true, limit: "25mb" }), async (req, res) => {
+  const acceptUpload = async (req, res) => {
     try {
       const uploaded = await service.acceptLocalUpload(req.params.token, req.body);
       return res.status(201).json({ success: true, uploaded });
     } catch (error) { return handle(error, res); }
-  });
+  };
+
+  // Canonical same-origin upload endpoint. The legacy local route remains as a
+  // compatibility alias while clients migrate; both execute the exact same path.
+  router.put("/site-media-upload/:token", express.raw({ type: () => true, limit: "25mb" }), acceptUpload);
+  router.put("/site-media-local/upload/:token", express.raw({ type: () => true, limit: "25mb" }), acceptUpload);
 
   router.get("/site-media-local/object/:key", async (req, res) => {
     try {
