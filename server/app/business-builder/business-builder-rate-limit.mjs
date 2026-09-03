@@ -13,6 +13,7 @@ export function createBusinessBuilderRateLimiter(kind="write",overrides={}){
     limit:overrides.limit??base.limit,
     standardHeaders:"draft-8",
     legacyHeaders:false,
+    ...(overrides.store?{store:overrides.store}:{}),
     keyGenerator:req=>`${req.user?.id||req.ip||"anonymous"}:${req.headers["x-workspace-id"]||"no-workspace"}:${kind}`,
     handler:(req,res)=>res.status(429).json({success:false,code:"RATE_LIMITED",message:"Too many requests. Please retry shortly."})
   });
