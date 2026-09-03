@@ -1,5 +1,9 @@
 import express from "express";
+import { db } from "../../db/workspace-database.mjs";
 import { loadderBusinessBuilderService } from "../business-builder/business-builder-service.mjs";
+import { createContractPreviewAdapter } from "../business-builder/contract-preview-adapter.mjs";
+import { createBusinessBuilderProjectService } from "../business-builder/project-service.mjs";
+import { createBusinessBuilderRepository } from "../repositories/business-builder-repository.mjs";
 
 export function createBusinessBuilderRouter({ service = loadderBusinessBuilderService, projects = null, previewAdapter = null } = {}) {
   const router = express.Router();
@@ -64,4 +68,7 @@ export function createBusinessBuilderRouter({ service = loadderBusinessBuilderSe
   return router;
 }
 
-export default createBusinessBuilderRouter();
+const defaultPreviewAdapter = createContractPreviewAdapter();
+const defaultRepository = createBusinessBuilderRepository(db);
+const defaultProjectService = createBusinessBuilderProjectService({ repository: defaultRepository, builder: loadderBusinessBuilderService, previewAdapter: defaultPreviewAdapter });
+export default createBusinessBuilderRouter({ projects: defaultProjectService, previewAdapter: defaultPreviewAdapter });
