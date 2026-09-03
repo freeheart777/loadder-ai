@@ -2,11 +2,14 @@ import express from "express";
 import { LoadderDataRuntime } from "./data-adapter.mjs";
 import { LoadderSqliteDataAdapter } from "./sqlite-data-adapter.mjs";
 import { LoadderWorkflowRuntime } from "./workflow-runtime.mjs";
+import { LoadderRuntimeCopilot } from "./runtime-copilot.mjs";
 
 export function createBusinessAppRuntimeRouter({ db, projects }) {
   const router = express.Router();
-  const dataRuntime = new LoadderDataRuntime({ adapter: new LoadderSqliteDataAdapter(db) });
+  const adapter = new LoadderSqliteDataAdapter(db);
+  const dataRuntime = new LoadderDataRuntime({ adapter });
   const workflowRuntime = new LoadderWorkflowRuntime();
+  const copilot = new LoadderRuntimeCopilot({ dataAdapter: adapter });
 
   function activeVersion(projectId){
     const project=projects.getProject(projectId);
@@ -19,7 +22,10 @@ export function createBusinessAppRuntimeRouter({ db, projects }) {
       const version=activeVersion(req.params.id);
       if(!version) return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});
       const result=await dataRuntime.execute({definition:version.definition,action,entityId:req.params.entityId,recordId:req.params.recordId||null,payload:req.body||{},query:req.query||{}});
-      if(action==="list")return res.json({success:true,records:result,result});
+      if(action==="list"){
+        const total=await adapter.count({appId:version.definition.id,entityId:req.params.entityId,query:req.query||{}});
+        return res.json({success:true,records:result,total,result});
+      }
       if(action==="create")return res.status(201).json({success:true,record:result,result});
       return res.json({success:true,record:action==="delete"?undefined:result,result});
     }catch(error){return res.status(400).json({success:false,code:error?.code||"RUNTIME_DATA_FAILED",message:error?.message});}
@@ -38,6 +44,22 @@ export function createBusinessAppRuntimeRouter({ db, projects }) {
       const result=await workflowRuntime.execute({definition:version.definition,workflowId:req.params.workflowId,input:req.body||{},context:{projectId:req.params.id,userId:req.user?.id||null}});
       return res.status(201).json({success:true,result});
     }catch(error){return res.status(400).json({success:false,code:error?.code||"WORKFLOW_RUN_FAILED",message:error?.message});}
+  });
+
+  router.post("/business-builder/projects/:id/copilot",async(req,res)=>{
+    try{
+      const version=activeVersion(req.params.id);
+      if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});
+      const result=await copilot.summarize({definition:version.definition,projectId:req.params.id,message:req.body?.message||"",context:{userId:req.user?.id||null}});
+      return res.json({success:true,result});
+    }catch(error){return res.status(400).json({success:false,code:error?.code||"COPILOT_FAILED",message:error?.message});}
+  });
+
+  router.get("/business-builder/projects/:id/deployment-readiness",(req,res)=>{
+    const version=activeVersion(req.params.id);
+    if(!version)return res.status(404).json({success:false,code:"ACTIVE_VERSION_NOT_FOUND"});
+    const approved=projects.canDeployProduction(req.params.id);
+    return res.json({success:true,readiness:{versionId:version.id,approved,providerConfigured:false,canaryPercent:5,healthCheckRequired:true,rollbackSupported:true,status:approved?"adapter-required":"approval-required"}});
   });
   return router;
 }
