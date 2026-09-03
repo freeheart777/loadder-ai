@@ -1,104 +1,47 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle, Cube, Database, Lightning, Sparkle, SquaresFour } from "@phosphor-icons/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, CheckCircle, Cube, Database, FloppyDisk, Lightning, Play, Sparkle, SquaresFour } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiUrl } from "../lib/api";
 
-type Preview = {
-  buildId: string;
-  definition: { id: string; name: string; vertical: string; entities: Array<{ id: string; name: string }>; workflows: Array<{ id: string; name: string }> };
-  ui: { direction: "rtl" | "ltr"; navigation: Array<{ id: string; label: string; route: string }>; views: Array<{ id: string; type: string; title: string; route: string; blocks: Array<{ type: string }> }> };
-  sourceBundle: { metrics: { fileCount: number; byteSize: number }; portable: boolean };
-  gates: Array<{ id: string; status: string }>;
-  productionDeploymentAllowed: boolean;
-};
+type Preview = { buildId:string; definition:{id:string;name:string;vertical:string;entities:Array<{id:string;name:string}>;workflows:Array<{id:string;name:string}>}; ui:{direction:"rtl"|"ltr";navigation:Array<{id:string;label:string;route:string}>;views:Array<{id:string;type:string;title:string;route:string;blocks:Array<{type:string}>}>}; sourceBundle:{metrics:{fileCount:number;byteSize:number};portable:boolean}; gates:Array<{id:string;status:string}>; productionDeploymentAllowed:boolean };
+type Version = { id:string; versionNumber:number; buildPlan:Preview; createdAt:string };
+type Project = { id:string; name:string; intent:string; locale:string; activeVersionId:string|null; updatedAt:string; versions?:Version[] };
 
-const examples = [
-  "برای شرکت پخش مواد غذایی یک CRM فروش، مدیریت انبار، سفارش و گزارش مدیریتی بساز.",
-  "برای کلینیک من سیستم رزرو، مشتریان، پرونده خدمات و داشبورد مدیریت بساز.",
-  "برای آژانس تبلیغاتی CRM مشتری، پروژه، کمپین، تایید محتوا و گزارش بساز.",
-];
+const examples=["برای شرکت پخش مواد غذایی یک CRM فروش، مدیریت انبار، سفارش و گزارش مدیریتی بساز.","برای کلینیک من سیستم رزرو، مشتریان، پرونده خدمات و داشبورد مدیریت بساز.","برای آژانس تبلیغاتی CRM مشتری، پروژه، کمپین، تایید محتوا و گزارش بساز."];
 
-export default function BusinessBuilderPage() {
-  const [intent, setIntent] = useState(examples[0]);
-  const [name, setName] = useState("");
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+export default function BusinessBuilderPage(){
+  const [intent,setIntent]=useState(examples[0]),[name,setName]=useState(""),[preview,setPreview]=useState<Preview|null>(null),[projects,setProjects]=useState<Project[]>([]),[activeProject,setActiveProject]=useState<Project|null>(null),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState(""),[previewUrl,setPreviewUrl]=useState("");
+  const hydrated=useRef(false);
+  const passedGates=useMemo(()=>preview?.gates.filter(g=>g.status==="passed").length||0,[preview]);
 
-  const passedGates = useMemo(() => preview?.gates.filter((gate) => gate.status === "passed").length || 0, [preview]);
+  async function loadProjects(){ const r=await apiFetch("/api/business-builder/projects"); const b=await r.json(); if(r.ok&&b.success)setProjects(b.projects||[]); }
+  useEffect(()=>{loadProjects().catch(()=>{});},[]);
 
-  async function buildPreview() {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await apiFetch("/api/business-builder/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intent, name: name || undefined, locale: "fa-IR" }),
-      });
-      const body = await response.json();
-      if (!response.ok || !body.success) throw new Error(body.message || "ساخت پیش‌نمایش ناموفق بود.");
-      setPreview(body.preview);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "ساخت پیش‌نمایش ناموفق بود.");
-    } finally {
-      setLoading(false);
-    }
+  async function openProject(id:string){
+    setLoading(true); setError("");
+    try{const r=await apiFetch(`/api/business-builder/projects/${id}`);const b=await r.json();if(!r.ok||!b.success)throw new Error("پروژه پیدا نشد.");const p=b.project as Project;setActiveProject(p);setName(p.name);setIntent(p.intent);const v=p.versions?.find(x=>x.id===p.activeVersionId)||p.versions?.[0];setPreview(v?.buildPlan||null);setPreviewUrl("");setTimeout(()=>{hydrated.current=true;},0);}catch(e){setError(e instanceof Error?e.message:"خطا");}finally{setLoading(false);}
   }
 
-  return (
-    <main dir="rtl" className="min-h-screen bg-[#08090b] text-white">
-      <div className="mx-auto max-w-[1500px] px-5 py-6 lg:px-10">
-        <header className="mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs text-white/45"><Sparkle size={14} /> LOADDER BUSINESS BUILDER / ALPHA</div>
-            <h1 className="text-2xl font-semibold tracking-tight lg:text-4xl">کسب‌وکارت را توضیح بده؛ لودر سیستمش را معماری می‌کند.</h1>
-          </div>
-          <Link to="/dashboard" className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/5"><ArrowLeft size={16} /> بازگشت</Link>
-        </header>
+  async function createProject(){
+    setLoading(true);setError("");hydrated.current=false;
+    try{const r=await apiFetch("/api/business-builder/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({intent,name:name||undefined,locale:"fa-IR"})});const b=await r.json();if(!r.ok||!b.success)throw new Error(b.message||"ساخت پروژه ناموفق بود.");setActiveProject({...b.project,versions:[b.version]});setName(b.project.name);setPreview(b.version.buildPlan);setPreviewUrl("");await loadProjects();setTimeout(()=>{hydrated.current=true;},0);}catch(e){setError(e instanceof Error?e.message:"ساخت پروژه ناموفق بود.");}finally{setLoading(false);}
+  }
 
-        <section className="grid gap-5 xl:grid-cols-[420px_1fr]">
-          <aside className="rounded-3xl border border-white/10 bg-white/[0.035] p-5">
-            <label className="mb-2 block text-sm text-white/65">نام اپلیکیشن — اختیاری</label>
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="مثلاً مرکز عملیات فروش" className="mb-5 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-white/25" />
-            <label className="mb-2 block text-sm text-white/65">کسب‌وکارت و چیزی که لازم داری</label>
-            <textarea value={intent} onChange={(event) => setIntent(event.target.value)} rows={9} className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-4 py-3 leading-7 outline-none focus:border-white/25" />
-            <div className="mt-4 space-y-2">
-              {examples.map((example, index) => <button key={example} onClick={() => setIntent(example)} className="w-full rounded-xl border border-white/10 px-3 py-2 text-right text-xs leading-5 text-white/55 hover:bg-white/5">نمونه {index + 1}: {example}</button>)}
-            </div>
-            <button disabled={loading || !intent.trim()} onClick={buildPreview} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 font-semibold text-black disabled:opacity-40"><Lightning size={18} weight="fill" />{loading ? "در حال معماری..." : "ساخت پیش‌نمایش"}</button>
-            {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
-          </aside>
+  useEffect(()=>{
+    if(!activeProject||!hydrated.current)return;
+    const timer=setTimeout(async()=>{setSaving(true);try{const r=await apiFetch(`/api/business-builder/projects/${activeProject.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({intent,name:name||undefined,locale:"fa-IR"})});const b=await r.json();if(r.ok&&b.success){setActiveProject({...b.project,versions:[b.version,...(activeProject.versions||[])]});setPreview(b.version.buildPlan);await loadProjects();}}finally{setSaving(false);}},1200);
+    return()=>clearTimeout(timer);
+  },[intent,name,activeProject?.id]);
 
-          <div className="min-h-[680px] rounded-3xl border border-white/10 bg-[#0d0f12] p-5 lg:p-7">
-            {!preview ? (
-              <div className="flex h-full min-h-[600px] flex-col items-center justify-center text-center text-white/35"><Cube size={52} /><p className="mt-4 max-w-md leading-7">لودر ابتدا مدل کسب‌وکار، داده‌ها، صفحات، نقش‌ها و Workflow را می‌سازد؛ بعد از تایید، وارد Runtime و Preview اجرایی می‌شود.</p></div>
-            ) : (
-              <div dir={preview.ui.direction}>
-                <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-                  <div><p className="text-xs text-white/35">{preview.definition.vertical} · {preview.buildId}</p><h2 className="mt-1 text-3xl font-semibold">{preview.definition.name}</h2></div>
-                  <div className="flex gap-2"><span className="rounded-full border border-white/10 px-3 py-1 text-xs">{preview.definition.entities.length} موجودیت</span><span className="rounded-full border border-white/10 px-3 py-1 text-xs">{passedGates} Gate پاس‌شده</span></div>
-                </div>
+  async function runPreview(){if(!activeProject)return;const r=await apiFetch(`/api/business-builder/projects/${activeProject.id}/preview-sessions`,{method:"POST"});const b=await r.json();if(!r.ok||!b.success){setError(b.message||"اجرای Preview ناموفق بود.");return;}setPreviewUrl(apiUrl(b.session.previewUrl));}
+  async function approve(stage:"preview"|"production",decision:"approved"|"rejected"){if(!activeProject?.activeVersionId)return;const r=await apiFetch(`/api/business-builder/projects/${activeProject.id}/approvals`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({versionId:activeProject.activeVersionId,stage,decision})});const b=await r.json();if(!r.ok)setError(b.message||"ثبت تایید ناموفق بود.");}
+  async function restore(versionId:string){if(!activeProject)return;const r=await apiFetch(`/api/business-builder/projects/${activeProject.id}/versions/${versionId}/restore`,{method:"POST"});const b=await r.json();if(r.ok&&b.success)await openProject(activeProject.id);}
 
-                <div className="mb-5 grid gap-3 md:grid-cols-4">
-                  {[{ icon: Database, label: "مدل داده", value: preview.definition.entities.length }, { icon: SquaresFour, label: "صفحات", value: preview.ui.views.length }, { icon: Lightning, label: "Workflow", value: preview.definition.workflows.length }, { icon: Cube, label: "Bundle", value: `${preview.sourceBundle.metrics.fileCount} فایل` }].map(({ icon: Icon, label, value }) => <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><Icon size={20} className="mb-5 text-white/50" /><div className="text-2xl font-semibold">{value}</div><div className="mt-1 text-xs text-white/40">{label}</div></div>)}
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-                  <nav className="rounded-2xl border border-white/10 p-3"><p className="px-2 py-2 text-xs text-white/35">Navigation</p>{preview.ui.navigation.slice(0, 12).map((item) => <div key={item.id} className="rounded-lg px-3 py-2 text-sm text-white/65 first:bg-white/8">{item.label}</div>)}</nav>
-                  <div className="rounded-2xl border border-white/10 p-5">
-                    <div className="mb-5 flex items-center justify-between"><div><p className="text-xs text-white/35">Generated dashboard</p><h3 className="mt-1 text-xl font-medium">داشبورد مدیریتی</h3></div><Sparkle size={22} /></div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{preview.definition.entities.slice(0, 4).map((entity) => <div key={entity.id} className="rounded-xl bg-white/[0.045] p-4"><p className="text-xs text-white/40">{entity.name}</p><p className="mt-4 text-2xl font-semibold">—</p><p className="mt-1 text-[11px] text-white/25">پس از اتصال داده</p></div>)}</div>
-                    <div className="mt-4 rounded-xl border border-dashed border-white/10 p-6 text-sm leading-7 text-white/40">این Preview از قرارداد <code>loadder.ui.v1</code> ساخته شده است؛ هنوز Production Deploy عمداً غیرفعال است.</div>
-                  </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">{preview.gates.map((gate) => <span key={gate.id} className="flex items-center gap-1 rounded-full border border-white/10 px-3 py-1 text-[11px] text-white/50"><CheckCircle size={13} />{gate.id}: {gate.status}</span>)}</div>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-    </main>
-  );
+  return <main dir="rtl" className="min-h-screen bg-[#08090b] text-white"><div className="mx-auto max-w-[1600px] px-5 py-6 lg:px-10">
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5"><div><div className="mb-2 flex items-center gap-2 text-xs text-white/45"><Sparkle size={14}/> LOADDER BUSINESS BUILDER / OWNED ALPHA</div><h1 className="text-2xl font-semibold lg:text-4xl">کسب‌وکارت را توضیح بده؛ لودر سیستمش را می‌سازد.</h1></div><div className="flex items-center gap-3"><span className="text-xs text-white/35">{saving?"در حال ذخیره نسخه...":activeProject?"ذخیره خودکار فعال":"پروژه جدید"}</span><Link to="/dashboard" className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white/70"><ArrowLeft size={16}/>بازگشت</Link></div></header>
+    <section className="grid gap-5 2xl:grid-cols-[250px_390px_1fr]">
+      <aside className="rounded-3xl border border-white/10 bg-white/[0.025] p-4"><div className="mb-3 flex items-center justify-between"><p className="text-xs text-white/45">پروژه‌ها</p><button onClick={()=>{hydrated.current=false;setActiveProject(null);setPreview(null);setName("");setIntent(examples[0]);setPreviewUrl("");}} className="text-xs text-white/50">+ جدید</button></div><div className="space-y-2">{projects.map(p=><button key={p.id} onClick={()=>openProject(p.id)} className={`w-full rounded-xl border p-3 text-right ${activeProject?.id===p.id?"border-white/25 bg-white/10":"border-white/8 bg-white/[0.02]"}`}><strong className="block text-sm">{p.name}</strong><span className="mt-1 block truncate text-[11px] text-white/35">{p.intent}</span></button>)}</div>{activeProject?.versions?.length?<div className="mt-6"><p className="mb-2 text-xs text-white/40">تاریخچه نسخه‌ها</p>{activeProject.versions.slice(0,8).map(v=><button key={v.id} onClick={()=>restore(v.id)} className="mb-1 flex w-full justify-between rounded-lg px-2 py-2 text-xs text-white/50 hover:bg-white/5"><span>نسخه {v.versionNumber}</span><span>بازگردانی</span></button>)}</div>:null}</aside>
+      <aside className="rounded-3xl border border-white/10 bg-white/[0.035] p-5"><label className="mb-2 block text-sm text-white/65">نام اپلیکیشن</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="مثلاً مرکز عملیات فروش" className="mb-5 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none"/><label className="mb-2 block text-sm text-white/65">کسب‌وکار و نیازت</label><textarea value={intent} onChange={e=>setIntent(e.target.value)} rows={9} className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-4 py-3 leading-7 outline-none"/><div className="mt-4 space-y-2">{examples.map((x,i)=><button key={x} onClick={()=>setIntent(x)} className="w-full rounded-xl border border-white/10 px-3 py-2 text-right text-xs leading-5 text-white/55">نمونه {i+1}: {x}</button>)}</div>{!activeProject?<button disabled={loading||!intent.trim()} onClick={createProject} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 font-semibold text-black disabled:opacity-40"><Lightning size={18} weight="fill"/>{loading?"در حال ساخت...":"ساخت و ذخیره پروژه"}</button>:<div className="mt-5 grid grid-cols-2 gap-2"><button onClick={runPreview} className="flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-3 font-semibold text-black"><Play size={17}/>اجرای Preview</button><div className="flex items-center justify-center gap-2 rounded-xl border border-white/10 text-xs text-white/45"><FloppyDisk size={15}/>{saving?"ذخیره...":"Auto-save"}</div></div>}{error&&<p className="mt-3 text-sm text-red-300">{error}</p>}</aside>
+      <div className="min-h-[720px] rounded-3xl border border-white/10 bg-[#0d0f12] p-5 lg:p-7">{previewUrl?<div className="h-full"><div className="mb-3 flex items-center justify-between"><span className="text-xs text-white/40">Executable Loadder Preview</span><button onClick={()=>setPreviewUrl("")} className="text-xs text-white/50">بستن</button></div><iframe title="Loadder generated app preview" src={previewUrl} sandbox="allow-same-origin" className="h-[680px] w-full rounded-2xl border border-white/10 bg-white"/></div>:!preview?<div className="flex h-full min-h-[600px] flex-col items-center justify-center text-center text-white/35"><Cube size={52}/><p className="mt-4 max-w-md leading-7">یک پروژه بساز یا از تاریخچه باز کن. هر تغییر به نسخه جدید تبدیل می‌شود.</p></div>:<div dir={preview.ui.direction}><div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs text-white/35">{preview.definition.vertical} · {preview.buildId}</p><h2 className="mt-1 text-3xl font-semibold">{preview.definition.name}</h2></div><div className="flex gap-2"><button onClick={()=>approve("preview","approved")} className="rounded-full border border-white/15 px-3 py-1 text-xs">تایید Preview</button><button onClick={()=>approve("production","approved")} className="rounded-full border border-amber-400/30 px-3 py-1 text-xs text-amber-200">درخواست تایید Production</button></div></div><div className="mb-5 grid gap-3 md:grid-cols-4">{[{icon:Database,label:"مدل داده",value:preview.definition.entities.length},{icon:SquaresFour,label:"صفحات",value:preview.ui.views.length},{icon:Lightning,label:"Workflow",value:preview.definition.workflows.length},{icon:Cube,label:"Bundle",value:`${preview.sourceBundle.metrics.fileCount} فایل`}].map(({icon:Icon,label,value})=><div key={label} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><Icon size={20} className="mb-5 text-white/50"/><div className="text-2xl font-semibold">{value}</div><div className="mt-1 text-xs text-white/40">{label}</div></div>)}</div><div className="grid gap-4 lg:grid-cols-[220px_1fr]"><nav className="rounded-2xl border border-white/10 p-3">{preview.ui.navigation.slice(0,12).map(i=><div key={i.id} className="rounded-lg px-3 py-2 text-sm text-white/65">{i.label}</div>)}</nav><div className="rounded-2xl border border-white/10 p-5"><h3 className="mb-5 text-xl font-medium">داشبورد تولیدشده</h3><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{preview.definition.entities.slice(0,4).map(e=><div key={e.id} className="rounded-xl bg-white/[0.045] p-4"><p className="text-xs text-white/40">{e.name}</p><p className="mt-4 text-2xl">—</p></div>)}</div></div></div><div className="mt-5 flex flex-wrap gap-2">{preview.gates.map(g=><span key={g.id} className="flex items-center gap-1 rounded-full border border-white/10 px-3 py-1 text-[11px] text-white/50"><CheckCircle size={13}/>{g.id}: {g.status}</span>)}</div><p className="mt-4 text-xs text-white/30">{passedGates} gate پاس شده؛ Production همچنان بدون approval صریح قفل است.</p></div>}</div>
+    </section></div></main>;
 }
