@@ -1,55 +1,17 @@
 import { loadderBusinessBuilderService } from "./business-builder-service.mjs";
-import { exportLoadderApplication } from "./portability.mjs";
+import { exportLoadderApplication, importLoadderApplication } from "./portability.mjs";
 
 export function createBusinessBuilderProjectService({ repository, builder = loadderBusinessBuilderService, previewAdapter }) {
   if (!repository) throw new TypeError("repository is required");
-
-  function listProjects() { return repository.listProjects(); }
-  function getProject(id) {
-    const project = repository.getProject(id);
-    if (!project) return null;
-    return { ...project, versions: repository.listVersions(id) };
-  }
-  function createProject(input, actorId = null) {
-    const plan = builder.preview(input);
-    const project = repository.createProject({ name: plan.definition.name, intent: input.intent, locale: input.locale || "fa-IR" });
-    const version = repository.createVersion(project.id, { definition: plan.definition, ui: plan.ui, bundle: plan.sourceBundle, buildPlan: plan, createdBy: actorId });
-    return { project: repository.getProject(project.id), version };
-  }
-  function saveProject(id, input, actorId = null) {
-    const current = repository.getProject(id); if (!current) return null;
-    const nextInput = { intent: input.intent ?? current.intent, name: input.name ?? current.name, locale: input.locale ?? current.locale };
-    const plan = builder.preview(nextInput);
-    repository.updateProject(id, nextInput);
-    const version = repository.createVersion(id, { definition: plan.definition, ui: plan.ui, bundle: plan.sourceBundle, buildPlan: plan, createdBy: actorId });
-    return { project: repository.getProject(id), version };
-  }
-  function restoreVersion(projectId, versionId, actorId = null) {
-    const version = repository.getVersion(versionId); if (!version || version.projectId !== projectId) return null;
-    const project = repository.getProject(projectId); if (!project) return null;
-    const restored = repository.createVersion(projectId, { ...version, createdBy: actorId });
-    return { project: repository.getProject(projectId), version: restored, restoredFrom: versionId };
-  }
-  async function startPreview(projectId) {
-    const version = repository.getActiveVersion(projectId); if (!version) return null;
-    const approval = repository.latestApproval(projectId, version.id, "preview");
-    if (approval?.decision === "rejected") { const error = new Error("Preview rejected by approval gate."); error.code = "PREVIEW_REJECTED"; throw error; }
-    const execution = previewAdapter ? await previewAdapter.start({ projectId, version }) : { adapter: "loadder-contract-preview", url: `/dashboard/business-builder?project=${projectId}&version=${version.id}` };
-    const session = repository.createPreviewSession({ projectId, versionId: version.id, runtimeAdapter: execution.adapter, previewUrl: execution.url });
-    return { session, version };
-  }
-  function decide({ projectId, versionId, stage, decision, actorId = null, note = null }) {
-    return repository.recordApproval({ projectId, versionId, stage, decision, decidedBy: actorId, note });
-  }
-  function canDeployProduction(projectId) {
-    const version = repository.getActiveVersion(projectId); if (!version) return false;
-    return repository.latestApproval(projectId, version.id, "production")?.decision === "approved";
-  }
-  function exportProject(projectId) {
-    const project = repository.getProject(projectId); if (!project) return null;
-    const version = repository.getActiveVersion(projectId); if (!version) return null;
-    return exportLoadderApplication({ project, version });
-  }
-
-  return { listProjects, getProject, createProject, saveProject, restoreVersion, startPreview, decide, canDeployProduction, exportProject };
+  function listProjects(){return repository.listProjects();}
+  function getProject(id){const p=repository.getProject(id);return p?{...p,versions:repository.listVersions(id)}:null;}
+  function createProject(input,actorId=null){const plan=builder.preview(input);const p=repository.createProject({name:plan.definition.name,intent:input.intent,locale:input.locale||"fa-IR"});const v=repository.createVersion(p.id,{definition:plan.definition,ui:plan.ui,bundle:plan.sourceBundle,buildPlan:plan,createdBy:actorId});return{project:repository.getProject(p.id),version:v};}
+  function saveProject(id,input,actorId=null){const current=repository.getProject(id);if(!current)return null;const next={intent:input.intent??current.intent,name:input.name??current.name,locale:input.locale??current.locale};const plan=builder.preview(next);repository.updateProject(id,next);const v=repository.createVersion(id,{definition:plan.definition,ui:plan.ui,bundle:plan.sourceBundle,buildPlan:plan,createdBy:actorId});return{project:repository.getProject(id),version:v};}
+  function restoreVersion(projectId,versionId,actorId=null){const version=repository.getVersion(versionId);if(!version||version.projectId!==projectId)return null;const p=repository.getProject(projectId);if(!p)return null;const restored=repository.createVersion(projectId,{...version,createdBy:actorId});return{project:repository.getProject(projectId),version:restored,restoredFrom:versionId};}
+  async function startPreview(projectId){const version=repository.getActiveVersion(projectId);if(!version)return null;const approval=repository.latestApproval(projectId,version.id,"preview");if(approval?.decision==="rejected"){const e=new Error("Preview rejected by approval gate.");e.code="PREVIEW_REJECTED";throw e;}const execution=previewAdapter?await previewAdapter.start({projectId,version}):{adapter:"loadder-contract-preview",url:`/dashboard/business-builder?project=${projectId}&version=${version.id}`};const session=repository.createPreviewSession({projectId,versionId:version.id,runtimeAdapter:execution.adapter,previewUrl:execution.url});return{session,version};}
+  function decide({projectId,versionId,stage,decision,actorId=null,note=null}){return repository.recordApproval({projectId,versionId,stage,decision,decidedBy:actorId,note});}
+  function canDeployProduction(projectId){const v=repository.getActiveVersion(projectId);return !!v&&repository.latestApproval(projectId,v.id,"production")?.decision==="approved";}
+  function exportProject(projectId){const p=repository.getProject(projectId),v=repository.getActiveVersion(projectId);return p&&v?exportLoadderApplication({project:p,version:v}):null;}
+  function importProject(payload,actorId=null){const imported=importLoadderApplication(payload);const p=repository.createProject(imported.project);const buildPlan={contract:"loadder.imported-build-plan.v1",definition:imported.version.definition,ui:imported.version.ui,sourceBundle:imported.version.bundle,imported:true};const v=repository.createVersion(p.id,{definition:imported.version.definition,ui:imported.version.ui,bundle:imported.version.bundle,buildPlan,createdBy:actorId});return{project:repository.getProject(p.id),version:v};}
+  return{listProjects,getProject,createProject,saveProject,restoreVersion,startPreview,decide,canDeployProduction,exportProject,importProject};
 }
