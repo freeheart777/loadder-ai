@@ -10,11 +10,13 @@ Loadder is an AI Business Operating System where **ENGINE BUILDS, AI GUIDES**.
 ## Permanent engineering law
 All work follows LES: Kaizen, Jidoka, Poka-Yoke, Genchi Genbutsu, Standard Work, Andon, Heijunka, waste elimination, Five Whys and quality-at-source.
 
-### Stop-the-line gate
-If required CI, security, tenant isolation, recovery, integrity or operational-completeness checks are red, feature expansion stops until root cause is understood and fixed.
+### Development/release gate model
+`FAST GATE -> DEVELOP -> FULL GATE -> RELEASE`
+
+Fast Gate gives targeted feedback on the Business Builder surface and is allowed to cancel stale runs on the same branch. Full Gate remains mandatory on the exact release SHA for merge/release/production. A queued Full Gate does not freeze unrelated reversible development, but no newer SHA inherits an older SHA's green evidence.
 
 ### Definition of Done
-No UI-only/mock-success capability is Done. A feature must prove its real UI/API/service/persistence-or-runtime path, define failure/retry behavior, add regression/integration coverage, and pass exact-head Server Tests + Frontend Build + Security Supply Chain.
+No UI-only/mock-success capability is Done. A feature must prove its real UI/API/service/persistence-or-runtime path, define failure/retry behavior, add regression/integration coverage, and pass the exact release SHA Full Gate before merge/release.
 
 ## Core doctrine — ENGINE BUILDS, AI GUIDES
 - Deterministic Loadder code/blueprints/contracts build supported applications.
@@ -59,11 +61,12 @@ No UI-only/mock-success capability is Done. A feature must prove its real UI/API
 - [x] LES permanent engineering law
 - [x] AI-offline commercial acceptance
 - [x] Low-cost production runbook
-- [x] Feature-branch exact-head Server/Frontend/Security gates
+- [x] Feature-branch exact-head Server/Frontend/Security Full Gates
+- [x] Business Builder targeted Fast Gate with stale-run cancellation
 - [x] Dated GitHub architecture/recovery snapshot
 
 ## Phase A — Quality hardening (ACTIVE)
-- [~] LES automated quality gate/checklist in CI; three core exact-head gates enforced on feat/**
+- [x] LES Fast Gate / Full Gate development model codified and automated for Business Builder
 - [x] Approval Center UI
 - [~] Action Ledger recommendation -> approval -> execution -> outcome; external executors pending
 - [~] Idempotency on mutating operator/executor paths
@@ -157,15 +160,6 @@ No default Kubernetes or per-tenant always-on container requirement.
 - Engineering constitution: `docs/LOADDER_ENGINEERING_SYSTEM.md`.
 - Dated immutable-style checkpoints: `docs/backups/LOADDER_BUSINESS_BUILDER_SNAPSHOT_*.md`.
 - Git snapshots are architecture/recovery memory, not substitutes for encrypted production database/object-storage backups.
-
-## Current seven-step hardening checkpoint — 2026-09-04
-1. Backup/Restore Drill added and exact-head CI triggered.
-2. GitHub dated memory/recovery snapshot created.
-3. Provider-neutral PostgreSQL Data Adapter added.
-4. PostgreSQL schema + SQLite portability mapping + tests added.
-5. Performance/cost budgets codified; deterministic build token budget = 0.
-6. Low-cost production profile codified with fail-closed safety blockers.
-7. Roadmap synchronized; exact-head gates must pass before broader runtime expansion.
 
 ## Documentation rule
 Material architecture/quality changes update this roadmap and, when appropriate, create a new dated snapshot. Historical snapshots are never overwritten.
