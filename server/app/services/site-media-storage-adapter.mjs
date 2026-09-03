@@ -47,7 +47,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
       bucket: remoteConfigured ? bucket : "local",
       path: storagePath,
       token,
-      signedUrl: `${localApiBaseUrl}/api/site-media-local/upload/${token}`,
+      signedUrl: `${localApiBaseUrl}/api/site-media-upload/${token}`,
       local: true,
       proxied: true,
     };
