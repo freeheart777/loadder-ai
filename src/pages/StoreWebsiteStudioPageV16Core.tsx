@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CaretLeft, CaretRight, CursorClick, ImageSquare, Plus, Tag, UploadSimple, X } from "@phosphor-icons/react";
+import { ArrowRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
 import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
+import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCanvas";
 import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
 import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, Selection, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { apiFetch } from "../lib/api";
 
 type Project = { id: string; name?: string; content: Record<string, any> };
-type MediaTarget = { kind: "hero" } | { kind: "banner"; sectionId: string } | { kind: "logo" };
 type ProductDraft = {
   name: string;
   basePriceMinor: string;
@@ -65,6 +65,23 @@ function normalizeManual(settings: ProductSettings, products: Product[]) {
   return { ...settings, source: "manual" as const, productIds: productsForSection(products, settings).slice(0, 12).map((p) => p.id) };
 }
 
+function applyMediaToConfig(current: StudioConfig, target: InlineMediaTarget, url: string): StudioConfig {
+  if (target.kind === "hero") return { ...current, hero: { ...current.hero, imageUrl: url } };
+  if (target.kind === "logo") return { ...current, header: { ...current.header, logoUrl: url } };
+  if (target.kind === "banner" && target.id) return { ...current, sections: current.sections.map((section) => section.id === target.id ? { ...section, imageUrl: url } : section) };
+  if (target.kind === "product" && target.id) return {
+    ...current,
+    commerce: {
+      ...current.commerce,
+      productOverrides: {
+        ...current.commerce.productOverrides,
+        [target.id]: { ...(current.commerce.productOverrides[target.id] || {}), imageUrl: url },
+      },
+    },
+  };
+  return current;
+}
+
 export default function StoreWebsiteStudioPageV16() {
   const [project, setProject] = useState<Project | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -79,7 +96,6 @@ export default function StoreWebsiteStudioPageV16() {
   const [createProductOpen, setCreateProductOpen] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
-  const [mediaTarget, setMediaTarget] = useState<MediaTarget | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
 
@@ -112,8 +128,6 @@ export default function StoreWebsiteStudioPageV16() {
       setConfig((cur) => ({ ...cur, selectedElement }));
       setTab("context");
       setInspectorOpen(true);
-      if (selectedElement.type === "hero") setMediaTarget({ kind: "hero" });
-      if (selectedElement.type === "banner" && selectedElement.id) setMediaTarget({ kind: "banner", sectionId: selectedElement.id });
     },
     patchDesign: (p) => setConfig((c) => ({ ...c, design: { ...c.design, ...p } })),
     patchHeader: (p) => setConfig((c) => ({ ...c, header: { ...c.header, ...p } })),
@@ -237,8 +251,8 @@ export default function StoreWebsiteStudioPageV16() {
       return { ...c, sections, selectedElement: { type: type === "banner" ? "banner" : type === "trust" ? "trust" : "section", id: section.id } };
     });
     setTab("context");
-    if (type === "banner") setMediaTarget({ kind: "banner", sectionId: section.id });
     if (type === "products") setMessage("بخش محصولات اضافه شد؛ از + داخل آن محصول انتخاب کنید.");
+    if (type === "banner") setMessage("بنر اضافه شد؛ از + روی خود تصویر بنر عکس را انتخاب کنید.");
   }
 
   function addSection(type: SectionConfig["type"]) { insertSection(config.sections.length, type); }
@@ -270,28 +284,49 @@ export default function StoreWebsiteStudioPageV16() {
     setConfig((c) => ({ ...c, sections: [...c.sections, section], selectedElement: { type: "section", id: section.id } }));
   }
 
-  function applyMedia(url: string) {
-    if (!mediaTarget) return;
-    if (mediaTarget.kind === "hero") actions.patchHero({ imageUrl: url });
-    if (mediaTarget.kind === "logo") actions.patchHeader({ logoUrl: url });
-    if (mediaTarget.kind === "banner") actions.patchSection(mediaTarget.sectionId, { imageUrl: url });
-    setMediaTarget(null);
-    setMessage("تصویر اعمال شد.");
+  async function persistConfig(nextConfig: StudioConfig) {
+    if (!project) throw new Error("پروژه فروشگاه آماده نیست.");
+    const storeBuilderV16: StudioConfig = { ...nextConfig, version: 16 };
+    const content = { ...project.content, storeBuilderV16 };
+    const out = await read(await apiFetch(`/api/site-projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) }));
+    setProject(out.project);
   }
 
-  async function uploadMedia(file: File) {
-    if (!project || !mediaTarget) return;
-    const mimeType = file.type || "image/jpeg", assetType = mediaTarget.kind === "logo" ? "logo" : mediaTarget.kind === "hero" ? "hero" : "banner";
+  async function uploadMedia(target: InlineMediaTarget, file: File) {
+    if (!project || mediaBusy) {
+      if (!project) setMessage("پروژه فروشگاه آماده نیست؛ آپلود متوقف شد.");
+      return;
+    }
+    if ((target.kind === "banner" || target.kind === "product") && !target.id) {
+      setMessage("هدف تصویر مشخص نیست؛ آپلود متوقف شد.");
+      return;
+    }
+    const mimeType = file.type || "image/jpeg";
+    const assetType = target.kind;
     setMediaBusy(true);
+    setMessage("در حال آپلود و اعمال تصویر…");
     try {
-      const created = await read(await apiFetch(`/api/site-projects/${project.id}/media/upload-url`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assetType, fileName: file.name, mimeType, sizeBytes: file.size }) }));
+      const created = await read(await apiFetch(`/api/site-projects/${project.id}/media/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetType, fileName: file.name, mimeType, sizeBytes: file.size }),
+      }));
       const upload = created.upload;
-      const uploaded = await fetch(upload.signedUrl, { method: "PUT", headers: { "Content-Type": mimeType }, body: file });
-      if (!uploaded.ok) throw new Error("آپلود فایل ناموفق بود");
-      const completed = await read(await apiFetch(`/api/site-projects/${project.id}/media/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assetType, mimeType, sizeBytes: file.size, storageKey: upload.path, metadata: { name: file.name } }) }));
+      if (!upload?.signedUrl || !upload?.path) throw new Error("آدرس آپلود معتبر دریافت نشد.");
+      const uploaded = await fetch(upload.signedUrl, { method: "PUT", headers: { "Content-Type": mimeType }, body: file, credentials: upload.signedUrl.startsWith("/") ? "include" : "omit" });
+      if (!uploaded.ok) throw new Error(`آپلود فایل ناموفق بود (HTTP ${uploaded.status})`);
+      const completed = await read(await apiFetch(`/api/site-projects/${project.id}/media/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetType, mimeType, sizeBytes: file.size, storageKey: upload.path, metadata: { name: file.name, target } }),
+      }));
       const asset = { ...completed.media, name: completed.media?.name || file.name } as MediaAsset;
-      setAssets((c) => [asset, ...c.filter((a) => a.id !== asset.id)]);
-      applyMedia(asset.url);
+      if (!asset?.url) throw new Error("فایل ذخیره شد اما URL تصویر دریافت نشد.");
+      const nextConfig = applyMediaToConfig(config, target, asset.url);
+      setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)]);
+      setConfig(nextConfig);
+      await persistConfig(nextConfig);
+      setMessage("تصویر آپلود، اعمال و ذخیره شد.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "آپلود ناموفق بود");
     } finally {
@@ -303,10 +338,7 @@ export default function StoreWebsiteStudioPageV16() {
     if (!project) return;
     setBusy(true);
     try {
-      const storeBuilderV16: StudioConfig = { ...config, version: 16 };
-      const content = { ...project.content, storeBuilderV16 };
-      const out = await read(await apiFetch(`/api/site-projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) }));
-      setProject(out.project);
+      await persistConfig(config);
       setMessage("طراحی ذخیره شد.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "ذخیره ناموفق بود");
@@ -322,19 +354,18 @@ export default function StoreWebsiteStudioPageV16() {
   return <main dir="rtl" className="h-screen overflow-hidden bg-[#070b12] text-white" data-studio-version="16">
     <header className="flex min-h-20 items-center gap-3 border-b border-white/10 bg-[#0a111b] px-4 py-3">
       <Link to="/dashboard" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10"><ArrowRight /></Link>
-      <div className="min-w-56"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</div><h1 className="font-black">فروشگاه شما</h1><p className="mt-1 flex items-center gap-1 text-[10px] text-white/35"><CursorClick /> روی خود سایت کلیک کنید</p></div>
-      <StudioToolbar device={device} page={config.activePage} busy={busy || !project} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} />
+      <div className="min-w-56"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</div><h1 className="font-black">فروشگاه شما</h1><p className="mt-1 flex items-center gap-1 text-[10px] text-white/35"><CursorClick /> تصویر را از + روی خود تصویر تغییر دهید</p></div>
+      <StudioToolbar device={device} page={config.activePage} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
       <section className="order-2 min-h-0 overflow-auto bg-[#dfe5ec] p-3 lg:order-1 lg:p-5">
         <div className="sticky top-2 z-40 mx-auto mb-3 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-white/15 bg-[#111827]/92 p-1.5 shadow-xl backdrop-blur">
-          <button onClick={() => setMediaTarget({ kind: "hero" })} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><ImageSquare size={16} /> عکس اصلی</button>
+          <span className="px-3 py-2 text-[10px] font-bold text-emerald-200">عکس‌ها: + روی خود تصویر</span>
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> بنر</button>
           <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
-          <button onClick={() => setMediaTarget({ kind: "logo" })} className="rounded-xl px-3 py-2 text-[11px] font-bold text-emerald-200 hover:bg-emerald-400/10"><UploadSimple size={16} /> لوگو</button>
         </div>
-        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={config} products={products} device={device} selected={config.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} />}
+        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={config} products={products} device={device} selected={config.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
       <aside className={`order-1 min-h-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
@@ -395,8 +426,6 @@ export default function StoreWebsiteStudioPageV16() {
         </form>}
       </div>
     </div>}
-
-    {mediaTarget && <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/80 p-4"><div className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622]"><div className="flex items-center justify-between border-b border-white/10 p-4"><h2 className="font-black">انتخاب تصویر</h2><button onClick={() => setMediaTarget(null)}><X /></button></div><div className="p-4"><label className="flex min-h-16 cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-emerald-400/30 bg-emerald-400/5 text-sm font-black text-emerald-200"><UploadSimple />{mediaBusy ? "در حال آپلود…" : "آپلود تصویر جدید"}<input type="file" accept="image/*" className="hidden" disabled={mediaBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadMedia(f); e.currentTarget.value = ""; }} /></label></div><div className="grid max-h-[58vh] grid-cols-2 gap-3 overflow-auto p-4 sm:grid-cols-4">{assets.map((a) => <button key={a.id} onClick={() => applyMedia(a.url)} className="overflow-hidden rounded-2xl border border-white/10"><img src={a.url} alt={a.name} className="aspect-[4/3] w-full object-cover" /><div className="truncate p-2 text-xs">{a.name}</div></button>)}</div></div></div>}
 
     {message && <div className="fixed bottom-5 left-5 z-[140] rounded-xl bg-slate-950 px-4 py-3 text-xs shadow-2xl">{message}</div>}
   </main>;
