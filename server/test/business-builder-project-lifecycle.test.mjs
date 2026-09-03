@@ -22,8 +22,11 @@ test("business builder persists immutable versions, restores and gates productio
     const projects=createBusinessBuilderProjectService({repository,previewAdapter});
     const created=projects.createProject({intent:"برای شرکت پخش CRM فروش و انبار بساز",name:"Ops"},"u1");
     assert.equal(created.version.versionNumber,1);
+    assert.equal(created.version.bundle.contract,"loadder.source-bundle.v1");
+    assert.equal(created.version.bundle.portable,true);
     const saved=projects.saveProject(created.project.id,{intent:"برای شرکت پخش CRM فروش، انبار و رزرو بساز"},"u1");
     assert.equal(saved.version.versionNumber,2);
+    assert.equal(saved.version.bundle.contract,"loadder.source-bundle.v1");
     const restored=projects.restoreVersion(created.project.id,created.version.id,"u1");
     assert.equal(restored.version.versionNumber,3);
     assert.equal(repository.listVersions(created.project.id).length,3);
