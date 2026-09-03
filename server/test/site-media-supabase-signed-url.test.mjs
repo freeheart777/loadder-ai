@@ -2,20 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createSiteMediaStorageAdapter } from "../app/services/site-media-storage-adapter.mjs";
 
-test("Supabase site media signed upload preserves /storage/v1 in the returned URL", async () => {
+test("remote site media never exposes a Supabase signed upload URL to the browser", async () => {
   const calls = [];
   const storage = createSiteMediaStorageAdapter({
     env: {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
       SITE_MEDIA_BUCKET: "site-media",
+      API_PUBLIC_URL: "http://localhost:3001",
     },
     fetchImpl: async (url, options) => {
       calls.push({ url, options });
-      return new Response(JSON.stringify({
-        url: "/object/upload/sign/site-media/ws-1/site-1/gallery/photo.jpg?token=abc123",
-        token: "abc123",
-      }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ Key: "stored" }), { status: 200, headers: { "content-type": "application/json" } });
     },
   });
 
@@ -24,34 +22,50 @@ test("Supabase site media signed upload preserves /storage/v1 in the returned UR
     siteProjectId: "site-1",
     assetType: "gallery",
     fileName: "photo.jpg",
+    mimeType: "image/jpeg",
   });
 
   assert.equal(storage.remoteConfigured, true);
-  assert.match(calls[0].url, /^https:\/\/example\.supabase\.co\/storage\/v1\/object\/upload\/sign\/site-media\//);
-  assert.equal(
-    upload.signedUrl,
-    "https://example.supabase.co/storage/v1/object/upload/sign/site-media/ws-1/site-1/gallery/photo.jpg?token=abc123"
-  );
+  assert.equal(calls.length, 0, "allocating an upload must not call Supabase from the browser flow");
+  assert.match(upload.signedUrl, /^http:\/\/localhost:3001\/api\/site-media-local\/upload\//);
+  assert.equal(upload.local, true);
+  assert.equal(upload.proxied, true);
+  assert.doesNotMatch(upload.signedUrl, /supabase|storage\/v1/i);
+
+  const body = Buffer.from("real-image-bytes");
+  const stored = await storage.acceptLocalUpload(upload.token, body);
+  assert.equal(stored.sizeBytes, body.length);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /^https:\/\/example\.supabase\.co\/storage\/v1\/object\/site-media\/ws-1\/site-1\/gallery\//);
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.headers["Content-Type"], "image/jpeg");
+  assert.deepEqual(calls[0].options.body, body);
 });
 
-test("Supabase site media keeps an already absolute signed upload URL unchanged", async () => {
-  const absolute = "https://cdn.example.test/storage/v1/object/upload/sign/site-media/a.jpg?token=xyz";
+test("failed provider upload is surfaced and its one-time upload token is consumed", async () => {
   const storage = createSiteMediaStorageAdapter({
     env: {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      API_PUBLIC_URL: "http://localhost:3001",
     },
-    fetchImpl: async () => new Response(JSON.stringify({ url: absolute, token: "xyz" }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
+    fetchImpl: async () => new Response("provider rejected upload", { status: 500 }),
   });
 
   const upload = await storage.signedUpload({
     workspaceId: "ws-1",
     siteProjectId: "site-1",
-    assetType: "gallery",
-    fileName: "photo.jpg",
+    assetType: "hero",
+    fileName: "hero.jpg",
+    mimeType: "image/jpeg",
   });
-  assert.equal(upload.signedUrl, absolute);
+
+  await assert.rejects(
+    storage.acceptLocalUpload(upload.token, Buffer.from("bytes")),
+    (error) => error?.code === "SITE_MEDIA_PROVIDER_UPLOAD_FAILED" && error?.status === 502,
+  );
+  await assert.rejects(
+    storage.acceptLocalUpload(upload.token, Buffer.from("bytes")),
+    (error) => error?.code === "SITE_MEDIA_UPLOAD_TOKEN_INVALID" && error?.status === 403,
+  );
 });
