@@ -12,14 +12,6 @@ on:
       - ".github/workflows/frontend-build.yml"
   push:
     branches: ["feat/**"]
-    paths:
-      - "src/**"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig*.json"
-      - "vite.config.*"
-      - "tailwind.config.*"
-      - ".github/workflows/frontend-build.yml"
   workflow_dispatch:
 
 jobs:
