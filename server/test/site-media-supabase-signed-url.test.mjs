@@ -40,6 +40,38 @@ test("remote site media never exposes a Supabase signed upload URL to the browse
   assert.equal(calls[0].options.method, "POST");
   assert.equal(calls[0].options.headers["Content-Type"], "image/jpeg");
   assert.deepEqual(calls[0].options.body, body);
+
+  const publicUrl = storage.publicAssetUrl(stored.path);
+  assert.match(publicUrl, /^http:\/\/localhost:3001\/api\/site-media-object\//);
+  assert.doesNotMatch(publicUrl, /supabase|storage\/v1/i);
+});
+
+test("private remote media can be read back through the backend proxy", async () => {
+  const image = Buffer.from([1, 2, 3, 4, 5]);
+  const calls = [];
+  const storage = createSiteMediaStorageAdapter({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      SITE_MEDIA_BUCKET: "site-media",
+      API_PUBLIC_URL: "http://localhost:3001",
+    },
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return new Response(image, { status: 200, headers: { "content-type": "image/webp" } });
+    },
+  });
+
+  const key = "ws-1/site-1/hero/hero.webp";
+  const encoded = Buffer.from(key, "utf8").toString("base64url");
+  const asset = await storage.readLocalAsset(encoded);
+
+  assert.deepEqual(asset.body, image);
+  assert.equal(asset.mimeType, "image/webp");
+  assert.equal(asset.fileName, "hero.webp");
+  assert.equal(calls[0].options.method, "GET");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer service-role-key");
+  assert.match(calls[0].url, /\/storage\/v1\/object\/site-media\/ws-1\/site-1\/hero\/hero\.webp$/);
 });
 
 test("failed provider upload is surfaced and its one-time upload token is consumed", async () => {
