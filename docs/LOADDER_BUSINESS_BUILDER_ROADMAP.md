@@ -40,7 +40,7 @@ No UI-only/mock-success capability is Done. A feature must prove its real path t
 ## Completed foundation
 - [x] Deterministic Persian/English compiler
 - [x] Loadder App Definition + validation
-- [x] CRM / Inventory / Booking / Project / Approval / Customer Portal blueprints
+- [x] CRM / Inventory / Booking / Project / Approval / Customer Portal / Logistics / Agency blueprints
 - [x] UI contract + RTL renderer
 - [x] Versioned Visual Editor patch path; rename/hide/theme controls
 - [x] Portable bundle; persistence; immutable versions; restore/export/import
@@ -50,37 +50,41 @@ No UI-only/mock-success capability is Done. A feature must prove its real path t
 - [x] Vertical intelligence for CRM/Inventory/Booking
 - [x] Governed action drafts
 - [x] Action Ledger foundation + idempotency uniqueness
+- [x] Append-only Action Event history with DB mutation guards
 - [x] Deployment canary/health/rollback contracts
+- [x] Deterministic Publish Readiness evaluator with explicit blockers
 - [x] Commercial catalog
 - [x] Zero-token deterministic Navigator foundation
 - [x] Loadder Engineering System documented as permanent law
+- [x] Module smoke + commercial AI-offline acceptance tests
+- [x] Low-cost production runbook
 
 ## Phase A — Quality hardening (ACTIVE)
 - [ ] LES automated quality gate/checklist in CI
 - [ ] Approval Center UI
 - [~] Action Ledger end-to-end recommendation -> approval -> execution -> outcome
 - [~] Idempotency on every mutating operator/executor endpoint
-- [ ] Immutable audit trail
+- [x] Immutable action audit trail
 - [ ] Fine-grained RBAC enforcement
 - [~] Cross-tenant isolation coverage extended to records/approvals/exports/executors
 - [ ] Restart/retry recovery tests
-- [ ] Corrupt payload/malformed definition tests
+- [~] Corrupt payload/malformed definition tests
 - [ ] Provider outage/timeout tests
 - [ ] Rate limiting/abuse limits
 - [ ] Backup/restore verification
 - [ ] Performance and cost baseline
-- [ ] Deterministic AI-offline acceptance test
+- [x] Deterministic AI-offline acceptance test
 
 ## Phase B — Minimal Product Studio
 - [x] Minimal `چی می‌خوای بسازی؟` entry
 - [x] Commercial catalog from backend
 - [x] Visual editor side panel
 - [x] Zero-token next-step Navigator
-- [ ] Block reorder with persisted version + restore
-- [ ] Full page/field visibility controls
+- [~] Block reorder with validated patch contract; Studio UX pending
+- [~] Field visibility controls; full page visibility pending
 - [ ] Navigation/page rename UX polish
 - [ ] Mobile/responsive acceptance suite
-- [ ] Publish readiness surface
+- [~] Publish readiness backend complete; blocker UI polish pending
 
 ## Phase C — AI Navigator
 - [x] Deterministic fallback guidance foundation
@@ -91,7 +95,7 @@ No UI-only/mock-success capability is Done. A feature must prove its real path t
 - [ ] Explicit token budget and cache policy per navigation task
 
 ## Phase D — Vertical expansion
-Logistics -> Real Estate -> Agency/Marketing -> Retail/Distribution -> Construction -> HR -> Procurement -> Support -> Lightweight ERP.
+Logistics + Agency are now deterministic foundations. Next: Real Estate -> Retail/Distribution -> Construction -> HR -> Procurement -> Support -> Lightweight ERP.
 Every vertical ships as deterministic blueprints + fixtures + roles + workflows + KPIs + alerts + governed actions.
 
 ## Phase E — Production runtime/deployment
@@ -103,7 +107,7 @@ Every vertical ships as deterministic blueprints + fixtures + roles + workflows 
 - [ ] Synthetic smoke + canary + automatic rollback
 - [ ] Deployment history
 - [ ] Backup/restore drill
-- [ ] Reference low-cost single-node profile
+- [x] Reference low-cost single-node profile documented
 - [ ] Scale-out profile and observability/cost accounting
 
 ## Phase F — Native / enterprise / ecosystem
@@ -126,6 +130,7 @@ MINIMAL PRODUCT EXPERIENCE
     -> Shared Runtime
     -> Intelligence
     -> Governed Action Ledger
+    -> Append-only Action Events
     -> Human Approval
     -> Replaceable Executor
     -> Outcome
