@@ -41,17 +41,19 @@ Core loop:
 - [x] Vertical Intelligence for CRM / Inventory / Booking
 - [x] Governed action recommendations and draft-only operator actions
 - [x] Deployment controller contracts for canary / health / rollback
+- [x] Action Ledger schema + service foundation with workspace isolation
+- [x] Action state-machine contract and idempotency uniqueness at persistence boundary
 
 ## Phase 1 — Reliability hardening (ACTIVE)
 
 Goal: make the existing platform safe to trust before adding broad feature surface.
 
-- [ ] Action Ledger: persist recommendation, draft, approval, execution, outcome
+- [~] Action Ledger: persistence/state machine exists; wire recommendation -> draft -> approval -> execution -> outcome end-to-end
 - [ ] Approval Center UI across generated applications
-- [ ] Idempotency keys for every mutating operator action
+- [~] Idempotency: persistence uniqueness exists; require idempotency keys on every mutating operator endpoint/executor
 - [ ] Immutable audit trail for approvals and executions
 - [ ] RBAC enforcement beyond admin-only schema defaults
-- [ ] Cross-tenant isolation tests for runtime records, actions, approvals, exports
+- [~] Cross-tenant isolation: Action Ledger covered; extend to runtime records, approvals, exports and executor paths
 - [ ] Restart/retry recovery tests
 - [ ] Corrupt payload / malformed definition tests
 - [ ] Provider outage and timeout tests
@@ -64,8 +66,8 @@ Exit gate: Server Tests + Frontend Build + Security Gate green, isolation tests 
 
 - [ ] Executor adapter contract (`email`, `CRM`, `procurement`, `calendar`, `webhook`, etc.)
 - [ ] Human-approved execution only
-- [ ] Action status machine: proposed -> drafted -> approved/rejected -> executing -> succeeded/failed -> evaluated
-- [ ] Retry policy with idempotency
+- [x] Action status machine: proposed -> drafted -> approved/rejected -> executing -> succeeded/failed -> evaluated
+- [~] Retry policy with idempotency: database uniqueness implemented; executor-level retries pending
 - [ ] Action outcome capture
 - [ ] Operator daily queue
 - [ ] Action history and filters
@@ -170,6 +172,8 @@ LOADDER APPLICATION RUNTIME
   Vertical Intelligence
       |
   Governed Recommendations
+      |
+  Action Ledger
       |
   Approval Center
       |
