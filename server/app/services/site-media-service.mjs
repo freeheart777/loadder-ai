@@ -39,7 +39,7 @@ export function createSiteMediaService({ repository, siteProjectService, storage
     const fileName = String(input.fileName || "").trim();
     if (!fileName) throw new SiteMediaError("fileName is required.", 400, "SITE_MEDIA_FILENAME_REQUIRED");
     const upload = await storage.signedUpload({
-      workspaceId: requireWorkspaceId(), siteProjectId: project.id, assetType, fileName, upsert: false,
+      workspaceId: requireWorkspaceId(), siteProjectId: project.id, assetType, fileName, mimeType, upsert: false,
     });
     return { ...upload, assetType, mimeType, sizeBytes };
   }
