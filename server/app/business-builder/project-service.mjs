@@ -12,7 +12,7 @@ export function createBusinessBuilderProjectService({ repository, builder = load
   function createProject(input, actorId = null) {
     const plan = builder.preview(input);
     const project = repository.createProject({ name: plan.definition.name, intent: input.intent, locale: input.locale || "fa-IR" });
-    const version = repository.createVersion(project.id, { definition: plan.definition, ui: plan.ui, bundle: plan.bundle, buildPlan: plan, createdBy: actorId });
+    const version = repository.createVersion(project.id, { definition: plan.definition, ui: plan.ui, bundle: plan.sourceBundle, buildPlan: plan, createdBy: actorId });
     return { project: repository.getProject(project.id), version };
   }
   function saveProject(id, input, actorId = null) {
@@ -20,7 +20,7 @@ export function createBusinessBuilderProjectService({ repository, builder = load
     const nextInput = { intent: input.intent ?? current.intent, name: input.name ?? current.name, locale: input.locale ?? current.locale };
     const plan = builder.preview(nextInput);
     repository.updateProject(id, nextInput);
-    const version = repository.createVersion(id, { definition: plan.definition, ui: plan.ui, bundle: plan.bundle, buildPlan: plan, createdBy: actorId });
+    const version = repository.createVersion(id, { definition: plan.definition, ui: plan.ui, bundle: plan.sourceBundle, buildPlan: plan, createdBy: actorId });
     return { project: repository.getProject(id), version };
   }
   function restoreVersion(projectId, versionId, actorId = null) {
