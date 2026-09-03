@@ -4,7 +4,6 @@
 
 ## North Star
 Loadder is an AI Business Operating System where **ENGINE BUILDS, AI GUIDES**.
-
 `User Goal -> Navigator -> Deterministic Engine -> App Definition -> Runtime -> Intelligence -> Governed Action -> Approval -> Execution -> Outcome`
 
 ## Permanent engineering law
@@ -13,75 +12,67 @@ All work follows LES. Development model: `FAST GATE -> DEVELOP -> FULL GATE -> R
 ## Core doctrine
 - Deterministic Loadder code builds supported applications; deterministic build token budget is **zero**.
 - AI navigates, teaches, reviews and proposes; AI outage must not break supported apps.
-- Minimal UX remains: `چی می‌خوای بسازی؟ -> بساز -> ادیت -> استفاده -> انتشار`.
+- Minimal UX: `چی می‌خوای بسازی؟ -> بساز -> ادیت -> استفاده -> انتشار`.
 - No UI-only/mock-success capability is Done.
+
+## Competitive ten-gap program — ACTIVE
+Benchmark-derived gaps against leading AI/no-code/internal-tool/mobile builders. These are product capabilities, not checkbox clones; each must preserve Loadder ownership, deterministic-first economics and LES quality.
+
+1. **Visual Studio Complete — P0**: drag/drop, responsive layout, page management, rename/hide/show, component properties, undo/version safety.
+2. **App-level Auth & RBAC — P0**: Public/Customer/Employee/Manager/Admin roles plus entity/action/field policies independent from Loadder workspace admin.
+3. **Integration Hub — P0**: generic REST, Webhook, OAuth, Database Connector and Event Trigger primitives; vendor integrations become adapters.
+4. **Blueprint/App Store — P0**: installable deterministic apps/templates with preview, version, ownership metadata and zero-token install path.
+5. **Files/Object Storage UX — P1**: file fields, uploads, quotas, signed access, lifecycle and portable metadata.
+6. **Realtime Data — P1**: subscriptions/events with tenant boundaries, reconnect/backpressure and graceful fallback.
+7. **Payments/Commerce Primitive — P1**: provider-neutral checkout/payment/webhook contracts; Stripe-like providers are replaceable adapters.
+8. **Environment + Git Lifecycle — P1**: dev/staging/prod promotion, diffs, immutable release refs, rollback and optional Git synchronization.
+9. **Shared Native Renderer — P1**: web definition reused for iOS/Android where possible; device capabilities explicitly permissioned; store signing gates remain separate.
+10. **Collaboration — P2**: multi-user editing, comments/presence, conflict strategy and audit; never sacrifice deterministic version integrity.
+
+### Competitive rule
+Do not reproduce competitor complexity. Loadder should combine simple onboarding, deep business capability, enterprise governance, source/infra ownership and deterministic cost. Integrations and native platforms must remain replaceable adapters.
 
 ## Completed foundation
 - [x] Deterministic Persian/English compiler + eight commercial blueprints
-- [x] App Definition, RTL UI contract, Visual Editor, immutable versions, export/import
+- [x] App Definition, RTL UI contract, Visual Editor foundation, immutable versions, export/import
 - [x] SQLite runtime + PostgreSQL production adapter/schema/integration foundation
 - [x] Workflow runtime, intelligence, Action Ledger, append-only ordered history
 - [x] Approval Center RBAC + Publish Center blockers
 - [x] Zero-token Navigator + AI-offline acceptance
 - [x] Backup/Restore Drill foundation
 - [x] Fast Gate + exact-head Full Gates
+- [x] Operations Dashboard + Owner/Admin Console foundations
 - [x] Low-cost production profile and recovery snapshots
 
-## Phase A — Quality hardening
+## Quality / Production hardening
 - [x] Bounded transient retry + PostgreSQL recovery health contract
 - [x] Builder/operator rate limiting + distributed-store injection contract
 - [x] Deployment artifact integrity + canary/rollback contracts
-- [x] Tenant-scoped deployment history persistence foundation
+- [x] Tenant-scoped deployment history persistence
 - [x] Isolated worker execution policy rejects privileged/host capabilities
 - [x] Workspace/project cost + latency telemetry contract with zero-token assertion
-- [x] Tenant-scoped operations dashboard aggregation + regression coverage
-- [x] Owner/Admin-only Business Builder admin summary endpoint
-- [~] Cross-tenant isolation coverage extended; continue across new production stores
+- [x] Tenant-scoped operations aggregation + Owner/Admin server enforcement
 - [ ] Provider outage/timeout suite across external services
-- [ ] Fine-grained per-app/per-action RBAC
-
-## Phase B — Minimal Product Studio
-- [x] Minimal build entry, backend catalog, Visual Editor, Navigator, Approval Center, Publish Center
-- [x] Business Builder Operations Dashboard route/UI
-- [x] Business Builder Admin Console route/UI with Owner/Admin server enforcement
-- [~] Block reorder backend complete; drag/drop UX pending
-- [~] Field visibility complete; full page visibility pending
-- [ ] Navigation/page rename UX polish
-- [ ] Mobile/responsive acceptance suite
-
-## Phase C — AI Navigator
-- [x] Deterministic fallback guidance
-- [ ] Context-aware screen guidance
-- [ ] Natural language -> validated editor/workflow patches
-- [ ] Error explanation/remediation
-- [ ] Explicit AI cache/routing policy
-
-## Phase D — Vertical expansion
-Next: Real Estate -> Retail/Distribution -> Construction -> HR -> Procurement -> Support -> Lightweight ERP. Every vertical must ship deterministic blueprints + fixtures + roles + workflows + KPIs + governed actions.
-
-## Phase E — Production runtime/deployment
-- [x] PostgreSQL adapter, pool provider, schema mapping and real PostgreSQL 16 CI integration
-- [x] Composable secret backend chain
-- [x] Distributed rate-limit store contract
-- [x] Production deploy adapter with SHA-256 verification
-- [x] Canary controller + automatic rollback contract
-- [x] Deployment history persistence foundation
-- [x] Isolated worker execution contract/policy foundation
-- [x] Cost/latency/token telemetry contract
-- [x] Production operations Release Drill workflow foundation
-- [~] Production smoke evaluator; real environment wiring pending
 - [ ] Production PostgreSQL backup/restore drill
-- [ ] Real external secret backend integration
-- [ ] Real distributed limiter backend integration
-- [ ] Real deploy provider integration
+- [ ] Real external secret backend / distributed limiter / deploy provider integrations
 - [ ] Persisted telemetry dashboard and admin health controls
 
-## Dashboard/Admin operating model
-### User Dashboard
-Shows only current workspace operational truth: app count, deployments, failed deployments, pending approvals/actions, runtime records and active members. Project operations can expose recent deployments/actions without exposing another tenant.
+## Product Studio status
+- [x] Minimal build entry, backend catalog, Visual Editor foundation, Navigator, Approval Center, Publish Center
+- [x] Operations Dashboard and Admin Console routes
+- [~] Visual Studio Complete: validated block reorder + field visibility exist; drag/drop/page/responsive/property UX pending
+- [ ] App-level Auth/RBAC
+- [ ] Integration Hub
+- [~] Blueprint Store foundation: deterministic catalog exists; installable store UX/version metadata pending
+- [ ] Files/Object Storage UX
+- [ ] Realtime Data
+- [ ] Payments primitive
+- [ ] Environment/Git lifecycle
+- [ ] Shared Native Renderer
+- [ ] Collaboration
 
-### Admin Console
-Owner/Admin-only server-enforced surface for workspace membership, deployment history, failure reasons, canary state and future cost/security/health controls. Client-side hiding is never the authorization boundary.
+## Dashboard/Admin operating model
+User Dashboard shows workspace/project operational truth and next actions. Admin Console is server-enforced Owner/Admin and evolves into the control plane for tenant health, deployments, incidents, backup/restore, security/RBAC, cost/token usage and infrastructure health. Client-side hiding is never authorization.
 
 ## Canonical production topology
 ```text
