@@ -1,4 +1,5 @@
 import { loadderBusinessBuilderService } from "./business-builder-service.mjs";
+import { exportLoadderApplication } from "./portability.mjs";
 
 export function createBusinessBuilderProjectService({ repository, builder = loadderBusinessBuilderService, previewAdapter }) {
   if (!repository) throw new TypeError("repository is required");
@@ -44,6 +45,11 @@ export function createBusinessBuilderProjectService({ repository, builder = load
     const version = repository.getActiveVersion(projectId); if (!version) return false;
     return repository.latestApproval(projectId, version.id, "production")?.decision === "approved";
   }
+  function exportProject(projectId) {
+    const project = repository.getProject(projectId); if (!project) return null;
+    const version = repository.getActiveVersion(projectId); if (!version) return null;
+    return exportLoadderApplication({ project, version });
+  }
 
-  return { listProjects, getProject, createProject, saveProject, restoreVersion, startPreview, decide, canDeployProduction };
+  return { listProjects, getProject, createProject, saveProject, restoreVersion, startPreview, decide, canDeployProduction, exportProject };
 }
