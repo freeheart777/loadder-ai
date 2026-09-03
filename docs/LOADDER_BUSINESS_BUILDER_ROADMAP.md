@@ -9,13 +9,13 @@
 `FOUNDATION` = validated contract/test. `RUNTIME` = execution path exists. `PRODUCT` = persistence/API/UX exists. `DONE` still requires all applicable recovery/security + exact-head Full Gate.
 
 1. **Visual Studio Complete — PRODUCT-/P0** — page rename/visibility/width, block reorder/visibility/properties, field visibility and theme controls are versioned and exposed in Studio UI. Pointer drag/drop and responsive breakpoints remain.
-2. **App-level Auth & RBAC — RUNTIME/P0** — versioned Public/Customer/Employee/Manager/Admin policy with entity/action/field rules; data/workflow runtime enforcement exists and fails closed for protected resources. Trusted app-principal authentication UX/session layer remains.
-3. **Integration Hub — PRODUCT-/P0** — REST/Webhook/OAuth/Database/Event validation, tenant-scoped persistence, provider-neutral execution runtime, CRUD API and management UI exist. Real provider adapters/OAuth handshake and execution UX remain.
+2. **App-level Auth & RBAC — PRODUCT-/P0** — versioned Public/Customer/Employee/Manager/Admin policy; data/workflow runtime enforcement; tenant/project-scoped app users; hashed expiring sessions; admin user management UI; live runtime resolves only trusted `X-Loadder-App-Token` sessions. Public self-service login/invite UX remains.
+3. **Integration Hub — PRODUCT-/P0** — REST/Webhook/OAuth/Database/Event validation, tenant-scoped persistence, provider-neutral execution runtime, CRUD API and management UI exist. OAuth PKCE + signed state + token exchange contract exists. Real provider credentials/callback adapters remain.
 4. **Blueprint/App Store — PRODUCT-/P0** — deterministic catalog, zero-token installs, install API and Studio App Store panel exist. Rich previews/categories/version upgrade lifecycle remain.
-5. **Files/Object Storage — RUNTIME/P1** — `file` field type, portable descriptor/upload policy and provider-neutral upload/signed-url/delete runtime exist. Real storage provider, metadata persistence and UI remain.
-6. **Realtime Data — RUNTIME/P1** — tenant-safe subscriptions, reconnect/fallback contract and provider-neutral emit/watch runtime exist. Real transport/provider and client subscription UX remain.
-7. **Payments/Commerce Primitive — RUNTIME/P1** — provider-neutral intent, checkout adapter, verified webhook normalization and idempotency runtime exist. Durable idempotency store/provider adapter/UI remain.
-8. **Environment + Git Lifecycle — PRODUCT-/P1** — sequential dev->staging->production gates plus tenant-scoped environment persistence exist. API/UI, diff and optional Git sync remain.
+5. **Files/Object Storage — PRODUCT-/P1** — `file` field type, upload policy, provider-neutral runtime plus a safe self-hosted local object provider with traversal protection, checksums and signed access exist. Metadata persistence/upload UI and optional S3-compatible adapter remain.
+6. **Realtime Data — RUNTIME/P1** — tenant-safe subscriptions, reconnect/fallback contract and provider-neutral emit/watch runtime exist. Real SSE/WebSocket transport and client subscription UX remain.
+7. **Payments/Commerce Primitive — PRODUCT-/P1** — provider-neutral intent, verified webhook normalization, durable tenant/provider-scoped idempotency persistence and regression coverage exist. External payment provider adapter/checkout UI remain.
+8. **Environment + Git Lifecycle — PRODUCT/P1** — sequential dev->staging->production promotion gates, tenant-scoped persistence, API and live-app environment control UI exist. Diff and optional Git synchronization remain.
 9. **Shared Native Renderer — FOUNDATION/P1** — iOS/Android target + explicit device capability/signing/store-gate contract exists; renderer/build/sign pipeline remains.
 10. **Collaboration — FOUNDATION/P2** — optimistic immutable-version patch/conflict contract exists; presence/comments/rebase UX/persistence remain.
 
@@ -40,15 +40,17 @@ Do not copy competitor complexity. Loadder target: simple onboarding + deep busi
 - [x] Isolated worker policy
 - [x] Operations Dashboard + server-enforced Owner/Admin Console
 - [x] Integration persistence tenant-isolation regression
-- [x] Environment persistence tenant-isolation regression
-- [x] Object storage/realtime/payment runtime regression coverage
+- [x] App-user session tenant/project isolation and hashed-token regression
+- [x] OAuth PKCE/state and self-hosted storage security regression
+- [x] Environment persistence + product control path
+- [x] Durable payment idempotency tenant isolation
 - [ ] Provider outage/timeout suite
 - [ ] Production PostgreSQL restore drill
 - [ ] Real external secrets/distributed limiter/deploy provider
 - [ ] Persisted cost/health/security Admin controls
 
 ## Next execution order
-Close remaining P0 gaps before calling them Done: trusted app-user authentication/session layer -> Integration provider execution/OAuth -> richer App Store lifecycle -> pointer drag/drop/responsive breakpoints. Then wire real object storage, realtime transport, durable payments and environment control UI. Native Renderer follows only after shared definition fidelity is proven. Collaboration follows after immutable multi-user semantics are proven.
+Finish the remaining product gaps instead of adding breadth: public app-user login/invite flow -> real OAuth callbacks/provider adapters -> storage metadata/upload UX -> SSE/WebSocket realtime transport -> payment provider checkout/webhooks -> Visual Studio pointer drag/drop/responsive breakpoints -> App Store upgrade lifecycle -> Git diff/sync. Native Renderer follows only after shared definition fidelity is proven. Collaboration follows after immutable multi-user semantics are proven.
 
 ## Dashboard/Admin law
 Every operational backend capability must expose appropriate visibility: user Dashboard for app/workspace truth and next actions; Admin Console for tenant health, deployment, incident, backup/restore, security/RBAC, cost/token and infrastructure controls. Client hiding is never authorization.
