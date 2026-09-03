@@ -6,11 +6,13 @@ import { createBusinessBuilderProjectService } from "../business-builder/project
 import { createBusinessAppRuntimeRouter } from "../business-builder/runtime-router.mjs";
 import { getCommercialBuilderCatalog } from "../business-builder/commercial-catalog.mjs";
 import { LOADDER_EDITOR_CAPABILITIES } from "../business-builder/editor-patch.mjs";
+import { navigateLoadder } from "../business-builder/navigator.mjs";
 import { createBusinessBuilderRepository } from "../repositories/business-builder-repository.mjs";
 
 export function createBusinessBuilderRouter({ service = loadderBusinessBuilderService, projects = null, previewAdapter = null, database = db } = {}) {
   const router = express.Router();
   router.get("/business-builder/catalog",(req,res)=>res.json({success:true,...getCommercialBuilderCatalog(),editor:LOADDER_EDITOR_CAPABILITIES}));
+  router.post("/business-builder/navigator",(req,res)=>{const project=req.body?.projectId&&projects?projects.getProject(req.body.projectId):null;return res.json({success:true,guidance:navigateLoadder({goal:req.body?.goal||"",screen:req.body?.screen||"builder",project})});});
   router.post("/business-builder/preview", (req,res)=>{try{const intent=String(req.body?.intent||"").trim();if(!intent)return res.status(400).json({success:false,code:"BUSINESS_INTENT_REQUIRED"});return res.status(201).json({success:true,preview:service.preview({intent,name:req.body?.name,locale:req.body?.locale||"fa-IR"})});}catch(error){return res.status(400).json({success:false,code:error?.code||"BUSINESS_BUILDER_PREVIEW_FAILED",message:error?.message});}});
   if(!projects)return router;
   router.get("/business-builder/projects",(req,res)=>res.json({success:true,projects:projects.listProjects()}));
