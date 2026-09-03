@@ -19,6 +19,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
     env.API_PUBLIC_URL ||
     `http://localhost:${env.API_PORT || env.PORT || 3001}`
   ).replace(/\/$/, "");
+  const storageApiBaseUrl = `${baseUrl}/storage/v1`;
 
   function safeStorageKey(storageKey) {
     const key = String(storageKey || "").replace(/\\/g, "/").replace(/^\/+/, "");
@@ -37,12 +38,19 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
       return { bucket: "local", path: storagePath, token, signedUrl: `${localApiBaseUrl}/api/site-media-local/upload/${token}`, local: true };
     }
 
-    const response = await fetchImpl(`${baseUrl}/storage/v1/object/upload/sign/${encodeURIComponent(bucket)}/${storagePath}`, {
-      method: "POST", headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey, "Content-Type": "application/json" }, body: JSON.stringify({ upsert })
+    const headers = { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey, "Content-Type": "application/json" };
+    if (upsert) headers["x-upsert"] = "true";
+    const response = await fetchImpl(`${storageApiBaseUrl}/object/upload/sign/${encodeURIComponent(bucket)}/${storagePath}`, {
+      method: "POST", headers, body: JSON.stringify({})
     });
     if (!response.ok) throw new SiteMediaStorageError("Unable to create signed upload URL.", "SITE_MEDIA_SIGNED_UPLOAD_FAILED", 502);
     const payload = await response.json();
-    const signedUrl = payload.url ? new URL(payload.url, baseUrl).toString() : `${baseUrl}/storage/v1/object/upload/sign/${encodeURIComponent(bucket)}/${storagePath}?token=${encodeURIComponent(payload.token)}`;
+    const returnedUrl = String(payload.url || "").trim();
+    const signedUrl = returnedUrl
+      ? (/^https?:\/\//i.test(returnedUrl)
+        ? returnedUrl
+        : `${storageApiBaseUrl}${returnedUrl.startsWith("/") ? "" : "/"}${returnedUrl}`)
+      : `${storageApiBaseUrl}/object/upload/sign/${encodeURIComponent(bucket)}/${storagePath}?token=${encodeURIComponent(payload.token)}`;
     return { bucket, path: storagePath, token: payload.token, signedUrl };
   }
 
@@ -77,7 +85,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
   function publicAssetUrl(storageKey) {
     const key = safeStorageKey(storageKey);
     if (!remoteConfigured) return `${localApiBaseUrl}/api/site-media-local/object/${Buffer.from(key, "utf8").toString("base64url")}`;
-    return `${baseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${key}`;
+    return `${storageApiBaseUrl}/object/public/${encodeURIComponent(bucket)}/${key}`;
   }
 
   return { signedUpload, publicAssetUrl, acceptLocalUpload, readLocalAsset, bucket, remoteConfigured };
