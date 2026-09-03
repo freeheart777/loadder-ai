@@ -48,6 +48,7 @@ import { migration047GoogleAdsCampaignDrafts } from "./047_google_ads_campaign_d
 import { migration048GoogleAdsOauthConnections } from "./048_google_ads_oauth_connections.mjs";
 import { migration049EcommerceCore } from "./049_ecommerce_core.mjs";
 import { migration050BusinessBuilderProjects } from "./050_business_builder_projects.mjs";
+import { migration051BusinessBuilderRuntimeRecords } from "./051_business_builder_runtime_records.mjs";
 
 export const migrations = [
   migration001Identity,migration002TenantDomainData,migration003TenantRelationshipGuards,migration004WorkspaceManagementAudit,
@@ -61,5 +62,5 @@ export const migrations = [
   migration033ListeningGuards,migration034ListeningIntelligence,migration035SemanticFindings,migration036IntelligenceRecommendations,
   migration037HumanGovernance,migration038Experiments,migration039ExperimentRuns,migration040ExperimentRunIdempotency,migration041ExperimentRunLeases,
   migration042SiteBuilderControlPlane,migration043SitePublishVersions,migration044SiteDomains,migration045SitePreviewTokens,migration046SiteMediaLibrary,
-  migration047GoogleAdsCampaignDrafts,migration048GoogleAdsOauthConnections,migration049EcommerceCore,migration050BusinessBuilderProjects,
+  migration047GoogleAdsCampaignDrafts,migration048GoogleAdsOauthConnections,migration049EcommerceCore,migration050BusinessBuilderProjects,migration051BusinessBuilderRuntimeRecords,
 ];
