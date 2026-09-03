@@ -34,6 +34,7 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   PredictivePage = lazy(() => import("./pages/PredictivePage")),
   AutomationPage = lazy(() => import("./pages/AutomationPage")),
   BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage")),
+  BusinessBuilderPage = lazy(() => import("./pages/BusinessBuilderPage")),
   ClickTestPage = lazy(() => import("./pages/ClickTestPage")),
   IntelligencePreviewPage = lazy(
     () => import("./pages/IntelligencePreviewPage"),
@@ -129,6 +130,7 @@ export default function App() {
               <Route path="/dashboard/predictive" element={<PredictivePage />} />
               <Route path="/dashboard/automation" element={<AutomationPage />} />
               <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
+              <Route path="/dashboard/business-builder" element={<BusinessBuilderPage />} />
               <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/websites/quick-start" element={<StoreQuickStartPage />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
