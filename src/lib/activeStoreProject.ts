@@ -45,9 +45,10 @@ async function resolveActiveStoreProject(fetcher: Fetcher): Promise<ActiveStoreP
     project = created.project as ActiveStoreProject | undefined;
   }
 
-  if (!isStore(project)) throw new Error("ساخت یا انتخاب پروژه فروشگاهی کامل نشد.");
+  if (!project || !isStore(project)) throw new Error("ساخت یا انتخاب پروژه فروشگاهی کامل نشد.");
+  const projectId = project.id;
 
-  const detail = await read(await fetcher(`/api/site-projects/${project.id}`));
+  const detail = await read(await fetcher(`/api/site-projects/${projectId}`));
   if (!isStore(detail.project)) throw new Error("جزئیات پروژه فروشگاهی معتبر دریافت نشد.");
   if (fetcher === apiFetch) setCanonicalStoreProjectId(detail.project.id);
   return detail as ActiveStoreProjectDetail;
