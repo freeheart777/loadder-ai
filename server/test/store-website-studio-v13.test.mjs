@@ -118,8 +118,8 @@ test("V13 is standalone and has no DOM-driven canvas manipulation", () => {
 });
 
 test("preview modes and responsive storefront layouts are explicit React branches", () => {
-  assert.match(v13, /type DeviceMode="desktop"\|"tablet"\|"mobile"/);
-  assert.match(v13, /data-preview-device=\{device\}/);
+  assert.match(v13, /type PreviewMode = "desktop" \| "tablet" \| "mobile"/);
+  assert.match(v13, /data-preview-mode=\{mode\}/);
 });
 
 test("all V13 design controls are state-owned and applied to preview", () => {
