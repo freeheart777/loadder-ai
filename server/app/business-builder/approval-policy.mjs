@@ -1,0 +1,3 @@
+export function canDecideMembership(membership){return !!membership&&membership.status==="active"&&(membership.role==="owner"||membership.role==="admin");}
+export function normalizeDecision(value){const decision=String(value||"").toLowerCase();return decision==="approved"||decision==="rejected"?decision:null;}
+export function decideActionState(action,decision){if(!action)return{ok:false,status:404,code:"ACTION_NOT_FOUND"};if(!decision)return{ok:false,status:400,code:"INVALID_DECISION"};if(action.status===decision)return{ok:true,idempotent:true,nextStatus:decision};if(action.status!=="drafted")return{ok:false,status:409,code:"ACTION_NOT_PENDING"};return{ok:true,idempotent:false,nextStatus:decision};}
