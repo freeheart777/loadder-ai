@@ -32,4 +32,5 @@ test("inline media upload fails loudly and persists after successful completion"
   assert.match(core, /URL تصویر دریافت نشد/);
   assert.match(core, /تصویر آپلود، اعمال و ذخیره شد/);
   assert.match(core, /assetType = target\.kind/);
+  assert.match(core, /credentials:\s*upload\.local\s*\?\s*"include"\s*:\s*"omit"/, "local API upload must carry the authenticated session while external signed storage URLs must not");
 });
