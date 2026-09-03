@@ -35,8 +35,10 @@ test("local media storage performs a real binary write/read round-trip", async (
     });
 
     assert.equal(allocation.local, true);
+    assert.equal(allocation.proxied, true);
     assert.ok(allocation.token);
     assert.ok(allocation.path.endsWith("-pixel.png"));
+    assert.match(allocation.signedUrl, /^http:\/\/127\.0\.0\.1:3001\/api\/site-media-upload\//);
 
     const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4]);
     const accepted = await adapter.acceptLocalUpload(allocation.token, bytes);
@@ -49,28 +51,24 @@ test("local media storage performs a real binary write/read round-trip", async (
     assert.equal(stored.fileName, path.basename(allocation.path));
 
     const publicUrl = adapter.publicAssetUrl(allocation.path);
-    assert.match(publicUrl, /^http:\/\/127\.0\.0\.1:3001\/api\/site-media-local\/object\//);
+    assert.match(publicUrl, /^http:\/\/127\.0\.0\.1:3001\/api\/site-media-object\//);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
 });
 
-test("remote media storage signs uploads and returns a matching public URL contract", async () => {
+test("remote media storage keeps browser traffic same-origin and uploads provider-side", async () => {
   const calls = [];
   const adapter = createSiteMediaStorageAdapter({
     env: {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
       SITE_MEDIA_BUCKET: "site-media",
+      API_PUBLIC_URL: "http://localhost:3001",
     },
     fetchImpl: async (url, options) => {
       calls.push({ url: String(url), options });
-      return {
-        ok: true,
-        async json() {
-          return { url: "/object/upload/sign/site-media/workspace/store/gallery/file.png?token=test-token", token: "test-token" };
-        },
-      };
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
     },
   });
 
@@ -79,11 +77,19 @@ test("remote media storage signs uploads and returns a matching public URL contr
     siteProjectId: "store",
     assetType: "gallery",
     fileName: "file.png",
+    mimeType: "image/png",
   });
 
+  assert.equal(calls.length, 0, "allocating an upload must not expose provider traffic to the browser");
+  assert.match(allocation.signedUrl, /^http:\/\/localhost:3001\/api\/site-media-upload\//);
+  assert.doesNotMatch(allocation.signedUrl, /supabase|storage\/v1/i);
+
+  const bytes = Buffer.from("provider-image-bytes");
+  const accepted = await adapter.acceptLocalUpload(allocation.token, bytes);
+  assert.equal(accepted.sizeBytes, bytes.length);
   assert.equal(calls.length, 1);
-  assert.match(calls[0].url, /\/storage\/v1\/object\/upload\/sign\/site-media\//);
+  assert.match(calls[0].url, /^https:\/\/example\.supabase\.co\/storage\/v1\/object\/site-media\/workspace\/store\/gallery\//);
   assert.equal(calls[0].options.method, "POST");
-  assert.match(allocation.signedUrl, /^https:\/\/example\.supabase\.co\/storage\/v1\/object\/upload\/sign\/site-media\//);
-  assert.match(adapter.publicAssetUrl(allocation.path), /^https:\/\/example\.supabase\.co\/storage\/v1\/object\/public\/site-media\//);
+  assert.deepEqual(calls[0].options.body, bytes);
+  assert.match(adapter.publicAssetUrl(allocation.path), /^http:\/\/localhost:3001\/api\/site-media-object\//);
 });
