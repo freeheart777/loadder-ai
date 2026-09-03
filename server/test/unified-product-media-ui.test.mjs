@@ -9,7 +9,8 @@ const detail = read("../../src/pages/StoreProductDetailPage.tsx");
 test("product media uses canonical site media storage instead of Base64 JSON", () => {
   assert.match(editor, /\/media\/upload-url/);
   assert.match(editor, /\/media\/complete/);
-  assert.match(editor, /fetch\(upload\.signedUrl/);
+  assert.match(editor, /const signedUrl = String\(upload\.signedUrl\)/);
+  assert.match(editor, /fetch\(signedUrl/);
   assert.doesNotMatch(editor, /FileReader/);
   assert.doesNotMatch(editor, /readAsDataURL/);
 });
