@@ -27,12 +27,6 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
     return key;
   }
 
-  /**
-   * Poka-Yoke upload contract:
-   * The browser NEVER talks directly to Supabase Storage. Every upload goes to
-   * Loadder's own API first, so CORS, auth/session and provider-specific signed
-   * URL behavior cannot diverge between Hero, Banner, Product and Gallery.
-   */
   async function signedUpload({ workspaceId, siteProjectId, assetType, fileName, mimeType = "application/octet-stream" }) {
     if (!workspaceId || !siteProjectId || !assetType || !fileName) throw new SiteMediaStorageError("workspaceId, siteProjectId, assetType and fileName are required.", "SITE_MEDIA_UPLOAD_INPUT_INVALID", 400);
     const safeName = String(fileName).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -96,11 +90,24 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
   }
 
   async function readLocalAsset(encodedKey) {
-    if (remoteConfigured) throw new SiteMediaStorageError("Local media is disabled.", "SITE_MEDIA_LOCAL_DISABLED", 404);
     let key;
     try { key = Buffer.from(String(encodedKey || ""), "base64url").toString("utf8"); }
-    catch { throw new SiteMediaStorageError("Invalid local media key.", "SITE_MEDIA_LOCAL_KEY_INVALID", 400); }
+    catch { throw new SiteMediaStorageError("Invalid media key.", "SITE_MEDIA_KEY_INVALID", 400); }
     key = safeStorageKey(key);
+
+    if (remoteConfigured) {
+      const response = await fetchImpl(`${storageApiBaseUrl}/object/${encodeURIComponent(bucket)}/${key}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey },
+      });
+      if (!response.ok) {
+        if (response.status === 404) throw new SiteMediaStorageError("Media not found.", "SITE_MEDIA_NOT_FOUND", 404);
+        throw new SiteMediaStorageError("Unable to read media from storage provider.", "SITE_MEDIA_PROVIDER_READ_FAILED", 502);
+      }
+      const body = Buffer.from(await response.arrayBuffer());
+      return { body, fileName: path.basename(key), mimeType: response.headers.get("content-type") || undefined };
+    }
+
     const target = path.resolve(localRoot, key);
     if (!target.startsWith(`${localRoot}${path.sep}`)) throw new SiteMediaStorageError("Invalid local media path.", "SITE_MEDIA_LOCAL_PATH_INVALID", 400);
     try { return { body: await fs.readFile(target), fileName: path.basename(target) }; }
@@ -109,8 +116,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
 
   function publicAssetUrl(storageKey) {
     const key = safeStorageKey(storageKey);
-    if (!remoteConfigured) return `${localApiBaseUrl}/api/site-media-local/object/${Buffer.from(key, "utf8").toString("base64url")}`;
-    return `${storageApiBaseUrl}/object/public/${encodeURIComponent(bucket)}/${key}`;
+    return `${localApiBaseUrl}/api/site-media-object/${Buffer.from(key, "utf8").toString("base64url")}`;
   }
 
   return { signedUpload, publicAssetUrl, acceptLocalUpload, readLocalAsset, bucket, remoteConfigured };
