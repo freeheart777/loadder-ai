@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { executeAgentTask } from "../../ai/agent/executor.js";
 import { runCloudflare } from "../../ai/providers/cloudflare.js";
 import siteBuilderRouter from "../../site-builder-runtime.mjs";
+import businessBuilderRouter from "./business-builder.mjs";
 
 const router = express.Router();
 
@@ -192,7 +193,8 @@ router.post("/business-brain/analyze", async (req, res) => {
 });
 
 // index.mjs mounts aiRouter at /api after Auth -> Workspace Membership -> Workspace Context.
-// Site Builder inherits that chain and adds Project Ownership at its service boundary.
+// Business Builder and Site Builder inherit that authenticated, workspace-scoped chain.
+router.use(businessBuilderRouter);
 router.use(siteBuilderRouter);
 
 export default router;
