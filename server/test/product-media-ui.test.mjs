@@ -22,7 +22,7 @@ test("legacy product editor retains URL and variant editing compatibility", () =
 test("active product media editor uses storage-backed gallery controls", () => {
   assert.match(unifiedEditor, /\/media\/upload-url/);
   assert.match(unifiedEditor, /\/media\/complete/);
-  assert.match(unifiedEditor, /const setMain/);
+  assert.match(unifiedEditor, /async function setMain/);
   assert.match(unifiedEditor, /async function remove/);
   assert.match(unifiedEditor, /تصویر اصلی/);
   assert.match(unifiedEditor, /فایل در Media Library باقی ماند/);
