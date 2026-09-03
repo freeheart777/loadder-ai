@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
-const editor = read("../../src/components/commerce/UnifiedProductMediaEditor.tsx");
+const editor = read("../../src/components/commerce/ProductMediaEditor.tsx");
 const detail = read("../../src/pages/StoreProductDetailPage.tsx");
 
 test("product media uses canonical site media storage instead of Base64 JSON", () => {
@@ -14,9 +14,9 @@ test("product media uses canonical site media storage instead of Base64 JSON", (
   assert.doesNotMatch(editor, /readAsDataURL/);
 });
 
-test("product detail renders unified storage-backed media editor", () => {
-  assert.match(detail, /UnifiedProductMediaEditor/);
-  assert.doesNotMatch(detail, /<ProductMediaEditor/);
+test("product detail renders the proven storage-backed product media editor", () => {
+  assert.match(detail, /ProductMediaEditor/);
+  assert.doesNotMatch(detail, /UnifiedProductMediaEditor/);
 });
 
 test("upload failures surface useful HTTP diagnostics", () => {
