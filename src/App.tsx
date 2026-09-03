@@ -2,18 +2,8 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DemoModePreserver from "./components/DemoModePreserver";
 import { AuthProvider, RequireAuth } from "./lib/auth";
-const StoreWebsiteStudioPageV13 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV13"),
-);
-const StoreWebsiteStudioPageV14 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV14"),
-);
-const StoreWebsiteStudioPageV15 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV15"),
-);
-const StoreWebsiteStudioPageV16 = lazy(
-  () => import("./pages/StoreWebsiteStudioPageV16"),
-);
+
+const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -23,9 +13,7 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   ContentStudioPage = lazy(() => import("./pages/ContentStudioPage")),
   SocialManagerPage = lazy(() => import("./pages/SocialManagerPage")),
   AdsCenterPage = lazy(() => import("./pages/AdsCenterWithGoogleEntryPage")),
-  GoogleAdsSearchWizardPage = lazy(
-    () => import("./pages/GoogleAdsConnectedWizardPage"),
-  ),
+  GoogleAdsSearchWizardPage = lazy(() => import("./pages/GoogleAdsConnectedWizardPage")),
   MarketingPage = lazy(() => import("./pages/MarketingPage")),
   CRMPage = lazy(() => import("./pages/CRMPage")),
   CustomerProfilePage = lazy(() => import("./pages/CustomerProfilePage")),
@@ -35,58 +23,11 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   AutomationPage = lazy(() => import("./pages/AutomationPage")),
   BusinessBrainPage = lazy(() => import("./pages/BusinessBrainPage")),
   ClickTestPage = lazy(() => import("./pages/ClickTestPage")),
-  IntelligencePreviewPage = lazy(
-    () => import("./pages/IntelligencePreviewPage"),
-  ),
-  NativeSiteBuilderPage = lazy(() => import("./pages/NativeSiteBuilderPage")),
-  SiteProjectStudioPage = lazy(() => import("./pages/SiteProjectStudioPage")),
-  VisualWebsiteStudioPage = lazy(
-    () => import("./pages/VisualWebsiteStudioPage"),
-  ),
-  StoreWebsiteStudioPage = lazy(() => import("./pages/StoreWebsiteStudioPage")),
-  StoreWebsiteStudioPageV2 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV2"),
-  ),
-  StoreWebsiteStudioPageV3 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV3"),
-  ),
-  StoreWebsiteStudioPageV4 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV4"),
-  ),
-  StoreWebsiteStudioPageV5 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV5"),
-  ),
-  StoreWebsiteStudioPageV6 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV6"),
-  ),
-  StoreWebsiteStudioPageV7 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV7"),
-  ),
-  StoreWebsiteStudioPageV8 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV8"),
-  ),
-  StoreWebsiteStudioPageV9 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV9"),
-  ),
-  StoreWebsiteStudioPageV10 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV10"),
-  ),
-  StoreWebsiteStudioPageV11 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV11"),
-  ),
-  StoreWebsiteStudioPageV12 = lazy(
-    () => import("./pages/StoreWebsiteStudioPageV12"),
-  ),
+  IntelligencePreviewPage = lazy(() => import("./pages/IntelligencePreviewPage")),
   StoreSetupWizardPage = lazy(() => import("./pages/StoreSetupWizardPage")),
-  StoreAdminDashboardPage = lazy(
-    () => import("./pages/StoreAdminDashboardPage"),
-  ),
-  StoreCommerceManagerPage = lazy(
-    () => import("./pages/StoreCommerceManagerPage"),
-  ),
-  StoreCatalogOperationsPage = lazy(
-    () => import("./pages/StoreCatalogOperationsPage"),
-  ),
+  StoreAdminDashboardPage = lazy(() => import("./pages/StoreAdminDashboardPage")),
+  StoreCommerceManagerPage = lazy(() => import("./pages/StoreCommerceManagerPage")),
+  StoreCatalogOperationsPage = lazy(() => import("./pages/StoreCatalogOperationsPage")),
   StoreProductDetailPage = lazy(() => import("./pages/StoreProductDetailPage")),
   StorefrontTestPage = lazy(() => import("./pages/StorefrontTestPage")),
   PublicStorefrontPage = lazy(() => import("./pages/PublicStorefrontPage")),
@@ -94,9 +35,10 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   PublicCartPage = lazy(() => import("./pages/PublicCartPage")),
   PublicCheckoutPage = lazy(() => import("./pages/PublicCheckoutPage")),
   PublicOrderSuccessPage = lazy(() => import("./pages/PublicOrderSuccessPage")),
-  SiteOperationsDashboardPage = lazy(
-    () => import("./pages/SiteOperationsDashboardPage"),
-  );
+  SiteOperationsDashboardPage = lazy(() => import("./pages/SiteOperationsDashboardPage"));
+
+const canonicalBuilder = <Navigate to="/dashboard/websites" replace />;
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -128,40 +70,43 @@ export default function App() {
               <Route path="/dashboard/predictive" element={<PredictivePage />} />
               <Route path="/dashboard/automation" element={<AutomationPage />} />
               <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
+
               <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV16 />} />
-              <Route path="/dashboard/websites/quick-start" element={<Navigate to="/dashboard/websites" replace />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
               <Route path="/dashboard/websites/admin" element={<StoreAdminDashboardPage />} />
               <Route path="/dashboard/websites/commerce" element={<StoreCommerceManagerPage />} />
               <Route path="/dashboard/websites/commerce/operations" element={<StoreCatalogOperationsPage />} />
               <Route path="/dashboard/websites/commerce/product/:id" element={<StoreProductDetailPage />} />
               <Route path="/dashboard/websites/storefront-test" element={<StorefrontTestPage />} />
-              <Route path="/dashboard/websites/studio" element={<StoreWebsiteStudioPageV16 />} />
-              <Route path="/dashboard/websites/store-v1" element={<StoreWebsiteStudioPage />} />
-              <Route path="/dashboard/websites/studio-v2" element={<StoreWebsiteStudioPageV2 />} />
-              <Route path="/dashboard/websites/studio-v3" element={<StoreWebsiteStudioPageV3 />} />
-              <Route path="/dashboard/websites/studio-v4" element={<StoreWebsiteStudioPageV4 />} />
-              <Route path="/dashboard/websites/studio-v5" element={<StoreWebsiteStudioPageV5 />} />
-              <Route path="/dashboard/websites/studio-v6" element={<StoreWebsiteStudioPageV6 />} />
-              <Route path="/dashboard/websites/studio-v7" element={<StoreWebsiteStudioPageV7 />} />
-              <Route path="/dashboard/websites/studio-v8" element={<StoreWebsiteStudioPageV8 />} />
-              <Route path="/dashboard/websites/studio-v9" element={<StoreWebsiteStudioPageV9 />} />
-              <Route path="/dashboard/websites/studio-v10" element={<StoreWebsiteStudioPageV10 />} />
-              <Route path="/dashboard/websites/studio-v11" element={<StoreWebsiteStudioPageV11 />} />
-              <Route path="/dashboard/websites/studio-v12" element={<StoreWebsiteStudioPageV12 />} />
-              <Route path="/dashboard/websites/studio-v13" element={<Navigate to="/dashboard/websites" replace />} />
-              <Route path="/dashboard/websites/studio-v14" element={<Navigate to="/dashboard/websites" replace />} />
-              <Route path="/dashboard/websites/studio-v15" element={<Navigate to="/dashboard/websites" replace />} />
-              <Route path="/dashboard/websites/studio-v16" element={<Navigate to="/dashboard/websites" replace />} />
-              <Route path="/dashboard/websites/fallback/v13" element={<StoreWebsiteStudioPageV13 />} />
-              <Route path="/dashboard/websites/fallback/v14" element={<StoreWebsiteStudioPageV14 />} />
-              <Route path="/dashboard/websites/fallback/v15" element={<StoreWebsiteStudioPageV15 />} />
-              <Route path="/dashboard/websites/studio-legacy" element={<VisualWebsiteStudioPage />} />
-              <Route path="/dashboard/websites/ai" element={<NativeSiteBuilderPage />} />
-              <Route path="/dashboard/websites/new" element={<Navigate to="/dashboard/websites" replace />} />
+
+              <Route path="/dashboard/websites/quick-start" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/store-v1" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v2" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v3" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v4" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v5" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v6" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v7" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v8" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v9" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v10" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v11" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v12" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v13" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v14" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v15" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-v16" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/fallback/v13" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/fallback/v14" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/fallback/v15" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/studio-legacy" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/ai" element={canonicalBuilder} />
+              <Route path="/dashboard/websites/new" element={canonicalBuilder} />
+              <Route path="/site-builder" element={canonicalBuilder} />
+              <Route path="/site-builder/legacy" element={canonicalBuilder} />
+
               <Route path="/dashboard/site-operations" element={<SiteOperationsDashboardPage />} />
-              <Route path="/site-builder" element={<StoreWebsiteStudioPageV16 />} />
-              <Route path="/site-builder/legacy" element={<SiteProjectStudioPage />} />
               <Route path="/click-test" element={<ClickTestPage />} />
               <Route path="/intelligence" element={<IntelligencePreviewPage />} />
             </Route>
