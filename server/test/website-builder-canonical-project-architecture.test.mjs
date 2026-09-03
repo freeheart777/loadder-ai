@@ -17,6 +17,7 @@ test("website builder keeps one canonical store-project resolver", () => {
 
 test("legacy website-builder routes cannot execute legacy builders", () => {
   const app = read("src/App.tsx");
+  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites" replace \/>/);
   for (const pathName of [
     "/dashboard/websites/store-v1",
     "/dashboard/websites/studio-v2",
@@ -27,7 +28,7 @@ test("legacy website-builder routes cannot execute legacy builders", () => {
     "/site-builder/legacy",
   ]) {
     const escaped = pathName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    assert.match(app, new RegExp(`path=\\"${escaped}\\" element=\\{<Navigate to=\\"/dashboard/websites\\" replace`));
+    assert.match(app, new RegExp(`path="${escaped}" element=\\{canonicalBuilder\\}`));
   }
   assert.doesNotMatch(app, /element=\{<StoreWebsiteStudioPageV(?:2|3|4|5|6|7|8|9|10|11|12|13|14|15)\s*\/?>\}/);
 });
