@@ -20,19 +20,22 @@ export function createSiteMediaRouter({ service }) {
     } catch (error) { return handle(error, res); }
   };
 
-  // Canonical same-origin upload endpoint. The legacy local route remains as a
-  // compatibility alias while clients migrate; both execute the exact same path.
+  const serveObject = async (req, res) => {
+    try {
+      const asset = await service.readLocalAsset(req.params.key);
+      if (asset.mimeType) res.type(asset.mimeType);
+      else res.type(asset.fileName);
+      res.set("Cache-Control", "private, max-age=3600");
+      return res.send(asset.body);
+    } catch (error) { return handle(error, res); }
+  };
+
   router.put("/site-media-upload/:token", express.raw({ type: () => true, limit: "25mb" }), acceptUpload);
   router.put("/site-media-local/upload/:token", express.raw({ type: () => true, limit: "25mb" }), acceptUpload);
 
-  router.get("/site-media-local/object/:key", async (req, res) => {
-    try {
-      const asset = await service.readLocalAsset(req.params.key);
-      res.type(asset.fileName);
-      res.set("Cache-Control", "public, max-age=3600");
-      return res.send(asset.body);
-    } catch (error) { return handle(error, res); }
-  });
+  // Canonical read path works for both local files and private remote buckets.
+  router.get("/site-media-object/:key", serveObject);
+  router.get("/site-media-local/object/:key", serveObject);
 
   router.get("/site-projects/:id/media", (req, res) => {
     try { return res.json({ success: true, media: service.list(req.params.id) }); }
