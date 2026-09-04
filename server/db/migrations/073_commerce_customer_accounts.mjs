@@ -70,10 +70,13 @@ CREATE TABLE IF NOT EXISTS ecommerce_customer_order_links(
 );
 CREATE INDEX IF NOT EXISTS idx_ecommerce_customer_order_links_account ON ecommerce_customer_order_links(workspace_id,customer_account_id,linked_at DESC);
 
+ALTER TABLE ecommerce_carts ADD COLUMN commerce_customer_account_id TEXT REFERENCES ecommerce_customer_accounts(id);
+CREATE INDEX IF NOT EXISTS idx_ecommerce_carts_customer_account ON ecommerce_carts(workspace_id,site_project_id,commerce_customer_account_id,status);
+
 CREATE TRIGGER IF NOT EXISTS trg_ecommerce_customer_account_guard BEFORE INSERT ON ecommerce_customer_accounts BEGIN
   SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM site_projects s WHERE s.id=NEW.site_project_id AND s.workspace_id=NEW.workspace_id) THEN RAISE(ABORT,'customer account site workspace mismatch') END;
   SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM business_builder_commerce_bindings b WHERE b.workspace_id=NEW.workspace_id AND b.site_project_id=NEW.site_project_id AND b.business_builder_project_id=NEW.auth_project_id AND b.status='active') THEN RAISE(ABORT,'customer account commerce binding mismatch') END;
-  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM business_builder_app_users u WHERE u.id=NEW.app_user_id AND u.workspace_id=NEW.workspace_id AND u.project_id=NEW.auth_project_id AND u.role='customer') THEN RAISE(ABORT,'customer account app user mismatch') END;
+  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM business_builder_app_users u WHERE u.id=NEW.app_user_id AND u.workspace_id=NEW.workspace_id AND u.project_id=NEW.auth_project_id AND u.role='customer' AND u.status='active') THEN RAISE(ABORT,'customer account app user mismatch') END;
 END;
 CREATE TRIGGER IF NOT EXISTS trg_ecommerce_customer_account_identity_immutable BEFORE UPDATE OF workspace_id,site_project_id,auth_project_id,app_user_id ON ecommerce_customer_accounts BEGIN
   SELECT RAISE(ABORT,'customer account identity is immutable');
@@ -90,6 +93,57 @@ CREATE TRIGGER IF NOT EXISTS trg_ecommerce_customer_order_link_guard BEFORE INSE
 END;
 CREATE TRIGGER IF NOT EXISTS trg_ecommerce_customer_order_link_immutable_update BEFORE UPDATE ON ecommerce_customer_order_links BEGIN SELECT RAISE(ABORT,'customer order link is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS trg_ecommerce_customer_order_link_immutable_delete BEFORE DELETE ON ecommerce_customer_order_links BEGIN SELECT RAISE(ABORT,'customer order link is immutable'); END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ecommerce_cart_customer_bind_guard
+BEFORE UPDATE OF commerce_customer_account_id ON ecommerce_carts
+WHEN NEW.commerce_customer_account_id IS NOT NULL
+BEGIN
+  SELECT CASE WHEN OLD.status<>'ACTIVE' THEN RAISE(ABORT,'customer cart binding requires active cart') END;
+  SELECT CASE WHEN OLD.commerce_customer_account_id IS NOT NULL AND OLD.commerce_customer_account_id<>NEW.commerce_customer_account_id THEN RAISE(ABORT,'customer cart binding is immutable') END;
+  SELECT CASE WHEN NOT EXISTS(
+    SELECT 1 FROM ecommerce_customer_accounts c
+    JOIN business_builder_app_users u ON u.id=c.app_user_id
+    WHERE c.id=NEW.commerce_customer_account_id
+      AND c.workspace_id=NEW.workspace_id
+      AND c.site_project_id=NEW.site_project_id
+      AND u.workspace_id=c.workspace_id
+      AND u.project_id=c.auth_project_id
+      AND u.role='customer'
+      AND u.status='active'
+  ) THEN RAISE(ABORT,'customer cart account mismatch') END;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_ecommerce_cart_customer_unbind_guard
+BEFORE UPDATE OF commerce_customer_account_id ON ecommerce_carts
+WHEN OLD.commerce_customer_account_id IS NOT NULL AND NEW.commerce_customer_account_id IS NULL
+BEGIN
+  SELECT RAISE(ABORT,'customer cart binding is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ecommerce_order_customer_link
+AFTER INSERT ON ecommerce_orders
+WHEN NEW.cart_id IS NOT NULL
+BEGIN
+  INSERT INTO ecommerce_customer_order_links(
+    id,workspace_id,site_project_id,order_id,customer_account_id,app_user_id,auth_project_id,source,linked_at,metadata_json
+  )
+  SELECT
+    'customer-order:'||NEW.id,
+    NEW.workspace_id,
+    NEW.site_project_id,
+    NEW.id,
+    c.id,
+    c.app_user_id,
+    c.auth_project_id,
+    'CHECKOUT',
+    NEW.created_at,
+    json_object('source','authenticated_cart')
+  FROM ecommerce_carts cart
+  JOIN ecommerce_customer_accounts c ON c.id=cart.commerce_customer_account_id
+  WHERE cart.id=NEW.cart_id
+    AND cart.workspace_id=NEW.workspace_id
+    AND cart.site_project_id=NEW.site_project_id
+    AND cart.commerce_customer_account_id IS NOT NULL;
+END;
 `);
   },
 };
