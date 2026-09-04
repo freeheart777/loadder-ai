@@ -6,7 +6,6 @@ import {
   updateCustomerAddress,
   setDefaultCustomerAddress,
   removeCustomerAddress,
-  createCustomerOrderLink,
 } from "./customer-account-engine.mjs";
 import { CustomerAccountPersistenceError } from "./customer-account-repository.mjs";
 
@@ -24,6 +23,9 @@ export function createCustomerAccountService({ repository, clock = now, idFactor
     const workspace = required(workspaceId, "workspaceId");
     const store = required(siteProjectId, "siteProjectId");
     const authProjectId = required(principal?.projectId, "principal.projectId");
+    if (String(principal?.role || "").toLowerCase() !== "customer") {
+      throw new CustomerAccountPersistenceError("Customer app-user role is required", "CUSTOMER_APP_USER_ROLE_REQUIRED", 403);
+    }
     const binding = repository.resolveStoreBinding({ workspaceId: workspace, siteProjectId: store, authProjectId });
     if (!binding) throw new CustomerAccountPersistenceError("Store is not bound to this authenticated app project", "CUSTOMER_STORE_AUTH_BINDING_REQUIRED", 403);
     return { workspaceId: workspace, siteProjectId: store, authProjectId };
@@ -91,20 +93,13 @@ export function createCustomerAccountService({ repository, clock = now, idFactor
       removeCustomerAddress(account, input.principal, input.addressId, { updatedAt: stamp });
       return repository.removeAddress({ account, addressId: input.addressId, expectedRevision: Number(input.expectedRevision), updatedAt: stamp });
     },
+    bindCart(input = {}) {
+      const { account } = owned(input);
+      return repository.bindCart({ account, cartId: input.cartId });
+    },
     listOrders(input = {}) {
       const { account } = owned(input);
       return repository.listOrders({ workspaceId: account.workspaceId, accountId: account.id, limit: input.limit });
-    },
-    linkCheckoutOrder(input = {}) {
-      const { account } = owned(input); const stamp = clock();
-      const link = createCustomerOrderLink({ id: `customer-order:${input.order.id}`, account, principal: input.principal, order: input.order, source: "CHECKOUT", linkedAt: stamp });
-      try { return repository.linkOrder(link); }
-      catch (error) {
-        if (String(error?.message || "").includes("UNIQUE constraint failed")) {
-          throw new CustomerAccountPersistenceError("Order is already linked to a customer", "CUSTOMER_ORDER_ALREADY_LINKED", 409);
-        }
-        throw error;
-      }
     },
   });
 }
