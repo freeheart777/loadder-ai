@@ -64,8 +64,10 @@ test("V16 reads real catalog and media while keeping visual overrides separate",
   assert.match(v16, /setAssets\(\(detail\.assets/);
   assert.match(v16Inspector, /ویرایش اطلاعات اصلی محصول/);
   assert.match(v16Inspector, /override بصری/);
-  assert.match(v16, /\/media\/upload-url/);
-  assert.match(v16, /\/media\/complete/);
+  assert.match(v16, /import \{ uploadSiteMedia \} from "\.\.\/lib\/siteMediaUpload"/);
+  assert.match(v16, /await uploadSiteMedia\(\{/);
+  assert.doesNotMatch(v16, /\/media\/upload-url/);
+  assert.doesNotMatch(v16, /\/media\/complete/);
   assert.doesNotMatch(v16Source, /\/api\/commerce\/products\/\$\{/);
   assert.doesNotMatch(v16Source, /api\/public\/cart|api\/public\/checkout|addPublicCartItem|Commerce Core V2/);
 });
