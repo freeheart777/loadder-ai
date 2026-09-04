@@ -9,18 +9,34 @@ import { createSiteMediaStorageAdapter } from "../app/services/site-media-storag
 const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("website builder exposes one-request media upload and image-surface picker", () => {
+test("website builder actual V16 runtime uses one-request upload and image-surface picker", () => {
   const route = read("server/app/routes/site-media.mjs");
   const helper = read("src/lib/siteMediaUpload.ts");
+  const core = read("src/pages/StoreWebsiteStudioPageV16Core.tsx");
+  const canvas = read("src/components/store-studio-v16/StudioCanvas.tsx");
   const css = read("src/direct-media.css");
+  const main = read("src/main.tsx");
   const wrapper = read("src/pages/StoreWebsiteStudioPageV16.tsx");
+
   assert.match(route, /site-projects\/:id\/media\/upload/);
   assert.match(route, /express\.raw\(\{ type: \(\) => true, limit: "25mb" \}\)/);
+
   assert.match(helper, /\/media\/upload`/);
   assert.doesNotMatch(helper, /media\/upload-url/);
   assert.doesNotMatch(helper, /media\/complete/);
+
+  assert.match(core, /import \{ uploadSiteMedia \} from "\.\.\/lib\/siteMediaUpload"/);
+  assert.match(core, /await uploadSiteMedia\(\{/);
+  assert.doesNotMatch(core, /\/media\/upload-url/);
+  assert.doesNotMatch(core, /\/media\/complete/);
+  assert.doesNotMatch(core, /fetch\(upload\.signedUrl/);
+
+  assert.match(canvas, /data-inline-media-control="true"/);
+  assert.match(canvas, /onUpload\(target,file\)/);
   assert.match(css, /label\[data-inline-media-control="true"\]/);
   assert.match(css, /inset: 0 !important/);
+  assert.match(css, /کلیک برای تغییر تصویر/);
+  assert.match(main, /import "\.\/direct-media\.css"/);
   assert.match(wrapper, /DIRECT MEDIA · 2026\.09\.04/);
 });
 
