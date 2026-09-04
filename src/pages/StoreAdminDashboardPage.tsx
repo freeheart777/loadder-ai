@@ -1,15 +1,280 @@
-import { useEffect,useMemo,useState } from "react";
-import { ArrowRight,ChartLineUp,Checks,Cube,Globe,MagicWand,Megaphone,Package,PaintBrush,Receipt,ShoppingCartSimple,Storefront,Truck,UsersThree,Wallet } from "@phosphor-icons/react";
-import { Link,useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Bank,
+  ChartLineUp,
+  Checks,
+  Cube,
+  Globe,
+  MagicWand,
+  Megaphone,
+  Package,
+  PaintBrush,
+  Receipt,
+  ShoppingCartSimple,
+  Storefront,
+  Truck,
+  UsersThree,
+  Wallet,
+} from "@phosphor-icons/react";
+import { Link, useLocation } from "react-router-dom";
 import { apiFetch } from "../lib/api";
-type Project={id:string;name:string;siteType:string;content:Record<string,unknown>};type Product={id:string;status:string;variants:Array<{inventoryQuantity:number}>};type Order={id:string;status:string;paymentStatus:string;fulfillmentStatus:string;totalMinor:number;currency:string};type Setup={industry?:string;channels?:string[];productCount?:string;salesGoal?:string;learning?:string;storeName?:string;currency?:string;country?:string;shipping?:string;payment?:string;completed?:boolean};
-async function json(r:Response){const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"خطا در دریافت اطلاعات فروشگاه");return d}const money=(minor:number,currency="IRT")=>`${new Intl.NumberFormat("fa-IR",{maximumFractionDigits:0}).format((minor||0)/100)} ${currency==="IRT"?"تومان":currency}`;
-export default function StoreAdminDashboardPage(){const location=useLocation(),[project,setProject]=useState<Project|null>(null),[products,setProducts]=useState<Product[]>([]),[orders,setOrders]=useState<Order[]>([]),[message,setMessage]=useState("");useEffect(()=>{void boot()},[]);async function boot(){try{const p=await json(await apiFetch("/api/site-projects"));const store=(p.projects||[]).find((x:Project)=>String(x.siteType).toUpperCase()==="STORE")||p.projects?.[0];if(!store)throw new Error("پروژه فروشگاهی پیدا نشد.");const[detail,pc,oc]=await Promise.all([json(await apiFetch(`/api/site-projects/${store.id}`)),json(await apiFetch(`/api/stores/${store.id}/products`)),json(await apiFetch(`/api/stores/${store.id}/orders`))]);setProject(detail.project);setProducts(pc.products||[]);setOrders(oc.orders||[])}catch(e){setMessage(e instanceof Error?e.message:"خطا")}}
- const setup=(project?.content?.storeSetupV10||{}) as Setup,stock=useMemo(()=>products.reduce((s,p)=>s+p.variants.reduce((x,v)=>x+Number(v.inventoryQuantity||0),0),0),[products]),revenue=useMemo(()=>orders.filter(o=>!["CANCELLED","REFUNDED"].includes(o.status)).reduce((s,o)=>s+Number(o.totalMinor||0),0),[orders]);const checklist=[{title:"تکمیل اطلاعات فروشگاه",done:!!setup.completed,href:"/dashboard/websites/setup",icon:<Checks/>},{title:"افزودن اولین محصول",done:products.length>0,href:"/dashboard/websites/commerce",icon:<Cube/>},{title:"طراحی صفحه فروشگاه",done:true,href:"/dashboard/websites",icon:<PaintBrush/>},{title:"اتصال دامنه",done:false,href:"/dashboard/site-operations",icon:<Globe/>},{title:"روش‌های ارسال",done:!!setup.shipping&&setup.shipping!=="manual",href:"/dashboard/websites/commerce",icon:<Truck/>},{title:"روش‌های پرداخت",done:!!setup.payment&&setup.payment!=="manual",href:"/dashboard/websites/commerce",icon:<Wallet/>}];const done=checklist.filter(x=>x.done).length;
- return <main dir="rtl" className="min-h-screen bg-[#f4f6fa] text-slate-900"><header className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4"><div className="flex items-center gap-3"><Link to="/dashboard" className="rounded-xl border p-2"><ArrowRight/></Link><div><div className="text-xs text-slate-400">مدیریت فروشگاه</div><h1 className="font-black">{setup.storeName||project?.name||"فروشگاه"}</h1></div></div><div className="flex gap-2"><Link to="/dashboard/websites" className="rounded-xl border px-4 py-2 text-sm font-bold">مشاهده و طراحی سایت</Link><Link to="/dashboard/websites/commerce" className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white">محصولات</Link></div></div></header><div className="mx-auto max-w-7xl px-5 py-7">{(location.state as {created?:boolean}|null)?.created&&<div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center"><Storefront className="mx-auto text-emerald-600" size={34}/><h2 className="mt-2 text-xl font-black">فروشگاه با موفقیت ایجاد شد</h2><p className="mt-1 text-sm text-emerald-800">حالا فقط مراحل فعال‌سازی را تکمیل کن.</p></div>}{message&&<div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{message}</div>}
- <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Stat icon={<Cube/>} title="محصولات" value={String(products.length)}/><Stat icon={<Package/>} title="موجودی" value={String(stock)}/><Stat icon={<ShoppingCartSimple/>} title="سفارش‌ها" value={String(orders.length)}/><Stat icon={<Receipt/>} title="فروش ثبت‌شده" value={money(revenue,orders[0]?.currency||setup.currency||"IRT")}/></section>
- <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]"><section className="rounded-3xl border bg-white p-6 shadow-sm"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-xl font-black">شروع راه‌اندازی</h2><p className="mt-1 text-sm text-slate-400">از ساخت فروشگاه تا آماده‌شدن برای اولین فروش.</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{Math.round(done/checklist.length*100)}٪ پیشرفت</span></div><div className="mb-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-emerald-500" style={{width:`${done/checklist.length*100}%`}}/></div><div className="divide-y">{checklist.map((x,i)=><Link key={x.title} to={x.href} className="flex items-center gap-4 py-4 hover:bg-slate-50"><span className={`grid h-10 w-10 place-items-center rounded-full font-black ${x.done?"bg-emerald-100 text-emerald-700":"bg-slate-100 text-slate-500"}`}>{x.done?<Checks/>:i+1}</span><span className="text-xl text-slate-400">{x.icon}</span><div className="flex-1"><b>{x.title}</b><div className="text-xs text-slate-400">{x.done?"انجام شده":"نیاز به تکمیل"}</div></div><ArrowRight className="rotate-180 text-slate-300"/></Link>)}</div></section>
- <section className="rounded-3xl bg-[#101827] p-6 text-white shadow-sm"><h2 className="text-xl font-black">پروفایل رشد فروشگاه</h2><div className="mt-5 space-y-3 text-sm"><Row k="حوزه" v={setup.industry||"—"}/><Row k="تعداد محصول" v={setup.productCount||"—"}/><Row k="هدف فروش" v={setup.salesGoal||"—"}/><Row k="روش آموزش" v={setup.learning||"—"}/><Row k="کانال‌های فعلی" v={String(setup.channels?.length||0)}/></div><Link to="/dashboard/websites/setup" className="mt-6 block rounded-xl bg-white px-4 py-3 text-center text-sm font-black text-slate-900">ویرایش اطلاعات</Link></section></div>
- <section className="mt-6 rounded-3xl border bg-white p-6 shadow-sm"><h2 className="text-xl font-black">افزایش فروش</h2><p className="mt-1 mb-5 text-sm text-slate-400">مرحله‌ای که Loadder باید از یک فروشگاه‌ساز عادی جلو بزند.</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{[{t:"Google Ads و Conversion",h:"/dashboard/ads",i:<Megaphone/>},{t:"CRM و مشتریان",h:"/dashboard/crm",i:<UsersThree/>},{t:"بازیابی سبد رهاشده",h:"/dashboard/automation",i:<MagicWand/>},{t:"تحلیل فروش",h:"/dashboard/analytics",i:<ChartLineUp/>}].map(x=><Link key={x.t} to={x.h} className="rounded-2xl border p-5 hover:border-violet-300"><span className="text-3xl text-violet-700">{x.i}</span><b className="mt-3 block">{x.t}</b></Link>)}</div></section></div></main>}
-function Stat({icon,title,value}:{icon:React.ReactNode;title:string;value:string}){return <div className="flex items-center gap-4 rounded-2xl border bg-white p-5 shadow-sm"><span className="grid h-12 w-12 place-items-center rounded-xl bg-violet-50 text-2xl text-violet-700">{icon}</span><div><div className="text-xs text-slate-400">{title}</div><b className="text-xl">{value}</b></div></div>}
-function Row({k,v}:{k:string;v:string}){return <div className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3"><span className="text-white/50">{k}</span><b className="max-w-52 text-left">{v}</b></div>}
+
+type Project = { id: string; name: string; siteType: string; content: Record<string, unknown> };
+type Product = { id: string; status: string; variants: Array<{ inventoryQuantity: number }> };
+type Order = {
+  id: string;
+  status: string;
+  paymentStatus: string;
+  fulfillmentStatus: string;
+  totalMinor: number;
+  currency: string;
+};
+type Setup = {
+  industry?: string;
+  channels?: string[];
+  productCount?: string;
+  salesGoal?: string;
+  learning?: string;
+  storeName?: string;
+  currency?: string;
+  country?: string;
+  shipping?: string;
+  payment?: string;
+  completed?: boolean;
+};
+
+async function json(response: Response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "خطا در دریافت اطلاعات فروشگاه");
+  return data;
+}
+
+const money = (minor: number, currency = "IRT") =>
+  `${new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 0 }).format((minor || 0) / 100)} ${currency === "IRT" ? "تومان" : currency}`;
+
+export default function StoreAdminDashboardPage() {
+  const location = useLocation();
+  const [project, setProject] = useState<Project | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    void boot();
+  }, []);
+
+  async function boot() {
+    try {
+      const projects = await json(await apiFetch("/api/site-projects"));
+      const store =
+        (projects.projects || []).find(
+          (item: Project) => String(item.siteType).toUpperCase() === "STORE"
+        ) || projects.projects?.[0];
+      if (!store) throw new Error("پروژه فروشگاهی پیدا نشد.");
+      const [detail, productCollection, orderCollection] = await Promise.all([
+        json(await apiFetch(`/api/site-projects/${store.id}`)),
+        json(await apiFetch(`/api/stores/${store.id}/products`)),
+        json(await apiFetch(`/api/stores/${store.id}/orders`)),
+      ]);
+      setProject(detail.project);
+      setProducts(productCollection.products || []);
+      setOrders(orderCollection.orders || []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "خطا");
+    }
+  }
+
+  const setup = (project?.content?.storeSetupV10 || {}) as Setup;
+  const stock = useMemo(
+    () =>
+      products.reduce(
+        (sum, product) =>
+          sum +
+          product.variants.reduce(
+            (variantSum, variant) => variantSum + Number(variant.inventoryQuantity || 0),
+            0
+          ),
+        0
+      ),
+    [products]
+  );
+  const revenue = useMemo(
+    () =>
+      orders
+        .filter((order) => !["CANCELLED", "REFUNDED"].includes(order.status))
+        .reduce((sum, order) => sum + Number(order.totalMinor || 0), 0),
+    [orders]
+  );
+  const checklist = [
+    { title: "تکمیل اطلاعات فروشگاه", done: !!setup.completed, href: "/dashboard/websites/setup", icon: <Checks /> },
+    { title: "افزودن اولین محصول", done: products.length > 0, href: "/dashboard/websites/commerce", icon: <Cube /> },
+    { title: "طراحی صفحه فروشگاه", done: true, href: "/dashboard/websites", icon: <PaintBrush /> },
+    { title: "اتصال دامنه", done: false, href: "/dashboard/site-operations", icon: <Globe /> },
+    { title: "روش‌های ارسال", done: !!setup.shipping && setup.shipping !== "manual", href: "/dashboard/websites/commerce", icon: <Truck /> },
+    { title: "روش‌های پرداخت", done: !!setup.payment && setup.payment !== "manual", href: "/dashboard/websites/commerce", icon: <Wallet /> },
+  ];
+  const done = checklist.filter((item) => item.done).length;
+
+  return (
+    <main dir="rtl" className="min-h-screen bg-[#f4f6fa] text-slate-900">
+      <header className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <Link to="/dashboard" className="rounded-xl border p-2">
+              <ArrowRight />
+            </Link>
+            <div>
+              <div className="text-xs text-slate-400">مدیریت فروشگاه</div>
+              <h1 className="font-black">{setup.storeName || project?.name || "فروشگاه"}</h1>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/dashboard/websites/commerce/financials"
+              className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-black text-violet-800"
+            >
+              <Bank /> دفتر مالی
+            </Link>
+            <Link to="/dashboard/websites" className="rounded-xl border px-4 py-2 text-sm font-bold">
+              مشاهده و طراحی سایت
+            </Link>
+            <Link
+              to="/dashboard/websites/commerce"
+              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white"
+            >
+              محصولات
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-5 py-7">
+        {(location.state as { created?: boolean } | null)?.created && (
+          <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+            <Storefront className="mx-auto text-emerald-600" size={34} />
+            <h2 className="mt-2 text-xl font-black">فروشگاه با موفقیت ایجاد شد</h2>
+            <p className="mt-1 text-sm text-emerald-800">حالا فقط مراحل فعال‌سازی را تکمیل کن.</p>
+          </div>
+        )}
+        {message && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {message}
+          </div>
+        )}
+
+        <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat icon={<Cube />} title="محصولات" value={String(products.length)} />
+          <Stat icon={<Package />} title="موجودی" value={String(stock)} />
+          <Stat icon={<ShoppingCartSimple />} title="سفارش‌ها" value={String(orders.length)} />
+          <Stat
+            icon={<Receipt />}
+            title="فروش ثبت‌شده"
+            value={money(revenue, orders[0]?.currency || setup.currency || "IRT")}
+          />
+        </section>
+
+        <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
+          <section className="rounded-3xl border bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black">شروع راه‌اندازی</h2>
+                <p className="mt-1 text-sm text-slate-400">از ساخت فروشگاه تا آماده‌شدن برای اولین فروش.</p>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                {Math.round((done / checklist.length) * 100)}٪ پیشرفت
+              </span>
+            </div>
+            <div className="mb-5 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full bg-emerald-500" style={{ width: `${(done / checklist.length) * 100}%` }} />
+            </div>
+            <div className="divide-y">
+              {checklist.map((item, index) => (
+                <Link
+                  key={item.title}
+                  to={item.href}
+                  className="flex items-center gap-4 py-4 hover:bg-slate-50"
+                >
+                  <span
+                    className={`grid h-10 w-10 place-items-center rounded-full font-black ${
+                      item.done ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {item.done ? <Checks /> : index + 1}
+                  </span>
+                  <span className="text-xl text-slate-400">{item.icon}</span>
+                  <div className="flex-1">
+                    <b>{item.title}</b>
+                    <div className="text-xs text-slate-400">{item.done ? "انجام شده" : "نیاز به تکمیل"}</div>
+                  </div>
+                  <ArrowRight className="rotate-180 text-slate-300" />
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-3xl bg-[#101827] p-6 text-white shadow-sm">
+            <h2 className="text-xl font-black">پروفایل رشد فروشگاه</h2>
+            <div className="mt-5 space-y-3 text-sm">
+              <Row k="حوزه" v={setup.industry || "—"} />
+              <Row k="تعداد محصول" v={setup.productCount || "—"} />
+              <Row k="هدف فروش" v={setup.salesGoal || "—"} />
+              <Row k="روش آموزش" v={setup.learning || "—"} />
+              <Row k="کانال‌های فعلی" v={String(setup.channels?.length || 0)} />
+            </div>
+            <Link
+              to="/dashboard/websites/setup"
+              className="mt-6 block rounded-xl bg-white px-4 py-3 text-center text-sm font-black text-slate-900"
+            >
+              ویرایش اطلاعات
+            </Link>
+          </section>
+        </div>
+
+        <section className="mt-6 rounded-3xl border bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-black">افزایش فروش و عملیات</h2>
+          <p className="mb-5 mt-1 text-sm text-slate-400">از جذب مشتری تا کنترل مالی فروشگاه.</p>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {[
+              { t: "دفتر مالی و Ledger", h: "/dashboard/websites/commerce/financials", i: <Bank /> },
+              { t: "Google Ads و Conversion", h: "/dashboard/ads", i: <Megaphone /> },
+              { t: "CRM و مشتریان", h: "/dashboard/crm", i: <UsersThree /> },
+              { t: "بازیابی سبد رهاشده", h: "/dashboard/automation", i: <MagicWand /> },
+              { t: "تحلیل فروش", h: "/dashboard/analytics", i: <ChartLineUp /> },
+            ].map((item) => (
+              <Link
+                key={item.t}
+                to={item.h}
+                className="rounded-2xl border p-5 hover:border-violet-300"
+              >
+                <span className="text-3xl text-violet-700">{item.i}</span>
+                <b className="mt-3 block">{item.t}</b>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function Stat({ icon, title, value }: { icon: React.ReactNode; title: string; value: string }) {
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border bg-white p-5 shadow-sm">
+      <span className="grid h-12 w-12 place-items-center rounded-xl bg-violet-50 text-2xl text-violet-700">{icon}</span>
+      <div>
+        <div className="text-xs text-slate-400">{title}</div>
+        <b className="text-xl">{value}</b>
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+      <span className="text-white/50">{k}</span>
+      <b className="max-w-52 text-left">{v}</b>
+    </div>
+  );
+}
