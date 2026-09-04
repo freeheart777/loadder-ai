@@ -59,6 +59,11 @@ function inferVertical(intent, selectedBlueprints) {
   return selectedBlueprints.length === 1 ? selectedBlueprints[0].id : "business-operations";
 }
 
+function exactBlueprintFromStoreIntent(catalog, intent) {
+  const normalized = String(intent || "").trim().replace(/\s+/g, " ").toLowerCase();
+  return Object.values(catalog).find((blueprint) => normalized === `یک ${blueprint.name} بساز`.toLowerCase()) || null;
+}
+
 export class LoadderBusinessCompiler {
   constructor({ blueprintCatalog = BUSINESS_BLUEPRINTS } = {}) {
     this.blueprintCatalog = blueprintCatalog;
@@ -69,8 +74,10 @@ export class LoadderBusinessCompiler {
 
     let selectedBlueprints;
     let confidence;
-    if (blueprintId) {
-      const exact = this.blueprintCatalog[String(blueprintId)];
+    let selectionMode;
+    const storeBlueprint = !blueprintId ? exactBlueprintFromStoreIntent(this.blueprintCatalog, intent) : null;
+    if (blueprintId || storeBlueprint) {
+      const exact = blueprintId ? this.blueprintCatalog[String(blueprintId)] : storeBlueprint;
       if (!exact) {
         const error = new Error(`Unknown business blueprint: ${blueprintId}`);
         error.code = "BUSINESS_BLUEPRINT_NOT_FOUND";
@@ -78,16 +85,18 @@ export class LoadderBusinessCompiler {
       }
       selectedBlueprints = [exact];
       confidence = 1;
+      selectionMode = blueprintId ? "exact-blueprint" : "exact-store-intent";
     } else {
       const ranked = rankBlueprints(intent);
       selectedBlueprints = ranked.length
         ? ranked.slice(0, 3).map((item) => this.blueprintCatalog[item.blueprint.id]).filter(Boolean)
         : [this.blueprintCatalog.crm];
       confidence = ranked.length ? Math.min(0.95, 0.55 + ranked[0].score * 0.1) : 0.4;
+      selectionMode = "intent-ranked";
     }
 
     const merged = mergeBlueprints(selectedBlueprints);
-    const vertical = blueprintId ? selectedBlueprints[0].id : inferVertical(intent, selectedBlueprints);
+    const vertical = selectionMode.startsWith("exact-") ? selectedBlueprints[0].id : inferVertical(intent, selectedBlueprints);
     const appName = name?.trim() || `${vertical.replace(/-/g, " ")} workspace`;
 
     return {
@@ -96,7 +105,7 @@ export class LoadderBusinessCompiler {
       locale,
       vertical,
       selectedBlueprints: selectedBlueprints.map((blueprint) => blueprint.id),
-      selectionMode: blueprintId ? "exact-blueprint" : "intent-ranked",
+      selectionMode,
       confidence,
       merged,
     };
