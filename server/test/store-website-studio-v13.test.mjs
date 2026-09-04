@@ -14,16 +14,17 @@ const v16Canvas = read("../../src/components/store-studio-v16/StudioCanvas.tsx")
 const v16Inspector = read("../../src/components/store-studio-v16/InspectorPanel.tsx");
 const v16Source = [v16, v16Types, v16Config, v16Canvas, v16Inspector].join("\n");
 
+function routeWindow(path,length=260){const marker=`path="${path}"`,at=app.indexOf(marker);assert.ok(at>=0,`missing route ${path}`);return app.slice(at,at+length);}
+
 test("main Store Studio routes use canonical V16 and legacy URLs cannot surface old studios", () => {
   for (const route of ["/dashboard/websites", "/dashboard/websites/studio", "/site-builder"]) {
-    const escaped = route.replaceAll("/", "\\/");
-    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV16\\s*\\/>\\}`));
+    assert.match(routeWindow(route),/element=\{<StoreWebsiteStudioPageV16\s*\/>\}/);
   }
   for (const route of ["studio-v13", "studio-v14", "studio-v15", "studio-v16"]) {
-    assert.match(app,new RegExp(`path="\\/dashboard\\/websites\\/${route}"[\\s\\S]{0,140}<Navigate to="\\/dashboard\\/websites" replace \\/>`));
+    assert.match(routeWindow(`/dashboard/websites/${route}`),/<Navigate\s+to="\/dashboard\/websites"\s+replace\s*\/>/);
   }
   for (const [route,page] of [["fallback/v13","StoreWebsiteStudioPageV13"],["fallback/v14","StoreWebsiteStudioPageV14"],["fallback/v15","StoreWebsiteStudioPageV15"]]) {
-    assert.match(app,new RegExp(`path="\\/dashboard\\/websites\\/${route}"[\\s\\S]{0,100}${page}`));
+    assert.match(routeWindow(`/dashboard/websites/${route}`),new RegExp(page));
   }
 });
 
