@@ -28,6 +28,15 @@ test("studio and commerce duplicate project reads are served from canonical memo
   assert.match(api, /if \(cached\) return cached/);
 });
 
+test("save and publish update the canonical project snapshot before any later reload", () => {
+  const api = read("src/lib/api.ts");
+  assert.match(api, /function synchronizeCanonicalSnapshot/);
+  assert.match(api, /method === "PATCH" && normalized === projectPath/);
+  assert.match(api, /method === "POST" && normalized === `\$\{projectPath\}\/publish`/);
+  assert.match(api, /project: data\.project/);
+  assert.ok(api.indexOf("await synchronizeCanonicalSnapshot(path, method, response)") < api.lastIndexOf("return response"));
+});
+
 test("legacy website-builder routes cannot execute legacy builders", () => {
   const app = read("src/App.tsx");
   assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites" replace \/>/);
