@@ -4,7 +4,7 @@ import { ArrowClockwise, Desktop, DeviceMobile, DeviceTablet, ShieldCheck, X } f
 type Viewport = "desktop" | "tablet" | "mobile";
 const viewportWidth: Record<Viewport,string>={desktop:"100%",tablet:"820px",mobile:"390px"};
 
-export default function PreviewStudioFrame({url,onRefresh,onApprove,onClose,approving=false}:{url:string;onRefresh:()=>void|Promise<void>;onApprove:()=>void|Promise<void>;onClose:()=>void;approving?:boolean}){
+export default function PreviewStudioFrame({url,onRefresh,onApprove,onClose,approving=false,approveDisabled=false}:{url:string;onRefresh:()=>void|Promise<void>;onApprove:()=>void|Promise<void>;onClose:()=>void;approving?:boolean;approveDisabled?:boolean}){
   const [viewport,setViewport]=useState<Viewport>("desktop");
   const [frameKey,setFrameKey]=useState(0);
   const refresh=async()=>{await onRefresh();setFrameKey(v=>v+1)};
@@ -18,7 +18,7 @@ export default function PreviewStudioFrame({url,onRefresh,onApprove,onClose,appr
           <button aria-label="Mobile preview" onClick={()=>setViewport("mobile")} className={`rounded-lg p-2 ${viewport==="mobile"?"bg-white text-black":"text-white/55"}`}><DeviceMobile size={16}/></button>
         </div>
         <button onClick={refresh} className="flex items-center gap-1 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/65"><ArrowClockwise size={14}/>تازه‌سازی</button>
-        <button disabled={approving} onClick={onApprove} className="rounded-xl bg-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-950 disabled:opacity-50">{approving?"در حال تأیید...":"تأیید پیش‌نمایش"}</button>
+        <button disabled={approving||approveDisabled} onClick={onApprove} title={approveDisabled?"ابتدا Quality Gate را کامل کنید":""} className="rounded-xl bg-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-950 disabled:cursor-not-allowed disabled:opacity-35">{approving?"در حال تأیید...":approveDisabled?"Quality Gate ناقص است":"تأیید پیش‌نمایش"}</button>
         <button aria-label="Close preview" onClick={onClose} className="rounded-xl border border-white/10 p-2 text-white/55"><X size={16}/></button>
       </div>
     </div>
