@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS business_builder_commerce_event_receipts(
   consumer TEXT NOT NULL CHECK(consumer IN ('inventory','crm','accounting','analytics')),
   event_type TEXT NOT NULL,
   order_id TEXT NOT NULL,
-  status TEXT NOT NULL CHECK(status IN ('processed','failed')),
+  status TEXT NOT NULL CHECK(status='processed'),
   details_json TEXT NOT NULL DEFAULT '{}',
   processed_at TEXT NOT NULL,
   UNIQUE(workspace_id,project_id,event_id,consumer),
