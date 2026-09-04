@@ -4,6 +4,7 @@ import { LoadderBusinessBuilderService } from "../app/business-builder/business-
 import { materializeLoadderSourceBundle } from "../app/business-builder/source-materializer.mjs";
 import { loadderBusinessCompiler } from "../app/business-builder/business-compiler.mjs";
 import { renderLoadderApp } from "../app/business-builder/app-renderer.mjs";
+import { renderExecutablePreview } from "../app/business-builder/contract-preview-adapter.mjs";
 
 test("materializer produces a portable Loadder-owned bundle", () => {
   const definition = loadderBusinessCompiler.compile({ intent: "برای فروش یک CRM و انبار بساز", locale: "fa-IR" });
@@ -28,6 +29,17 @@ test("preview completes intent -> definition -> ui -> bundle without production 
   assert.equal(preview.productionDeploymentAllowed, false);
   assert.equal(preview.gates.find((gate) => gate.id === "portable-source-bundle")?.status, "passed");
   assert.equal(preview.gates.find((gate) => gate.id === "human-approval-before-production")?.status, "required");
+});
+
+test("design preview navigation works without enabling scripts and remains unpublished",()=>{
+  const definition=loadderBusinessCompiler.compile({intent:"CRM و انبار بساز",locale:"fa-IR"});
+  const ui=renderLoadderApp(definition),html=renderExecutablePreview({definition,ui});
+  assert.match(html,/href="#view-/);
+  assert.match(html,/id="view-/);
+  assert.match(html,/Loadder Design Preview/);
+  assert.match(html,/منتشر نشده/);
+  assert.doesNotMatch(html,/<script/i);
+  assert.doesNotMatch(html,/onclick=/i);
 });
 
 test("materializer rejects a UI contract for another app", () => {
