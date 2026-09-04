@@ -121,6 +121,7 @@ export function createCustomerAccount({
   id,
   workspaceId,
   storeId,
+  authProjectId,
   principal,
   existingAccounts = [],
   profile = {},
@@ -130,10 +131,13 @@ export function createCustomerAccount({
   const accountId = text(id, 200);
   const workspace = text(workspaceId, 200);
   const store = text(storeId, 200);
+  const authProject = text(authProjectId, 200);
   if (!accountId) throw new TypeError("CUSTOMER_ACCOUNT_ID_REQUIRED");
   if (!workspace) throw new TypeError("CUSTOMER_WORKSPACE_REQUIRED");
   if (!store) throw new TypeError("CUSTOMER_STORE_REQUIRED");
+  if (!authProject) throw new TypeError("CUSTOMER_STORE_AUTH_PROJECT_REQUIRED");
   const resolved = normalizePrincipal(principal);
+  if (resolved.projectId !== authProject) throw new Error("CUSTOMER_STORE_AUTH_PROJECT_MISMATCH");
   const history = validateAccountHistory(workspace, store, existingAccounts);
   if (history.ids.has(accountId)) throw new Error("CUSTOMER_DUPLICATE_ACCOUNT_ID");
   if (history.subjects.has(`${resolved.projectId}:${resolved.id}`)) {
@@ -146,7 +150,7 @@ export function createCustomerAccount({
     storeId: store,
     identitySource: "APP_USER",
     identitySubjectId: resolved.id,
-    authProjectId: resolved.projectId,
+    authProjectId: authProject,
     profile: normalizeProfile(profile),
     addresses: [],
     defaultShippingAddressId: null,
@@ -162,10 +166,7 @@ export function updateCustomerProfile(account, principal, patch = {}, { updatedA
   const at = timestamp(updatedAt);
   assertNotBefore(at, account.createdAt);
   assertNotBefore(at, account.updatedAt);
-  const nextProfile = normalizeProfile({
-    ...clone(account.profile || {}),
-    ...(patch || {}),
-  });
+  const nextProfile = normalizeProfile({ ...clone(account.profile || {}), ...(patch || {}) });
   return deepFreeze({ ...clone(account), profile: nextProfile, updatedAt: at });
 }
 
