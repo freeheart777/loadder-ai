@@ -44,6 +44,28 @@ export function createSiteMediaService({ repository, siteProjectService, storage
     return { ...upload, assetType, mimeType, sizeBytes };
   }
 
+  async function directUpload(siteProjectId, input = {}) {
+    const project = siteProjectService.get(siteProjectId);
+    const workspaceId = requireWorkspaceId();
+    const assetType = requireAssetType(input.assetType);
+    const mimeType = requireMimeType(input.mimeType);
+    const fileName = String(input.fileName || "").trim();
+    if (!fileName) throw new SiteMediaError("fileName is required.", 400, "SITE_MEDIA_FILENAME_REQUIRED");
+    if (!Buffer.isBuffer(input.body)) throw new SiteMediaError("Media body is required.", 400, "SITE_MEDIA_BODY_REQUIRED");
+    const sizeBytes = requireSize(input.body.length);
+    const stored = await storage.directUpload({ workspaceId, siteProjectId: project.id, assetType, fileName, mimeType, body: input.body });
+    const asset = repository.create({
+      siteProjectId: project.id,
+      assetType,
+      storageKey: stored.path,
+      mimeType,
+      sizeBytes,
+      metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata : {},
+      now: now().toISOString(),
+    });
+    return expose(asset);
+  }
+
   async function acceptLocalUpload(token, body) {
     return storage.acceptLocalUpload(token, body);
   }
@@ -86,5 +108,5 @@ export function createSiteMediaService({ repository, siteProjectService, storage
     return repository.remove(siteProjectId, mediaId);
   }
 
-  return Object.freeze({ createUpload, acceptLocalUpload, readLocalAsset, completeUpload, list, remove });
+  return Object.freeze({ createUpload, directUpload, acceptLocalUpload, readLocalAsset, completeUpload, list, remove });
 }
