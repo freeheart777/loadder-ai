@@ -64,16 +64,30 @@ export class LoadderBusinessCompiler {
     this.blueprintCatalog = blueprintCatalog;
   }
 
-  analyze({ intent, name, locale = "fa-IR" }) {
+  analyze({ intent, name, locale = "fa-IR", blueprintId = null }) {
     if (!intent || !String(intent).trim()) throw new Error("Business intent is required.");
 
-    const ranked = rankBlueprints(intent);
-    const selectedBlueprints = ranked.length
-      ? ranked.slice(0, 3).map((item) => this.blueprintCatalog[item.blueprint.id]).filter(Boolean)
-      : [this.blueprintCatalog.crm];
+    let selectedBlueprints;
+    let confidence;
+    if (blueprintId) {
+      const exact = this.blueprintCatalog[String(blueprintId)];
+      if (!exact) {
+        const error = new Error(`Unknown business blueprint: ${blueprintId}`);
+        error.code = "BUSINESS_BLUEPRINT_NOT_FOUND";
+        throw error;
+      }
+      selectedBlueprints = [exact];
+      confidence = 1;
+    } else {
+      const ranked = rankBlueprints(intent);
+      selectedBlueprints = ranked.length
+        ? ranked.slice(0, 3).map((item) => this.blueprintCatalog[item.blueprint.id]).filter(Boolean)
+        : [this.blueprintCatalog.crm];
+      confidence = ranked.length ? Math.min(0.95, 0.55 + ranked[0].score * 0.1) : 0.4;
+    }
 
     const merged = mergeBlueprints(selectedBlueprints);
-    const vertical = inferVertical(intent, selectedBlueprints);
+    const vertical = blueprintId ? selectedBlueprints[0].id : inferVertical(intent, selectedBlueprints);
     const appName = name?.trim() || `${vertical.replace(/-/g, " ")} workspace`;
 
     return {
@@ -82,7 +96,8 @@ export class LoadderBusinessCompiler {
       locale,
       vertical,
       selectedBlueprints: selectedBlueprints.map((blueprint) => blueprint.id),
-      confidence: ranked.length ? Math.min(0.95, 0.55 + ranked[0].score * 0.1) : 0.4,
+      selectionMode: blueprintId ? "exact-blueprint" : "intent-ranked",
+      confidence,
       merged,
     };
   }
