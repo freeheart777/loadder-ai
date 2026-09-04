@@ -1,4 +1,4 @@
-import { apiFetch, setCanonicalStoreProjectId } from "./api";
+import { apiFetch, setCanonicalStoreProjectId, setCanonicalStoreProjectSnapshot } from "./api";
 
 export type ActiveStoreProject = {
   id: string;
@@ -50,12 +50,15 @@ async function resolveActiveStoreProject(fetcher: Fetcher): Promise<ActiveStoreP
 
   const detail = await read(await fetcher(`/api/site-projects/${projectId}`));
   if (!isStore(detail.project)) throw new Error("جزئیات پروژه فروشگاهی معتبر دریافت نشد.");
-  if (fetcher === apiFetch) setCanonicalStoreProjectId(detail.project.id);
+  if (fetcher === apiFetch) {
+    setCanonicalStoreProjectSnapshot(detail as Record<string, unknown>);
+  }
   return detail as ActiveStoreProjectDetail;
 }
 
 export function invalidateActiveStoreProject() {
   canonicalProjectPromise = null;
+  setCanonicalStoreProjectSnapshot(null);
   setCanonicalStoreProjectId("");
 }
 
@@ -64,6 +67,7 @@ export async function loadActiveStoreProject(fetcher: Fetcher = apiFetch): Promi
   if (!canonicalProjectPromise) {
     canonicalProjectPromise = resolveActiveStoreProject(apiFetch).catch((error) => {
       canonicalProjectPromise = null;
+      setCanonicalStoreProjectSnapshot(null);
       setCanonicalStoreProjectId("");
       throw error;
     });
