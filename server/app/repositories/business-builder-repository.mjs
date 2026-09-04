@@ -69,6 +69,12 @@ export function createBusinessBuilderRepository(db) {
     }
     return session;
   }
+  function latestPreviewSession(projectId,versionId){
+    const row=db.prepare("SELECT * FROM business_builder_preview_sessions WHERE project_id=? AND version_id=? AND workspace_id=? ORDER BY created_at DESC LIMIT 1").get(projectId,versionId,workspaceId());
+    const session=mapPreview(row);if(!session)return null;
+    if(Date.parse(session.expiresAt)<=Date.now()&&session.status==="active"){db.prepare("UPDATE business_builder_preview_sessions SET status='expired' WHERE id=? AND workspace_id=?").run(session.id,workspaceId());return{...session,status:"expired"};}
+    return session;
+  }
   function recordApproval({ projectId, versionId, stage, decision, decidedBy = null, note = null }) {
     const id = crypto.randomUUID(), timestamp = now();
     db.prepare(`INSERT INTO business_builder_approvals (id, project_id, version_id, workspace_id, stage, decision, decided_by, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -80,5 +86,5 @@ export function createBusinessBuilderRepository(db) {
     return row ? { id: row.id, decision: row.decision, stage: row.stage, note: row.note, createdAt: row.created_at } : null;
   }
 
-  return { listProjects, getProject, createProject, updateProject, createVersion, getVersion, listVersions, getActiveVersion, createPreviewSession, getPreviewSession, recordApproval, latestApproval };
+  return { listProjects, getProject, createProject, updateProject, createVersion, getVersion, listVersions, getActiveVersion, createPreviewSession, getPreviewSession, latestPreviewSession, recordApproval, latestApproval };
 }
