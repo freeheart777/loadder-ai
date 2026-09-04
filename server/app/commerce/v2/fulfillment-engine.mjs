@@ -19,7 +19,21 @@ const positiveInt = (value, code) => {
   return number;
 };
 
-const timestamp = (value) => text(value, 80) || new Date().toISOString();
+const timestamp = (value) => {
+  const normalized = text(value, 80) || new Date().toISOString();
+  if (!Number.isFinite(Date.parse(normalized))) {
+    throw new Error("FULFILLMENT_INVALID_TIMESTAMP");
+  }
+  return normalized;
+};
+
+const assertTimestampNotBefore = (candidate, baseline) => {
+  if (!baseline) return;
+  const baselineTimestamp = timestamp(baseline);
+  if (Date.parse(candidate) < Date.parse(baselineTimestamp)) {
+    throw new Error("FULFILLMENT_TIMESTAMP_REGRESSION");
+  }
+};
 
 const fulfillmentStatuses = new Set([
   "PENDING",
@@ -70,6 +84,19 @@ function normalizeLineRequest(order, rawLine) {
   };
 }
 
+function validatedFulfillmentLines(order, fulfillment) {
+  if (!Array.isArray(fulfillment.lines) || fulfillment.lines.length === 0) {
+    throw new Error("FULFILLMENT_LINES_REQUIRED");
+  }
+  const seen = new Set();
+  return fulfillment.lines.map((rawLine) => {
+    const line = normalizeLineRequest(order, rawLine);
+    if (seen.has(line.orderLineId)) throw new Error("FULFILLMENT_DUPLICATE_ORDER_LINE");
+    seen.add(line.orderLineId);
+    return line;
+  });
+}
+
 function allocatedByLine(order, fulfillments = []) {
   const totals = new Map(order.lines.map((line) => [line.id, 0]));
   for (const fulfillment of fulfillments) {
@@ -77,9 +104,9 @@ function allocatedByLine(order, fulfillments = []) {
     if (!fulfillmentStatuses.has(fulfillment.status)) {
       throw new Error("FULFILLMENT_INVALID_STATUS");
     }
+    const lines = validatedFulfillmentLines(order, fulfillment);
     if (!activeAllocation(fulfillment)) continue;
-    for (const line of fulfillment.lines || []) {
-      if (!totals.has(line.orderLineId)) throw new Error("FULFILLMENT_UNKNOWN_ORDER_LINE");
+    for (const line of lines) {
       totals.set(line.orderLineId, totals.get(line.orderLineId) + line.quantity);
     }
   }
@@ -158,6 +185,10 @@ export function transitionFulfillment(
   if (!(allowed[current] || []).includes(next)) throw new Error("INVALID_FULFILLMENT_TRANSITION");
 
   const at = timestamp(occurredAt);
+  assertTimestampNotBefore(at, fulfillment.createdAt);
+  assertTimestampNotBefore(at, fulfillment.updatedAt);
+  if (next === "DELIVERED") assertTimestampNotBefore(at, fulfillment.shippedAt);
+
   const nextValue = {
     ...clone(fulfillment),
     status: next,
@@ -191,17 +222,22 @@ export function recordTrackingEvent(
   }
   const normalizedStatus = text(status, 80).toUpperCase();
   if (!normalizedStatus) throw new Error("TRACKING_EVENT_STATUS_REQUIRED");
+  const eventTimestamp = timestamp(occurredAt);
+  assertTimestampNotBefore(eventTimestamp, fulfillment.createdAt);
   const event = {
     id: eventId,
     status: normalizedStatus,
     message: text(message, 1000),
     location: text(location, 300),
-    occurredAt: timestamp(occurredAt),
+    occurredAt: eventTimestamp,
   };
+  const currentUpdatedAt = timestamp(fulfillment.updatedAt || fulfillment.createdAt);
+  const updatedAt =
+    Date.parse(eventTimestamp) > Date.parse(currentUpdatedAt) ? eventTimestamp : currentUpdatedAt;
   return deepFreeze({
     ...clone(fulfillment),
     trackingEvents: [...(fulfillment.trackingEvents || []).map(clone), event],
-    updatedAt: event.occurredAt,
+    updatedAt,
   });
 }
 
@@ -228,9 +264,9 @@ export function summarizeOrderFulfillment(order, fulfillments = []) {
     if (!fulfillmentStatuses.has(fulfillment.status)) {
       throw new Error("FULFILLMENT_INVALID_STATUS");
     }
-    for (const line of fulfillment.lines || []) {
+    const lines = validatedFulfillmentLines(order, fulfillment);
+    for (const line of lines) {
       const state = lineState.get(line.orderLineId);
-      if (!state) throw new Error("FULFILLMENT_UNKNOWN_ORDER_LINE");
       if (activeAllocation(fulfillment)) state.allocatedQuantity += line.quantity;
       if (shippedAllocation(fulfillment)) state.fulfilledQuantity += line.quantity;
       if (deliveredAllocation(fulfillment)) state.deliveredQuantity += line.quantity;
