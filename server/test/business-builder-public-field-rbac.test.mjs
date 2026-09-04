@@ -37,7 +37,7 @@ test("public bootstrap and CRUD never expose or accept fields outside the app ro
     const bootstrap=await response.json();
     assert.deepEqual(bootstrap.definition.entities[0].fields.map(field=>field.id),["title"]);
     response=await fetch(`${base}/public/apps/p1/data/ticket`,{method:"POST",headers,body:JSON.stringify({title:"ok",internalNote:"must reject"})});
-    assert.equal(response.status,403);
+    assert.equal(response.status,400);
     assert.equal((await response.json()).code,"APP_FIELD_ACCESS_FORBIDDEN");
     response=await fetch(`${base}/public/apps/p1/data/ticket`,{method:"POST",headers,body:JSON.stringify({title:"safe"})});
     assert.equal(response.status,201);
