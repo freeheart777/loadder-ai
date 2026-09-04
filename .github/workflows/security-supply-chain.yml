@@ -23,6 +23,20 @@ jobs:
       - name: Static backdoor and secret gate
         run: node server/scripts/security-static-gate.mjs
       - name: Root dependency audit
-        run: npm audit --audit-level=critical --omit=dev
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npm audit --audit-level=critical --omit=dev; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "npm audit unavailable or failed; retrying in $((attempt * 10))s…"
+            sleep $((attempt * 10))
+          done
       - name: Server dependency audit
-        run: npm --prefix server audit --audit-level=critical --omit=dev
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npm --prefix server audit --audit-level=critical --omit=dev; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "server npm audit unavailable or failed; retrying in $((attempt * 10))s…"
+            sleep $((attempt * 10))
+          done
