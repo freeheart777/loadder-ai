@@ -1,1 +1,22 @@
-import{requireWorkspaceId}from"../tenant-context.mjs";export function createBusinessBuilderAdminHealth(db){const count=(sql,...args)=>Number(db.prepare(sql).get(...args)?.c||0);return Object.freeze({summary(){const w=requireWorkspaceId(),failedDeployments=count("SELECT COUNT(*) c FROM business_builder_deployments WHERE workspace_id=? AND status IN ('failed','rolled_back','blocked')",w),pendingActions=count("SELECT COUNT(*) c FROM business_builder_action_ledger WHERE workspace_id=? AND status='drafted'",w),disabledAppUsers=count("SELECT COUNT(*) c FROM business_builder_app_users WHERE workspace_id=? AND status='disabled'",w),expiredInvites=count("SELECT COUNT(*) c FROM business_builder_app_invites WHERE workspace_id=? AND used_at IS NULL AND expires_at < ?",w,new Date().toISOString()),paymentEvents=count("SELECT COUNT(*) c FROM business_builder_payment_events WHERE workspace_id=?",w),files=count("SELECT COUNT(*) c FROM business_builder_files WHERE workspace_id=? AND status='active'",w),gitFailures=count("SELECT COUNT(*) c FROM business_builder_git_sync_events WHERE workspace_id=? AND status='failed'",w),collaborationEvents=count("SELECT COUNT(*) c FROM business_builder_collaboration_events WHERE workspace_id=?",w);const incidents=[...(failedDeployments?[{code:"DEPLOYMENT_FAILURE",severity:"high",count:failedDeployments}]:[]),...(gitFailures?[{code:"GIT_SYNC_FAILURE",severity:"medium",count:gitFailures}]:[]),...(expiredInvites?[{code:"EXPIRED_INVITES",severity:"low",count:expiredInvites}]:[])];return{status:incidents.some(x=>x.severity==="high")?"degraded":incidents.length?"attention":"healthy",incidents,counters:{failedDeployments,pendingActions,disabledAppUsers,expiredInvites,paymentEvents,files,gitFailures,collaborationEvents}};}});}
+import{requireWorkspaceId}from"../tenant-context.mjs";
+export function createBusinessBuilderAdminHealth(db){
+  const safeCount=(source,sql,...args)=>{try{return{source,value:Number(db.prepare(sql).get(...args)?.c||0),known:true};}catch(error){if(String(error?.code||"")==="SQLITE_ERROR")return{source,value:null,known:false};throw error;}};
+  return Object.freeze({summary(){
+    const w=requireWorkspaceId(),at=new Date().toISOString();
+    const checks=[
+      safeCount("deployments","SELECT COUNT(*) c FROM business_builder_deployments WHERE workspace_id=? AND status IN ('failed','rolled_back','blocked')",w),
+      safeCount("actions","SELECT COUNT(*) c FROM business_builder_action_ledger WHERE workspace_id=? AND status='drafted'",w),
+      safeCount("appUsers","SELECT COUNT(*) c FROM business_builder_app_users WHERE workspace_id=? AND status='disabled'",w),
+      safeCount("invites","SELECT COUNT(*) c FROM business_builder_app_invites WHERE workspace_id=? AND consumed_at IS NULL AND expires_at < ?",w,at),
+      safeCount("payments","SELECT COUNT(*) c FROM business_builder_payment_events WHERE workspace_id=?",w),
+      safeCount("files","SELECT COUNT(*) c FROM business_builder_files WHERE workspace_id=? AND deleted_at IS NULL",w),
+      safeCount("git","SELECT COUNT(*) c FROM business_builder_git_sync_events WHERE workspace_id=? AND status='failed'",w),
+      safeCount("collaboration","SELECT COUNT(*) c FROM business_builder_collaboration_events WHERE workspace_id=?",w)
+    ];
+    const by=Object.fromEntries(checks.map(x=>[x.source,x.value])),unknownSources=checks.filter(x=>!x.known).map(x=>x.source);
+    const failedDeployments=by.deployments,pendingActions=by.actions,disabledAppUsers=by.appUsers,expiredInvites=by.invites,paymentEvents=by.payments,files=by.files,gitFailures=by.git,collaborationEvents=by.collaboration;
+    const incidents=[...(Number(failedDeployments)>0?[{code:"DEPLOYMENT_FAILURE",severity:"high",count:failedDeployments}]:[]),...(Number(gitFailures)>0?[{code:"GIT_SYNC_FAILURE",severity:"medium",count:gitFailures}]:[]),...(Number(expiredInvites)>0?[{code:"EXPIRED_INVITES",severity:"low",count:expiredInvites}]:[])];
+    const status=incidents.some(x=>x.severity==="high")?"degraded":incidents.length?"attention":unknownSources.length?"unknown":"healthy";
+    return{status,incidents,unknownSources,counters:{failedDeployments,pendingActions,disabledAppUsers,expiredInvites,paymentEvents,files,gitFailures,collaborationEvents}};
+  }});
+}
