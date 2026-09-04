@@ -14,7 +14,7 @@ function setup(){
   return db;
 }
 
-test("business builder persists immutable versions, restores and requires preview plus production approval", async()=>{
+test("business builder persists immutable versions, restores and requires ordered preview plus production approval", async()=>{
   const db=setup();
   await runWithWorkspace("w1", async()=>{
     const repository=createBusinessBuilderRepository(db);
@@ -32,16 +32,17 @@ test("business builder persists immutable versions, restores and requires previe
     assert.equal(repository.listVersions(created.project.id).length,3);
     assert.equal(projects.canDeployProduction(created.project.id),false);
 
-    projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"production",decision:"approved",actorId:"u1"});
-    assert.equal(projects.canDeployProduction(created.project.id),false,"production approval alone must not bypass preview");
+    assert.throws(()=>projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"production",decision:"approved",actorId:"u1"}),e=>e.code==="PREVIEW_APPROVAL_REQUIRED");
     projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"preview",decision:"approved",actorId:"u1"});
+    assert.equal(projects.canDeployProduction(created.project.id),false,"preview approval alone is insufficient");
+    projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"production",decision:"approved",actorId:"u1"});
     assert.equal(projects.canDeployProduction(created.project.id),true);
 
     const changed=projects.saveProject(created.project.id,{name:"Ops 2"},"u1");
     assert.notEqual(changed.version.id,restored.version.id);
-    assert.equal(projects.canDeployProduction(created.project.id),false,"a new active version needs fresh preview and production approvals");
+    assert.equal(projects.canDeployProduction(created.project.id),false,"a new active version needs fresh approvals");
+    assert.throws(()=>projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"preview",decision:"approved",actorId:"u1"}),e=>e.code==="ACTIVE_VERSION_APPROVAL_REQUIRED");
     projects.decide({projectId:created.project.id,versionId:changed.version.id,stage:"preview",decision:"approved",actorId:"u1"});
-    assert.equal(projects.canDeployProduction(created.project.id),false,"preview approval alone is insufficient");
     projects.decide({projectId:created.project.id,versionId:changed.version.id,stage:"production",decision:"approved",actorId:"u1"});
     assert.equal(projects.canDeployProduction(created.project.id),true);
 
