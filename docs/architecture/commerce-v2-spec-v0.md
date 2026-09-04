@@ -98,6 +98,8 @@ A new fulfillment:
 - counts active pending/packing/shipped/delivered allocations when checking remaining quantity;
 - rejects any allocation that would exceed the ordered quantity across active fulfillments.
 
+Existing/persisted fulfillment history is treated as untrusted input at the domain boundary: ownership, order-line references and quantities are revalidated before allocation or summary calculations. Negative, zero or fractional fulfillment quantities are rejected instead of being allowed to corrupt remaining-quantity calculations.
+
 A cancelled fulfillment releases its unshipped allocation so a replacement fulfillment may be created without over-fulfilling the order.
 
 ### Lifecycle
@@ -112,8 +114,12 @@ Cancellation is allowed only before shipping:
 
 `SHIPPED`, `DELIVERED` and `CANCELLED` cannot move backward. Shipping carrier, tracking number and tracking URL are provider-neutral optional metadata because local/manual delivery may legitimately have no carrier tracking number.
 
+Lifecycle timestamps must be valid timestamps and may not move the fulfillment clock backward. A transition cannot occur before fulfillment creation or before its current `updatedAt`; delivery cannot occur before shipment. This keeps persisted history internally chronological even when callers provide explicit timestamps.
+
 ### Tracking
 Tracking events are append-only immutable facts identified by a unique event ID within a fulfillment. Recording a tracking event returns a new fulfillment value and never mutates earlier snapshots. Duplicate event IDs are rejected. Cancelled fulfillments cannot receive new tracking events.
+
+A tracking event cannot predate fulfillment creation. Carrier events may arrive out of chronological delivery order, so appending an older valid tracking fact does not rewrite history or move the fulfillment aggregate `updatedAt` backward.
 
 ### Derived order fulfillment status
 Order fulfillment status is derived from shipped/delivered quantities, not from merely allocating a pending fulfillment:
