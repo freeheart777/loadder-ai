@@ -1,6 +1,12 @@
 import crypto from "node:crypto";
 
-export function sha256Artifact(artifact){return crypto.createHash("sha256").update(typeof artifact==="string"?artifact:JSON.stringify(artifact)).digest("hex");}
+function canonicalize(value){
+  if(value===null||typeof value!=="object")return value;
+  if(Array.isArray(value))return value.map(canonicalize);
+  const out={};for(const key of Object.keys(value).sort())out[key]=canonicalize(value[key]);return out;
+}
+export function canonicalArtifactJson(artifact){return JSON.stringify(canonicalize(artifact));}
+export function sha256Artifact(artifact){return crypto.createHash("sha256").update(typeof artifact==="string"?artifact:canonicalArtifactJson(artifact)).digest("hex");}
 
 export function createProductionDeployAdapter({deploy,health,rollback}={}){
   if(typeof deploy!=="function"||typeof health!=="function"||typeof rollback!=="function")throw new Error("deploy, health and rollback functions are required");
