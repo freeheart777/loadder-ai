@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
@@ -41,8 +41,44 @@ const emptyProductDraft: ProductDraft = {
 
 async function read(response: Response) {
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "عملیات Studio ناموفق بود");
+  if (!response.ok) {
+    const code = data.code ? ` (${data.code})` : "";
+    throw new Error(`${data.message || "عملیات Studio ناموفق بود"}${code}`);
+  }
   return data;
+}
+
+function localizedInteger(value: string, label: string) {
+  const normalized = value
+    .trim()
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[\s,_٬،]/g, "");
+  const parsed = Number(normalized);
+  if (!normalized || !Number.isSafeInteger(parsed) || parsed < 0) throw new Error(`${label} باید یک عدد صحیح و نامنفی باشد.`);
+  return parsed;
+}
+
+function toMinorUnits(amount: number, label: string) {
+  const minor = amount * 100;
+  if (!Number.isSafeInteger(minor)) throw new Error(`${label} از محدوده مجاز بزرگ‌تر است.`);
+  return minor;
+}
+
+function withProductInSection(current: StudioConfig, sectionId: string, productId: string, availableProducts: Product[]) {
+  return {
+    ...current,
+    sections: current.sections.map((section) => {
+      if (section.id !== sectionId || section.type !== "products" || !section.productSettings) return section;
+      const settings = normalizeManual(section.productSettings, availableProducts);
+      return {
+        ...section,
+        productSettings: settings.productIds.includes(productId)
+          ? settings
+          : { ...settings, productIds: [productId, ...settings.productIds].slice(0, 12) },
+      };
+    }),
+  };
 }
 
 function newSection(type: SectionConfig["type"]): SectionConfig {
@@ -96,7 +132,10 @@ export default function StoreWebsiteStudioPageV16() {
   const [pickerSectionId, setPickerSectionId] = useState<string | null>(null);
   const [createProductOpen, setCreateProductOpen] = useState(false);
   const [productBusy, setProductBusy] = useState(false);
+  const [productImageBusy, setProductImageBusy] = useState(false);
+  const [productError, setProductError] = useState("");
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
+  const productSubmitLock = useRef(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
 
@@ -158,24 +197,35 @@ export default function StoreWebsiteStudioPageV16() {
   }
 
   async function createProductInCatalog() {
-    if (!project || !pickerSectionId || productBusy) return;
+    if (!project || !pickerSectionId || productBusy || productSubmitLock.current) return;
+    setProductError("");
     const name = productDraft.name.trim();
-    const basePriceMinor = Number(productDraft.basePriceMinor);
-    const inventoryQuantity = Number(productDraft.inventoryQuantity || 0);
-    const compareAtPriceMinor = productDraft.compareAtPriceMinor.trim() === "" ? null : Number(productDraft.compareAtPriceMinor);
-    if (!name) return setMessage("نام محصول را وارد کنید.");
-    if (!Number.isInteger(basePriceMinor) || basePriceMinor < 0) return setMessage("قیمت محصول معتبر نیست.");
-    if (!Number.isInteger(inventoryQuantity) || inventoryQuantity < 0) return setMessage("موجودی محصول معتبر نیست.");
-    if (compareAtPriceMinor !== null && (!Number.isInteger(compareAtPriceMinor) || compareAtPriceMinor < 0)) return setMessage("قیمت قبل از تخفیف معتبر نیست.");
+    if (!name) {
+      setProductError("نام محصول را وارد کنید.");
+      return;
+    }
+    let basePriceMinor: number;
+    let inventoryQuantity: number;
+    let compareAtPriceMinor: number | null;
+    try {
+      basePriceMinor = toMinorUnits(localizedInteger(productDraft.basePriceMinor, "قیمت محصول"), "قیمت محصول");
+      inventoryQuantity = localizedInteger(productDraft.inventoryQuantity || "0", "موجودی محصول");
+      compareAtPriceMinor = productDraft.compareAtPriceMinor.trim() === "" ? null : toMinorUnits(localizedInteger(productDraft.compareAtPriceMinor, "قیمت قبل از تخفیف"), "قیمت قبل از تخفیف");
+    } catch (error) {
+      setProductError(error instanceof Error ? error.message : "اطلاعات عددی محصول معتبر نیست.");
+      return;
+    }
 
+    productSubmitLock.current = true;
     setProductBusy(true);
+    const sectionId = pickerSectionId;
     try {
       const payload = {
         name,
         basePriceMinor,
         compareAtPriceMinor,
         inventoryQuantity,
-        currency: "IRR",
+        currency: config.commerce.currency,
         status: "ACTIVE",
         category: productDraft.category.trim() || null,
         brand: productDraft.brand.trim() || null,
@@ -194,21 +244,63 @@ export default function StoreWebsiteStudioPageV16() {
         body: JSON.stringify(payload),
       }));
       const product = out.product as Product;
-      const nextProducts = [product, ...products.filter((p) => p.id !== product.id)];
+      let nextProducts = [product, ...products.filter((p) => p.id !== product.id)];
+      let refreshWarning = "";
+      try {
+        const refreshed = await read(await apiFetch(`/api/stores/${project.id}/products`));
+        const authoritativeProducts = (refreshed.products || []) as Product[];
+        if (!authoritativeProducts.some((item) => item.id === product.id)) throw new Error("محصول تازه در بازخوانی کاتالوگ پیدا نشد.");
+        nextProducts = authoritativeProducts;
+      } catch (error) {
+        refreshWarning = error instanceof Error ? error.message : "بازخوانی کاتالوگ ناموفق بود.";
+      }
+      const nextConfig = withProductInSection(config, sectionId, product.id, nextProducts);
       setProducts(nextProducts);
-      patchProductSection(pickerSectionId, (raw) => {
-        const s = normalizeManual(raw, nextProducts);
-        return s.productIds.includes(product.id) ? s : { ...s, productIds: [...s.productIds, product.id].slice(0, 12) };
-      });
+      setConfig(nextConfig);
+      let configWarning = "";
+      try {
+        await persistConfig(nextConfig);
+      } catch (error) {
+        configWarning = error instanceof Error ? error.message : "ذخیره چیدمان فروشگاه ناموفق بود.";
+      }
       selectCanvasElement({ type: "product-card", id: product.id });
       setProductDraft(emptyProductDraft);
+      setProductError("");
       setCreateProductOpen(false);
       setPickerSectionId(null);
-      setMessage("محصول ساخته شد و روی فروشگاه قرار گرفت.");
+      const warning = [refreshWarning, configWarning].filter(Boolean).join(" ");
+      setMessage(warning ? `محصول ذخیره شد؛ اما همگام‌سازی کامل نشد: ${warning}` : "محصول ساخته، ذخیره و روی فروشگاه قرار گرفت.");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "ساخت محصول ناموفق بود.");
+      const error = e instanceof Error ? e.message : "ساخت محصول ناموفق بود.";
+      setProductError(error);
+      setMessage(error);
     } finally {
+      productSubmitLock.current = false;
       setProductBusy(false);
+    }
+  }
+
+  async function uploadProductDraftImage(file: File) {
+    if (!project || productImageBusy || productBusy) return;
+    setProductImageBusy(true);
+    setProductError("");
+    try {
+      const uploaded = await uploadSiteMedia({
+        siteProjectId: project.id,
+        file,
+        assetType: "product",
+        metadata: { target: { kind: "product-draft" } },
+      });
+      if (!uploaded.url) throw new Error("فایل ذخیره شد اما URL نهایی تصویر دریافت نشد.");
+      setAssets((current) => [{ ...uploaded, name: file.name } as MediaAsset, ...current.filter((item) => item.id !== uploaded.id)]);
+      setProductDraft((current) => ({ ...current, imageUrl: uploaded.url }));
+      setMessage("تصویر محصول در Media Library ذخیره و به فرم متصل شد.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "آپلود تصویر محصول ناموفق بود.";
+      setProductError(message);
+      setMessage(message);
+    } finally {
+      setProductImageBusy(false);
     }
   }
 
@@ -393,14 +485,27 @@ export default function StoreWebsiteStudioPageV16() {
               </button>;
             })}
           </div>
-        </> : <form className="grid max-h-[72vh] gap-4 overflow-auto p-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); void createProductInCatalog(); }}>
+        </> : <form data-product-create-form="true" className="grid max-h-[72vh] gap-4 overflow-auto p-4 sm:grid-cols-2" noValidate onSubmit={(e) => { e.preventDefault(); void createProductInCatalog(); }}>
+          {productError && <div role="alert" aria-live="assertive" data-product-form-error="true" className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm leading-6 text-rose-100 sm:col-span-2">{productError}</div>}
           <label className="grid gap-1 text-xs font-bold">نام محصول<input value={productDraft.name} onChange={(e) => setProductDraft((d) => ({ ...d, name: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="مثلاً سرم آبرسان" /></label>
-          <label className="grid gap-1 text-xs font-bold">قیمت<input inputMode="numeric" value={productDraft.basePriceMinor} onChange={(e) => setProductDraft((d) => ({ ...d, basePriceMinor: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="مثلاً 450000" /></label>
+          <label className="grid gap-1 text-xs font-bold">قیمت ({config.commerce.currency === "IRT" ? "تومان" : config.commerce.currency})<input inputMode="numeric" value={productDraft.basePriceMinor} onChange={(e) => setProductDraft((d) => ({ ...d, basePriceMinor: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="مثلاً 450000" /></label>
           <label className="grid gap-1 text-xs font-bold">قیمت قبل از تخفیف<input inputMode="numeric" value={productDraft.compareAtPriceMinor} onChange={(e) => setProductDraft((d) => ({ ...d, compareAtPriceMinor: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="اختیاری" /></label>
           <label className="grid gap-1 text-xs font-bold">موجودی<input inputMode="numeric" value={productDraft.inventoryQuantity} onChange={(e) => setProductDraft((d) => ({ ...d, inventoryQuantity: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
           <label className="grid gap-1 text-xs font-bold">دسته‌بندی<input value={productDraft.category} onChange={(e) => setProductDraft((d) => ({ ...d, category: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
           <label className="grid gap-1 text-xs font-bold">برند<input value={productDraft.brand} onChange={(e) => setProductDraft((d) => ({ ...d, brand: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
-          <label className="grid gap-1 text-xs font-bold sm:col-span-2">آدرس تصویر<input value={productDraft.imageUrl} onChange={(e) => setProductDraft((d) => ({ ...d, imageUrl: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="https://..." /></label>
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-3 sm:col-span-2" data-product-image-input="true">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <label className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-white/10 px-4 py-2.5 text-xs font-black hover:bg-white/15 aria-disabled:pointer-events-none aria-disabled:opacity-50" aria-disabled={productImageBusy || productBusy}>
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" disabled={productImageBusy || productBusy} className="sr-only" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void uploadProductDraftImage(file); }} />
+                {productImageBusy ? "در حال آپلود تصویر…" : "آپلود تصویر از دستگاه"}
+              </label>
+              <span className="text-[10px] leading-5 text-white/40">فایل با یک درخواست مستقیم ذخیره می‌شود و فقط URL نهایی آن در محصول ثبت خواهد شد.</span>
+            </div>
+            <label className="grid gap-1 text-xs font-bold">یا آدرس تصویر
+              <input value={productDraft.imageUrl} onChange={(e) => setProductDraft((d) => ({ ...d, imageUrl: e.target.value }))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="https://..." />
+            </label>
+            {productDraft.imageUrl && <div className="flex items-center gap-3 rounded-xl border border-white/10 p-2"><img src={productDraft.imageUrl} alt="پیش‌نمایش تصویر محصول" className="h-16 w-16 rounded-lg object-cover" /><span className="min-w-0 break-all text-[10px] text-emerald-200">URL نهایی آمادهٔ ذخیره است</span></div>}
+          </div>
           <label className="grid gap-1 text-xs font-bold sm:col-span-2">توضیحات محصول<textarea value={productDraft.description} onChange={(e) => setProductDraft((d) => ({ ...d, description: e.target.value }))} className="min-h-24 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" /></label>
           <div className="rounded-2xl border border-white/10 bg-white/[.03] p-3 sm:col-span-2">
             <div className="mb-3"><b className="text-sm">SEO + GEO</b><p className="mt-1 text-[10px] text-white/40">می‌توانید فقط SEO، فقط GEO یا هر دو را با هم وارد کنید.</p></div>
@@ -410,9 +515,9 @@ export default function StoreWebsiteStudioPageV16() {
               <label className="grid gap-1 text-xs font-bold sm:col-span-2">توضیح GEO برای موتورهای AI<textarea value={productDraft.geoDescription} onChange={(e) => setProductDraft((d) => ({ ...d, geoDescription: e.target.value }))} className="min-h-24 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-emerald-400/50" placeholder="محصول برای چه کسی مناسب است، چه مسئله‌ای را حل می‌کند و مزیت اصلی آن چیست؟" /></label>
             </div>
           </div>
-          <div className="flex gap-2 sm:col-span-2">
-            <button type="button" onClick={() => setCreateProductOpen(false)} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-bold">بازگشت به کاتالوگ</button>
-            <button type="submit" disabled={productBusy} className="flex-1 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 disabled:opacity-50">{productBusy ? "در حال ساخت…" : "ساخت و افزودن به فروشگاه"}</button>
+          <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row" data-product-form-actions="mobile-safe">
+            <button type="button" disabled={productBusy || productImageBusy} onClick={() => { setProductError(""); setCreateProductOpen(false); }} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-bold disabled:opacity-50">بازگشت به کاتالوگ</button>
+            <button type="submit" data-product-submit="true" disabled={productBusy || productImageBusy} aria-busy={productBusy} className="flex-1 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{productBusy ? "در حال ساخت…" : "ساخت و افزودن به فروشگاه"}</button>
           </div>
         </form>}
       </div>
