@@ -5,7 +5,7 @@ import { createBusinessBuilderRepository } from "../repositories/business-builde
 import { LoadderAppUserAuth } from "./app-user-auth.mjs";
 import { LoadderSqliteDataAdapter } from "./sqlite-data-adapter.mjs";
 import { LoadderDataRuntime } from "./data-adapter.mjs";
-import { appFieldAccess, assertAppPayloadFields, filterDefinitionForRole, redactAppRecord, redactAppRecords } from "./app-field-access.mjs";
+import { appFieldAccess, assertAppPayloadFields, filterDefinitionForRole, filterUiForRole, redactAppRecord, redactAppRecords } from "./app-field-access.mjs";
 
 const tokenFrom = (req) => String(req.get("X-Loadder-App-Token") || "").trim();
 const limited = (limit) => rateLimit({
@@ -71,7 +71,8 @@ export function createPublicBusinessAppRouter({ db }) {
         entities: (filtered.entities || []).map((entity) => ({ id: entity.id, name: entity.name, fields: entity.fields || [] })),
         workflows: (filtered.workflows || []).map((workflow) => ({ id: workflow.id, name: workflow.name })),
       };
-      return { status: 200, body: { success: true, project: { id: project.id, name: project.name, locale: project.locale }, definition, ui: version.ui, principal: appPrincipal } };
+      const safeUi = filterUiForRole(version.ui, version.definition, effectiveRole);
+      return { status: 200, body: { success: true, project: { id: project.id, name: project.name, locale: project.locale }, definition, ui: safeUi, principal: appPrincipal } };
     });
     return res.status(out.status).json(out.body);
   });
