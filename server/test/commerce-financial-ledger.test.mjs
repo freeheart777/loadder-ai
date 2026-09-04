@@ -8,7 +8,7 @@ import {migration072CommerceFinancialLedger} from '../db/migrations/072_commerce
 import {getOrderFinancialSummary,reconcileCapturedPayment} from '../app/commerce/v2/financial-ledger.mjs';
 
 function setup(){
-  const db=new Database(':memory:');db.pragma('foreign_keys=OFF');migration001Identity.up(db);db.exec('CREATE TABLE IF NOT EXISTS business_context_versions(id TEXT PRIMARY KEY)');migration042SiteBuilderControlPlane.up(db);migration049EcommerceCore.up(db);migration072CommerceFinancialLedger.up(db);db.pragma('foreign_keys=ON');
+  const db=new Database(':memory:');db.pragma('foreign_keys=OFF');migration001Identity.up(db);db.exec('CREATE TABLE IF NOT EXISTS business_context_versions(id TEXT PRIMARY KEY); CREATE TABLE IF NOT EXISTS customers(id TEXT PRIMARY KEY)');migration042SiteBuilderControlPlane.up(db);migration049EcommerceCore.up(db);migration072CommerceFinancialLedger.up(db);db.pragma('foreign_keys=ON');
   const t='2026-09-04T00:00:00.000Z';
   db.prepare('INSERT INTO workspaces(id,name,slug,status,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('w1','W1','w1','active',t,t);
   db.prepare('INSERT INTO site_projects(id,workspace_id,name,site_type,slug,status,content_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run('s1','w1','Store','STORE','store','PUBLISHED','{}',t,t);
