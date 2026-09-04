@@ -43,7 +43,7 @@ jobs:
         run: npm ci --prefix server --prefer-offline --no-audit
       - name: Critical module import smoke
         run: |
-          node -e "Promise.all(['business-compiler','app-renderer','editor-patch','navigator','publish-readiness','postgres-data-adapter','operations-dashboard','app-user-auth','integration-runtime','oauth-flow','file-router','realtime-hub','environment-router','native-source-generator','collaboration-store','app-store-installation-store'].map(x=>import('./server/app/business-builder/'+x+'.mjs'))).then(()=>console.log('critical imports ok'))"
+          node -e "Promise.all(['business-compiler','app-renderer','editor-patch','navigator','publish-readiness','postgres-data-adapter','operations-dashboard','app-user-auth','integration-runtime','oauth-flow','oauth-provider-registry','oauth-credential-vault','object-storage-runtime','file-router','realtime-hub','environment-router','native-source-generator','collaboration-store','app-store-installation-store'].map(x=>import('./server/app/business-builder/'+x+'.mjs'))).then(()=>console.log('critical imports ok'))"
       - name: Targeted business builder tests
         run: node --test --test-concurrency=1 server/test/business-builder-*.test.mjs
       - name: Targeted builder UI typecheck
