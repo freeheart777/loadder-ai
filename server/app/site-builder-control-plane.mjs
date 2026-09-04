@@ -7,6 +7,7 @@ import { createSiteMediaStorageAdapter } from "./services/site-media-storage-ada
 import { createDesignModelRouter } from "./services/design-model-router.mjs";
 import { createDesignCopilotService } from "./services/design-copilot-service.mjs";
 import { createEcommerceService } from "./services/ecommerce-service.mjs";
+import { createFinancialLedgerService } from "./commerce/v2/financial-ledger.mjs";
 import { createSupabaseStorageService } from "./storage/supabase-storage-service.mjs";
 import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
@@ -14,23 +15,65 @@ import { createSiteMediaRouter } from "./routes/site-media.mjs";
 import { createDesignCopilotRouter } from "./routes/design-copilot.mjs";
 import { createEcommerceRouter } from "./routes/ecommerce.mjs";
 
-export function mountSiteBuilderControlPlane({ app, db, businessContextService, basePath = "/api" }) {
+export function mountSiteBuilderControlPlane({
+  app,
+  db,
+  businessContextService,
+  auditRepository = null,
+  basePath = "/api",
+}) {
   const projectRepository = createSiteProjectRepository(db);
   const domainService = createSiteDomainService(db);
-  const projectService = createSiteProjectService({ repository: projectRepository, businessContextService, domainService });
+  const projectService = createSiteProjectService({
+    repository: projectRepository,
+    businessContextService,
+    domainService,
+  });
 
   const mediaRepository = createSiteMediaRepository(db);
   const mediaStorage = createSiteMediaStorageAdapter();
-  const mediaService = createSiteMediaService({ repository: mediaRepository, siteProjectService: projectService, storage: mediaStorage });
-  const designCopilotService = createDesignCopilotService({ projectService, modelRouter: createDesignModelRouter() });
+  const mediaService = createSiteMediaService({
+    repository: mediaRepository,
+    siteProjectService: projectService,
+    storage: mediaStorage,
+  });
+  const designCopilotService = createDesignCopilotService({
+    projectService,
+    modelRouter: createDesignModelRouter(),
+  });
   const ecommerceService = createEcommerceService({ db });
+  const financialLedgerService = createFinancialLedgerService({
+    db,
+    auditRepository,
+  });
 
   const mountPath = basePath || "/";
   app.use(mountPath, createSiteProjectsRouter({ service: projectService }));
-  app.use(mountPath, createSiteStorageRouter({ storage: createSupabaseStorageService(), siteService: projectService }));
+  app.use(
+    mountPath,
+    createSiteStorageRouter({
+      storage: createSupabaseStorageService(),
+      siteService: projectService,
+    })
+  );
   app.use(mountPath, createSiteMediaRouter({ service: mediaService }));
-  app.use(mountPath, createDesignCopilotRouter({ service: designCopilotService }));
-  app.use(mountPath, createEcommerceRouter({ service: ecommerceService }));
+  app.use(
+    mountPath,
+    createDesignCopilotRouter({ service: designCopilotService })
+  );
+  app.use(
+    mountPath,
+    createEcommerceRouter({
+      service: ecommerceService,
+      financialLedgerService,
+    })
+  );
 
-  return Object.freeze({ projectService, mediaService, designCopilotService, ecommerceService });
+  return Object.freeze({
+    projectService,
+    mediaService,
+    designCopilotService,
+    ecommerceService,
+    financialLedgerService,
+  });
 }
