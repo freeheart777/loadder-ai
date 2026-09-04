@@ -125,6 +125,16 @@ export function createCustomerAccountRepository(db) {
     removeAddress({ account, addressId, expectedRevision, updatedAt }) {
       const tx=db.transaction(()=>{const result=db.prepare(`DELETE FROM ecommerce_customer_addresses WHERE workspace_id=? AND customer_account_id=? AND id=?`).run(account.workspaceId,account.id,addressId);if(result.changes!==1)throw new CustomerAccountPersistenceError("Address not found","CUSTOMER_ADDRESS_NOT_FOUND",404);bump(account.workspaceId,account.id,expectedRevision,updatedAt);});tx();return this.getById({workspaceId:account.workspaceId,accountId:account.id});
     },
+    bindCart({ account, cartId }) {
+      const id = required(cartId,"cartId");
+      const cart = db.prepare(`SELECT id,workspace_id AS workspaceId,site_project_id AS siteProjectId,status,commerce_customer_account_id AS customerAccountId FROM ecommerce_carts WHERE id=? AND workspace_id=?`).get(id,account.workspaceId);
+      if(!cart) throw new CustomerAccountPersistenceError("Cart not found","CUSTOMER_CART_NOT_FOUND",404);
+      if(cart.siteProjectId!==account.storeId) throw new CustomerAccountPersistenceError("Cart belongs to another store","CUSTOMER_CART_STORE_MISMATCH",403);
+      if(cart.customerAccountId===account.id) return { id:cart.id, customerAccountId:account.id, idempotent:true };
+      if(cart.customerAccountId) throw new CustomerAccountPersistenceError("Cart is already bound to another customer","CUSTOMER_CART_ALREADY_BOUND",409);
+      db.prepare(`UPDATE ecommerce_carts SET commerce_customer_account_id=?,updated_at=? WHERE id=? AND workspace_id=?`).run(account.id,new Date().toISOString(),cart.id,account.workspaceId);
+      return { id:cart.id, customerAccountId:account.id, idempotent:false };
+    },
     linkOrder(link) {
       db.prepare(`INSERT INTO ecommerce_customer_order_links(id,workspace_id,site_project_id,order_id,customer_account_id,app_user_id,auth_project_id,source,linked_at,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)`).run(link.id,link.workspaceId,link.storeId,link.orderId,link.customerAccountId,link.identitySubjectId,link.authProjectId,link.source,link.linkedAt,JSON.stringify(link.metadata||{}));
       return link;
