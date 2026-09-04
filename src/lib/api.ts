@@ -81,6 +81,23 @@ async function normalizeCanonicalStoreListing(response: Response) {
   });
 }
 
+async function synchronizeCanonicalSnapshot(path: string, method: string, response: Response) {
+  if (!response.ok || !canonicalStoreProjectId || !canonicalStoreProjectSnapshot) return;
+  const normalized = path.replace(/\/+$/, "");
+  const projectPath = `/api/site-projects/${canonicalStoreProjectId}`;
+  const mutatesCanonicalProject =
+    (method === "PATCH" && normalized === projectPath) ||
+    (method === "POST" && normalized === `${projectPath}/publish`);
+  if (!mutatesCanonicalProject) return;
+
+  const data = await response.clone().json().catch(() => null);
+  if (!data?.project || data.project.id !== canonicalStoreProjectId) return;
+  canonicalStoreProjectSnapshot = structuredClone({
+    ...canonicalStoreProjectSnapshot,
+    project: data.project,
+  });
+}
+
 export async function apiFetch(
   path: string,
   init?: RequestInit
@@ -99,5 +116,6 @@ export async function apiFetch(
   if (method === "GET" && path.replace(/\/+$/, "") === "/api/site-projects") {
     return normalizeCanonicalStoreListing(response);
   }
+  await synchronizeCanonicalSnapshot(path, method, response);
   return response;
 }
