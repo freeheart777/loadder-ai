@@ -19,15 +19,18 @@ const principal = Object.freeze({
   email: "buyer@example.com",
 });
 
-const baseAccount = () =>
-  createCustomerAccount({
-    id: "customer-1",
-    workspaceId: "w1",
-    storeId: "s1",
-    principal,
-    profile: { displayName: "Buyer", phone: "09120000000" },
-    createdAt: "2026-09-05T10:00:00.000Z",
-  });
+const accountInput = (overrides = {}) => ({
+  id: "customer-1",
+  workspaceId: "w1",
+  storeId: "s1",
+  authProjectId: "project-1",
+  principal,
+  profile: { displayName: "Buyer", phone: "09120000000" },
+  createdAt: "2026-09-05T10:00:00.000Z",
+  ...overrides,
+});
+
+const baseAccount = () => createCustomerAccount(accountInput());
 
 const address = {
   id: "addr-1",
@@ -59,24 +62,35 @@ test("customer account binds commerce profile to resolved active customer app-us
 
   assert.throws(
     () =>
-      createCustomerAccount({
-        id: "customer-employee",
-        workspaceId: "w1",
-        storeId: "s1",
-        principal: { ...principal, id: "employee-1", role: "employee" },
-      }),
+      createCustomerAccount(
+        accountInput({
+          id: "customer-employee",
+          principal: { ...principal, id: "employee-1", role: "employee" },
+        })
+      ),
     /CUSTOMER_APP_USER_ROLE_REQUIRED/
   );
 
   assert.throws(
     () =>
-      createCustomerAccount({
-        id: "customer-disabled",
-        workspaceId: "w1",
-        storeId: "s1",
-        principal: { ...principal, id: "disabled-1", status: "disabled" },
-      }),
+      createCustomerAccount(
+        accountInput({
+          id: "customer-disabled",
+          principal: { ...principal, id: "disabled-1", status: "disabled" },
+        })
+      ),
     /CUSTOMER_APP_USER_INACTIVE/
+  );
+});
+
+test("customer account requires explicit store auth-project binding", () => {
+  assert.throws(
+    () => createCustomerAccount(accountInput({ authProjectId: undefined })),
+    /CUSTOMER_STORE_AUTH_PROJECT_REQUIRED/
+  );
+  assert.throws(
+    () => createCustomerAccount(accountInput({ authProjectId: "project-other" })),
+    /CUSTOMER_STORE_AUTH_PROJECT_MISMATCH/
   );
 });
 
@@ -84,25 +98,24 @@ test("one app-user identity cannot silently create duplicate customer accounts i
   const existing = baseAccount();
   assert.throws(
     () =>
-      createCustomerAccount({
-        id: "customer-2",
-        workspaceId: "w1",
-        storeId: "s1",
-        principal,
-        existingAccounts: [existing],
-      }),
+      createCustomerAccount(
+        accountInput({
+          id: "customer-2",
+          existingAccounts: [existing],
+        })
+      ),
     /CUSTOMER_IDENTITY_ALREADY_BOUND/
   );
 
   assert.throws(
     () =>
-      createCustomerAccount({
-        id: "customer-1",
-        workspaceId: "w1",
-        storeId: "s1",
-        principal: { ...principal, id: "app-user-2" },
-        existingAccounts: [existing],
-      }),
+      createCustomerAccount(
+        accountInput({
+          id: "customer-1",
+          principal: { ...principal, id: "app-user-2" },
+          existingAccounts: [existing],
+        })
+      ),
     /CUSTOMER_DUPLICATE_ACCOUNT_ID/
   );
 });
@@ -288,13 +301,13 @@ test("malformed persisted account history fails closed instead of creating a sec
 
   assert.throws(
     () =>
-      createCustomerAccount({
-        id: "customer-new",
-        workspaceId: "w1",
-        storeId: "s1",
-        principal: { ...principal, id: "app-user-new" },
-        existingAccounts: [malformed],
-      }),
+      createCustomerAccount(
+        accountInput({
+          id: "customer-new",
+          principal: { ...principal, id: "app-user-new" },
+          existingAccounts: [malformed],
+        })
+      ),
     /CUSTOMER_DUPLICATE_ADDRESS_ID/
   );
 });
