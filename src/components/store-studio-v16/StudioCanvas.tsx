@@ -8,8 +8,9 @@ type CanvasProps = { config: StudioConfig; products: Product[]; device: DeviceMo
 
 function InlineMediaControl({ target, onUpload, busy, label = "تغییر تصویر", compact = false }: { target: InlineMediaTarget; onUpload?: CanvasProps["onImageUpload"]; busy?: boolean; label?: string; compact?: boolean }) {
   if (!onUpload) return null;
-  return <label data-inline-media-control="true" onClick={(e)=>e.stopPropagation()} className={`absolute z-40 flex cursor-pointer items-center justify-center gap-1 rounded-full border-2 border-white bg-emerald-400 font-black text-slate-950 shadow-xl transition hover:scale-105 ${compact ? "bottom-1 left-1 h-7 w-7" : "bottom-3 left-3 min-h-10 px-3 text-[10px]"}`} title={label}>
-    <Plus size={compact ? 14 : 16}/>{compact ? null : <span>{busy ? "آپلود…" : label}</span>}
+  return <label data-inline-media-control="true" onClick={(e)=>e.stopPropagation()} className="group/media absolute inset-0 z-40 cursor-pointer overflow-hidden rounded-[inherit]" title={label} aria-label={label}>
+    <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-slate-950/0 transition-colors group-hover/media:bg-slate-950/15" />
+    {!compact && <span className="pointer-events-none absolute bottom-3 left-3 translate-y-1 rounded-full border border-white/20 bg-slate-950/80 px-3 py-2 text-[10px] font-black text-white opacity-0 shadow-lg transition group-hover/media:translate-y-0 group-hover/media:opacity-100 group-focus-within/media:translate-y-0 group-focus-within/media:opacity-100">{busy ? "در حال بارگذاری…" : label}</span>}
     <input data-inline-media-input="true" type="file" accept="image/*" className="hidden" disabled={busy} onChange={(e)=>{const file=e.target.files?.[0]; if(file) void onUpload(target,file); e.currentTarget.value="";}}/>
   </label>;
 }

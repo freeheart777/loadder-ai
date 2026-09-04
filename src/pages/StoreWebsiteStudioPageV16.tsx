@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import StoreWebsiteStudioPageV16Core from "./StoreWebsiteStudioPageV16Core";
 import { loadActiveStoreProject } from "../lib/activeStoreProject";
-import "../direct-media.css";
 
 type GateState = "loading" | "ready" | "error";
 
