@@ -102,8 +102,7 @@ export function createPublicBusinessAppRouter({ db }) {
         const safe = readAccess.allowed ? redactAppRecord(result, readAccess) : { id: result?.id };
         return { status: action === "create" ? 201 : 200, body: { success: true, result: safe, record: safe } };
       } catch (error) {
-        const status = error?.code === "APP_FIELD_ACCESS_FORBIDDEN" ? 403 : 400;
-        return { status, body: { success: false, code: error?.code || "PUBLIC_RUNTIME_FAILED", message: error?.message, fields: error?.fields || undefined } };
+        return { status: 400, body: { success: false, code: error?.code || "PUBLIC_RUNTIME_FAILED", message: error?.message, fields: error?.fields || undefined } };
       }
     });
     return res.status(out.status).json(out.body);
