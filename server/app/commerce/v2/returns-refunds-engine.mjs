@@ -198,6 +198,7 @@ function validateRefundHistory(order, existingRefunds = []) {
   if (!Array.isArray(existingRefunds)) throw new TypeError("REFUNDS_ARRAY_REQUIRED");
   const ids = new Set();
   const consumedByReturn = new Map();
+  const succeededProviderReferences = new Set();
   let inFlightMinor = 0;
   let succeededMinor = 0;
 
@@ -214,8 +215,14 @@ function validateRefundHistory(order, existingRefunds = []) {
     const amount = positiveInt(refundRequest.amountMinor, "REFUND_INVALID_AMOUNT");
     const returnId = text(refundRequest.returnId, 200);
     if (!returnId) throw new Error("REFUND_RETURN_ID_REQUIRED");
-    if (status === "SUCCEEDED" && !text(refundRequest.providerReference, 300)) {
-      throw new Error("REFUND_PROVIDER_REFERENCE_REQUIRED");
+
+    if (status === "SUCCEEDED") {
+      const providerReference = text(refundRequest.providerReference, 300);
+      if (!providerReference) throw new Error("REFUND_PROVIDER_REFERENCE_REQUIRED");
+      if (succeededProviderReferences.has(providerReference)) {
+        throw new Error("REFUND_PROVIDER_REFERENCE_DUPLICATE");
+      }
+      succeededProviderReferences.add(providerReference);
     }
 
     if (inFlightRefundStatuses.has(status)) {
@@ -233,7 +240,7 @@ function validateRefundHistory(order, existingRefunds = []) {
     }
   }
 
-  return { ids, inFlightMinor, succeededMinor, consumedByReturn };
+  return { ids, inFlightMinor, succeededMinor, consumedByReturn, succeededProviderReferences };
 }
 
 function merchandiseGross(order, returnLines) {
@@ -367,6 +374,8 @@ export function createRefundRequest({
   assertOrder(order);
   if (!returnRequest || typeof returnRequest !== "object") throw new TypeError("REFUND_RETURN_REQUIRED");
   assertReturnOwnership(order, returnRequest);
+  const returnId = text(returnRequest.id, 200);
+  if (!returnId) throw new Error("REFUND_RETURN_ID_REQUIRED");
   const returnStatus = text(returnRequest.status, 40).toUpperCase();
   if (!refundableReturnStatuses.has(returnStatus)) throw new Error("RETURN_NOT_REFUNDABLE");
   const validatedReturnLines = validateReturnLines(order, returnRequest, { requireSnapshot: true });
@@ -395,7 +404,7 @@ export function createRefundRequest({
   if (amount > merchandiseGrossMinor) {
     throw new Error("REFUND_AMOUNT_EXCEEDS_RETURN_MERCHANDISE");
   }
-  const alreadyConsumedForReturn = refundHistory.consumedByReturn.get(returnRequest.id) || 0;
+  const alreadyConsumedForReturn = refundHistory.consumedByReturn.get(returnId) || 0;
   const returnRemainingMinor = merchandiseGrossMinor - alreadyConsumedForReturn;
   if (amount > returnRemainingMinor) {
     throw new Error("REFUND_AMOUNT_EXCEEDS_RETURN_REMAINING");
@@ -407,7 +416,7 @@ export function createRefundRequest({
     workspaceId: order.workspaceId,
     storeId: order.storeId,
     orderId: order.id,
-    returnId: returnRequest.id,
+    returnId,
     status: "REQUESTED",
     amountMinor: amount,
     currency: capacity.currency,
@@ -435,7 +444,7 @@ export function createRefundRequest({
 export function transitionRefundRequest(
   refundRequest,
   nextStatus,
-  { occurredAt, providerReference = undefined } = {}
+  { occurredAt, providerReference = undefined, existingRefunds = [] } = {}
 ) {
   if (!refundRequest || typeof refundRequest !== "object") throw new TypeError("REFUND_REQUIRED");
   const current = text(refundRequest.status, 40).toUpperCase();
@@ -462,8 +471,20 @@ export function transitionRefundRequest(
   if (providerReference !== undefined) {
     result.providerReference = text(providerReference, 300) || null;
   }
-  if (next === "SUCCEEDED" && !result.providerReference) {
-    throw new Error("REFUND_PROVIDER_REFERENCE_REQUIRED");
+  if (next === "SUCCEEDED") {
+    if (!result.providerReference) throw new Error("REFUND_PROVIDER_REFERENCE_REQUIRED");
+    const peerHistory = validateRefundHistory(
+      {
+        id: refundRequest.orderId,
+        workspaceId: refundRequest.workspaceId,
+        storeId: refundRequest.storeId,
+        currency: refundRequest.currency,
+      },
+      (existingRefunds || []).filter((candidate) => candidate?.id !== refundRequest.id)
+    );
+    if (peerHistory.succeededProviderReferences.has(result.providerReference)) {
+      throw new Error("REFUND_PROVIDER_REFERENCE_DUPLICATE");
+    }
   }
   if (next === "APPROVED") result.approvedAt = at;
   if (next === "PROCESSING") result.processingAt = at;
