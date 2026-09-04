@@ -140,11 +140,14 @@ Returns and refunds are separate provider-neutral facts. A Return owns physical-
 A return request:
 - belongs to exactly one workspace, store and order;
 - references immutable order-line IDs;
-- uses positive integer quantities;
+- uses positive safe-integer quantities;
 - is limited by quantities actually `DELIVERED`, not merely ordered, allocated or shipped;
 - subtracts quantities already consumed by active return requests (`REQUESTED`, `APPROVED`, `RECEIVED`);
 - rejects duplicate order-line references inside one return request;
-- snapshots SKU, product/variant identity, unit price and currency from the immutable order line.
+- snapshots SKU, product/variant identity, unit price and currency from the immutable order line;
+- rejects a return ID already present in the supplied order return history.
+
+Persisted return history is treated as untrusted domain input. Before it can consume or release eligibility, workspace/store/order ownership, status, order-line references, duplicate lines, quantities and any supplied immutable snapshot fields are revalidated. Malformed negative, zero or fractional history cannot be used to manufacture additional return eligibility.
 
 `REJECTED` or `CANCELLED` return requests release their quantity eligibility. `RECEIVED` remains consumed historical return quantity.
 
@@ -158,6 +161,8 @@ Return state is forward-only:
 
 `RECEIVED`, `REJECTED`, and `CANCELLED` are terminal in v0.
 
+Return lifecycle timestamps must be valid and monotonic. A transition may not predate the request `createdAt` or current `updatedAt`.
+
 ### Financial authority boundary
 The returns engine does not calculate authoritative captured/refunded money from mutable order state. A refund request receives an immutable financial snapshot from the authoritative financial read model:
 
@@ -166,16 +171,33 @@ The returns engine does not calculate authoritative captured/refunded money from
 - `refundableMinor = capturedMinor - refundedMinor`
 - `currency`
 
-All amounts are non-negative integer minor units. Refunded amount may not exceed captured amount. The financial currency must match the immutable order currency.
+All amounts are non-negative safe integer minor units. Refunded amount may not exceed captured amount. If a caller supplies `refundableMinor`, it must exactly equal `capturedMinor - refundedMinor`; an internally inconsistent snapshot is rejected. The financial currency must match the immutable order currency.
+
+A known `SUCCEEDED` refund is committed financial history and therefore must already be represented by the authoritative `refundedMinor` snapshot before another refund is authorized. If supplied refund history proves more successful refunds than the financial snapshot contains, the snapshot is stale and the request fails closed.
+
+### In-flight refund reservation
+Financial capture capacity and request concurrency are separate concerns.
+
+Refund requests in `REQUESTED`, `APPROVED`, or `PROCESSING` reserve their amount against the current authoritative refundable capacity. A new request therefore must satisfy:
+
+`requested <= captured - refunded - inFlightReserved`
+
+`REJECTED`, `FAILED`, and `CANCELLED` refund requests release their in-flight reservation. `SUCCEEDED` is no longer an in-flight reservation because it must be represented in the refreshed authoritative refunded snapshot.
+
+Callers/persistence adapters must supply the complete relevant refund history when creating a new request. A later persistent implementation must enforce the same invariant transactionally so concurrent writers cannot both reserve the same remaining capture capacity.
 
 ### Refund request rules
 A refund request:
 - may be created only for an `APPROVED` or `RECEIVED` return;
-- requires a positive integer amount;
-- may not exceed the authoritative financial refundable capacity;
+- requires a positive safe-integer amount;
+- may not exceed the authoritative financial refundable capacity after in-flight reservations;
 - may not exceed the gross merchandise value represented by the returned immutable order-line snapshots;
-- does not infer shipping/tax/promotion allocation policy in v0;
-- stores the financial-capacity snapshot that authorized the request.
+- revalidates the Return snapshot against the immutable Order before using quantity, price, identity or currency for financial authorization;
+- rejects a refund ID already present in supplied refund history;
+- stores both the authoritative financial-capacity snapshot and the reservation state that authorized the request;
+- does not infer shipping/tax/promotion allocation policy in v0.
+
+Multiple active or successful refunds for the same Return cumulatively consume that Return's merchandise value. A second refund request may only use the remaining merchandise value after `REQUESTED`, `APPROVED`, `PROCESSING`, and `SUCCEEDED` refund requests for that Return are counted. `FAILED`, `REJECTED`, and `CANCELLED` requests release that Return-level request capacity.
 
 The merchandise-value cap is intentionally conservative. A future explicit refund-allocation policy may version support for shipping, tax, promotion allocation, goodwill credits, or other adjustments rather than silently inventing those rules.
 
@@ -190,8 +212,12 @@ Refund request state is forward-only:
 
 `SUCCEEDED`, `FAILED`, `REJECTED`, and `CANCELLED` are terminal in v0. A transition to `SUCCEEDED` requires a non-empty provider reference so provider success cannot be represented without an external execution fact.
 
+Refund lifecycle timestamps must be valid and monotonic. A transition may not predate the request `createdAt` or current `updatedAt`.
+
 ### Ledger bridge boundary
 Returns / Refunds v0 does not directly append or mutate Commerce Financial Ledger entries. After a provider-confirmed refund succeeds, an explicit accounting/payment bridge must append a new immutable `REFUND` ledger entry with its own deterministic idempotency boundary and provider reference. The original `PAYMENT_CAPTURED` entry must never be updated, deleted, negated in place, or rewritten.
+
+The future bridge/persistence transaction must coordinate refund-request success, financial-ledger idempotency and any downstream outbox event without weakening the immutable ledger boundary.
 
 ## V2 compatibility goal
 The V2 core must eventually satisfy the existing Loadder Commerce Provider Contract for product, variant, inventory, cart, coupon/shipping, checkout and order operations. New capabilities may extend the contract only through explicit versioning.
