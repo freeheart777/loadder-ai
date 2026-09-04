@@ -67,7 +67,21 @@ export function createSiteMediaService({ repository, siteProjectService, storage
   }
 
   async function acceptLocalUpload(token, body) {
-    return storage.acceptLocalUpload(token, body);
+    const stored = await storage.acceptLocalUpload(token, body);
+    const project = siteProjectService.get(stored.siteProjectId);
+    const assetType = requireAssetType(stored.assetType);
+    const mimeType = requireMimeType(stored.mimeType);
+    const sizeBytes = requireSize(stored.sizeBytes);
+    const asset = repository.create({
+      siteProjectId: project.id,
+      assetType,
+      storageKey: stored.path,
+      mimeType,
+      sizeBytes,
+      metadata: { name: stored.fileName || "image" },
+      now: now().toISOString(),
+    });
+    return { ...stored, media: expose(asset) };
   }
 
   async function readLocalAsset(encodedKey) {
@@ -85,6 +99,8 @@ export function createSiteMediaService({ repository, siteProjectService, storage
     if (!storageKey.startsWith(expectedPrefix) || storageKey === expectedPrefix) {
       throw new SiteMediaError("storageKey does not belong to this project.", 403, "SITE_MEDIA_STORAGE_KEY_FORBIDDEN");
     }
+    const existing = repository.findByStorageKey?.(project.id, storageKey);
+    if (existing) return expose(existing);
     const asset = repository.create({
       siteProjectId: project.id,
       assetType,
