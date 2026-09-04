@@ -42,6 +42,27 @@ export function createSiteMediaRouter({ service }) {
     catch (error) { return handle(error, res); }
   });
 
+  // Canonical browser upload: one authenticated request from the UI to Loadder.
+  router.post("/site-projects/:id/media/upload", express.raw({ type: () => true, limit: "25mb" }), async (req, res) => {
+    try {
+      const metadataHeader = String(req.get("x-loadder-media-metadata") || "");
+      let metadata = {};
+      if (metadataHeader) {
+        try { metadata = JSON.parse(Buffer.from(metadataHeader, "base64url").toString("utf8")); }
+        catch { throw new SiteMediaError("Media metadata is invalid.", 400, "SITE_MEDIA_METADATA_INVALID"); }
+      }
+      const media = await service.directUpload(req.params.id, {
+        assetType: String(req.get("x-loadder-asset-type") || ""),
+        fileName: String(req.get("x-loadder-file-name") || ""),
+        mimeType: String(req.get("content-type") || ""),
+        body: req.body,
+        metadata,
+      });
+      return res.status(201).json({ success: true, media });
+    } catch (error) { return handle(error, res); }
+  });
+
+  // Compatibility path retained for old clients; new UI must not depend on it.
   router.post("/site-projects/:id/media/upload-url", async (req, res) => {
     try {
       const upload = await service.createUpload(req.params.id, req.body || {});

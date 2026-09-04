@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import StoreWebsiteStudioPageV16Core from "./StoreWebsiteStudioPageV16Core";
 import { loadActiveStoreProject } from "../lib/activeStoreProject";
+import "../direct-media.css";
 
 type GateState = "loading" | "ready" | "error";
 
@@ -23,7 +24,14 @@ export default function StoreWebsiteStudioPageV16() {
     return () => { active = false; };
   }, [attempt]);
 
-  if (state === "ready") return <StoreWebsiteStudioPageV16Core />;
+  if (state === "ready") return (
+    <>
+      <StoreWebsiteStudioPageV16Core />
+      <div data-loadder-runtime="direct-media-v1" className="pointer-events-none fixed bottom-3 right-3 z-[9999] rounded-full border border-emerald-300/30 bg-slate-950/90 px-3 py-1.5 text-[9px] font-black tracking-wide text-emerald-300 shadow-xl">
+        DIRECT MEDIA · 2026.09.04
+      </div>
+    </>
+  );
 
   return (
     <main dir="rtl" className="grid min-h-screen place-items-center bg-[#070b12] p-6 text-white" data-store-project-gate={state}>

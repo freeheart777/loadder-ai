@@ -27,13 +27,58 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
     return key;
   }
 
-  async function signedUpload({ workspaceId, siteProjectId, assetType, fileName, mimeType = "application/octet-stream" }) {
+  function buildStoragePath({ workspaceId, siteProjectId, assetType, fileName }) {
     if (!workspaceId || !siteProjectId || !assetType || !fileName) throw new SiteMediaStorageError("workspaceId, siteProjectId, assetType and fileName are required.", "SITE_MEDIA_UPLOAD_INPUT_INVALID", 400);
     const safeName = String(fileName).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, "-");
-    const storagePath = `${workspaceId}/${siteProjectId}/${assetType}/${crypto.randomUUID()}-${safeName}`;
+    return `${workspaceId}/${siteProjectId}/${assetType}/${crypto.randomUUID()}-${safeName}`;
+  }
+
+  async function writeObject({ storagePath, mimeType, body }) {
+    const key = safeStorageKey(storagePath);
+    if (!Buffer.isBuffer(body) || body.length === 0) throw new SiteMediaStorageError("Uploaded file is empty.", "SITE_MEDIA_BODY_EMPTY", 400);
+    if (remoteConfigured) {
+      const response = await fetchImpl(`${storageApiBaseUrl}/object/${encodeURIComponent(bucket)}/${key}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+          "Content-Type": String(mimeType || "application/octet-stream"),
+          "x-upsert": "false",
+        },
+        body,
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new SiteMediaStorageError(
+          `Unable to store media${detail ? `: ${detail.slice(0, 180)}` : "."}`,
+          "SITE_MEDIA_PROVIDER_UPLOAD_FAILED",
+          502,
+        );
+      }
+    } else {
+      const target = path.resolve(localRoot, key);
+      if (!target.startsWith(`${localRoot}${path.sep}`)) throw new SiteMediaStorageError("Invalid local media path.", "SITE_MEDIA_LOCAL_PATH_INVALID", 400);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, body);
+    }
+    return { path: key, sizeBytes: body.length };
+  }
+
+  async function directUpload({ workspaceId, siteProjectId, assetType, fileName, mimeType = "application/octet-stream", body }) {
+    const storagePath = buildStoragePath({ workspaceId, siteProjectId, assetType, fileName });
+    const stored = await writeObject({ storagePath, mimeType, body });
+    return { ...stored, workspaceId, siteProjectId, assetType, fileName, mimeType };
+  }
+
+  async function signedUpload({ workspaceId, siteProjectId, assetType, fileName, mimeType = "application/octet-stream" }) {
+    const storagePath = buildStoragePath({ workspaceId, siteProjectId, assetType, fileName });
     const token = crypto.randomUUID();
     pendingUploads.set(token, {
       path: storagePath,
+      workspaceId,
+      siteProjectId,
+      assetType,
+      fileName,
       mimeType: String(mimeType || "application/octet-stream"),
       expiresAt: Date.now() + 2 * 60 * 60 * 1000,
     });
@@ -54,36 +99,9 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
       pendingUploads.delete(keyToken);
       throw new SiteMediaStorageError("Upload token is invalid or expired.", "SITE_MEDIA_UPLOAD_TOKEN_INVALID", 403);
     }
-    if (!Buffer.isBuffer(body) || body.length === 0) throw new SiteMediaStorageError("Uploaded file is empty.", "SITE_MEDIA_BODY_EMPTY", 400);
-    const key = safeStorageKey(pending.path);
-
     try {
-      if (remoteConfigured) {
-        const response = await fetchImpl(`${storageApiBaseUrl}/object/${encodeURIComponent(bucket)}/${key}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${serviceRoleKey}`,
-            apikey: serviceRoleKey,
-            "Content-Type": pending.mimeType,
-            "x-upsert": "false",
-          },
-          body,
-        });
-        if (!response.ok) {
-          const detail = await response.text().catch(() => "");
-          throw new SiteMediaStorageError(
-            `Unable to store media${detail ? `: ${detail.slice(0, 180)}` : "."}`,
-            "SITE_MEDIA_PROVIDER_UPLOAD_FAILED",
-            502,
-          );
-        }
-      } else {
-        const target = path.resolve(localRoot, key);
-        if (!target.startsWith(`${localRoot}${path.sep}`)) throw new SiteMediaStorageError("Invalid local media path.", "SITE_MEDIA_LOCAL_PATH_INVALID", 400);
-        await fs.mkdir(path.dirname(target), { recursive: true });
-        await fs.writeFile(target, body);
-      }
-      return { path: key, sizeBytes: body.length };
+      const stored = await writeObject({ storagePath: pending.path, mimeType: pending.mimeType, body });
+      return { ...stored, workspaceId: pending.workspaceId, siteProjectId: pending.siteProjectId, assetType: pending.assetType, fileName: pending.fileName, mimeType: pending.mimeType };
     } finally {
       pendingUploads.delete(keyToken);
     }
@@ -119,5 +137,5 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
     return `${localApiBaseUrl}/api/site-media-object/${Buffer.from(key, "utf8").toString("base64url")}`;
   }
 
-  return { signedUpload, publicAssetUrl, acceptLocalUpload, readLocalAsset, bucket, remoteConfigured };
+  return { signedUpload, directUpload, publicAssetUrl, acceptLocalUpload, readLocalAsset, bucket, remoteConfigured };
 }

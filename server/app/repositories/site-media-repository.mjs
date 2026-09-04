@@ -29,7 +29,14 @@ export function createSiteMediaRepository(db) {
       .get(mediaId, requireWorkspaceId(), siteProjectId));
   }
 
+  function findByStorageKey(siteProjectId, storageKey) {
+    return mapRow(db.prepare(`SELECT * FROM site_media_assets WHERE workspace_id=? AND site_project_id=? AND storage_key=? ORDER BY created_at DESC LIMIT 1`)
+      .get(requireWorkspaceId(), siteProjectId, storageKey));
+  }
+
   function create({ siteProjectId, assetType, storageKey, mimeType, sizeBytes, metadata = {}, now }) {
+    const existing = findByStorageKey(siteProjectId, storageKey);
+    if (existing) return existing;
     const id = crypto.randomUUID();
     const workspaceId = requireWorkspaceId();
     db.prepare(`INSERT INTO site_media_assets
@@ -44,5 +51,5 @@ export function createSiteMediaRepository(db) {
       .run(mediaId, requireWorkspaceId(), siteProjectId).changes > 0;
   }
 
-  return Object.freeze({ listByProject, get, create, remove });
+  return Object.freeze({ listByProject, get, findByStorageKey, create, remove });
 }
