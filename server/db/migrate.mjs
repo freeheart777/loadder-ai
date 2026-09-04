@@ -1,9 +1,6 @@
 import { migrations } from "./migrations/index.mjs";
-import { migration072CommerceFinancialLedger } from "./migrations/072_commerce_financial_ledger.mjs";
 
-const runtimeMigrations = [...migrations, migration072CommerceFinancialLedger];
-
-export function runMigrations(db, migrationList = runtimeMigrations) {
+export function runMigrations(db, migrationList = migrations) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
