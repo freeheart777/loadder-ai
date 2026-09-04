@@ -9,8 +9,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 test("Store Studio media is uploaded from the rendered image, not a detached picker modal", () => {
   const canvas = read("src/components/store-studio-v16/StudioCanvas.tsx");
   const core = read("src/pages/StoreWebsiteStudioPageV16Core.tsx");
-  const css = read("src/direct-media.css");
-  const main = read("src/main.tsx");
+  const mediaControl = canvas.slice(canvas.indexOf("function InlineMediaControl"), canvas.indexOf("function editorLabel"));
 
   assert.match(canvas, /data-inline-media-control="true"/);
   assert.match(canvas, /data-inline-media-input="true"/);
@@ -19,9 +18,10 @@ test("Store Studio media is uploaded from the rendered image, not a detached pic
   assert.match(canvas, /kind:\s*"logo"/);
   assert.match(canvas, /kind:\s*"product"/);
   assert.match(canvas, /onImageUpload/);
-  assert.match(css, /inset: 0 !important/);
-  assert.match(css, /کلیک برای تغییر تصویر/);
-  assert.match(main, /import "\.\/direct-media\.css"/);
+  assert.match(mediaControl, /absolute inset-0/);
+  assert.match(mediaControl, /type="file"/);
+  assert.match(mediaControl, /group-hover\/media/);
+  assert.doesNotMatch(mediaControl, /<Plus/);
 
   assert.match(core, /async function uploadMedia\(target: InlineMediaTarget, file: File\)/);
   assert.match(core, /applyMediaToConfig/);

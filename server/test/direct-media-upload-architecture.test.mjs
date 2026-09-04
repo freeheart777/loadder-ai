@@ -14,9 +14,8 @@ test("website builder actual V16 runtime uses one-request upload and image-surfa
   const helper = read("src/lib/siteMediaUpload.ts");
   const core = read("src/pages/StoreWebsiteStudioPageV16Core.tsx");
   const canvas = read("src/components/store-studio-v16/StudioCanvas.tsx");
-  const css = read("src/direct-media.css");
-  const main = read("src/main.tsx");
   const wrapper = read("src/pages/StoreWebsiteStudioPageV16.tsx");
+  const mediaControl = canvas.slice(canvas.indexOf("function InlineMediaControl"), canvas.indexOf("function editorLabel"));
 
   assert.match(route, /site-projects\/:id\/media\/upload/);
   assert.match(route, /express\.raw\(\{ type: \(\) => true, limit: "25mb" \}\)/);
@@ -33,10 +32,10 @@ test("website builder actual V16 runtime uses one-request upload and image-surfa
 
   assert.match(canvas, /data-inline-media-control="true"/);
   assert.match(canvas, /onUpload\(target,file\)/);
-  assert.match(css, /label\[data-inline-media-control="true"\]/);
-  assert.match(css, /inset: 0 !important/);
-  assert.match(css, /کلیک برای تغییر تصویر/);
-  assert.match(main, /import "\.\/direct-media\.css"/);
+  assert.match(mediaControl, /absolute inset-0/);
+  assert.match(mediaControl, /group-hover\/media/);
+  assert.doesNotMatch(mediaControl, /<Plus/);
+  assert.doesNotMatch(wrapper, /direct-media\.css/);
   assert.match(wrapper, /DIRECT MEDIA · 2026\.09\.04/);
 });
 
