@@ -66,7 +66,8 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
 
   async function directUpload({ workspaceId, siteProjectId, assetType, fileName, mimeType = "application/octet-stream", body }) {
     const storagePath = buildStoragePath({ workspaceId, siteProjectId, assetType, fileName });
-    return writeObject({ storagePath, mimeType, body });
+    const stored = await writeObject({ storagePath, mimeType, body });
+    return { ...stored, workspaceId, siteProjectId, assetType, fileName, mimeType };
   }
 
   async function signedUpload({ workspaceId, siteProjectId, assetType, fileName, mimeType = "application/octet-stream" }) {
@@ -74,6 +75,10 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
     const token = crypto.randomUUID();
     pendingUploads.set(token, {
       path: storagePath,
+      workspaceId,
+      siteProjectId,
+      assetType,
+      fileName,
       mimeType: String(mimeType || "application/octet-stream"),
       expiresAt: Date.now() + 2 * 60 * 60 * 1000,
     });
@@ -95,7 +100,8 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
       throw new SiteMediaStorageError("Upload token is invalid or expired.", "SITE_MEDIA_UPLOAD_TOKEN_INVALID", 403);
     }
     try {
-      return await writeObject({ storagePath: pending.path, mimeType: pending.mimeType, body });
+      const stored = await writeObject({ storagePath: pending.path, mimeType: pending.mimeType, body });
+      return { ...stored, workspaceId: pending.workspaceId, siteProjectId: pending.siteProjectId, assetType: pending.assetType, fileName: pending.fileName, mimeType: pending.mimeType };
     } finally {
       pendingUploads.delete(keyToken);
     }
