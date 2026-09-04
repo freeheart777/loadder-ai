@@ -1,0 +1,65 @@
+/* Loadder direct-media interaction: the image itself is the picker. */
+[data-studio-version="16"] label[data-inline-media-control="true"] {
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: inherit !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  transform: none !important;
+  cursor: pointer !important;
+  overflow: hidden;
+}
+
+[data-studio-version="16"] label[data-inline-media-control="true"] > svg,
+[data-studio-version="16"] label[data-inline-media-control="true"] > span {
+  display: none !important;
+}
+
+[data-studio-version="16"] label[data-inline-media-control="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0);
+  transition: background 140ms ease;
+}
+
+[data-studio-version="16"] label[data-inline-media-control="true"]::after {
+  content: "کلیک برای تغییر تصویر";
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(2,6,23,.82);
+  padding: 7px 11px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+[data-studio-version="16"] label[data-inline-media-control="true"]:hover::before {
+  background: rgba(15, 23, 42, .14);
+}
+
+[data-studio-version="16"] label[data-inline-media-control="true"]:hover::after,
+[data-studio-version="16"] label[data-inline-media-control="true"]:focus-within::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+[data-studio-version="16"] label[data-inline-media-control="true"]:has(input:disabled)::after {
+  content: "در حال بارگذاری…";
+  opacity: 1;
+  transform: translateY(0);
+}
