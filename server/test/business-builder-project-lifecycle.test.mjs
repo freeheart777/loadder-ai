@@ -48,7 +48,7 @@ test("business builder persists immutable versions, restores and requires previe
     const preview=await projects.startPreview(created.project.id);
     assert.equal(preview.session.runtimeAdapter,"loadder-contract-html-v1");
     const html=previewAdapter.render({version:preview.version});
-    assert.match(html,/Loadder Contract Preview/);
+    assert.match(html,/Loadder Design Preview/);
     assert.match(html,/Content|Ops|workspace/i);
   });
   db.close();
