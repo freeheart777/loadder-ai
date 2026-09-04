@@ -23,7 +23,7 @@ const nonNegativeInt = (value, field) => {
   if (!Number.isInteger(n) || n < 0) throw new EcommerceError(`${field} must be a non-negative integer.`, "INVALID_AMOUNT");
   return n;
 };
-const productImageUrl = (value, { nullable = false } = {}) => {
+const productImageUrl = (value, { nullable = false, allowLocal = false } = {}) => {
   if (value == null || value === "") {
     if (nullable) return null;
     throw new EcommerceError("Product image URL is required.", "PRODUCT_IMAGE_URL_REQUIRED");
@@ -34,17 +34,18 @@ const productImageUrl = (value, { nullable = false } = {}) => {
   try {
     const parsed = new URL(url);
     if (parsed.protocol === "https:") return url;
+    if (allowLocal && parsed.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)) return url;
   } catch {}
   throw new EcommerceError("Product image URL must use HTTPS or a supported image data URL.", "PRODUCT_IMAGE_URL_INVALID");
 };
-const productMetadata = (value, fallback = "{}") => {
+const productMetadata = (value, fallback = "{}", { allowLocal = false } = {}) => {
   const next = value === undefined ? json(fallback) : (value && typeof value === "object" && !Array.isArray(value) ? value : {});
   if (next.gallery === undefined) return next;
   if (!Array.isArray(next.gallery) || next.gallery.length > 12) throw new EcommerceError("Product gallery must contain at most 12 images.", "PRODUCT_GALLERY_INVALID");
-  return { ...next, gallery: [...new Set(next.gallery.map((url) => productImageUrl(url)))].slice(0, 12) };
+  return { ...next, gallery: [...new Set(next.gallery.map((url) => productImageUrl(url, { allowLocal })))].slice(0, 12) };
 };
 
-export function createEcommerceService({ db }) {
+export function createEcommerceService({ db, env = process.env }) {
   const workspaceId = () => requireWorkspaceId();
   const ownedSite = (siteProjectId) => db.prepare("SELECT id,site_type AS siteType,name FROM site_projects WHERE id=? AND workspace_id=?").get(siteProjectId, workspaceId());
   const requireSite = (siteProjectId) => {
@@ -134,15 +135,24 @@ export function createEcommerceService({ db }) {
       const name = String(input.name || "").trim();
       if (!name) throw new EcommerceError("Product name is required.", "PRODUCT_NAME_REQUIRED");
       const productId = id("prod"), stamp = now();
+      const ownerWorkspaceId = workspaceId();
       const productCurrency = currency(input.currency);
       const slug = slugify(input.slug || name) || productId.toLowerCase();
       const price = nonNegativeInt(input.basePriceMinor, "basePriceMinor");
-      db.prepare(`INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,description,category,brand,status,currency,base_price_minor,compare_at_price_minor,featured,seo_title,seo_description,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(productId,workspaceId(),siteProjectId,name,slug,String(input.description||""),input.category||null,input.brand||null,input.status||"DRAFT",productCurrency,price,input.compareAtPriceMinor==null?null:nonNegativeInt(input.compareAtPriceMinor,"compareAtPriceMinor"),input.featured?1:0,input.seoTitle||null,input.seoDescription||null,JSON.stringify(input.metadata||{}),stamp,stamp);
+      const compareAtPrice = input.compareAtPriceMinor == null ? null : nonNegativeInt(input.compareAtPriceMinor, "compareAtPriceMinor");
+      const inventoryQuantity = nonNegativeInt(input.inventoryQuantity, "inventoryQuantity");
+      const imageUrl = productImageUrl(input.imageUrl, { nullable: true, allowLocal: env.NODE_ENV !== "production" });
+      const metadata = productMetadata(input.metadata, "{}", { allowLocal: env.NODE_ENV !== "production" });
       const sku = String(input.sku || `${slug}-${crypto.randomBytes(3).toString("hex")}`).trim();
       const variantId = id("var");
-      db.prepare(`INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,image_url,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(variantId,workspaceId(),productId,sku,String(input.variantTitle||"Default"),input.variantPriceMinor==null?null:nonNegativeInt(input.variantPriceMinor,"variantPriceMinor"),nonNegativeInt(input.inventoryQuantity,"inventoryQuantity"),input.inventoryPolicy||"DENY",JSON.stringify(input.options||{}),input.imageUrl||null,1,stamp,stamp);
+      const variantPrice = input.variantPriceMinor == null ? null : nonNegativeInt(input.variantPriceMinor, "variantPriceMinor");
+      const insert = db.transaction(() => {
+        db.prepare(`INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,description,category,brand,status,currency,base_price_minor,compare_at_price_minor,featured,seo_title,seo_description,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(productId,ownerWorkspaceId,siteProjectId,name,slug,String(input.description||""),input.category||null,input.brand||null,input.status||"DRAFT",productCurrency,price,compareAtPrice,input.featured?1:0,input.seoTitle||null,input.seoDescription||null,JSON.stringify(metadata),stamp,stamp);
+        db.prepare(`INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,image_url,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(variantId,ownerWorkspaceId,productId,sku,String(input.variantTitle||"Default"),variantPrice,inventoryQuantity,input.inventoryPolicy||"DENY",JSON.stringify(input.options||{}),imageUrl,1,stamp,stamp);
+      });
+      insert();
       return this.getProduct(productId);
     },
     updateProduct(productId, input = {}) {
@@ -160,7 +170,7 @@ export function createEcommerceService({ db }) {
         featured: input.featured === undefined ? p.featured : (input.featured?1:0),
         seoTitle: input.seoTitle === undefined ? p.seo_title : input.seoTitle || null,
         seoDescription: input.seoDescription === undefined ? p.seo_description : input.seoDescription || null,
-        metadata: input.metadata === undefined ? p.metadata_json : JSON.stringify(productMetadata(input.metadata)),
+        metadata: input.metadata === undefined ? p.metadata_json : JSON.stringify(productMetadata(input.metadata, "{}", { allowLocal: env.NODE_ENV !== "production" })),
       };
       if (!next.name || !next.slug) throw new EcommerceError("Product name and slug are required.", "INVALID_PRODUCT");
       db.prepare(`UPDATE ecommerce_products SET name=?,slug=?,description=?,category=?,brand=?,status=?,currency=?,base_price_minor=?,compare_at_price_minor=?,featured=?,seo_title=?,seo_description=?,metadata_json=?,updated_at=? WHERE id=? AND workspace_id=?`)
@@ -172,13 +182,14 @@ export function createEcommerceService({ db }) {
       const sku = String(input.sku || "").trim();
       if (!sku) throw new EcommerceError("SKU is required.", "SKU_REQUIRED");
       const stamp=now(), variantId=id("var");
+      const imageUrl = productImageUrl(input.imageUrl, { nullable:true, allowLocal: env.NODE_ENV !== "production" });
       db.prepare(`INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,image_url,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(variantId,workspaceId(),productId,sku,String(input.title||"Variant"),input.priceMinor==null?null:nonNegativeInt(input.priceMinor,"priceMinor"),nonNegativeInt(input.inventoryQuantity,"inventoryQuantity"),input.inventoryPolicy||"DENY",JSON.stringify(input.options||{}),input.imageUrl||null,input.active===false?0:1,stamp,stamp);
+        .run(variantId,workspaceId(),productId,sku,String(input.title||"Variant"),input.priceMinor==null?null:nonNegativeInt(input.priceMinor,"priceMinor"),nonNegativeInt(input.inventoryQuantity,"inventoryQuantity"),input.inventoryPolicy||"DENY",JSON.stringify(input.options||{}),imageUrl,input.active===false?0:1,stamp,stamp);
       return variantMap(requireVariant(variantId));
     },
     updateVariant(variantId, input = {}) {
       const variant = requireVariant(variantId); requireSite(variant.site_project_id);
-      const imageUrl = input.imageUrl === undefined ? variant.image_url : productImageUrl(input.imageUrl, { nullable:true });
+      const imageUrl = input.imageUrl === undefined ? variant.image_url : productImageUrl(input.imageUrl, { nullable:true, allowLocal: env.NODE_ENV !== "production" });
       db.prepare("UPDATE ecommerce_variants SET image_url=?,updated_at=? WHERE id=? AND workspace_id=?")
         .run(imageUrl,now(),variantId,workspaceId());
       return variantMap(requireVariant(variantId));
