@@ -85,6 +85,48 @@ Inventory is modeled per `(workspace, store, variant, location)`.
 - exclusions win over inclusions.
 - no mutation of cart input is allowed during evaluation.
 
+## Fulfillment v0
+A Fulfillment is a provider-neutral allocation of one or more immutable Order lines to a shipment/delivery lifecycle. It does not mutate the Order snapshot and it does not perform returns or refunds.
+
+### Creation
+A new fulfillment:
+- belongs to exactly one workspace, store and order;
+- may be created only for orders in a fulfillable state (`CONFIRMED` or `PROCESSING` in v0);
+- references existing immutable order-line IDs;
+- uses positive integer quantities;
+- rejects duplicate order-line references inside the same fulfillment;
+- counts active pending/packing/shipped/delivered allocations when checking remaining quantity;
+- rejects any allocation that would exceed the ordered quantity across active fulfillments.
+
+A cancelled fulfillment releases its unshipped allocation so a replacement fulfillment may be created without over-fulfilling the order.
+
+### Lifecycle
+Fulfillment states are forward-only:
+
+`PENDING -> PACKING -> SHIPPED -> DELIVERED`
+
+Cancellation is allowed only before shipping:
+
+- `PENDING -> CANCELLED`
+- `PACKING -> CANCELLED`
+
+`SHIPPED`, `DELIVERED` and `CANCELLED` cannot move backward. Shipping carrier, tracking number and tracking URL are provider-neutral optional metadata because local/manual delivery may legitimately have no carrier tracking number.
+
+### Tracking
+Tracking events are append-only immutable facts identified by a unique event ID within a fulfillment. Recording a tracking event returns a new fulfillment value and never mutates earlier snapshots. Duplicate event IDs are rejected. Cancelled fulfillments cannot receive new tracking events.
+
+### Derived order fulfillment status
+Order fulfillment status is derived from shipped/delivered quantities, not from merely allocating a pending fulfillment:
+
+- `UNFULFILLED`: no ordered quantity has shipped;
+- `PARTIAL`: some but not all ordered quantity has shipped;
+- `FULFILLED`: all ordered quantity has shipped.
+
+The fulfillment summary separately exposes ordered, allocated, fulfilled/shipped and delivered quantities per order line. This distinction is required so partial shipments and later Returns / Refunds can reason from physical delivery facts instead of mutable catalog data.
+
+### Returns boundary
+Fulfillment v0 intentionally does not create return or refund records. Returns / Refunds v0 must reference real fulfilled/delivered quantities and must not rewrite fulfillment or financial history.
+
 ## V2 compatibility goal
 The V2 core must eventually satisfy the existing Loadder Commerce Provider Contract for product, variant, inventory, cart, coupon/shipping, checkout and order operations. New capabilities may extend the contract only through explicit versioning.
 
