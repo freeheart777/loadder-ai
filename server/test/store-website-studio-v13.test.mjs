@@ -15,20 +15,27 @@ const v16Canvas = read("../../src/components/store-studio-v16/StudioCanvas.tsx")
 const v16Inspector = read("../../src/components/store-studio-v16/InspectorPanel.tsx");
 const v16Source = [v16Gate, v16, v16Types, v16Config, v16Canvas, v16Inspector].join("\n");
 
-test("main Store Studio routes use canonical gated V16 and legacy URLs cannot surface old studios", () => {
-  for (const route of ["/dashboard/websites", "/dashboard/websites/studio", "/site-builder"]) {
-    const escaped = route.replaceAll("/", "\\/");
-    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV16 \\/>\\}`));
+test("main Store Studio route uses canonical gated V16 and every legacy URL redirects to it", () => {
+  assert.match(app, /path="\/dashboard\/websites" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
+  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites" replace \/>/);
+  for (const route of [
+    "/dashboard/websites/studio",
+    "/site-builder",
+    "/dashboard/websites/studio-v13",
+    "/dashboard/websites/studio-v14",
+    "/dashboard/websites/studio-v15",
+    "/dashboard/websites/studio-v16",
+    "/dashboard/websites/fallback/v13",
+    "/dashboard/websites/fallback/v14",
+    "/dashboard/websites/fallback/v15",
+  ]) {
+    const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(app, new RegExp(`path="${escaped}" element=\\{canonicalBuilder\\}`));
   }
   assert.match(v16Gate, /loadActiveStoreProject/);
   assert.match(v16Gate, /state === "ready"/);
   assert.match(v16Gate, /StoreWebsiteStudioPageV16Core/);
-  for (const route of ["studio-v13", "studio-v14", "studio-v15", "studio-v16"]) {
-    assert.match(app,new RegExp(`path="\\/dashboard\\/websites\\/${route}"[\\s\\S]{0,140}<Navigate to="\\/dashboard\\/websites" replace \\/>`));
-  }
-  for (const [route,page] of [["fallback/v13","StoreWebsiteStudioPageV13"],["fallback/v14","StoreWebsiteStudioPageV14"],["fallback/v15","StoreWebsiteStudioPageV15"]]) {
-    assert.match(app,new RegExp(`path="\\/dashboard\\/websites\\/${route}"[\\s\\S]{0,100}${page}`));
-  }
+  assert.doesNotMatch(app, /element=\{<StoreWebsiteStudioPageV(?:13|14|15)\s*\/?>\}/);
 });
 
 test("V16 is a true state-owned visual canvas with contextual selection", () => {

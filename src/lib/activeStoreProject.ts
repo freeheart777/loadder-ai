@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch, setCanonicalStoreProjectId } from "./api";
 
 export type ActiveStoreProject = {
   id: string;
@@ -7,7 +7,16 @@ export type ActiveStoreProject = {
   content?: Record<string, unknown>;
 };
 
+export type ActiveStoreProjectDetail = {
+  project: ActiveStoreProject;
+  assets?: unknown[];
+  versions?: unknown[];
+  domains?: unknown[];
+};
+
 type Fetcher = typeof apiFetch;
+
+let canonicalProjectPromise: Promise<ActiveStoreProjectDetail> | null = null;
 
 async function read(response: Response) {
   const data = await response.json().catch(() => ({}));
@@ -18,28 +27,50 @@ async function read(response: Response) {
   return data;
 }
 
-export async function ensureActiveStoreProject(fetcher: Fetcher = apiFetch): Promise<ActiveStoreProject> {
-  const listing = await read(await fetcher("/api/site-projects"));
-  const projects = Array.isArray(listing.projects) ? listing.projects : [];
-  const existing = projects.find((project: ActiveStoreProject) => String(project?.siteType || "").toUpperCase() === "STORE");
-  if (existing?.id) return existing;
-
-  const created = await read(await fetcher("/api/site-projects", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "فروشگاه شما",
-      siteType: "STORE",
-      content: {},
-    }),
-  }));
-  if (!created.project?.id) throw new Error("ساخت پروژه فروشگاهی کامل نشد.");
-  return created.project as ActiveStoreProject;
+function isStore(project: ActiveStoreProject | null | undefined) {
+  return Boolean(project?.id) && String(project?.siteType || "").toUpperCase() === "STORE";
 }
 
-export async function loadActiveStoreProject(fetcher: Fetcher = apiFetch) {
-  const project = await ensureActiveStoreProject(fetcher);
-  const detail = await read(await fetcher(`/api/site-projects/${project.id}`));
-  if (!detail.project?.id) throw new Error("جزئیات پروژه فروشگاهی دریافت نشد.");
-  return detail as { project: ActiveStoreProject; assets?: unknown[]; versions?: unknown[]; domains?: unknown[] };
+async function resolveActiveStoreProject(fetcher: Fetcher): Promise<ActiveStoreProjectDetail> {
+  const listing = await read(await fetcher("/api/site-projects"));
+  const projects = Array.isArray(listing.projects) ? listing.projects : [];
+  let project = projects.find((candidate: ActiveStoreProject) => isStore(candidate)) as ActiveStoreProject | undefined;
+
+  if (!project?.id) {
+    const created = await read(await fetcher("/api/site-projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "فروشگاه شما", siteType: "STORE", content: {} }),
+    }));
+    project = created.project as ActiveStoreProject | undefined;
+  }
+
+  if (!project || !isStore(project)) throw new Error("ساخت یا انتخاب پروژه فروشگاهی کامل نشد.");
+  const projectId = project.id;
+
+  const detail = await read(await fetcher(`/api/site-projects/${projectId}`));
+  if (!isStore(detail.project)) throw new Error("جزئیات پروژه فروشگاهی معتبر دریافت نشد.");
+  if (fetcher === apiFetch) setCanonicalStoreProjectId(detail.project.id);
+  return detail as ActiveStoreProjectDetail;
+}
+
+export function invalidateActiveStoreProject() {
+  canonicalProjectPromise = null;
+  setCanonicalStoreProjectId("");
+}
+
+export async function loadActiveStoreProject(fetcher: Fetcher = apiFetch): Promise<ActiveStoreProjectDetail> {
+  if (fetcher !== apiFetch) return resolveActiveStoreProject(fetcher);
+  if (!canonicalProjectPromise) {
+    canonicalProjectPromise = resolveActiveStoreProject(apiFetch).catch((error) => {
+      canonicalProjectPromise = null;
+      setCanonicalStoreProjectId("");
+      throw error;
+    });
+  }
+  return canonicalProjectPromise;
+}
+
+export async function ensureActiveStoreProject(fetcher: Fetcher = apiFetch): Promise<ActiveStoreProject> {
+  return (await loadActiveStoreProject(fetcher)).project;
 }

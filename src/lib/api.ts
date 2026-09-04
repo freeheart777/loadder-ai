@@ -6,6 +6,15 @@ export const API_BASE_URL = configuredBaseUrl.replace(/\/+$/, "");
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 const API_FETCH_PATCH_FLAG = "__loadderApiFetchPatched__";
+let canonicalStoreProjectId = "";
+
+export function setCanonicalStoreProjectId(projectId: string | null | undefined) {
+  canonicalStoreProjectId = String(projectId || "").trim();
+}
+
+export function getCanonicalStoreProjectId() {
+  return canonicalStoreProjectId;
+}
 
 function requestUrl(input: RequestInfo | URL) {
   if (typeof input === "string") return input;
@@ -28,15 +37,36 @@ export function apiUrl(path: string) {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
-export function apiFetch(
+async function normalizeCanonicalStoreListing(response: Response) {
+  if (!canonicalStoreProjectId || !response.ok) return response;
+  const data = await response.clone().json().catch(() => null);
+  if (!data || !Array.isArray(data.projects)) return response;
+  const index = data.projects.findIndex((project: { id?: string }) => project?.id === canonicalStoreProjectId);
+  if (index <= 0) return response;
+  const projects = [...data.projects];
+  const [active] = projects.splice(index, 1);
+  projects.unshift(active);
+  return new Response(JSON.stringify({ ...data, projects }), {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+export async function apiFetch(
   path: string,
   init?: RequestInit
 ) {
-  return nativeFetch(apiUrl(path), {
+  const response = await nativeFetch(apiUrl(path), {
     ...init,
     credentials: "include",
     headers: {
       ...init?.headers,
     },
   });
+  const method = String(init?.method || "GET").toUpperCase();
+  if (method === "GET" && path.replace(/\/+$/, "") === "/api/site-projects") {
+    return normalizeCanonicalStoreListing(response);
+  }
+  return response;
 }
