@@ -6,13 +6,17 @@ This document defines the first Customer Account boundary for Commerce V2. It is
 
 Customer Accounts do not own passwords, sessions, invite tokens, login state, or primary application-user identity.
 
-The existing App Builder app-user authentication system remains the identity source of truth. Commerce receives a resolved app-user principal and binds a customer account to:
+The existing App Builder app-user authentication system remains the identity source of truth. Commerce receives a resolved app-user principal plus the auth-project identity already resolved for the current store, and binds a customer account to:
 
 - `identitySource = APP_USER`
 - immutable app-user subject ID
 - immutable auth project ID
 - workspace
 - store
+
+Account creation requires the store's resolved `authProjectId` explicitly. The principal's `projectId` must exactly match that store auth project. This prevents an app user from one generated application/project from being bound accidentally to another store's Commerce customer account even when both are inside the same broader workspace.
+
+The domain does not infer that `storeId === projectId`; the application/store adapter owns that mapping and must pass the already-authorized auth project explicitly.
 
 Email is not a customer-account identity key. An email change must not create a second commerce customer. Authentication tokens and credentials must never be copied into Customer Account metadata.
 
@@ -51,7 +55,7 @@ Removing a saved address clears any default pointer that referenced that address
 
 Domain mutations require the same resolved active customer app-user principal that is bound to the Customer Account. A different subject or auth project cannot mutate the account, address book, or create order ownership links.
 
-Workspace/store authorization remains an application/persistence responsibility outside the pure domain engine, using authenticated tenant context. The domain still verifies workspace/store agreement between Customer Account and Order when producing links.
+Workspace/store authorization remains an application/persistence responsibility outside the pure domain engine, using authenticated tenant context. Account creation additionally requires the store adapter's explicit auth-project binding and validates it against the resolved principal. The domain verifies workspace/store agreement between Customer Account and Order when producing links.
 
 ## Customer Order ownership links
 
@@ -96,6 +100,7 @@ A later persistence phase must enforce at least:
 
 - unique customer account ID
 - unique `(workspace, store, auth_project, identity_subject)` binding
+- validated store-to-auth-project ownership/mapping before account creation
 - unique Order ownership link per Order
 - tenant/store foreign ownership integrity
 - transaction-safe account/link creation
