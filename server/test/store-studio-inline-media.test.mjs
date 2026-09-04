@@ -9,6 +9,8 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 test("Store Studio media is uploaded from the rendered image, not a detached picker modal", () => {
   const canvas = read("src/components/store-studio-v16/StudioCanvas.tsx");
   const core = read("src/pages/StoreWebsiteStudioPageV16Core.tsx");
+  const css = read("src/direct-media.css");
+  const main = read("src/main.tsx");
 
   assert.match(canvas, /data-inline-media-control="true"/);
   assert.match(canvas, /data-inline-media-input="true"/);
@@ -17,6 +19,9 @@ test("Store Studio media is uploaded from the rendered image, not a detached pic
   assert.match(canvas, /kind:\s*"logo"/);
   assert.match(canvas, /kind:\s*"product"/);
   assert.match(canvas, /onImageUpload/);
+  assert.match(css, /inset: 0 !important/);
+  assert.match(css, /کلیک برای تغییر تصویر/);
+  assert.match(main, /import "\.\/direct-media\.css"/);
 
   assert.match(core, /async function uploadMedia\(target: InlineMediaTarget, file: File\)/);
   assert.match(core, /applyMediaToConfig/);
@@ -26,11 +31,22 @@ test("Store Studio media is uploaded from the rendered image, not a detached pic
   assert.doesNotMatch(core, /انتخاب تصویر/);
 });
 
-test("inline media upload fails loudly and persists after successful completion", () => {
+test("inline media upload uses canonical helper, surfaces failures and persists success", () => {
   const core = read("src/pages/StoreWebsiteStudioPageV16Core.tsx");
-  assert.match(core, /HTTP \$\{uploaded\.status\}/);
+  const helper = read("src/lib/siteMediaUpload.ts");
+
+  assert.match(core, /import \{ uploadSiteMedia \} from "\.\.\/lib\/siteMediaUpload"/);
+  assert.match(core, /const uploaded = await uploadSiteMedia\(\{/);
+  assert.match(core, /siteProjectId: project\.id/);
+  assert.match(core, /assetType: target\.kind/);
   assert.match(core, /URL تصویر دریافت نشد/);
+  assert.match(core, /setMessage\(e instanceof Error \? e\.message : "آپلود ناموفق بود"\)/);
   assert.match(core, /تصویر آپلود، اعمال و ذخیره شد/);
-  assert.match(core, /assetType = target\.kind/);
-  assert.match(core, /credentials:\s*upload\.local\s*\?\s*"include"\s*:\s*"omit"/, "local API upload must carry the authenticated session while external signed storage URLs must not");
+  assert.match(core, /await persistConfig\(nextConfig\)/);
+  assert.doesNotMatch(core, /\/media\/upload-url/);
+  assert.doesNotMatch(core, /\/media\/complete/);
+  assert.doesNotMatch(core, /fetch\(upload\.signedUrl/);
+
+  assert.match(helper, /apiFetch\(`\/api\/site-projects\/\$\{siteProjectId\}\/media\/upload`/);
+  assert.match(helper, /body: file/);
 });
