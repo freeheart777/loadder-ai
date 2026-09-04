@@ -6,112 +6,49 @@ import { LoadderAppUserAuth } from "./app-user-auth.mjs";
 import { LoadderSqliteDataAdapter } from "./sqlite-data-adapter.mjs";
 import { LoadderDataRuntime } from "./data-adapter.mjs";
 import { appFieldAccess, assertAppPayloadFields, filterDefinitionForRole, filterUiForRole, redactAppRecord, redactAppRecords } from "./app-field-access.mjs";
+import { createCustomerAccountRepository, CustomerAccountPersistenceError } from "../commerce/v2/customer-account-repository.mjs";
+import { createCustomerAccountService } from "../commerce/v2/customer-account-service.mjs";
 
 const tokenFrom = (req) => String(req.get("X-Loadder-App-Token") || "").trim();
-const limited = (limit) => rateLimit({
-  windowMs: 60_000,
-  limit,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  keyGenerator: (req) => `${ipKeyGenerator(req.ip || "unknown")}:${String(req.params.projectId || "unknown").slice(0, 128)}`,
-  handler: (_req, res) => res.status(429).json({ success: false, code: "PUBLIC_APP_RATE_LIMITED" }),
-});
+const limited = (limit) => rateLimit({ windowMs:60_000, limit, standardHeaders:"draft-8", legacyHeaders:false, keyGenerator:(req)=>`${ipKeyGenerator(req.ip||"unknown")}:${String(req.params.projectId||"unknown").slice(0,128)}`, handler:(_req,res)=>res.status(429).json({success:false,code:"PUBLIC_APP_RATE_LIMITED"}) });
 
 export function createPublicBusinessAppRouter({ db }) {
-  const router = express.Router();
-  const repo = createBusinessBuilderRepository(db);
-  const auth = new LoadderAppUserAuth(db);
-  const adapter = new LoadderSqliteDataAdapter(db);
-  const runtime = new LoadderDataRuntime({ adapter });
-  const readLimit = limited(120);
-  const writeLimit = limited(30);
+  const router=express.Router(),repo=createBusinessBuilderRepository(db),auth=new LoadderAppUserAuth(db),adapter=new LoadderSqliteDataAdapter(db),runtime=new LoadderDataRuntime({adapter});
+  const customers=createCustomerAccountService({repository:createCustomerAccountRepository(db)});
+  const readLimit=limited(120),writeLimit=limited(30);
+  const locate=(projectId)=>db.prepare("SELECT id,workspace_id AS workspaceId,name,locale,active_version_id AS activeVersionId,status FROM business_builder_projects WHERE id=? AND status='ready'").get(projectId)||null;
+  async function scoped(projectId,fn){const project=locate(projectId);if(!project)return{status:404,body:{success:false,code:"PUBLIC_APP_NOT_FOUND"}};return runWithWorkspace(project.workspaceId,()=>fn(project));}
+  const principal=(req,projectId)=>{const token=tokenFrom(req);return token?auth.resolve(token,projectId):null};
+  const role=(req,projectId,definition)=>principal(req,projectId)?.role||definition.accessPolicy?.defaultRole||"public";
+  const access=(req,projectId,definition,resource,action)=>appFieldAccess({definition,role:role(req,projectId,definition),resource,action});
+  const storesFor=(project)=>{
+    try {
+      return db.prepare(`SELECT s.id,s.name,s.slug FROM business_builder_commerce_bindings b JOIN site_projects s ON s.id=b.site_project_id AND s.workspace_id=b.workspace_id WHERE b.workspace_id=? AND b.business_builder_project_id=? AND b.status='active' ORDER BY s.name,s.id`).all(project.workspaceId,project.id);
+    } catch (error) {
+      if (String(error?.message||"").includes("no such table: business_builder_commerce_bindings")) return [];
+      throw error;
+    }
+  };
+  const customerPrincipal=(req,project)=>{const p=principal(req,project.id);if(!p)return{error:{status:401,body:{success:false,code:"APP_CUSTOMER_AUTH_REQUIRED"}}};if(String(p.role||"").toLowerCase()!=="customer")return{error:{status:403,body:{success:false,code:"APP_CUSTOMER_ROLE_REQUIRED"}}};return{value:p}};
+  const revision=(req)=>{const raw=req.get("If-Match")||req.body?.expectedRevision;const n=Number(String(raw??"").replace(/^W\//,"").replace(/^"|"$/g,""));return Number.isInteger(n)&&n>0?n:null};
+  const customerError=(error)=>error instanceof CustomerAccountPersistenceError?{status:error.status||400,body:{success:false,code:error.code,message:error.message}}:{status:/MISMATCH|FORBIDDEN|ROLE_REQUIRED|INACTIVE/.test(String(error?.message||""))?403:400,body:{success:false,code:error?.code||"CUSTOMER_SELF_SERVICE_INVALID",message:String(error?.message||"Customer self-service operation failed.")}};
+  async function customerRoute(req,res,fn,{needRevision=false,create=false}={}){const out=await scoped(req.params.projectId,(project)=>{const resolved=customerPrincipal(req,project);if(resolved.error)return resolved.error;const rev=needRevision?revision(req):null;if(needRevision&&!rev)return{status:428,body:{success:false,code:"CUSTOMER_REVISION_REQUIRED",message:"If-Match with current customer revision is required."}};try{return fn({project,principal:resolved.value,revision:rev,ctx:{workspaceId:project.workspaceId,siteProjectId:req.params.siteProjectId,principal:resolved.value},create});}catch(error){return customerError(error)}});return res.status(out.status).json(out.body);}
 
-  function locate(projectId) {
-    return db.prepare("SELECT id,workspace_id AS workspaceId,name,locale,active_version_id AS activeVersionId,status FROM business_builder_projects WHERE id=? AND status='ready'").get(projectId) || null;
-  }
-  async function scoped(projectId, fn) {
-    const project = locate(projectId);
-    if (!project) return { status: 404, body: { success: false, code: "PUBLIC_APP_NOT_FOUND" } };
-    return runWithWorkspace(project.workspaceId, () => fn(project));
-  }
-  function principal(req, projectId) {
-    const token = tokenFrom(req);
-    return token ? auth.resolve(token, projectId) : null;
-  }
-  function role(req, projectId, definition) {
-    return principal(req, projectId)?.role || definition.accessPolicy?.defaultRole || "public";
-  }
-  function access(req, projectId, definition, resource, action) {
-    return appFieldAccess({ definition, role: role(req, projectId, definition), resource, action });
-  }
+  router.post("/public/apps/:projectId/invite/exchange",writeLimit,express.json({limit:"32kb"}),async(req,res)=>{const out=await scoped(req.params.projectId,()=>{const session=auth.consumeInvite(req.params.projectId,req.body?.token);return session?{status:201,body:{success:true,session}}:{status:401,body:{success:false,code:"APP_INVITE_INVALID"}}});return res.status(out.status).json(out.body)});
+  router.get("/public/apps/:projectId/bootstrap",readLimit,async(req,res)=>{const out=await scoped(req.params.projectId,(project)=>{const version=repo.getActiveVersion(project.id);if(!version)return{status:404,body:{success:false,code:"ACTIVE_VERSION_NOT_FOUND"}};const appPrincipal=principal(req,project.id),effectiveRole=appPrincipal?.role||version.definition.accessPolicy?.defaultRole||"public";if(!appPrincipal&&effectiveRole!=="public")return{status:401,body:{success:false,code:"APP_SESSION_REQUIRED"}};const filtered=filterDefinitionForRole(version.definition,effectiveRole);const definition={id:filtered.id,name:filtered.name,vertical:filtered.vertical,locale:filtered.locale,entities:(filtered.entities||[]).map(e=>({id:e.id,name:e.name,fields:e.fields||[]})),workflows:(filtered.workflows||[]).map(w=>({id:w.id,name:w.name}))};return{status:200,body:{success:true,project:{id:project.id,name:project.name,locale:project.locale},definition,ui:filterUiForRole(version.ui,version.definition,effectiveRole),principal:appPrincipal,commerceStores:appPrincipal?.role==="customer"?storesFor(project):[]}}});return res.status(out.status).json(out.body)});
 
-  router.post("/public/apps/:projectId/invite/exchange", writeLimit, express.json({ limit: "32kb" }), async (req, res) => {
-    const out = await scoped(req.params.projectId, () => {
-      const session = auth.consumeInvite(req.params.projectId, req.body?.token);
-      return session
-        ? { status: 201, body: { success: true, session } }
-        : { status: 401, body: { success: false, code: "APP_INVITE_INVALID" } };
-    });
-    return res.status(out.status).json(out.body);
-  });
+  const base="/public/apps/:projectId/commerce/stores/:siteProjectId/me";
+  router.get(base,readLimit,(req,res)=>customerRoute(req,res,({ctx})=>{const account=customers.get(ctx);return account?{status:200,body:{success:true,account}}:{status:404,body:{success:false,code:"CUSTOMER_ACCOUNT_NOT_FOUND"}}}));
+  router.post(base,writeLimit,(req,res)=>customerRoute(req,res,({ctx})=>({status:201,body:{success:true,account:customers.getOrCreate(ctx)}})));
+  router.patch(base,writeLimit,express.json({limit:"64kb"}),(req,res)=>customerRoute(req,res,({ctx,revision:rev})=>({status:200,body:{success:true,account:customers.updateProfile({...ctx,expectedRevision:rev,patch:req.body?.profile||req.body||{}})}}),{needRevision:true}));
+  router.post(`${base}/addresses`,writeLimit,express.json({limit:"64kb"}),(req,res)=>customerRoute(req,res,({ctx,revision:rev})=>({status:201,body:{success:true,account:customers.addAddress({...ctx,expectedRevision:rev,address:req.body?.address||{},makeDefaultShipping:!!req.body?.makeDefaultShipping,makeDefaultBilling:!!req.body?.makeDefaultBilling})}}),{needRevision:true}));
+  router.patch(`${base}/addresses/:addressId`,writeLimit,express.json({limit:"64kb"}),(req,res)=>customerRoute(req,res,({ctx,revision:rev})=>({status:200,body:{success:true,account:customers.updateAddress({...ctx,expectedRevision:rev,addressId:req.params.addressId,patch:req.body?.address||req.body||{}})}}),{needRevision:true}));
+  router.put(`${base}/addresses/:addressId/defaults`,writeLimit,express.json({limit:"16kb"}),(req,res)=>customerRoute(req,res,({ctx,revision:rev})=>({status:200,body:{success:true,account:customers.setDefaultAddress({...ctx,expectedRevision:rev,addressId:req.params.addressId,shipping:!!req.body?.shipping,billing:!!req.body?.billing})}}),{needRevision:true}));
+  router.delete(`${base}/addresses/:addressId`,writeLimit,(req,res)=>customerRoute(req,res,({ctx,revision:rev})=>({status:200,body:{success:true,account:customers.removeAddress({...ctx,expectedRevision:rev,addressId:req.params.addressId})}}),{needRevision:true}));
+  router.put(`${base}/carts/:cartId/binding`,writeLimit,(req,res)=>customerRoute(req,res,({ctx})=>{const account=customers.getOrCreate(ctx);return{status:200,body:{success:true,accountId:account.id,binding:customers.bindCart({...ctx,cartId:req.params.cartId})}}}));
+  router.get(`${base}/orders`,readLimit,(req,res)=>customerRoute(req,res,({ctx})=>({status:200,body:{success:true,orders:customers.listOrders({...ctx,limit:req.query.limit})}})));
 
-  router.get("/public/apps/:projectId/bootstrap", readLimit, async (req, res) => {
-    const out = await scoped(req.params.projectId, (project) => {
-      const version = repo.getActiveVersion(project.id);
-      if (!version) return { status: 404, body: { success: false, code: "ACTIVE_VERSION_NOT_FOUND" } };
-      const appPrincipal = principal(req, project.id);
-      const effectiveRole = appPrincipal?.role || version.definition.accessPolicy?.defaultRole || "public";
-      if (!appPrincipal && effectiveRole !== "public") return { status: 401, body: { success: false, code: "APP_SESSION_REQUIRED" } };
-      const filtered = filterDefinitionForRole(version.definition, effectiveRole);
-      const definition = {
-        id: filtered.id,
-        name: filtered.name,
-        vertical: filtered.vertical,
-        locale: filtered.locale,
-        entities: (filtered.entities || []).map((entity) => ({ id: entity.id, name: entity.name, fields: entity.fields || [] })),
-        workflows: (filtered.workflows || []).map((workflow) => ({ id: workflow.id, name: workflow.name })),
-      };
-      const safeUi = filterUiForRole(version.ui, version.definition, effectiveRole);
-      return { status: 200, body: { success: true, project: { id: project.id, name: project.name, locale: project.locale }, definition, ui: safeUi, principal: appPrincipal } };
-    });
-    return res.status(out.status).json(out.body);
-  });
-
-  async function data(req, res, action) {
-    const out = await scoped(req.params.projectId, async (project) => {
-      const version = repo.getActiveVersion(project.id);
-      if (!version) return { status: 404, body: { success: false, code: "ACTIVE_VERSION_NOT_FOUND" } };
-      const accessAction = action === "list" || action === "get" ? "read" : action;
-      const operationAccess = access(req, project.id, version.definition, req.params.entityId, accessAction);
-      if (!operationAccess.allowed) return { status: 403, body: { success: false, code: "APP_ACCESS_FORBIDDEN" } };
-      try {
-        if (action === "create" || action === "update") assertAppPayloadFields(req.body || {}, operationAccess);
-        const result = await runtime.execute({
-          definition: version.definition,
-          action,
-          entityId: req.params.entityId,
-          recordId: req.params.recordId || null,
-          payload: req.body || {},
-          query: req.query || {},
-        });
-        if (action === "list") {
-          return { status: 200, body: { success: true, records: redactAppRecords(result, operationAccess), total: await adapter.count({ appId: version.definition.id, entityId: req.params.entityId, query: req.query || {} }) } };
-        }
-        if (action === "delete") return { status: 200, body: { success: true, result } };
-        const readAccess = access(req, project.id, version.definition, req.params.entityId, "read");
-        const safe = readAccess.allowed ? redactAppRecord(result, readAccess) : { id: result?.id };
-        return { status: action === "create" ? 201 : 200, body: { success: true, result: safe, record: safe } };
-      } catch (error) {
-        return { status: 400, body: { success: false, code: error?.code || "PUBLIC_RUNTIME_FAILED", message: error?.message, fields: error?.fields || undefined } };
-      }
-    });
-    return res.status(out.status).json(out.body);
-  }
-
-  router.get("/public/apps/:projectId/data/:entityId", readLimit, (req, res) => data(req, res, "list"));
-  router.get("/public/apps/:projectId/data/:entityId/:recordId", readLimit, (req, res) => data(req, res, "get"));
-  router.post("/public/apps/:projectId/data/:entityId", writeLimit, express.json({ limit: "256kb" }), (req, res) => data(req, res, "create"));
-  router.patch("/public/apps/:projectId/data/:entityId/:recordId", writeLimit, express.json({ limit: "256kb" }), (req, res) => data(req, res, "update"));
-  router.delete("/public/apps/:projectId/data/:entityId/:recordId", writeLimit, (req, res) => data(req, res, "delete"));
+  async function data(req,res,action){const out=await scoped(req.params.projectId,async(project)=>{const version=repo.getActiveVersion(project.id);if(!version)return{status:404,body:{success:false,code:"ACTIVE_VERSION_NOT_FOUND"}};const accessAction=action==="list"||action==="get"?"read":action,operationAccess=access(req,project.id,version.definition,req.params.entityId,accessAction);if(!operationAccess.allowed)return{status:403,body:{success:false,code:"APP_ACCESS_FORBIDDEN"}};try{if(action==="create"||action==="update")assertAppPayloadFields(req.body||{},operationAccess);const result=await runtime.execute({definition:version.definition,action,entityId:req.params.entityId,recordId:req.params.recordId||null,payload:req.body||{},query:req.query||{}});if(action==="list")return{status:200,body:{success:true,records:redactAppRecords(result,operationAccess),total:await adapter.count({appId:version.definition.id,entityId:req.params.entityId,query:req.query||{}})}};if(action==="delete")return{status:200,body:{success:true,result}};const readAccess=access(req,project.id,version.definition,req.params.entityId,"read"),safe=readAccess.allowed?redactAppRecord(result,readAccess):{id:result?.id};return{status:action==="create"?201:200,body:{success:true,result:safe,record:safe}}}catch(error){return{status:400,body:{success:false,code:error?.code||"PUBLIC_RUNTIME_FAILED",message:error?.message,fields:error?.fields||undefined}}}});return res.status(out.status).json(out.body)}
+  router.get("/public/apps/:projectId/data/:entityId",readLimit,(req,res)=>data(req,res,"list"));router.get("/public/apps/:projectId/data/:entityId/:recordId",readLimit,(req,res)=>data(req,res,"get"));router.post("/public/apps/:projectId/data/:entityId",writeLimit,express.json({limit:"256kb"}),(req,res)=>data(req,res,"create"));router.patch("/public/apps/:projectId/data/:entityId/:recordId",writeLimit,express.json({limit:"256kb"}),(req,res)=>data(req,res,"update"));router.delete("/public/apps/:projectId/data/:entityId/:recordId",writeLimit,(req,res)=>data(req,res,"delete"));
   return router;
 }
