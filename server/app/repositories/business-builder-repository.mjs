@@ -16,6 +16,10 @@ function mapPreview(row) {
   if (!row) return null;
   return { id: row.id, projectId: row.project_id, versionId: row.version_id, status: row.status, previewUrl: row.preview_url, runtimeAdapter: row.runtime_adapter, expiresAt: row.expires_at, createdAt: row.created_at };
 }
+function mapQualityEvidence(row) {
+  if (!row) return null;
+  return { id: row.id, projectId: row.project_id, versionId: row.version_id, checks: parse(row.checks_json), recordedBy: row.recorded_by, createdAt: row.created_at };
+}
 
 export function createBusinessBuilderRepository(db) {
   const workspaceId = () => requireWorkspaceId();
@@ -75,6 +79,23 @@ export function createBusinessBuilderRepository(db) {
     if(Date.parse(session.expiresAt)<=Date.now()&&session.status==="active"){db.prepare("UPDATE business_builder_preview_sessions SET status='expired' WHERE id=? AND workspace_id=?").run(session.id,workspaceId());return{...session,status:"expired"};}
     return session;
   }
+  function recordQualityEvidence({ projectId, versionId, checks, recordedBy = null }) {
+    const existing = latestQualityEvidence(projectId, versionId);
+    if (existing) {
+      const same = JSON.stringify(existing.checks) === JSON.stringify(checks);
+      if (same) return existing;
+      const error = new Error("Quality evidence for this version is immutable.");
+      error.code = "QUALITY_EVIDENCE_IMMUTABLE";
+      throw error;
+    }
+    const id = crypto.randomUUID(), timestamp = now();
+    db.prepare(`INSERT INTO business_builder_preview_quality_evidence (id,workspace_id,project_id,version_id,checks_json,recorded_by,created_at) VALUES (?,?,?,?,?,?,?)`)
+      .run(id, workspaceId(), projectId, versionId, JSON.stringify(checks), recordedBy, timestamp);
+    return latestQualityEvidence(projectId, versionId);
+  }
+  function latestQualityEvidence(projectId, versionId) {
+    return mapQualityEvidence(db.prepare("SELECT * FROM business_builder_preview_quality_evidence WHERE project_id=? AND version_id=? AND workspace_id=? ORDER BY created_at DESC LIMIT 1").get(projectId, versionId, workspaceId()));
+  }
   function recordApproval({ projectId, versionId, stage, decision, decidedBy = null, note = null }) {
     const id = crypto.randomUUID(), timestamp = now();
     db.prepare(`INSERT INTO business_builder_approvals (id, project_id, version_id, workspace_id, stage, decision, decided_by, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -86,5 +107,5 @@ export function createBusinessBuilderRepository(db) {
     return row ? { id: row.id, decision: row.decision, stage: row.stage, note: row.note, createdAt: row.created_at } : null;
   }
 
-  return { listProjects, getProject, createProject, updateProject, createVersion, getVersion, listVersions, getActiveVersion, createPreviewSession, getPreviewSession, latestPreviewSession, recordApproval, latestApproval };
+  return { listProjects, getProject, createProject, updateProject, createVersion, getVersion, listVersions, getActiveVersion, createPreviewSession, getPreviewSession, latestPreviewSession, recordQualityEvidence, latestQualityEvidence, recordApproval, latestApproval };
 }
