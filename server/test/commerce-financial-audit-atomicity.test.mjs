@@ -13,7 +13,7 @@ test("reconciliation repair rolls back when the required audit write fails", () 
   const projectService = createSiteProjectService({
     repository: createSiteProjectRepository(db),
     businessContextService: {
-      getCurrent: () => ({ activeContext: { id: "ctx-audit" }, isStale: false }),
+      getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }),
     },
   });
   const store = runWithWorkspace("ws-1", () =>
