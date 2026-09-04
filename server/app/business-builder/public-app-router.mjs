@@ -21,7 +21,14 @@ export function createPublicBusinessAppRouter({ db }) {
   const principal=(req,projectId)=>{const token=tokenFrom(req);return token?auth.resolve(token,projectId):null};
   const role=(req,projectId,definition)=>principal(req,projectId)?.role||definition.accessPolicy?.defaultRole||"public";
   const access=(req,projectId,definition,resource,action)=>appFieldAccess({definition,role:role(req,projectId,definition),resource,action});
-  const storesFor=(project)=>db.prepare(`SELECT s.id,s.name,s.slug FROM business_builder_commerce_bindings b JOIN site_projects s ON s.id=b.site_project_id AND s.workspace_id=b.workspace_id WHERE b.workspace_id=? AND b.business_builder_project_id=? AND b.status='active' ORDER BY s.name,s.id`).all(project.workspaceId,project.id);
+  const storesFor=(project)=>{
+    try {
+      return db.prepare(`SELECT s.id,s.name,s.slug FROM business_builder_commerce_bindings b JOIN site_projects s ON s.id=b.site_project_id AND s.workspace_id=b.workspace_id WHERE b.workspace_id=? AND b.business_builder_project_id=? AND b.status='active' ORDER BY s.name,s.id`).all(project.workspaceId,project.id);
+    } catch (error) {
+      if (String(error?.message||"").includes("no such table: business_builder_commerce_bindings")) return [];
+      throw error;
+    }
+  };
   const customerPrincipal=(req,project)=>{const p=principal(req,project.id);if(!p)return{error:{status:401,body:{success:false,code:"APP_CUSTOMER_AUTH_REQUIRED"}}};if(String(p.role||"").toLowerCase()!=="customer")return{error:{status:403,body:{success:false,code:"APP_CUSTOMER_ROLE_REQUIRED"}}};return{value:p}};
   const revision=(req)=>{const raw=req.get("If-Match")||req.body?.expectedRevision;const n=Number(String(raw??"").replace(/^W\//,"").replace(/^"|"$/g,""));return Number.isInteger(n)&&n>0?n:null};
   const customerError=(error)=>error instanceof CustomerAccountPersistenceError?{status:error.status||400,body:{success:false,code:error.code,message:error.message}}:{status:/MISMATCH|FORBIDDEN|ROLE_REQUIRED|INACTIVE/.test(String(error?.message||""))?403:400,body:{success:false,code:error?.code||"CUSTOMER_SELF_SERVICE_INVALID",message:String(error?.message||"Customer self-service operation failed.")}};
