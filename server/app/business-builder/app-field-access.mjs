@@ -56,3 +56,35 @@ export function filterDefinitionForRole(definition, role = "public") {
   next.pages = (next.pages || []).filter((page) => !page.entityId || entityIds.has(page.entityId));
   return next;
 }
+
+function filterBlock(block, allowedFields) {
+  const next = structuredClone(block);
+  if (Array.isArray(next.columns)) next.columns = next.columns.filter((column) => !column?.id || allowedFields.has(column.id));
+  if (Array.isArray(next.fields)) {
+    next.fields = next.fields.filter((field) => {
+      const id = typeof field === "string" ? field : field?.id;
+      return !id || allowedFields.has(id);
+    });
+  }
+  return next;
+}
+
+export function filterUiForRole(ui, definition, role = "public") {
+  if (!ui) return ui;
+  if (!definition?.accessPolicy) return structuredClone(ui);
+  const next = structuredClone(ui);
+  const entityAccess = new Map((definition.entities || []).map((entity) => [entity.id, appFieldAccess({ definition, role, resource: entity.id, action: "read" })]));
+  const allowedResources = new Set([...entityAccess.entries()].filter(([, access]) => access.allowed).map(([id]) => id));
+  next.navigation = (next.navigation || []).filter((item) => item.id === "dashboard" || !item.id || allowedResources.has(item.id));
+  next.views = (next.views || []).flatMap((view) => {
+    if (view.resource && !allowedResources.has(view.resource)) return [];
+    const access = view.resource ? entityAccess.get(view.resource) : null;
+    const blocks = (view.blocks || []).flatMap((block) => {
+      if (block.resource && !allowedResources.has(block.resource)) return [];
+      const blockAccess = block.resource ? entityAccess.get(block.resource) : access;
+      return [filterBlock(block, blockAccess?.fields || new Set())];
+    });
+    return [{ ...view, blocks }];
+  });
+  return next;
+}
