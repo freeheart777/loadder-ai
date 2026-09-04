@@ -5,7 +5,7 @@ This document defines behavior, not implementation.
 ## Domain primitives
 - `Money`: integer minor units plus ISO/provider-neutral currency code.
 - `Product`: sellable concept with slug, status, content, classification and metadata.
-- `Variant`: purchasable SKU with options, price override, inventory policy and lifecycle state.
+- `Variant`: purchasable SKU with options, price override, lifecycle state and inventory policy.
 - `InventoryUnit`: on-hand, reserved and committed quantities per variant/location.
 - `Cart`: mutable collection of priced lines before order creation.
 - `Order`: immutable commercial snapshot created from a validated cart.
@@ -126,6 +126,66 @@ The fulfillment summary separately exposes ordered, allocated, fulfilled/shipped
 
 ### Returns boundary
 Fulfillment v0 intentionally does not create return or refund records. Returns / Refunds v0 must reference real fulfilled/delivered quantities and must not rewrite fulfillment or financial history.
+
+## Returns / Refunds v0
+Returns and refunds are separate provider-neutral facts. A Return owns physical-item eligibility and lifecycle. A Refund Request owns a requested monetary amount and an immutable financial-capacity snapshot. Neither domain is allowed to rewrite Order, Fulfillment, or Financial Ledger history.
+
+### Return eligibility
+A return request:
+- belongs to exactly one workspace, store and order;
+- references immutable order-line IDs;
+- uses positive integer quantities;
+- is limited by quantities actually `DELIVERED`, not merely ordered, allocated or shipped;
+- subtracts quantities already consumed by active return requests (`REQUESTED`, `APPROVED`, `RECEIVED`);
+- rejects duplicate order-line references inside one return request;
+- snapshots SKU, product/variant identity, unit price and currency from the immutable order line.
+
+`REJECTED` or `CANCELLED` return requests release their quantity eligibility. `RECEIVED` remains consumed historical return quantity.
+
+### Return lifecycle
+Return state is forward-only:
+
+- `REQUESTED -> APPROVED -> RECEIVED`
+- `REQUESTED -> REJECTED`
+- `REQUESTED -> CANCELLED`
+- `APPROVED -> CANCELLED`
+
+`RECEIVED`, `REJECTED`, and `CANCELLED` are terminal in v0.
+
+### Financial authority boundary
+The returns engine does not calculate authoritative captured/refunded money from mutable order state. A refund request receives an immutable financial snapshot from the authoritative financial read model:
+
+- `capturedMinor`
+- `refundedMinor`
+- `refundableMinor = capturedMinor - refundedMinor`
+- `currency`
+
+All amounts are non-negative integer minor units. Refunded amount may not exceed captured amount. The financial currency must match the immutable order currency.
+
+### Refund request rules
+A refund request:
+- may be created only for an `APPROVED` or `RECEIVED` return;
+- requires a positive integer amount;
+- may not exceed the authoritative financial refundable capacity;
+- may not exceed the gross merchandise value represented by the returned immutable order-line snapshots;
+- does not infer shipping/tax/promotion allocation policy in v0;
+- stores the financial-capacity snapshot that authorized the request.
+
+The merchandise-value cap is intentionally conservative. A future explicit refund-allocation policy may version support for shipping, tax, promotion allocation, goodwill credits, or other adjustments rather than silently inventing those rules.
+
+### Refund lifecycle
+Refund request state is forward-only:
+
+- `REQUESTED -> APPROVED -> PROCESSING -> SUCCEEDED`
+- `REQUESTED -> REJECTED`
+- `REQUESTED -> CANCELLED`
+- `APPROVED -> CANCELLED`
+- `PROCESSING -> FAILED`
+
+`SUCCEEDED`, `FAILED`, `REJECTED`, and `CANCELLED` are terminal in v0. A transition to `SUCCEEDED` requires a non-empty provider reference so provider success cannot be represented without an external execution fact.
+
+### Ledger bridge boundary
+Returns / Refunds v0 does not directly append or mutate Commerce Financial Ledger entries. After a provider-confirmed refund succeeds, an explicit accounting/payment bridge must append a new immutable `REFUND` ledger entry with its own deterministic idempotency boundary and provider reference. The original `PAYMENT_CAPTURED` entry must never be updated, deleted, negated in place, or rewritten.
 
 ## V2 compatibility goal
 The V2 core must eventually satisfy the existing Loadder Commerce Provider Contract for product, variant, inventory, cart, coupon/shipping, checkout and order operations. New capabilities may extend the contract only through explicit versioning.
