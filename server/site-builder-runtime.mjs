@@ -6,17 +6,24 @@ import { createBusinessContextService } from "./app/services/business-context-se
 import { mountSiteBuilderControlPlane } from "./app/site-builder-control-plane.mjs";
 
 const router = express.Router();
-const identityRepository = createIdentityRepository(db);
 const businessContextService = createBusinessContextService({
   repository: createBusinessContextRepository(db),
   auditRepository: null,
 });
 
+let identityRepository = null;
+const auditRepository = {
+  createAuditLog(input) {
+    identityRepository ||= createIdentityRepository(db);
+    return identityRepository.createAuditLog(input);
+  },
+};
+
 mountSiteBuilderControlPlane({
   app: router,
   db,
   businessContextService,
-  auditRepository: identityRepository,
+  auditRepository,
   basePath: "/",
 });
 
