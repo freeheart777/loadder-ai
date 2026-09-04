@@ -7,6 +7,7 @@ import { createSiteProjectRepository } from "../repositories/site-project-reposi
 import { renderPublishedSite } from "./public-sites.mjs";
 import { createEcommerceService } from "../services/ecommerce-service.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
+import { createPublicBusinessAppRouter } from "../business-builder/public-app-router.mjs";
 
 export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false }) {
   const router = express.Router();
@@ -21,7 +22,8 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   function publicProduct(product){if(!product||product.status!=="ACTIVE")return null;const gallery=Array.isArray(product.metadata?.gallery)?product.metadata.gallery.filter(x=>typeof x==="string").slice(0,12):[];return{id:product.id,siteProjectId:product.siteProjectId,name:product.name,slug:product.slug,description:product.description||"",category:product.category||null,brand:product.brand||null,currency:product.currency,basePriceMinor:product.basePriceMinor,compareAtPriceMinor:product.compareAtPriceMinor??null,featured:Boolean(product.featured),seoTitle:product.seoTitle||null,seoDescription:product.seoDescription||null,gallery,variants:(product.variants||[]).filter(v=>v.active).map(v=>({id:v.id,sku:v.sku,title:v.title,priceMinor:v.priceMinor,inventoryQuantity:v.inventoryQuantity,inventoryPolicy:v.inventoryPolicy,options:v.options||{},imageUrl:v.imageUrl||null}))}}
   function storefrontError(error,res){console.error("Public storefront error:",error);const status=Number(error?.status)||500;return res.status(status>=400&&status<600?status:500).json({success:false,code:error?.code||"STOREFRONT_ERROR",message:status===500?"Unable to process storefront request.":error.message})}
 
-  router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp}));
+  if(process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true") router.use(createPublicBusinessAppRouter({db}));
+  router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"}));
   router.get("/sites/:id",(req,res)=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");res.set({"Cache-Control":"public, max-age=60, stale-while-revalidate=300","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin"});return res.type("html").send(renderPublishedSite(published.project,published.version,published.assets))}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}});
 
   router.get("/storefront/:siteProjectId",(req,res)=>{try{const store=publicStore(req.params.siteProjectId);if(!store)return res.status(404).json({success:false,message:"Store not found."});const products=runWithWorkspace(store.workspaceId,()=>ecommerceService.listProducts(store.id)).map(publicProduct).filter(Boolean);return res.json({success:true,store:{id:store.id,name:store.name},categories:[...new Set(products.map(p=>p.category).filter(Boolean))],brands:[...new Set(products.map(p=>p.brand).filter(Boolean))],productCount:products.length})}catch(e){return storefrontError(e,res)}});
