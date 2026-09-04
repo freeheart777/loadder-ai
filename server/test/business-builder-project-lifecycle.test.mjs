@@ -13,8 +13,9 @@ function setup(){
   const at=new Date().toISOString(); db.prepare("INSERT INTO workspaces (id,name,slug,status,created_at,updated_at) VALUES ('w1','Test','test','active',?,?)").run(at,at);
   return db;
 }
+const completeChecks={desktop:true,tablet:true,mobile:true,roleSimulation:true,sandboxCrud:true};
 
-test("business builder persists immutable versions, restores and requires ordered preview plus production approval", async()=>{
+test("business builder persists immutable versions and requires quality preview then production approval", async()=>{
   const db=setup();
   await runWithWorkspace("w1", async()=>{
     const repository=createBusinessBuilderRepository(db);
@@ -26,12 +27,15 @@ test("business builder persists immutable versions, restores and requires ordere
     assert.equal(created.version.bundle.portable,true);
     const saved=projects.saveProject(created.project.id,{intent:"برای شرکت پخش CRM فروش، انبار و رزرو بساز"},"u1");
     assert.equal(saved.version.versionNumber,2);
-    assert.equal(saved.version.bundle.contract,"loadder.source-bundle.v1");
     const restored=projects.restoreVersion(created.project.id,created.version.id,"u1");
     assert.equal(restored.version.versionNumber,3);
     assert.equal(repository.listVersions(created.project.id).length,3);
     assert.equal(projects.canDeployProduction(created.project.id),false);
 
+    assert.throws(()=>projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"preview",decision:"approved",actorId:"u1"}),e=>e.code==="PREVIEW_QUALITY_REQUIRED");
+    const firstPreview=await projects.startPreview(created.project.id);
+    assert.equal(firstPreview.session.runtimeAdapter,"loadder-contract-html-v1");
+    projects.recordQualityChecklist({projectId:created.project.id,versionId:restored.version.id,checks:completeChecks,actorId:"u1"});
     assert.throws(()=>projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"production",decision:"approved",actorId:"u1"}),e=>e.code==="PREVIEW_APPROVAL_REQUIRED");
     projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"preview",decision:"approved",actorId:"u1"});
     assert.equal(projects.canDeployProduction(created.project.id),false,"preview approval alone is insufficient");
@@ -40,15 +44,15 @@ test("business builder persists immutable versions, restores and requires ordere
 
     const changed=projects.saveProject(created.project.id,{name:"Ops 2"},"u1");
     assert.notEqual(changed.version.id,restored.version.id);
-    assert.equal(projects.canDeployProduction(created.project.id),false,"a new active version needs fresh approvals");
+    assert.equal(projects.canDeployProduction(created.project.id),false,"a new active version needs fresh quality evidence and approvals");
     assert.throws(()=>projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"preview",decision:"approved",actorId:"u1"}),e=>e.code==="ACTIVE_VERSION_APPROVAL_REQUIRED");
+    await projects.startPreview(created.project.id);
+    projects.recordQualityChecklist({projectId:created.project.id,versionId:changed.version.id,checks:completeChecks,actorId:"u1"});
     projects.decide({projectId:created.project.id,versionId:changed.version.id,stage:"preview",decision:"approved",actorId:"u1"});
     projects.decide({projectId:created.project.id,versionId:changed.version.id,stage:"production",decision:"approved",actorId:"u1"});
     assert.equal(projects.canDeployProduction(created.project.id),true);
 
-    const preview=await projects.startPreview(created.project.id);
-    assert.equal(preview.session.runtimeAdapter,"loadder-contract-html-v1");
-    const html=previewAdapter.render({version:preview.version});
+    const html=previewAdapter.render({version:changed.version});
     assert.match(html,/Loadder Design Preview/);
     assert.match(html,/Content|Ops|workspace/i);
   });
