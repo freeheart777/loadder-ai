@@ -14,7 +14,7 @@ function setup(){
   return db;
 }
 
-test("business builder persists immutable versions, restores and gates production", async()=>{
+test("business builder persists immutable versions, restores and requires preview plus production approval", async()=>{
   const db=setup();
   await runWithWorkspace("w1", async()=>{
     const repository=createBusinessBuilderRepository(db);
@@ -31,8 +31,20 @@ test("business builder persists immutable versions, restores and gates productio
     assert.equal(restored.version.versionNumber,3);
     assert.equal(repository.listVersions(created.project.id).length,3);
     assert.equal(projects.canDeployProduction(created.project.id),false);
+
     projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"production",decision:"approved",actorId:"u1"});
+    assert.equal(projects.canDeployProduction(created.project.id),false,"production approval alone must not bypass preview");
+    projects.decide({projectId:created.project.id,versionId:restored.version.id,stage:"preview",decision:"approved",actorId:"u1"});
     assert.equal(projects.canDeployProduction(created.project.id),true);
+
+    const changed=projects.saveProject(created.project.id,{name:"Ops 2"},"u1");
+    assert.notEqual(changed.version.id,restored.version.id);
+    assert.equal(projects.canDeployProduction(created.project.id),false,"a new active version needs fresh preview and production approvals");
+    projects.decide({projectId:created.project.id,versionId:changed.version.id,stage:"preview",decision:"approved",actorId:"u1"});
+    assert.equal(projects.canDeployProduction(created.project.id),false,"preview approval alone is insufficient");
+    projects.decide({projectId:created.project.id,versionId:changed.version.id,stage:"production",decision:"approved",actorId:"u1"});
+    assert.equal(projects.canDeployProduction(created.project.id),true);
+
     const preview=await projects.startPreview(created.project.id);
     assert.equal(preview.session.runtimeAdapter,"loadder-contract-html-v1");
     const html=previewAdapter.render({version:preview.version});
