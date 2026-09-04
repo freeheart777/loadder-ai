@@ -17,7 +17,7 @@ const v16Source = [v16, v16Types, v16Config, v16Canvas, v16Inspector].join("\n")
 test("main Store Studio routes use canonical V16 and legacy URLs cannot surface old studios", () => {
   for (const route of ["/dashboard/websites", "/dashboard/websites/studio", "/site-builder"]) {
     const escaped = route.replaceAll("/", "\\/");
-    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV16 \\/>\\}`));
+    assert.match(app,new RegExp(`path="${escaped}"[\\s\\S]{0,100}element=\\{<StoreWebsiteStudioPageV16\\s*\\/>\\}`));
   }
   for (const route of ["studio-v13", "studio-v14", "studio-v15", "studio-v16"]) {
     assert.match(app,new RegExp(`path="\\/dashboard\\/websites\\/${route}"[\\s\\S]{0,140}<Navigate to="\\/dashboard\\/websites" replace \\/>`));
@@ -81,19 +81,7 @@ test("V15 is a state-owned commerce editor without DOM-driven canvas manipulatio
 });
 
 test("V15 exposes direct product and checkout-copy editing", () => {
-  for (const field of [
-    "selectedProductId",
-    "title",
-    "regularPriceMinor",
-    "compareAtPriceMinor",
-    "promotionBadge",
-    "promotionBadgeText",
-    "cartButtonLabel",
-    "shippingLabel",
-    "freeShippingThresholdMinor",
-    "checkoutButtonLabel",
-    "orderSuccessTitle",
-  ]) assert.match(v15,new RegExp(field));
+  for (const field of ["selectedProductId","title","regularPriceMinor","compareAtPriceMinor","promotionBadge","promotionBadgeText","cartButtonLabel","shippingLabel","freeShippingThresholdMinor","checkoutButtonLabel","orderSuccessTitle"]) assert.match(v15,new RegExp(field));
 });
 
 test("V15 persists backward-compatible configuration without replacing commerce runtime", () => {
