@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { migration001Identity } from "../db/migrations/001_identity.mjs";
 import { migration050BusinessBuilderProjects } from "../db/migrations/050_business_builder_projects.mjs";
+import { migration065BusinessBuilderPreviewQualityEvidence } from "../db/migrations/065_business_builder_preview_quality_evidence.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { createBusinessBuilderRepository } from "../app/repositories/business-builder-repository.mjs";
 import { createBusinessBuilderProjectService } from "../app/business-builder/project-service.mjs";
 import { createContractPreviewAdapter } from "../app/business-builder/contract-preview-adapter.mjs";
 
 function setup(){
-  const db=new Database(":memory:"); db.pragma("foreign_keys = ON"); migration001Identity.up(db); migration050BusinessBuilderProjects.up(db);
+  const db=new Database(":memory:"); db.pragma("foreign_keys = ON"); migration001Identity.up(db); migration050BusinessBuilderProjects.up(db); migration065BusinessBuilderPreviewQualityEvidence.up(db);
   const at=new Date().toISOString(); db.prepare("INSERT INTO workspaces (id,name,slug,status,created_at,updated_at) VALUES ('w1','Test','test','active',?,?)").run(at,at);
   return db;
 }
