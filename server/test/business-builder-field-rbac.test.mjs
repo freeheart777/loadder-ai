@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appFieldAccess, assertAppPayloadFields, filterDefinitionForRole, redactAppRecord } from "../app/business-builder/app-field-access.mjs";
+import { appFieldAccess, assertAppPayloadFields, filterDefinitionForRole, filterUiForRole, redactAppRecord } from "../app/business-builder/app-field-access.mjs";
 
 const definition={
   id:"crm",entities:[{id:"customer",fields:[{id:"name"},{id:"email"},{id:"internalNote"}]},{id:"secret",fields:[{id:"value"}]}],relationships:[],pages:[],
@@ -32,4 +32,19 @@ test("role-filtered definition removes inaccessible resources and fields",()=>{
   assert.deepEqual(customer.entities[0].fields.map(f=>f.id),["name","email"]);
   const manager=filterDefinitionForRole(definition,"manager");
   assert.deepEqual(manager.entities.map(e=>e.id),["customer","secret"]);
+});
+
+test("role-filtered UI removes hidden resources and field references without losing layout metadata",()=>{
+  const ui={theme:{density:"compact"},navigation:[{id:"dashboard"},{id:"customer"},{id:"secret"}],views:[
+    {id:"dashboard",type:"dashboard",blocks:[]},
+    {id:"customer-list",resource:"customer",blocks:[{type:"data-table",resource:"customer",columns:[{id:"name"},{id:"internalNote"}]}]},
+    {id:"customer-form",resource:"customer",blocks:[{type:"form",resource:"customer",fields:[{id:"email"},{id:"internalNote"}]}]},
+    {id:"secret-list",resource:"secret",blocks:[{type:"data-table",resource:"secret",columns:[{id:"value"}]}]}
+  ]};
+  const customer=filterUiForRole(ui,definition,"customer");
+  assert.deepEqual(customer.navigation.map(x=>x.id),["dashboard","customer"]);
+  assert.equal(customer.views.some(v=>v.resource==="secret"),false);
+  assert.deepEqual(customer.views.find(v=>v.id==="customer-list").blocks[0].columns.map(x=>x.id),["name"]);
+  assert.deepEqual(customer.views.find(v=>v.id==="customer-form").blocks[0].fields.map(x=>x.id),["email"]);
+  assert.equal(customer.theme.density,"compact");
 });
