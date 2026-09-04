@@ -1,0 +1,5 @@
+const TYPES=Object.freeze({ORDER_CREATED:"commerce.order.created",PAYMENT_CAPTURED:"commerce.payment.captured",FULFILLMENT_COMPLETED:"commerce.fulfillment.completed",ORDER_CANCELLED:"commerce.order.cancelled"});
+const ID=/^[a-zA-Z0-9._:-]{6,200}$/;
+export function createCommerceEvent({id,type,workspaceId,projectId,orderId,occurredAt=new Date().toISOString(),payload={}}){if(!ID.test(String(id||"")))throw new Error("event id required");if(!Object.values(TYPES).includes(type))throw new Error("unsupported commerce event type");if(!workspaceId||!projectId||!orderId)throw new Error("workspaceId, projectId and orderId are required");return Object.freeze({contract:"loadder.commerce-event.v1",id:String(id),type,workspaceId:String(workspaceId),projectId:String(projectId),orderId:String(orderId),occurredAt,payload:structuredClone(payload)});}
+export function validateCommerceEvent(event){if(!event||event.contract!=="loadder.commerce-event.v1")throw new Error("invalid commerce event contract");return createCommerceEvent(event);}
+export const LO_ADDRESSER_COMMERCE_EVENT_TYPES=TYPES;
