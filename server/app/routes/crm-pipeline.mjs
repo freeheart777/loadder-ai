@@ -68,6 +68,7 @@ export function createCrmPipelineRouter() {
         dealId: req.params.id,
         toStage: req.body?.toStage,
         expectedVersion: req.body?.expectedVersion,
+        expectedUpdatedAt: req.body?.expectedUpdatedAt,
         reason: req.body?.reason,
         actorType: req.body?.actorType || "user",
         actorId: req.user?.id || null,
