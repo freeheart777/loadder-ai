@@ -12,7 +12,7 @@ type Summary = {
   runtimeRecords: number;
   members: number;
   commerceOutbox?: { total: number; pending: number; retrying: number; deadLetter: number; delivered: number; claimedActive: number; claimedStale: number; };
-  commerceBindings?: { active: number; disabled: number; publishedUnbound: number; publishedDisabled: number; };
+  commerceBindings?: { active: number; disabled: number; publishedUnbound: number; publishedDisabled: number; publishedTargetUnrunnable: number; };
 };
 
 export default function BusinessBuilderOperationsPage() {
