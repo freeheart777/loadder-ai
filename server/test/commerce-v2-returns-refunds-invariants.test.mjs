@@ -227,6 +227,7 @@ test("failed or cancelled refund requests release reserved financial capacity", 
     returnRequest: returned,
     amountMinor: 120000,
     financialSnapshot: { capturedMinor: 200000, refundedMinor: 0, currency: "IRT" },
+    createdAt: "2026-09-05T12:20:00.000Z",
   });
   const approved = transitionRefundRequest(requested, "APPROVED", {
     occurredAt: "2026-09-05T13:00:00.000Z",
@@ -254,6 +255,7 @@ test("known succeeded refunds require a financial snapshot that has caught up", 
     returnRequest: returned,
     amountMinor: 50000,
     financialSnapshot: { capturedMinor: 200000, refundedMinor: 0, currency: "IRT" },
+    createdAt: "2026-09-05T12:20:00.000Z",
   });
   succeeded = transitionRefundRequest(succeeded, "APPROVED", {
     occurredAt: "2026-09-05T13:00:00.000Z",
