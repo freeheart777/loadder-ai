@@ -74,6 +74,7 @@ import { migration073CommerceCustomerAccounts } from "./073_commerce_customer_ac
 import { migration074CommerceOutboxDeadLetter } from "./074_commerce_outbox_dead_letter.mjs";
 import { migration075CommerceOutboxClaimLease } from "./075_commerce_outbox_claim_lease.mjs";
 import { migration076CommerceBindingTargetInvariants } from "./076_commerce_binding_target_invariants.mjs";
+import { migration077CommerceLifecycleOutboxTriggers } from "./077_commerce_lifecycle_outbox_triggers.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -152,4 +153,5 @@ export const migrations = [
   migration074CommerceOutboxDeadLetter,
   migration075CommerceOutboxClaimLease,
   migration076CommerceBindingTargetInvariants,
+  migration077CommerceLifecycleOutboxTriggers,
 ];
