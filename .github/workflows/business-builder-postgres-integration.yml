@@ -10,6 +10,7 @@ on:
     paths:
       - "server/app/business-builder/postgres-*.mjs"
       - "server/test/business-builder-postgres*.test.mjs"
+      - ".github/workflows/business-builder-postgres-integration.yml"
   workflow_dispatch:
 concurrency:
   group: bb-postgres-${{ github.ref }}
@@ -38,7 +39,7 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
       - name: Materialize canonical runtime schema
-        run: node -e "import('./server/app/business-builder/postgres-schema.mjs').then(m=>process.stdout.write(m.LOADDER_POSTGRES_RUNTIME_SCHEMA))" > /tmp/loadder-runtime.sql
+        run: node -e "import('./server/app/business-builder/postgres-schema.mjs').then(m=>process.stdout.write(m.LOADDER_POSTGRES_DDL))" > /tmp/loadder-runtime.sql
       - name: Apply schema to real PostgreSQL
         run: psql -h 127.0.0.1 -U loadder -d loadder -v ON_ERROR_STOP=1 -f /tmp/loadder-runtime.sql
       - name: Verify tenant-aware JSONB runtime behavior
