@@ -1,0 +1,80 @@
+name: Browser E2E Infrastructure
+
+on:
+  push:
+    branches: ["test/browser-e2e-infrastructure"]
+  pull_request:
+    branches: [main]
+    paths:
+      - "e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/browser-e2e-infrastructure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e-infrastructure:
+    name: Browser E2E Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Resolve official stable Playwright metadata
+        if: ${{ !hashFiles('node_modules/@playwright/test/package.json') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if node -e "const p=require('./package.json'); process.exit(p.devDependencies?.['@playwright/test'] ? 0 : 1)"; then
+            npm ci
+          else
+            version="$(npm view @playwright/test version --registry=https://registry.npmjs.org/)"
+            case "$version" in
+              *-*) echo "Refusing non-stable Playwright version: $version" >&2; exit 1 ;;
+            esac
+            npm install --save-dev --save-exact "@playwright/test@$version" --registry=https://registry.npmjs.org/
+            npm pkg set 'scripts.test:e2e=playwright test' 'scripts.test:e2e:infra=playwright test e2e/infrastructure/browser-smoke.spec.ts'
+          fi
+          node --input-type=module -e "import pkg from '@playwright/test/package.json' with { type: 'json' }; if (pkg.license !== 'Apache-2.0') throw new Error('Unexpected Playwright license'); if (!pkg.engines?.node) throw new Error('Missing Node engine contract'); console.log(JSON.stringify({version:pkg.version,license:pkg.license,node:pkg.engines.node}))"
+      - name: Install official Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run deterministic browser smoke
+        run: npm run test:e2e:infra
+      - name: Persist npm-generated dependency metadata
+        if: ${{ github.event_name == 'push' && github.actor != 'github-actions[bot]' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package.json package-lock.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "test: resolve official Playwright dependency metadata"
+          git push
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-infrastructure-failure
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
