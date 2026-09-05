@@ -8,28 +8,56 @@ let servicePromise;
 
 function getPipelineService() {
   if (!servicePromise) {
-    servicePromise = import("../../db/workspace-database.mjs").then(
-      ({ getLeads, getLeadById, updateLead }) =>
-        createCrmPipelineService({ getLeads, getLeadById, updateLead })
+    servicePromise = import("../repositories/crm-deal-repository.mjs").then((repository) =>
+      createCrmPipelineService(repository)
     );
   }
   return servicePromise;
 }
 
+function handlePipelineError(error, res, fallbackCode, fallbackMessage) {
+  if (error instanceof CrmPipelineError) {
+    return res.status(error.status).json({ ok: false, code: error.code, message: error.message });
+  }
+  console.error(fallbackCode, error);
+  return res.status(500).json({ ok: false, code: fallbackCode, message: fallbackMessage });
+}
+
 export function createCrmPipelineRouter() {
   const router = express.Router();
 
-  router.get("/", async (req, res) => {
+  router.get("/", async (_req, res) => {
     try {
       const service = await getPipelineService();
       return res.json({ ok: true, data: service.board() });
     } catch (error) {
-      console.error("CRM pipeline board error:", error);
-      return res.status(500).json({
-        ok: false,
-        code: "CRM_PIPELINE_READ_FAILED",
-        message: "خطا در دریافت Pipeline فروش.",
+      return handlePipelineError(error, res, "CRM_PIPELINE_READ_FAILED", "خطا در دریافت Pipeline فروش.");
+    }
+  });
+
+  router.get("/deals/:id/history", async (req, res) => {
+    try {
+      const service = await getPipelineService();
+      return res.json({ ok: true, data: service.history(req.params.id) });
+    } catch (error) {
+      return handlePipelineError(error, res, "CRM_DEAL_HISTORY_READ_FAILED", "خطا در دریافت تاریخچه Deal.");
+    }
+  });
+
+  router.patch("/deals/:id", async (req, res) => {
+    try {
+      const service = await getPipelineService();
+      const deal = service.updateMetadata({
+        dealId: req.params.id,
+        expectedVersion: req.body?.expectedVersion,
+        ownerId: req.body?.ownerId,
+        owner: req.body?.owner,
+        nextAction: req.body?.nextAction,
+        nextActionDueAt: req.body?.nextActionDueAt,
       });
+      return res.json({ ok: true, data: deal });
+    } catch (error) {
+      return handlePipelineError(error, res, "CRM_DEAL_UPDATE_FAILED", "خطا در ویرایش Deal.");
     }
   });
 
@@ -39,25 +67,14 @@ export function createCrmPipelineRouter() {
       const deal = service.transition({
         dealId: req.params.id,
         toStage: req.body?.toStage,
-        expectedUpdatedAt: req.body?.expectedUpdatedAt,
+        expectedVersion: req.body?.expectedVersion,
+        reason: req.body?.reason,
+        actorType: req.body?.actorType || "user",
+        actorId: req.user?.id || null,
       });
-
       return res.json({ ok: true, data: deal });
     } catch (error) {
-      if (error instanceof CrmPipelineError) {
-        return res.status(error.status).json({
-          ok: false,
-          code: error.code,
-          message: error.message,
-        });
-      }
-
-      console.error("CRM pipeline transition error:", error);
-      return res.status(500).json({
-        ok: false,
-        code: "CRM_PIPELINE_TRANSITION_FAILED",
-        message: "خطا در جابه‌جایی فرصت فروش.",
-      });
+      return handlePipelineError(error, res, "CRM_PIPELINE_TRANSITION_FAILED", "خطا در جابه‌جایی فرصت فروش.");
     }
   });
 
