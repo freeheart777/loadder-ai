@@ -78,7 +78,7 @@ async function addFixtureProductThroughUi(page: Page) {
 }
 
 test.describe.serial("canonical public Cart → Checkout → Order journey", () => {
-  test.beforeAll(async (_fixtures, testInfo) => {
+  test.beforeAll(async ({}, testInfo) => {
     adminApi = await request.newContext({ baseURL: apiBaseURL });
     const identity = `${testInfo.workerIndex}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const mobile = `090${identity.replace(/\D/g, "").slice(-8).padStart(8, "0")}`;
