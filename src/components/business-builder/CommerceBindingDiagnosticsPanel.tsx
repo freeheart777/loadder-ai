@@ -58,6 +58,14 @@ function fmt(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("fa-IR");
 }
 
+function mutationError(data: any) {
+  if (data?.code === "COMMERCE_BINDING_OUTBOX_NOT_DRAINED") {
+    const count = Number(data?.unresolvedOutbox?.count || 0);
+    return `${count.toLocaleString("fa-IR")} event حل‌نشده هنوز به App قبلی متصل است. ابتدا در بخش Commerce Outbox پایین صفحه آن‌ها را drain/reconcile کنید و سپس تغییر اتصال را دوباره انجام دهید.`;
+  }
+  return errorText[data?.code] || data?.message || data?.code || "Binding update failed";
+}
+
 export default function CommerceBindingDiagnosticsPanel({ counters, onChanged }: Props) {
   const [rows, setRows] = useState<BindingDiagnostic[]>([]);
   const [targets, setTargets] = useState<BindingTarget[]>([]);
@@ -123,7 +131,7 @@ export default function CommerceBindingDiagnosticsPanel({ counters, onChanged }:
         body: JSON.stringify({ projectId: selectedTarget.id, confirmRebind: isRebind && confirmRebind, reason: reason.trim() || undefined }),
       });
       const data = await response.json();
-      if (!response.ok || !data?.success) throw new Error(errorText[data?.code] || data?.message || data?.code || "Binding update failed");
+      if (!response.ok || !data?.success) throw new Error(mutationError(data));
       setNotice(data.changed === false ? "Binding از قبل فعال بود و تغییری لازم نشد." : isRebind ? "App مقصد با ثبت Audit تغییر کرد." : editing.bindingState === "disabled" ? "Binding دوباره فعال شد." : "Store با موفقیت به App Builder متصل شد.");
       closeRemediation();
       await load();
@@ -176,7 +184,7 @@ export default function CommerceBindingDiagnosticsPanel({ counters, onChanged }:
         {targets.map(target=><option key={target.id} value={target.id} disabled={!target.eligible}>{target.name} · {target.status}{target.eligible ? "" : " · بدون Active Version"}</option>)}
       </select>
       {selectedTarget && !selectedTarget.eligible && <p className="mt-2 text-xs text-amber-300">این App هنوز Active Version ندارد و نمی‌تواند target عملیاتی Commerce باشد.</p>}
-      {isRebind && <div className="mt-4 rounded-xl border border-rose-900/50 bg-rose-950/15 p-4"><p className="text-sm text-rose-200">این انتخاب App مقصد فعلی را تغییر می‌دهد و روی eventهای بعدی اثر می‌گذارد.</p><textarea value={reason} onChange={event=>setReason(event.target.value)} maxLength={500} rows={3} placeholder="دلیل تغییر اتصال را ثبت کنید." className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm outline-none placeholder:text-slate-600"/><label className="mt-3 flex items-start gap-2 text-xs text-slate-300"><input type="checkbox" checked={confirmRebind} onChange={event=>setConfirmRebind(event.target.checked)} className="mt-0.5"/><span>تأیید می‌کنم که App مقصد این Store عمداً تغییر کند و Audit ثبت شود.</span></label></div>}
+      {isRebind && <div className="mt-4 rounded-xl border border-rose-900/50 bg-rose-950/15 p-4"><p className="text-sm text-rose-200">این انتخاب App مقصد فعلی را تغییر می‌دهد. rebind فقط زمانی انجام می‌شود که Outbox حل‌نشده‌ای برای App قبلی باقی نمانده باشد.</p><textarea value={reason} onChange={event=>setReason(event.target.value)} maxLength={500} rows={3} placeholder="دلیل تغییر اتصال را ثبت کنید." className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm outline-none placeholder:text-slate-600"/><label className="mt-3 flex items-start gap-2 text-xs text-slate-300"><input type="checkbox" checked={confirmRebind} onChange={event=>setConfirmRebind(event.target.checked)} className="mt-0.5"/><span>تأیید می‌کنم که App مقصد این Store عمداً تغییر کند و Audit ثبت شود.</span></label></div>}
       <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!canSubmit} onClick={()=>void applyBinding()} className={`rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-40 ${isRebind ? "bg-rose-500 text-white" : "bg-white text-slate-950"}`}>{mutating ? "در حال اعمال…" : isRebind ? "تغییر اتصال با Audit" : editing.bindingState === "disabled" ? "فعال‌سازی Binding" : "اتصال Store"}</button></div>
     </div>}
   </section>;
