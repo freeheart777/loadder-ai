@@ -8,6 +8,7 @@ This file is the persistent entry point for AI coding agents and future implemen
 Before planning, editing, committing, reviewing, or merging work in this repository:
 
 1. Read GitHub Issue **#98 — “🚨 START HERE — Loadder Architecture & Commerce Source of Truth”** in `freeheart777/loadder-ai`.
+   For any Business Builder / App Builder work, also read GitHub Issue **#159 — “🚨 START HERE — Loadder App Builder Architecture & Roadmap Source of Truth”**.
 2. Check current `main` HEAD and recent merged PRs.
 3. Check relevant open PRs and CI status.
 4. Inspect the actual current implementation before proposing changes.
