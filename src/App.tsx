@@ -11,6 +11,7 @@ const BusinessBuilderOperationsPage = lazy(() => import("./pages/BusinessBuilder
 const BusinessBuilderAdminPage = lazy(() => import("./pages/BusinessBuilderAdminPage"));
 const BusinessBuilderIntegrationsPage = lazy(() => import("./pages/BusinessBuilderIntegrationsPage"));
 const GeneratedBusinessAppPage = lazy(() => import("./pages/GeneratedBusinessAppPage"));
+const CRMSalesPipelinePage = lazy(() => import("./pages/CRMSalesPipelinePage"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/dashboard/ads/google" element={<GoogleAdsSearchWizardPage />} />
               <Route path="/dashboard/marketing" element={<MarketingPage />} />
               <Route path="/dashboard/crm" element={<CRMPage />} />
+              <Route path="/dashboard/crm/pipeline" element={<CRMSalesPipelinePage />} />
               <Route path="/dashboard/crm/customer/:id" element={<CustomerProfilePage />} />
               <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
               <Route path="/dashboard/kpi" element={<KPIPage />} />
