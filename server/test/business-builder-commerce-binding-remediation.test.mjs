@@ -10,6 +10,7 @@ function setup({withAudit=true}={}){
     CREATE TABLE site_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,name TEXT NOT NULL,slug TEXT NOT NULL,status TEXT NOT NULL,site_type TEXT NOT NULL);
     CREATE TABLE business_builder_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,name TEXT NOT NULL,status TEXT NOT NULL,active_version_id TEXT,updated_at TEXT NOT NULL);
     CREATE TABLE business_builder_commerce_bindings(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_project_id TEXT NOT NULL,business_builder_project_id TEXT NOT NULL,status TEXT NOT NULL,created_by TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(workspace_id,site_project_id));
+    CREATE TABLE business_builder_commerce_outbox(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_project_id TEXT NOT NULL,business_builder_project_id TEXT NOT NULL,status TEXT NOT NULL,created_at TEXT NOT NULL);
   `);
   if(withAudit)db.exec(`CREATE TABLE audit_logs(id TEXT PRIMARY KEY,workspace_id TEXT,user_id TEXT,action TEXT NOT NULL,resource_type TEXT NOT NULL,resource_id TEXT,metadata_json TEXT NOT NULL,created_at TEXT NOT NULL);`);
   const site=db.prepare("INSERT INTO site_projects(id,workspace_id,name,slug,status,site_type) VALUES(?,?,?,?,?,?)");
@@ -28,6 +29,10 @@ function setup({withAudit=true}={}){
 
 function bind(db,{id="b1",site="s1",project="p-ready",status="active"}={}){
   db.prepare("INSERT INTO business_builder_commerce_bindings(id,workspace_id,site_project_id,business_builder_project_id,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)").run(id,"w1",site,project,status,"seed","2026-09-05T01:00:00.000Z","2026-09-05T01:00:00.000Z");
+}
+
+function outbox(db,{id="o1",workspace="w1",site="s1",project="p-ready",status="pending",createdAt="2026-09-05T02:30:00.000Z"}={}){
+  db.prepare("INSERT INTO business_builder_commerce_outbox(id,workspace_id,site_project_id,business_builder_project_id,status,created_at) VALUES(?,?,?,?,?,?)").run(id,workspace,site,project,status,createdAt);
 }
 
 test("binding targets exclude archived apps and identify runnable active-version targets",()=>{
@@ -105,8 +110,33 @@ test("changing an existing binding target requires explicit confirmation and an 
   });}finally{db.close();}
 });
 
-test("active binding to the same target is an idempotent no-op",()=>{
+test("rebind is blocked until unresolved outbox rows for the old Store target are drained",()=>{
   const db=setup();bind(db);
+  outbox(db,{id:"pending-old",site:"s1",project:"p-ready",status:"pending",createdAt:"2026-09-05T02:00:00.000Z"});
+  outbox(db,{id:"delivered-old",site:"s1",project:"p-ready",status:"delivered",createdAt:"2026-09-05T01:00:00.000Z"});
+  outbox(db,{id:"other-store",site:"s2",project:"p-ready",status:"pending",createdAt:"2026-09-05T03:00:00.000Z"});
+  try{runWithWorkspace("w1",()=>{
+    const operations=new CommerceBindingOperations(db);
+    const blocked=operations.setBinding("s1",{projectId:"p-draft",actorId:"admin",confirmRebind:true,reason:"Move after drain"});
+    assert.equal(blocked.ok,false);
+    assert.equal(blocked.code,"COMMERCE_BINDING_OUTBOX_NOT_DRAINED");
+    assert.equal(blocked.unresolvedOutbox.count,1);
+    assert.equal(blocked.unresolvedOutbox.siteProjectId,"s1");
+    assert.equal(blocked.unresolvedOutbox.projectId,"p-ready");
+    assert.equal(blocked.unresolvedOutbox.oldestCreatedAt,"2026-09-05T02:00:00.000Z");
+    assert.equal(operations.getBinding("s1").business_builder_project_id,"p-ready");
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM audit_logs").get().c,0);
+
+    db.prepare("UPDATE business_builder_commerce_outbox SET status='delivered' WHERE id='pending-old'").run();
+    const rebound=operations.setBinding("s1",{projectId:"p-draft",actorId:"admin",confirmRebind:true,reason:"Move after drain"});
+    assert.equal(rebound.ok,true);
+    assert.equal(rebound.binding.business_builder_project_id,"p-draft");
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM audit_logs WHERE action='commerce_binding.rebind'").get().c,1);
+  });}finally{db.close();}
+});
+
+test("active binding to the same target is an idempotent no-op even with unresolved outbox",()=>{
+  const db=setup();bind(db);outbox(db);
   try{runWithWorkspace("w1",()=>{
     const result=new CommerceBindingOperations(db).setBinding("s1",{projectId:"p-ready",actorId:"admin"});
     assert.equal(result.ok,true);

@@ -20,6 +20,11 @@ export class CommerceBindingOperations{
     return this.db.prepare("SELECT * FROM business_builder_commerce_bindings WHERE workspace_id=? AND site_project_id=?").get(requireWorkspaceId(),siteProjectId)||null;
   }
 
+  unresolvedOutbox(siteProjectId,projectId){
+    const workspaceId=requireWorkspaceId(),row=this.db.prepare("SELECT COUNT(*) total,MIN(created_at) oldest_created_at,MAX(created_at) newest_created_at FROM business_builder_commerce_outbox WHERE workspace_id=? AND site_project_id=? AND business_builder_project_id=? AND status='pending'").get(workspaceId,siteProjectId,projectId)||{};
+    return{count:Number(row.total||0),oldestCreatedAt:row.oldest_created_at||null,newestCreatedAt:row.newest_created_at||null};
+  }
+
   setBinding(siteProjectId,{projectId,actorId=null,reason=null,confirmRebind=false}={}){
     const workspaceId=requireWorkspaceId(),store=this.getStore(siteProjectId);
     if(!store||store.site_type!=="STORE")return{ok:false,code:"COMMERCE_STORE_NOT_FOUND"};
@@ -35,6 +40,10 @@ export class CommerceBindingOperations{
 
     const at=now(),action=!existing?"commerce_binding.create":targetChanged?"commerce_binding.rebind":"commerce_binding.enable";
     const run=this.db.transaction(()=>{
+      if(targetChanged){
+        const unresolved=this.unresolvedOutbox(siteProjectId,existing.business_builder_project_id);
+        if(unresolved.count>0)return{blocked:true,unresolved};
+      }
       let bindingId=existing?.id||crypto.randomUUID();
       if(existing){
         const result=this.db.prepare("UPDATE business_builder_commerce_bindings SET business_builder_project_id=?,status='active',updated_at=? WHERE id=? AND workspace_id=? AND site_project_id=?").run(project.id,at,existing.id,workspaceId,siteProjectId);
@@ -46,8 +55,10 @@ export class CommerceBindingOperations{
       if(actorId){
         this.db.prepare("INSERT INTO audit_logs(id,workspace_id,user_id,action,resource_type,resource_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?)").run(crypto.randomUUID(),workspaceId,actorId,action,"business_builder_commerce_binding",updated.id,JSON.stringify({siteProjectId,storeName:store.name,fromProjectId:existing?.business_builder_project_id||null,toProjectId:project.id,fromStatus:existing?.status||null,toStatus:"active",reason:normalizedReason}),at);
       }
-      return updated;
+      return{blocked:false,binding:updated};
     });
-    return{ok:true,changed:true,action,binding:run(),target:{id:project.id,name:project.name,status:project.status,activeVersionId:project.active_version_id}};
+    const result=run();
+    if(result.blocked)return{ok:false,code:"COMMERCE_BINDING_OUTBOX_NOT_DRAINED",binding:existing,unresolvedOutbox:{...result.unresolved,siteProjectId,projectId:existing.business_builder_project_id}};
+    return{ok:true,changed:true,action,binding:result.binding,target:{id:project.id,name:project.name,status:project.status,activeVersionId:project.active_version_id}};
   }
 }
