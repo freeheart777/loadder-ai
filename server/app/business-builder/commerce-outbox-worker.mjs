@@ -34,20 +34,22 @@ export function createCommerceOutboxWorker({
     const columns = db.prepare("PRAGMA table_info(business_builder_commerce_outbox)").all();
     if (!columns.length) return false;
     const names = new Set(columns.map((column) => column.name));
-    return ["workspace_id", "status", "available_at", "dead_lettered_at"].every((name) => names.has(name));
+    return ["workspace_id", "status", "available_at", "dead_lettered_at", "claim_expires_at"].every((name) => names.has(name));
   }
 
   function discoverWorkspaceIds() {
     if (!schemaReady()) return [];
+    const ts = now();
     return db.prepare(`
       SELECT DISTINCT workspace_id
       FROM business_builder_commerce_outbox
       WHERE status = 'pending'
         AND dead_lettered_at IS NULL
         AND available_at <= ?
+        AND (claim_expires_at IS NULL OR claim_expires_at <= ?)
       ORDER BY workspace_id
       LIMIT ?
-    `).all(now(), maxWorkspaces).map((row) => row.workspace_id);
+    `).all(ts, ts, maxWorkspaces).map((row) => row.workspace_id);
   }
 
   async function drainOnce() {
