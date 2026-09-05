@@ -56,10 +56,14 @@ function wholeDaysSince(value, now = Date.now()) {
   return Math.max(0, Math.floor((now - timestamp) / 86_400_000));
 }
 
-function serializeStage(stage) {
+function serializeStage(stage, deals = []) {
+  const stageDeals = deals.filter((deal) => deal.stage === stage.id);
+
   return {
     ...stage,
     allowedTargets: [...(ALLOWED_TRANSITIONS.get(stage.id) || [])],
+    dealCount: stageDeals.length,
+    totalValue: stageDeals.reduce((sum, deal) => sum + deal.amount, 0),
   };
 }
 
@@ -86,6 +90,20 @@ function enrichLead(lead, now) {
   };
 }
 
+function summarize(deals) {
+  return {
+    dealCount: deals.length,
+    totalValue: deals.reduce((sum, deal) => sum + deal.amount, 0),
+    weightedValue: Math.round(
+      deals.reduce(
+        (sum, deal) => sum + deal.amount * (deal.probability / 100),
+        0
+      )
+    ),
+    stuckCount: deals.filter((deal) => deal.isStuck).length,
+  };
+}
+
 export function createCrmPipelineService({ getLeads, getLeadById, updateLead, now = () => Date.now() }) {
   if (!getLeads || !getLeadById || !updateLead) {
     throw new Error("CRM pipeline service requires lead repository functions.");
@@ -96,8 +114,9 @@ export function createCrmPipelineService({ getLeads, getLeadById, updateLead, no
     const deals = getLeads().map((lead) => enrichLead(lead, timestamp));
 
     return {
-      stages: STAGES.map(serializeStage),
+      stages: STAGES.map((stage) => serializeStage(stage, deals)),
       deals,
+      summary: summarize(deals),
     };
   }
 
@@ -150,6 +169,6 @@ export function createCrmPipelineService({ getLeads, getLeadById, updateLead, no
   return {
     board,
     transition,
-    stages: () => STAGES.map(serializeStage),
+    stages: () => STAGES.map((stage) => serializeStage(stage)),
   };
 }
