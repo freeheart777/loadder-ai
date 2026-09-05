@@ -24,6 +24,7 @@ const address = {
   address1: "Street 1",
   country: "IR",
 };
+const fulfillmentCreatedAt = "2026-09-05T00:10:00.000Z";
 
 function orderFixture({ quantity = 2 } = {}) {
   let inventory = createInventoryState([{ ...selector, onHand: 10 }]);
@@ -89,6 +90,7 @@ test("partial fulfillments derive PARTIAL then FULFILLED without over-fulfilling
     order,
     existingFulfillments: [firstShipped],
     lines: [{ orderLineId: "line-1", quantity: 1 }],
+    createdAt: "2026-09-05T01:10:00.000Z",
   });
   const secondShipped = ship(secondPending, "2026-09-05T02:00:00.000Z");
   const complete = summarizeOrderFulfillment(order, [firstShipped, secondShipped]);
@@ -115,6 +117,7 @@ test("cancelling an unshipped fulfillment releases its allocation for a replacem
     id: "f-cancel",
     order,
     lines: [{ orderLineId: "line-1", quantity: 1 }],
+    createdAt: fulfillmentCreatedAt,
   });
   assert.throws(
     () =>
@@ -150,6 +153,7 @@ test("tracking is append-only and fulfillment transitions are forward-only witho
     id: "f-track",
     order,
     lines: [{ orderLineId: "line-1", quantity: 1 }],
+    createdAt: fulfillmentCreatedAt,
   });
   const before = structuredClone(pending);
   const tracked = recordTrackingEvent(pending, {
@@ -191,6 +195,7 @@ test("tracking is append-only and fulfillment transitions are forward-only witho
       id: "f-no-track",
       order,
       lines: [{ orderLineId: "line-1", quantity: 1 }],
+      createdAt: fulfillmentCreatedAt,
     }),
     "CANCELLED"
   );

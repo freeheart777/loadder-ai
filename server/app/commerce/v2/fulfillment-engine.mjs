@@ -224,6 +224,8 @@ export function recordTrackingEvent(
   if (!normalizedStatus) throw new Error("TRACKING_EVENT_STATUS_REQUIRED");
   const eventTimestamp = timestamp(occurredAt);
   assertTimestampNotBefore(eventTimestamp, fulfillment.createdAt);
+  const previousTrackingEvent = (fulfillment.trackingEvents || []).at(-1);
+  assertTimestampNotBefore(eventTimestamp, previousTrackingEvent?.occurredAt);
   const event = {
     id: eventId,
     status: normalizedStatus,
