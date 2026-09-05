@@ -16,11 +16,18 @@ worker.start();
 console.log("Commerce outbox worker started");
 
 let shuttingDown = false;
-function shutdown() {
+async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
-  worker.stop();
+  console.log(`Commerce outbox worker received ${signal}; draining current batch`);
+  try {
+    await worker.shutdown();
+    console.log("Commerce outbox worker drained and stopped");
+  } catch (error) {
+    console.error("Commerce outbox worker shutdown failed", error);
+    process.exitCode = 1;
+  }
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
