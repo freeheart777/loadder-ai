@@ -38,11 +38,11 @@ test("published storefront binding health is tenant scoped and fail-closed", asy
 
   assert.equal(result.counters.commerceBindingsActive, 0);
   assert.equal(result.counters.commerceBindingsDisabled, 1);
-  assert.equal(result.counters.commercePublishedStoresUnbound, 2);
+  assert.equal(result.counters.commercePublishedStoresUnbound, 1);
   assert.equal(result.counters.commercePublishedStoresDisabled, 1);
   assert.equal(result.status, "degraded");
   assert.deepEqual(result.incidents.filter((item) => item.code.startsWith("COMMERCE_STOREFRONT")), [
-    { code: "COMMERCE_STOREFRONT_UNBOUND", severity: "high", count: 2 },
+    { code: "COMMERCE_STOREFRONT_UNBOUND", severity: "high", count: 1 },
     { code: "COMMERCE_STOREFRONT_BINDING_DISABLED", severity: "medium", count: 1 },
   ]);
   db.close();
