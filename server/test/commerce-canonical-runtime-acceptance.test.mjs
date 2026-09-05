@@ -17,10 +17,15 @@ async function json(response) {
 
 function fixture() {
   const db = createSiteTestDb();
+  const stamp = "2026-09-05T00:00:00.000Z";
+  db.prepare(
+    "INSERT INTO workspaces(id,name,slug,status,created_at,updated_at) VALUES(?,?,?,?,?,?)"
+  ).run("ws-1", "Beta Workspace", "beta-workspace", "active", stamp, stamp);
+
   const projectService = createSiteProjectService({
     repository: createSiteProjectRepository(db),
     businessContextService: {
-      getCurrent: () => ({ activeContext: { id: "ctx-runtime" }, isStale: false }),
+      getCurrent: () => ({ activeContext: null, isStale: false }),
     },
   });
   const store = runWithWorkspace("ws-1", () =>
