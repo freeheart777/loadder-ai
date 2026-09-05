@@ -45,6 +45,10 @@ function setup({ withAudit = true } = {}) {
   return db;
 }
 
+function deadLetter(db) {
+  db.prepare("UPDATE business_builder_commerce_outbox SET attempts=5,dead_lettered_at=?,dead_letter_reason=? WHERE id='ob1'").run("2026-09-05T01:00:00.000Z","poison");
+}
+
 test("manual retry writes one minimal central audit record in the same workspace", () => {
   const db = setup();
   try {
@@ -72,11 +76,33 @@ test("manual retry writes one minimal central audit record in the same workspace
   } finally { db.close(); }
 });
 
+test("admin dead-letter requeue requires a non-empty reason before any mutation or audit", () => {
+  for (const reason of [undefined, null, "", "   \n\t  "]) {
+    const db = setup();
+    try {
+      runWithWorkspace("w1", () => {
+        deadLetter(db);
+        const operations = new CommerceOutboxOperations(db);
+        const before = operations.get("ob1");
+        const result = operations.requeue("ob1", { actorId: "admin-2", reason });
+        const after = operations.get("ob1");
+        assert.equal(result.ok, false);
+        assert.equal(result.code, "COMMERCE_OUTBOX_REQUEUE_REASON_REQUIRED");
+        assert.equal(after.dead_lettered_at, before.dead_lettered_at);
+        assert.equal(after.dead_letter_reason, before.dead_letter_reason);
+        assert.equal(after.attempts, before.attempts);
+        assert.equal(after.requeue_count, before.requeue_count);
+        assert.equal(db.prepare("SELECT COUNT(*) c FROM audit_logs").get().c, 0);
+      });
+    } finally { db.close(); }
+  }
+});
+
 test("dead-letter requeue audits the recovery and preserves immutable event identity", () => {
   const db = setup();
   try {
     runWithWorkspace("w1", () => {
-      db.prepare("UPDATE business_builder_commerce_outbox SET attempts=5,dead_lettered_at=?,dead_letter_reason=? WHERE id='ob1'").run("2026-09-05T01:00:00.000Z","poison");
+      deadLetter(db);
       const operations = new CommerceOutboxOperations(db);
       const before = operations.get("ob1");
       const result = operations.requeue("ob1", { actorId: "admin-2", reason: "fixed accounting mapping" });
@@ -90,6 +116,35 @@ test("dead-letter requeue audits the recovery and preserves immutable event iden
       const metadata = JSON.parse(audit.metadata_json);
       assert.equal(metadata.beforeState, "dead_letter");
       assert.equal(metadata.reason, "fixed accounting mapping");
+    });
+  } finally { db.close(); }
+});
+
+test("admin dead-letter requeue stores a bounded 500-character reason", () => {
+  const db = setup();
+  try {
+    runWithWorkspace("w1", () => {
+      deadLetter(db);
+      const reason = `  ${"x".repeat(700)}  `;
+      const result = new CommerceOutboxOperations(db).requeue("ob1", { actorId: "admin-2", reason });
+      assert.equal(result.ok, true);
+      const audit = db.prepare("SELECT metadata_json FROM audit_logs").get();
+      const metadata = JSON.parse(audit.metadata_json);
+      assert.equal(metadata.reason.length, 500);
+      assert.equal(metadata.reason, "x".repeat(500));
+    });
+  } finally { db.close(); }
+});
+
+test("direct internal dead-letter requeue remains compatible without an actor reason", () => {
+  const db = setup();
+  try {
+    runWithWorkspace("w1", () => {
+      deadLetter(db);
+      const result = new CommerceOutboxOperations(db).requeue("ob1");
+      assert.equal(result.ok, true);
+      assert.equal(result.event.dead_lettered_at, null);
+      assert.equal(db.prepare("SELECT COUNT(*) c FROM audit_logs").get().c, 0);
     });
   } finally { db.close(); }
 });
