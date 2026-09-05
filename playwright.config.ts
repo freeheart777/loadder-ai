@@ -12,6 +12,7 @@ export default defineConfig({
   },
   reporter: [["line"], ["html", { open: "never" }]],
   use: {
+    baseURL: process.env.E2E_BASE_URL,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "off",

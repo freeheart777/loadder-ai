@@ -1,0 +1,97 @@
+name: Store Studio Browser E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "server/**"
+      - "e2e/store/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/store-studio-browser-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  store-studio-browser-e2e:
+    name: Store Studio Browser E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      E2E_BASE_URL: http://127.0.0.1:4173
+      E2E_API_BASE_URL: http://127.0.0.1:3199
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies from lockfiles
+        run: |
+          npm ci
+          npm --prefix server ci
+      - name: Install official Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start isolated application
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/loadder-store-e2e/media"
+          DATABASE_PATH="$RUNNER_TEMP/loadder-store-e2e/test.sqlite" \
+          SITE_MEDIA_LOCAL_DIR="$RUNNER_TEMP/loadder-store-e2e/media" \
+          NODE_ENV=test API_HOST=127.0.0.1 API_PORT=3199 \
+          AUTH_EXPOSE_DEV_OTP=true AUTH_HASH_SECRET=store-studio-e2e-secret-2026 \
+          CLIENT_ORIGINS=http://127.0.0.1:4173 \
+          node server/index.mjs >"$RUNNER_TEMP/loadder-store-e2e/backend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/loadder-store-e2e/backend.pid"
+          VITE_API_BASE_URL=http://127.0.0.1:3199 \
+          npx vite --host 127.0.0.1 --port 4173 --strictPort >"$RUNNER_TEMP/loadder-store-e2e/frontend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/loadder-store-e2e/frontend.pid"
+          for attempt in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:3199/api/health >/dev/null && curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/loadder-store-e2e/backend.log"
+          cat "$RUNNER_TEMP/loadder-store-e2e/frontend.log"
+          exit 1
+      - name: Run canonical journey five consecutive times
+        shell: bash
+        run: |
+          set -o pipefail
+          for run in 1 2 3 4 5; do
+            echo "Store Studio browser journey run $run/5"
+            if ! npm run test:e2e:store 2>&1 | tee "$RUNNER_TEMP/loadder-store-e2e/browser-run-$run.log"; then
+              message="$(tail -80 "$RUNNER_TEMP/loadder-store-e2e/browser-run-$run.log")"
+              message="${message//'%'/'%25'}"
+              message="${message//$'\r'/'%0D'}"
+              message="${message//$'\n'/'%0A'}"
+              echo "::error file=e2e/store/store-studio-v16.spec.ts,line=1::$message"
+              exit 1
+            fi
+          done
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-studio-browser-e2e-failure
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop isolated application and remove temporary state
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/loadder-store-e2e/frontend.pid" ]]; then kill "$(cat "$RUNNER_TEMP/loadder-store-e2e/frontend.pid")" 2>/dev/null || true; fi
+          if [[ -f "$RUNNER_TEMP/loadder-store-e2e/backend.pid" ]]; then kill "$(cat "$RUNNER_TEMP/loadder-store-e2e/backend.pid")" 2>/dev/null || true; fi
+          rm -rf "$RUNNER_TEMP/loadder-store-e2e"
