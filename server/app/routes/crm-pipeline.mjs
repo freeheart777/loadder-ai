@@ -1,25 +1,27 @@
 import express from "express";
 import {
-  getLeads,
-  getLeadById,
-  updateLead,
-} from "../../db/workspace-database.mjs";
-import {
   CrmPipelineError,
   createCrmPipelineService,
 } from "../services/crm-pipeline-service.mjs";
 
-const service = createCrmPipelineService({
-  getLeads,
-  getLeadById,
-  updateLead,
-});
+let servicePromise;
+
+function getPipelineService() {
+  if (!servicePromise) {
+    servicePromise = import("../../db/workspace-database.mjs").then(
+      ({ getLeads, getLeadById, updateLead }) =>
+        createCrmPipelineService({ getLeads, getLeadById, updateLead })
+    );
+  }
+  return servicePromise;
+}
 
 export function createCrmPipelineRouter() {
   const router = express.Router();
 
-  router.get("/", (req, res) => {
+  router.get("/", async (req, res) => {
     try {
+      const service = await getPipelineService();
       return res.json({ ok: true, data: service.board() });
     } catch (error) {
       console.error("CRM pipeline board error:", error);
@@ -31,8 +33,9 @@ export function createCrmPipelineRouter() {
     }
   });
 
-  router.post("/leads/:id/transition", (req, res) => {
+  router.post("/leads/:id/transition", async (req, res) => {
     try {
+      const service = await getPipelineService();
       const deal = service.transition({
         dealId: req.params.id,
         toStage: req.body?.toStage,
