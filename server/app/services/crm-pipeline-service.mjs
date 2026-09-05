@@ -35,9 +35,7 @@ function wholeDaysSince(value, now = Date.now()) {
 
 function enrichDeal(deal, now) {
   const stage = STAGE_BY_ID.get(deal.stage) || STAGE_BY_ID.get("new");
-  const probability = Number.isFinite(deal.probabilityOverride)
-    ? deal.probabilityOverride
-    : stage.probability;
+  const probability = Number.isFinite(deal.probabilityOverride) ? deal.probabilityOverride : stage.probability;
   const idleDays = wholeDaysSince(deal.updatedAt, now);
   return {
     ...deal,
@@ -45,21 +43,18 @@ function enrichDeal(deal, now) {
     owner: deal.owner || "تیم فروش",
     nextAction: deal.nextAction || stage.nextAction,
     probability,
+    lastActivityAt: deal.updatedAt,
     ageDays: wholeDaysSince(deal.createdAt, now),
     idleDays,
     isStuck: ACTIVE_STAGES.includes(stage.id) && idleDays >= 3,
     expectedVersion: deal.version,
+    expectedUpdatedAt: deal.updatedAt,
   };
 }
 
 function serializeStage(stage, deals = []) {
   const stageDeals = deals.filter((deal) => deal.stage === stage.id);
-  return {
-    ...stage,
-    allowedTargets: [...(ALLOWED_TRANSITIONS.get(stage.id) || [])],
-    dealCount: stageDeals.length,
-    totalValue: stageDeals.reduce((sum, deal) => sum + deal.amount, 0),
-  };
+  return { ...stage, allowedTargets: [...(ALLOWED_TRANSITIONS.get(stage.id) || [])], dealCount: stageDeals.length, totalValue: stageDeals.reduce((sum, deal) => sum + deal.amount, 0) };
 }
 
 function summarize(deals) {
@@ -75,75 +70,39 @@ function summarize(deals) {
   };
 }
 
-export function createCrmPipelineService({
-  getDeals,
-  getDealById,
-  transitionDeal,
-  updateDealMetadata,
-  getDealStageHistory,
-  now = () => Date.now(),
-}) {
-  if (!getDeals || !getDealById || !transitionDeal || !updateDealMetadata || !getDealStageHistory) {
-    throw new Error("CRM pipeline service requires deal repository functions.");
-  }
+export function createCrmPipelineService({ getDeals, getDealById, transitionDeal, updateDealMetadata, getDealStageHistory, now = () => Date.now() }) {
+  if (!getDeals || !getDealById || !transitionDeal || !updateDealMetadata || !getDealStageHistory) throw new Error("CRM pipeline service requires deal repository functions.");
 
   function board() {
-    const timestamp = now();
-    const deals = getDeals().map((deal) => enrichDeal(deal, timestamp));
-    return {
-      stages: STAGES.map((stage) => serializeStage(stage, deals)),
-      deals,
-      summary: summarize(deals),
-    };
+    const deals = getDeals().map((deal) => enrichDeal(deal, now()));
+    return { stages: STAGES.map((stage) => serializeStage(stage, deals)), deals, summary: summarize(deals) };
   }
 
-  function transition({ dealId, toStage, expectedVersion, reason, actorType, actorId }) {
-    if (!STAGE_BY_ID.has(toStage)) {
-      throw new CrmPipelineError("مرحله مقصد معتبر نیست.", { code: "INVALID_STAGE", status: 400 });
-    }
+  function transition({ dealId, toStage, expectedVersion, expectedUpdatedAt, reason, actorType, actorId }) {
+    if (!STAGE_BY_ID.has(toStage)) throw new CrmPipelineError("مرحله مقصد معتبر نیست.", { code: "INVALID_STAGE", status: 400 });
     const current = getDealById(dealId);
-    if (!current) {
-      throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
-    }
+    if (!current) throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
+    const resolvedVersion = Number.isInteger(expectedVersion) ? expectedVersion : expectedUpdatedAt === current.updatedAt ? current.version : null;
+    if (resolvedVersion !== current.version) throw new CrmPipelineError("این Deal توسط کاربر یا Agent دیگری تغییر کرده است. برد را تازه‌سازی کنید.", { code: "STALE_DEAL_VERSION", status: 409 });
     if (current.stage === toStage) return enrichDeal(current, now());
     const allowedTargets = ALLOWED_TRANSITIONS.get(current.stage) || new Set();
-    if (!allowedTargets.has(toStage)) {
-      throw new CrmPipelineError("این جابه‌جایی در Pipeline مجاز نیست.", { code: "TRANSITION_NOT_ALLOWED", status: 409 });
-    }
-    if (toStage === "lost" && !String(reason || "").trim()) {
-      throw new CrmPipelineError("برای Deal از دست‌رفته ثبت علت شکست اجباری است.", { code: "LOST_REASON_REQUIRED", status: 400 });
-    }
-    const result = transitionDeal(dealId, {
-      toStage,
-      reason: String(reason || "").trim() || null,
-      expectedVersion,
-      actorType,
-      actorId,
-    });
-    if (result.kind === "not_found") {
-      throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
-    }
-    if (result.kind === "stale") {
-      throw new CrmPipelineError("این Deal توسط کاربر یا Agent دیگری تغییر کرده است. برد را تازه‌سازی کنید.", { code: "STALE_DEAL_VERSION", status: 409 });
-    }
+    if (!allowedTargets.has(toStage)) throw new CrmPipelineError("این جابه‌جایی در Pipeline مجاز نیست.", { code: "TRANSITION_NOT_ALLOWED", status: 409 });
+    if (toStage === "lost" && !String(reason || "").trim()) throw new CrmPipelineError("برای Deal از دست‌رفته ثبت علت شکست اجباری است.", { code: "LOST_REASON_REQUIRED", status: 400 });
+    const result = transitionDeal(dealId, { toStage, reason: String(reason || "").trim() || null, expectedVersion: resolvedVersion, actorType, actorId });
+    if (result.kind === "not_found") throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
+    if (result.kind === "stale") throw new CrmPipelineError("این Deal توسط کاربر یا Agent دیگری تغییر کرده است. برد را تازه‌سازی کنید.", { code: "STALE_DEAL_VERSION", status: 409 });
     return enrichDeal(result.deal, now());
   }
 
   function updateMetadata({ dealId, expectedVersion, ownerId, owner, nextAction, nextActionDueAt }) {
     const result = updateDealMetadata(dealId, { expectedVersion, ownerId, owner, nextAction, nextActionDueAt });
-    if (result.kind === "not_found") {
-      throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
-    }
-    if (result.kind === "stale") {
-      throw new CrmPipelineError("این Deal تغییر کرده است. اطلاعات را تازه‌سازی کنید.", { code: "STALE_DEAL_VERSION", status: 409 });
-    }
+    if (result.kind === "not_found") throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
+    if (result.kind === "stale") throw new CrmPipelineError("این Deal تغییر کرده است. اطلاعات را تازه‌سازی کنید.", { code: "STALE_DEAL_VERSION", status: 409 });
     return enrichDeal(result.deal, now());
   }
 
   function history(dealId) {
-    if (!getDealById(dealId)) {
-      throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
-    }
+    if (!getDealById(dealId)) throw new CrmPipelineError("فرصت فروش پیدا نشد.", { code: "DEAL_NOT_FOUND", status: 404 });
     return getDealStageHistory(dealId);
   }
 
