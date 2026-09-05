@@ -25,12 +25,13 @@ export function createProcessSupervisor({
     return { name: entry?.name || `child-${index + 1}`, child };
   });
   const graceMs = normalizeGraceMs(shutdownGraceMs);
+  const terminalErrors = new Set();
   let shuttingDown = false;
   let shutdownTimer = null;
   let shutdownSignal = null;
 
   function remaining() {
-    return entries.filter(({ child }) => !hasExited(child));
+    return entries.filter(({ child }) => !terminalErrors.has(child) && !hasExited(child));
   }
 
   function clearShutdownTimer() {
@@ -76,6 +77,14 @@ export function createProcessSupervisor({
   }
 
   for (const { name, child } of entries) {
+    child.on("error", (error) => {
+      terminalErrors.add(child);
+      if (!shuttingDown) {
+        logger?.error?.(`[process-supervisor] ${name} failed to spawn or communicate`, error);
+        shutdown("SIGTERM", { failureCode: 1 });
+      }
+      finishIfComplete();
+    });
     child.on("exit", (code, signal) => {
       if (!shuttingDown) {
         const failureCode = Number.isInteger(code) && code !== 0 ? code : 1;
