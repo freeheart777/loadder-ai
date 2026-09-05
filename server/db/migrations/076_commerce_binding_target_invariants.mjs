@@ -37,16 +37,17 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS trg_bb_commerce_target_no_delete
 BEFORE DELETE ON business_builder_projects
-WHEN EXISTS(
-  SELECT 1
-  FROM business_builder_commerce_bindings b
-  JOIN site_projects s ON s.id=b.site_project_id AND s.workspace_id=b.workspace_id
-  WHERE b.workspace_id=OLD.workspace_id
-    AND b.business_builder_project_id=OLD.id
-    AND b.status='active'
-    AND s.site_type='STORE'
-    AND s.status='PUBLISHED'
-)
+WHEN EXISTS(SELECT 1 FROM workspaces w WHERE w.id=OLD.workspace_id)
+  AND EXISTS(
+    SELECT 1
+    FROM business_builder_commerce_bindings b
+    JOIN site_projects s ON s.id=b.site_project_id AND s.workspace_id=b.workspace_id
+    WHERE b.workspace_id=OLD.workspace_id
+      AND b.business_builder_project_id=OLD.id
+      AND b.status='active'
+      AND s.site_type='STORE'
+      AND s.status='PUBLISHED'
+  )
 BEGIN
   SELECT RAISE(ABORT,'commerce target cannot be deleted while published storefront bound');
 END;
