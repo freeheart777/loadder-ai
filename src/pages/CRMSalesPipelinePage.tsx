@@ -18,6 +18,8 @@ type PipelineStage = {
   probability: number;
   nextAction: string;
   allowedTargets: string[];
+  dealCount: number;
+  totalValue: number;
 };
 
 type PipelineDeal = {
@@ -40,6 +42,12 @@ type PipelineDeal = {
 type PipelineBoard = {
   stages: PipelineStage[];
   deals: PipelineDeal[];
+  summary: {
+    dealCount: number;
+    totalValue: number;
+    weightedValue: number;
+    stuckCount: number;
+  };
 };
 
 type DragPayload = {
@@ -97,22 +105,6 @@ export default function CRMSalesPipelinePage() {
     return map;
   }, [board]);
 
-  const totalValue = useMemo(
-    () => board?.deals.reduce((sum, deal) => sum + deal.amount, 0) ?? 0,
-    [board]
-  );
-
-  const weightedValue = useMemo(
-    () =>
-      Math.round(
-        board?.deals.reduce(
-          (sum, deal) => sum + deal.amount * (deal.probability / 100),
-          0
-        ) ?? 0
-      ),
-    [board]
-  );
-
   function onDragStart(event: DragEvent, deal: PipelineDeal) {
     const payload: DragPayload = {
       dealId: deal.id,
@@ -158,16 +150,7 @@ export default function CRMSalesPipelinePage() {
         return;
       }
 
-      setBoard((current) =>
-        current
-          ? {
-              ...current,
-              deals: current.deals.map((deal) =>
-                deal.id === result.data.id ? result.data : deal
-              ),
-            }
-          : current
-      );
+      await loadBoard();
     } catch (error) {
       console.error(error);
       setNotice("ثبت تغییر مرحله ناموفق بود.");
@@ -202,11 +185,11 @@ export default function CRMSalesPipelinePage() {
           <div className="flex gap-2 text-xs md:text-sm">
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3">
               <span className="text-white/45">ارزش Pipeline </span>
-              <strong className="mr-2">{money(totalValue)}</strong>
+              <strong className="mr-2">{money(board?.summary.totalValue ?? 0)}</strong>
             </div>
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3">
               <span className="text-white/45">ارزش وزنی </span>
-              <strong className="mr-2">{money(weightedValue)}</strong>
+              <strong className="mr-2">{money(board?.summary.weightedValue ?? 0)}</strong>
             </div>
           </div>
         </div>
@@ -226,7 +209,6 @@ export default function CRMSalesPipelinePage() {
           <div className="flex min-w-full gap-4 overflow-x-auto pb-6">
             {board?.stages.map((stage) => {
               const deals = dealsByStage.get(stage.id) || [];
-              const stageValue = deals.reduce((sum, deal) => sum + deal.amount, 0);
 
               return (
                 <section
@@ -239,10 +221,10 @@ export default function CRMSalesPipelinePage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="font-semibold">{stage.label}</div>
                       <span className="rounded-full bg-white/[0.07] px-2.5 py-1 text-xs text-white/55">
-                        {deals.length.toLocaleString("fa-IR")}
+                        {stage.dealCount.toLocaleString("fa-IR")}
                       </span>
                     </div>
-                    <div className="mt-2 text-xs text-white/35">{money(stageValue)}</div>
+                    <div className="mt-2 text-xs text-white/35">{money(stage.totalValue)}</div>
                   </div>
 
                   <div className="space-y-3">
