@@ -17,10 +17,11 @@ V2 remains dark (not production-routed) until each module satisfies unit, cross-
 - [x] Customer Accounts v0
 - [x] Customer Account persistence & authenticated self-service v0
 - [x] Agent Commerce API safety layer v0
+- [x] Agent Commerce execution adapter v0 (dark, injected handlers only)
 
 ## Next
-- [ ] Agent Commerce execution adapter: bind the safety decision to real domain/application operations without bypassing existing invariants
 - [ ] Durable agent idempotency receipts and append-only audit trail
+- [ ] Concrete domain/application handlers for the allowed agent actions
 - [ ] Provider Adapters v1 where an external provider is actually required (payment / shipping / refund), behind provider-neutral contracts
 - [ ] Migration / shadow traffic / cutover rehearsal
 
