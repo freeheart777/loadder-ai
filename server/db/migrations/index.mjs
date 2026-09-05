@@ -73,6 +73,7 @@ import { migration072CommerceFinancialLedger } from "./072_commerce_financial_le
 import { migration073CommerceCustomerAccounts } from "./073_commerce_customer_accounts.mjs";
 import { migration074CommerceOutboxDeadLetter } from "./074_commerce_outbox_dead_letter.mjs";
 import { migration075CommerceOutboxClaimLease } from "./075_commerce_outbox_claim_lease.mjs";
+import { migration076CommerceBindingTargetInvariants } from "./076_commerce_binding_target_invariants.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -150,4 +151,5 @@ export const migrations = [
   migration073CommerceCustomerAccounts,
   migration074CommerceOutboxDeadLetter,
   migration075CommerceOutboxClaimLease,
+  migration076CommerceBindingTargetInvariants,
 ];
