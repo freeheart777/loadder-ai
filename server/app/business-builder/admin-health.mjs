@@ -14,7 +14,7 @@ export function createBusinessBuilderAdminHealth(db){
       safeCount("collaboration","SELECT COUNT(*) c FROM business_builder_collaboration_events WHERE workspace_id=?",w),
       safeCount("commerceBindingsActive","SELECT COUNT(*) c FROM business_builder_commerce_bindings WHERE workspace_id=? AND status='active'",w),
       safeCount("commerceBindingsDisabled","SELECT COUNT(*) c FROM business_builder_commerce_bindings WHERE workspace_id=? AND status='disabled'",w),
-      safeCount("commercePublishedStoresUnbound","SELECT COUNT(*) c FROM site_projects s WHERE s.workspace_id=? AND s.site_type='STORE' AND s.status='PUBLISHED' AND NOT EXISTS(SELECT 1 FROM business_builder_commerce_bindings b WHERE b.workspace_id=s.workspace_id AND b.site_project_id=s.id AND b.status='active')",w),
+      safeCount("commercePublishedStoresUnbound","SELECT COUNT(*) c FROM site_projects s WHERE s.workspace_id=? AND s.site_type='STORE' AND s.status='PUBLISHED' AND NOT EXISTS(SELECT 1 FROM business_builder_commerce_bindings b WHERE b.workspace_id=s.workspace_id AND b.site_project_id=s.id)",w),
       safeCount("commercePublishedStoresDisabled","SELECT COUNT(*) c FROM site_projects s JOIN business_builder_commerce_bindings b ON b.workspace_id=s.workspace_id AND b.site_project_id=s.id WHERE s.workspace_id=? AND s.site_type='STORE' AND s.status='PUBLISHED' AND b.status='disabled'",w),
       safeCount("commerceOutboxPending","SELECT COUNT(*) c FROM business_builder_commerce_outbox WHERE workspace_id=? AND status='pending' AND last_error IS NULL AND dead_lettered_at IS NULL",w),
       safeCount("commerceOutboxRetrying","SELECT COUNT(*) c FROM business_builder_commerce_outbox WHERE workspace_id=? AND status='pending' AND last_error IS NOT NULL AND dead_lettered_at IS NULL",w),
