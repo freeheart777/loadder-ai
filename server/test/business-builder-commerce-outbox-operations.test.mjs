@@ -72,11 +72,14 @@ test("poison events dead-letter at the retry ceiling and require explicit admin 
   runWithWorkspace("w1", () => {
     db.prepare("UPDATE business_builder_commerce_outbox SET attempts=4,last_error=NULL,available_at=? WHERE id='ob1'").run("2020-01-01T00:00:00.000Z");
     const store = new CommerceOutboxStore(db, { maxAttempts:5 });
-    const failed = store.failed("ob1", new Error("permanent accounting rejection"));
+    const claimed = store.claim(1);
+    assert.equal(claimed.length, 1);
+    assert.equal(claimed[0].id, "ob1");
+    const failed = store.failed("ob1", new Error("permanent accounting rejection"), claimed[0].claim_token);
     assert.equal(failed.attempts, 5);
     assert.ok(failed.dead_lettered_at);
     assert.equal(failed.dead_letter_reason, "permanent accounting rejection");
-    assert.equal(store.pending().some((row) => row.id === "ob1"), false);
+    assert.equal(store.claim().some((row) => row.id === "ob1"), false);
 
     const operations = new CommerceOutboxOperations(db);
     assert.equal(operations.list({ state:"dead_letter" }).length, 1);
@@ -87,7 +90,7 @@ test("poison events dead-letter at the retry ceiling and require explicit admin 
     assert.equal(requeued.event.dead_letter_reason, null);
     assert.equal(requeued.event.attempts, 0);
     assert.equal(requeued.event.requeue_count, 1);
-    assert.equal(store.pending().some((row) => row.id === "ob1"), true);
+    assert.equal(store.claim().some((row) => row.id === "ob1"), true);
   });
   db.close();
 });
