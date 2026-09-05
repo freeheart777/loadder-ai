@@ -1,4 +1,4 @@
-import { API_BASE_URL, apiFetch } from "./api";
+import { apiFetch } from "./api";
 
 export type SiteMediaAssetType = "logo" | "hero" | "banner" | "product" | "gallery" | "favicon";
 
@@ -34,8 +34,12 @@ export function validateSiteMediaFile(file: File) {
   return mimeType;
 }
 
-function targetsLoadderApi(url: string) {
-  return url === API_BASE_URL || url.startsWith(`${API_BASE_URL}/`);
+function encodeMetadata(metadata: Record<string, unknown>) {
+  const json = JSON.stringify(metadata || {});
+  const bytes = new TextEncoder().encode(json);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 export async function uploadSiteMedia({
@@ -52,37 +56,17 @@ export async function uploadSiteMedia({
   if (!siteProjectId) throw new Error("پروژه فروشگاهی برای آپلود تصویر مشخص نیست.");
   const mimeType = validateSiteMediaFile(file);
 
-  const created = await read(await apiFetch(`/api/site-projects/${siteProjectId}/media/upload-url`, {
+  const uploaded = await read(await apiFetch(`/api/site-projects/${siteProjectId}/media/upload`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ assetType, fileName: file.name, mimeType, sizeBytes: file.size }),
-  }));
-
-  const upload = created.upload;
-  if (!upload?.signedUrl || !upload?.path) throw new Error("سرور آدرس معتبر برای آپلود تصویر برنگرداند.");
-  const signedUrl = String(upload.signedUrl);
-  const response = await fetch(signedUrl, {
-    method: "PUT",
-    credentials: targetsLoadderApi(signedUrl) ? "include" : "omit",
-    headers: { "Content-Type": mimeType },
+    headers: {
+      "Content-Type": mimeType,
+      "x-loadder-asset-type": assetType,
+      "x-loadder-file-name": file.name,
+      "x-loadder-media-metadata": encodeMetadata({ name: file.name, ...metadata }),
+    },
     body: file,
-  });
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`ارسال تصویر به فضای ذخیره‌سازی ناموفق بود (HTTP ${response.status})${detail ? ` — ${detail.slice(0, 160)}` : ""}`);
-  }
-
-  const completed = await read(await apiFetch(`/api/site-projects/${siteProjectId}/media/complete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      assetType,
-      mimeType,
-      sizeBytes: file.size,
-      storageKey: upload.path,
-      metadata: { name: file.name, ...metadata },
-    }),
   }));
-  if (!completed.media?.url) throw new Error("تصویر آپلود شد اما ثبت آن در Media Library کامل نشد.");
-  return completed.media as UploadedSiteMedia;
+
+  if (!uploaded.media?.url) throw new Error("تصویر ذخیره شد اما Media Library پاسخ معتبر نداد.");
+  return uploaded.media as UploadedSiteMedia;
 }
