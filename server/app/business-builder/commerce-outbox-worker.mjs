@@ -78,10 +78,10 @@ export function createCommerceOutboxWorker({
   }
 
   function tick() {
-    if (inFlight) return inFlight;
     if (shuttingDown) {
       return Promise.resolve({ workspaceCount: 0, processed: 0, failed: 0, workspaces: [], skipped: "shutting_down" });
     }
+    if (inFlight) return inFlight;
     inFlight = drainOnce()
       .catch((error) => {
         logger?.error?.("[commerce-outbox-worker] poll failed", error);
