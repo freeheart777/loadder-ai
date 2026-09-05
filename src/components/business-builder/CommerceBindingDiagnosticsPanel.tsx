@@ -13,6 +13,8 @@ type BindingDiagnostic = {
   businessBuilderProjectId: string | null;
   businessBuilderProjectName: string | null;
   businessBuilderProjectStatus: string | null;
+  businessBuilderActiveVersionId: string | null;
+  targetRunnable: boolean | null;
   health: "critical" | "warning" | "healthy" | "info";
   issue: string | null;
 };
@@ -31,6 +33,7 @@ type Props = {
     disabled: number;
     publishedUnbound: number;
     publishedDisabled: number;
+    publishedTargetUnrunnable: number;
   };
   onChanged?: () => void | Promise<void>;
 };
@@ -40,8 +43,10 @@ const healthClass: Record<BindingDiagnostic["health"], string> = { critical: "bo
 const issueText: Record<string, string> = {
   PUBLISHED_STORE_UNBOUND: "فروشگاه منتشر شده اما به App Builder متصل نیست.",
   PUBLISHED_STORE_BINDING_DISABLED: "فروشگاه منتشر شده اما Binding آن غیرفعال است.",
+  PUBLISHED_STORE_TARGET_UNRUNNABLE: "فروشگاه منتشر شده به App Builder غیرقابل‌اجرا متصل است؛ App مقصد آرشیو شده یا Active Version ندارد.",
   DRAFT_STORE_UNBOUND: "فروشگاه هنوز منتشر نشده و Binding ندارد.",
   STORE_BINDING_DISABLED: "Binding این فروشگاه غیرفعال است.",
+  STORE_TARGET_UNRUNNABLE: "App Builder مقصد این Store قابل‌اجرا نیست.",
 };
 const errorText: Record<string,string> = {
   COMMERCE_STORE_NOT_FOUND: "Store پیدا نشد یا متعلق به Workspace فعلی نیست.",
@@ -150,11 +155,12 @@ export default function CommerceBindingDiagnosticsPanel({ counters, onChanged }:
       <button type="button" onClick={() => void load()} disabled={loading} className="rounded-xl border border-slate-700 px-4 py-2 text-xs disabled:opacity-50">{loading ? "در حال دریافت…" : "به‌روزرسانی"}</button>
     </div>
 
-    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <div className="rounded-xl bg-slate-950/60 p-4"><b className="text-2xl">{counters?.active ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Binding فعال</p></div>
       <div className="rounded-xl bg-slate-950/60 p-4"><b className="text-2xl">{counters?.disabled ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Binding غیرفعال</p></div>
       <div className="rounded-xl bg-slate-950/60 p-4"><b className={counters?.publishedUnbound ? "text-2xl text-rose-300" : "text-2xl"}>{counters?.publishedUnbound ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Store منتشرشده بدون Binding</p></div>
       <div className="rounded-xl bg-slate-950/60 p-4"><b className={counters?.publishedDisabled ? "text-2xl text-amber-300" : "text-2xl"}>{counters?.publishedDisabled ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Store منتشرشده با Binding غیرفعال</p></div>
+      <div className="rounded-xl bg-slate-950/60 p-4"><b className={counters?.publishedTargetUnrunnable ? "text-2xl text-rose-300" : "text-2xl"}>{counters?.publishedTargetUnrunnable ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Store منتشرشده با App مقصد غیرقابل‌اجرا</p></div>
     </div>
 
     {forbidden && <div className="mt-4 rounded-xl border border-amber-900/50 bg-amber-950/20 p-3 text-sm text-amber-200">جزئیات و اصلاح Binding فقط برای Owner و Admin فعال Workspace قابل دسترسی است.</div>}
@@ -169,7 +175,7 @@ export default function CommerceBindingDiagnosticsPanel({ counters, onChanged }:
           <td className="p-3"><div className="font-medium text-slate-200">{row.siteName}</div><div className="mt-1 text-slate-500">/{row.siteSlug}</div><div className="mt-1 max-w-52 truncate text-[10px] text-slate-600" title={row.siteProjectId}>{row.siteProjectId}</div></td>
           <td className="p-3"><span className={row.published ? "text-emerald-300" : "text-slate-400"}>{row.siteStatus}</span></td>
           <td className="p-3"><span className={row.bindingState === "active" ? "text-emerald-300" : row.bindingState === "disabled" ? "text-amber-300" : "text-rose-300"}>{row.bindingState === "active" ? "فعال" : row.bindingState === "disabled" ? "غیرفعال" : "بدون اتصال"}</span></td>
-          <td className="p-3">{row.businessBuilderProjectId ? <><div className="font-medium text-slate-200">{row.businessBuilderProjectName || row.businessBuilderProjectId}</div><div className="mt-1 text-slate-500">{row.businessBuilderProjectStatus || "—"}</div><div className="mt-1 max-w-52 truncate text-[10px] text-slate-600" title={row.businessBuilderProjectId}>{row.businessBuilderProjectId}</div></> : <span className="text-slate-500">—</span>}</td>
+          <td className="p-3">{row.businessBuilderProjectId ? <><div className="font-medium text-slate-200">{row.businessBuilderProjectName || row.businessBuilderProjectId}</div><div className="mt-1 text-slate-500">{row.businessBuilderProjectStatus || "—"}</div>{row.targetRunnable === false && <div className="mt-1 text-rose-300">Target غیرقابل‌اجرا</div>}{row.targetRunnable === true && <div className="mt-1 text-emerald-300">Target اجرایی</div>}<div className="mt-1 max-w-52 truncate text-[10px] text-slate-600" title={row.businessBuilderProjectId}>{row.businessBuilderProjectId}</div></> : <span className="text-slate-500">—</span>}</td>
           <td className="p-3 text-slate-500">{fmt(row.bindingUpdatedAt)}</td>
           <td className="p-3"><button type="button" onClick={() => beginRemediation(row)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-200">{row.bindingState === "unbound" ? "اتصال" : row.bindingState === "disabled" ? "فعال‌سازی" : "مدیریت"}</button></td>
         </tr>)}</tbody>
