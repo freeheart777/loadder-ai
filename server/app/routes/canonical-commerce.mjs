@@ -1,13 +1,13 @@
 import express from "express";
 
-import { db } from "../../db/workspace-database.mjs";
+import { db as defaultDb } from "../../db/workspace-database.mjs";
 import { createIdentityRepository } from "../repositories/identity-repository.mjs";
 import { createEcommerceService } from "../services/ecommerce-service.mjs";
 import { createFinancialLedgerService } from "../commerce/v2/financial-ledger.mjs";
 import { createRefundService } from "../commerce/v2/refund-service.mjs";
 import { createEcommerceRouter } from "./ecommerce.mjs";
 
-export function createCanonicalCommerceRouter() {
+export function createCanonicalCommerceRouter({ db = defaultDb } = {}) {
   const router = express.Router();
   let commerceRouter = null;
 
