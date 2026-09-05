@@ -12,26 +12,29 @@ function createDb() {
       workspace_id TEXT NOT NULL,
       status TEXT NOT NULL,
       available_at TEXT NOT NULL,
-      dead_lettered_at TEXT
+      dead_lettered_at TEXT,
+      claim_expires_at TEXT
     );
   `);
   return db;
 }
 
-function insert(db, { id, workspaceId, status = "pending", availableAt = "2000-01-01T00:00:00.000Z", deadLetteredAt = null }) {
+function insert(db, { id, workspaceId, status = "pending", availableAt = "2000-01-01T00:00:00.000Z", deadLetteredAt = null, claimExpiresAt = null }) {
   db.prepare(`
-    INSERT INTO business_builder_commerce_outbox(id, workspace_id, status, available_at, dead_lettered_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, workspaceId, status, availableAt, deadLetteredAt);
+    INSERT INTO business_builder_commerce_outbox(id, workspace_id, status, available_at, dead_lettered_at, claim_expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, workspaceId, status, availableAt, deadLetteredAt, claimExpiresAt);
 }
 
-test("worker discovers only eligible workspaces and drains inside tenant context", async () => {
+test("worker discovers only eligible unclaimed workspaces and drains inside tenant context", async () => {
   const db = createDb();
   insert(db, { id: "a", workspaceId: "workspace-a" });
   insert(db, { id: "b", workspaceId: "workspace-a" });
   insert(db, { id: "c", workspaceId: "workspace-b", deadLetteredAt: "2026-09-05T00:00:00.000Z" });
   insert(db, { id: "d", workspaceId: "workspace-c", availableAt: "2999-01-01T00:00:00.000Z" });
   insert(db, { id: "e", workspaceId: "workspace-d", status: "delivered" });
+  insert(db, { id: "f", workspaceId: "workspace-e", claimExpiresAt: "2999-01-01T00:00:00.000Z" });
+  insert(db, { id: "g", workspaceId: "workspace-f", claimExpiresAt: "2000-01-01T00:00:00.000Z" });
 
   const seen = [];
   const runtimeBridge = {
@@ -42,12 +45,15 @@ test("worker discovers only eligible workspaces and drains inside tenant context
   };
   const worker = createCommerceOutboxWorker({ db, runtimeBridge, batchSize: 17, logger: null });
 
-  assert.deepEqual(worker.discoverWorkspaceIds(), ["workspace-a"]);
+  assert.deepEqual(worker.discoverWorkspaceIds(), ["workspace-a", "workspace-f"]);
   const result = await worker.tick();
 
-  assert.deepEqual(seen, [{ workspaceId: "workspace-a", limit: 17 }]);
-  assert.equal(result.workspaceCount, 1);
-  assert.equal(result.processed, 1);
+  assert.deepEqual(seen, [
+    { workspaceId: "workspace-a", limit: 17 },
+    { workspaceId: "workspace-f", limit: 17 },
+  ]);
+  assert.equal(result.workspaceCount, 2);
+  assert.equal(result.processed, 2);
   assert.equal(result.failed, 0);
   db.close();
 });
@@ -79,8 +85,9 @@ test("worker coalesces overlapping ticks into one drain pass", async () => {
   db.close();
 });
 
-test("worker stays idle until the dead-letter schema is available", async () => {
+test("worker stays idle until the claim-lease schema is available", async () => {
   const db = new Database(":memory:");
+  db.exec(`CREATE TABLE business_builder_commerce_outbox(id TEXT PRIMARY KEY, workspace_id TEXT, status TEXT, available_at TEXT, dead_lettered_at TEXT);`);
   const runtimeBridge = { drain: async () => { throw new Error("must not drain"); } };
   const worker = createCommerceOutboxWorker({ db, runtimeBridge, logger: null });
 
