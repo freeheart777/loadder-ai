@@ -11,11 +11,12 @@ import { migration050BusinessBuilderProjects } from "../db/migrations/050_busine
 import { migration068BusinessBuilderCommerceEventReceipts } from "../db/migrations/068_business_builder_commerce_event_receipts.mjs";
 import { migration070BusinessBuilderCommerceOutbox } from "../db/migrations/070_business_builder_commerce_outbox.mjs";
 import { migration074CommerceOutboxDeadLetter } from "../db/migrations/074_commerce_outbox_dead_letter.mjs";
+import { migration075CommerceOutboxClaimLease } from "../db/migrations/075_commerce_outbox_claim_lease.mjs";
 
 function setup() {
   const db = new Database(":memory:");
   db.pragma("foreign_keys=OFF");
-  [migration001Identity, migration042SiteBuilderControlPlane, migration050BusinessBuilderProjects, migration068BusinessBuilderCommerceEventReceipts, migration070BusinessBuilderCommerceOutbox, migration074CommerceOutboxDeadLetter].forEach((migration) => migration.up(db));
+  [migration001Identity, migration042SiteBuilderControlPlane, migration050BusinessBuilderProjects, migration068BusinessBuilderCommerceEventReceipts, migration070BusinessBuilderCommerceOutbox, migration074CommerceOutboxDeadLetter, migration075CommerceOutboxClaimLease].forEach((migration) => migration.up(db));
   db.exec("CREATE TABLE IF NOT EXISTS business_context_versions(id TEXT PRIMARY KEY);");
   db.pragma("foreign_keys=ON");
   const t = "2026-09-05T00:00:00.000Z";
