@@ -29,6 +29,7 @@ export function createCommerceOutboxWorker({
   const maxWorkspaces = normalizePositiveInteger(workspaceLimit, 500, 5000);
   let timer = null;
   let inFlight = null;
+  let shuttingDown = false;
 
   function schemaReady() {
     const columns = db.prepare("PRAGMA table_info(business_builder_commerce_outbox)").all();
@@ -78,6 +79,9 @@ export function createCommerceOutboxWorker({
 
   function tick() {
     if (inFlight) return inFlight;
+    if (shuttingDown) {
+      return Promise.resolve({ workspaceCount: 0, processed: 0, failed: 0, workspaces: [], skipped: "shutting_down" });
+    }
     inFlight = drainOnce()
       .catch((error) => {
         logger?.error?.("[commerce-outbox-worker] poll failed", error);
@@ -90,7 +94,7 @@ export function createCommerceOutboxWorker({
   }
 
   function start() {
-    if (timer) return false;
+    if (timer || shuttingDown) return false;
     void tick();
     timer = setInterval(() => void tick(), pollIntervalMs);
     return true;
@@ -103,13 +107,31 @@ export function createCommerceOutboxWorker({
     return true;
   }
 
+  async function shutdown() {
+    if (shuttingDown) {
+      if (inFlight) await inFlight;
+      return false;
+    }
+    shuttingDown = true;
+    stop();
+    if (inFlight) await inFlight;
+    return true;
+  }
+
   return {
     start,
     stop,
+    shutdown,
     tick,
     discoverWorkspaceIds,
     get running() {
       return Boolean(timer);
+    },
+    get draining() {
+      return Boolean(inFlight);
+    },
+    get stopping() {
+      return shuttingDown;
     },
   };
 }
