@@ -103,10 +103,10 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       );
       await journey.page.getByRole("button", { name: "ساخت و افزودن به فروشگاه", exact: true }).click();
       await created;
-      await expect(journey.page.getByText("کرم زعفران ویژه", { exact: true })).toBeVisible();
+      await expect(journey.page.locator('[data-editor-element="product-card"]')).toContainText("کرم زعفران ویژه");
 
       await journey.page.reload();
-      await expect(journey.page.getByText("کرم زعفران ویژه", { exact: true })).toBeVisible();
+      await expect(journey.page.locator('[data-editor-element="product-card"]')).toContainText("کرم زعفران ویژه");
       await expect(journey.page.locator('[data-editor-element="product-card"]')).toContainText("۴۵۰٬۰۰۰");
     });
 
