@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, Heart, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, Heart, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
 import { defaultProductSettings, formatMoney, productView, productsForSection } from "./config";
-import type { DeviceMode, ElementType, PageMode, Product, ProductSettings, SectionConfig, Selection, StudioConfig } from "./types";
+import { BannerLayoutRenderer, HeroLayoutRenderer } from "./HeroBannerLayout";
+import type { DeviceMode, ElementType, MediaSlotKey, PageMode, Product, ProductSettings, SectionConfig, Selection, StudioConfig } from "./types";
 
-export type InlineMediaTarget = { kind: "hero" | "banner" | "logo" | "product"; id?: string };
+export type InlineMediaTarget = { kind: "hero" | "banner" | "logo" | "product"; id?: string; slot?: MediaSlotKey };
 type CanvasProps = { config: StudioConfig; products: Product[]; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; };
 
 function InlineMediaControl({ target, onUpload, busy, label = "تغییر تصویر", compact = false }: { target: InlineMediaTarget; onUpload?: CanvasProps["onImageUpload"]; busy?: boolean; label?: string; compact?: boolean }) {
@@ -26,7 +27,39 @@ function EditorElement({ type, id, selected, onSelect, onEdit, interactive = tru
 
 function Header(props: CanvasProps) { const { config, device, selected, select, interactive = true, onRuntimePage } = props; const mobile = device === "mobile"; return <EditorElement type="header" id="header" selected={selected} onSelect={select} onEdit={props.onEditElement} interactive={interactive} className={config.header.sticky ? "sticky top-0 z-30" : ""} style={{ background: config.header.backgroundColor, color: config.header.textColor }}><div className="bg-slate-950 px-4 py-2 text-center text-[10px] font-bold text-white/75">ارسال سریع · ضمانت خرید · پشتیبانی واقعی</div><div className="mx-auto flex min-h-20 items-center gap-4 px-5" style={{ maxWidth: config.design.containerWidth }}><button type="button" onClick={!interactive ? () => onRuntimePage?.("storefront") : undefined} className="flex items-center gap-3 text-right"><span className="relative block">{config.header.logoUrl ? <img src={config.header.logoUrl} alt="لوگو" className="h-11 w-11 rounded-xl object-cover" /> : <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-900 font-black text-white">L</span>}{interactive && <InlineMediaControl target={{kind:"logo"}} onUpload={props.onImageUpload} busy={props.imageBusy} label="لوگو" compact/>}</span><span><b className="block">{config.header.storeName}</b><span className="text-[10px] text-slate-400">فروشگاه آنلاین</span></span></button>{config.header.showSearch && !mobile && <label className="mx-auto flex min-h-11 max-w-xl flex-1 items-center gap-2 rounded-2xl bg-slate-100 px-4 text-xs text-slate-400"><MagnifyingGlass size={18}/><input className="w-full bg-transparent text-slate-700 outline-none" placeholder="جستجو بین محصولات..." /></label>}<div className="mr-auto flex items-center gap-1">{config.header.showAccount && <span className="grid h-11 w-11 place-items-center"><UserCircle size={24}/></span>}{config.header.showCart && <button type="button" onClick={!interactive ? () => onRuntimePage?.("cart") : undefined} className="relative grid h-11 w-11 place-items-center"><ShoppingCart size={23}/><span className="absolute right-0 top-0 rounded-full bg-violet-600 px-1.5 text-[9px] text-white">۱</span></button>}</div></div>{!mobile && <nav className="mx-auto flex min-h-11 items-center gap-6 border-t border-slate-100 px-5 text-xs font-bold text-slate-600" style={{ maxWidth: config.design.containerWidth }}><button type="button" onClick={!interactive ? () => onRuntimePage?.("storefront") : undefined}>خانه</button><button type="button" onClick={!interactive ? () => onRuntimePage?.("collection") : undefined}>همه محصولات</button><span>جدیدترین‌ها</span><span>پرفروش‌ها</span><span className="mr-auto" style={{ color: config.design.primaryColor }}>تخفیف‌های ویژه</span></nav>}</EditorElement>; }
 
-function Hero(props: CanvasProps) { const { config, device, selected, select, interactive = true, onRuntimePage } = props; if (!config.hero.enabled) return null; const mobile = device === "mobile"; return <EditorElement type="hero" id="hero" selected={selected} onSelect={select} onEdit={props.onEditElement} interactive={interactive} className="overflow-hidden" style={{ background: config.hero.backgroundColor, color: config.hero.textColor }}><div className={`mx-auto grid ${mobile ? "grid-cols-1" : "grid-cols-[1.05fr_.95fr]"}`} style={{ maxWidth: config.design.containerWidth, minHeight: mobile ? 420 : Math.max(360, config.hero.height) }}><div className="flex items-center p-8 sm:p-12"><div className="max-w-xl" style={{ textAlign: config.hero.alignment }}><span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-black">{config.hero.eyebrow || "انتخاب امروز"}</span><h2 className="mt-5 font-black leading-[1.1]" style={{ fontSize: mobile ? 36 : 52 * config.design.headingScale / 100 }}>{config.hero.title}</h2><p className="mt-5 max-w-lg text-sm leading-8 opacity-75">{config.hero.subtitle}</p><button type="button" onClick={!interactive ? () => onRuntimePage?.("collection") : undefined} className="mt-7 inline-flex min-h-12 items-center gap-2 px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{config.hero.ctaLabel || "مشاهده محصولات"}<ArrowLeft size={16}/></button></div></div><div className="relative min-h-72 bg-slate-100">{config.hero.imageUrl ? <img src={config.hero.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full min-h-80 place-items-center bg-gradient-to-br from-slate-100 to-slate-200 text-center text-slate-400"><div><ShoppingBag size={66} className="mx-auto"/><b className="mt-3 block text-slate-600">تصویر کمپین شما</b><span className="text-xs">از + همین تصویر را اضافه کنید</span></div></div>}{interactive && <InlineMediaControl target={{kind:"hero"}} onUpload={props.onImageUpload} busy={props.imageBusy} label={config.hero.imageUrl ? "تعویض عکس" : "افزودن عکس"}/>}</div></div></EditorElement>; }
+function Hero(props: CanvasProps) {
+  const { config, selected, select, interactive = true, onRuntimePage } = props;
+  if (!config.hero.enabled) return null;
+  return (
+    <EditorElement
+      type="hero"
+      id="hero"
+      selected={selected}
+      onSelect={select}
+      onEdit={props.onEditElement}
+      interactive={interactive}
+      className="overflow-hidden"
+      style={{ background: config.hero.backgroundColor, color: config.hero.textColor }}
+    >
+      <div className="mx-auto" style={{ maxWidth: config.design.containerWidth }}>
+        <HeroLayoutRenderer
+          hero={config.hero}
+          design={config.design}
+          device={props.device}
+          onPrimaryAction={!interactive ? () => onRuntimePage?.("collection") : undefined}
+          renderMediaControl={interactive ? (slot, hasImage) => (
+            <InlineMediaControl
+              target={{ kind: "hero", slot }}
+              onUpload={props.onImageUpload}
+              busy={props.imageBusy}
+              label={hasImage ? "تغییر تصویر" : "افزودن تصویر"}
+            />
+          ) : undefined}
+        />
+      </div>
+    </EditorElement>
+  );
+}
 
 function TrustStrip({ config }: { config: StudioConfig }) { const items = [[Truck,"ارسال سریع"],[ShieldCheck,"پرداخت امن"],[CheckCircle,"ضمانت خرید"],[Headset,"پشتیبانی"]] as const; return <div className="border-y border-slate-100 bg-white"><div className="mx-auto grid grid-cols-2 gap-3 px-5 py-5 md:grid-cols-4" style={{ maxWidth: config.design.containerWidth }}>{items.map(([Icon,label]) => <div key={label} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><span style={{color:config.design.primaryColor}}><Icon size={22}/></span><b className="text-xs text-slate-800">{label}</b></div>)}</div></div>; }
 
@@ -36,7 +69,69 @@ function InsertBetween({ index, onInsert }: { index: number; onInsert?: CanvasPr
 
 function SectionShell({ section, index, props, children }: { section: SectionConfig; index: number; props: CanvasProps; children: React.ReactNode }) { const type: ElementType = section.type === "banner" ? "banner" : section.type === "trust" ? "trust" : "section"; return <><InsertBetween index={index} onInsert={props.interactive === false ? undefined : props.onInsertSection}/><EditorElement type={type} id={section.id} selected={props.selected} onSelect={props.select} onEdit={props.onEditElement} interactive={props.interactive !== false} draggable className="group/section" onMoveUp={()=>props.onMoveSection?.(section.id,-1)} onMoveDown={()=>props.onMoveSection?.(section.id,1)} onDuplicate={()=>props.onDuplicateSection?.(section.id)} onDelete={()=>props.onDeleteSection?.(section.id)} onDragStart={(e)=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/loadder-section-id",section.id);}} onDragOver={(e)=>{if(e.dataTransfer.types.includes("text/loadder-section-id")){e.preventDefault();e.dataTransfer.dropEffect="move";}}} onDrop={(e)=>{const from=e.dataTransfer.getData("text/loadder-section-id");if(from){e.preventDefault();e.stopPropagation();props.onReorderSection?.(from,section.id);}}}>{children}</EditorElement></>; }
 
-function StorefrontCanvas(props: CanvasProps) { const visible = props.config.sections.filter(s=>s.enabled); return <div className="min-h-full bg-slate-50" style={{color:props.config.design.textColor}}><Header {...props}/><Hero {...props}/><TrustStrip config={props.config}/>{visible.map((section,index)=>{ if(section.type==="spacer") return <SectionShell key={section.id} section={section} index={index} props={props}><div style={{height:section.spacingTop+section.spacingBottom}}/></SectionShell>; if(section.type==="products") { const settings=section.productSettings || defaultProductSettings; const source=productsForSection(props.products,settings); const shown=(source.length?source:settings.source==="manual"?[]:props.products).slice(0,12); const columns=props.device==="mobile"?settings.columnsMobile:props.device==="tablet"?settings.columnsTablet:settings.columnsDesktop; return <SectionShell key={section.id} section={section} index={index} props={props}><section id="products" className="mx-auto px-5 py-10" style={{maxWidth:props.config.design.containerWidth}}><div className="mb-6 flex items-end justify-between gap-4"><div><span className="text-[10px] font-black" style={{color:props.config.design.primaryColor}}>منتخب فروشگاه</span><h3 className="mt-2 text-2xl font-black text-slate-900">{section.title}</h3><p className="mt-2 text-xs text-slate-400">{section.subtitle}</p></div>{props.interactive===false && <button type="button" onClick={()=>props.onRuntimePage?.("collection")} className="text-xs font-black" style={{color:props.config.design.primaryColor}}>مشاهده همه ←</button>}</div><div className="grid gap-4" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}}>{shown.map(p=><ProductCard key={p.id} product={p} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId={section.id} interactive={props.interactive!==false} onReorderProduct={props.onReorderProduct} onRuntimePage={props.onRuntimePage} onEditElement={props.onEditElement} onImageUpload={props.onImageUpload} imageBusy={props.imageBusy}/>)}{props.interactive!==false && <button type="button" onClick={(e)=>{e.stopPropagation();props.onAddProduct?.(section.id);}} className="grid min-h-64 place-items-center rounded-3xl border-2 border-dashed border-violet-300 bg-violet-50 text-violet-700"><span><Plus size={32} className="mx-auto"/><b className="mt-2 block">افزودن محصول</b><small>از کاتالوگ واقعی</small></span></button>}</div></section></SectionShell>; } if(section.type==="banner") return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="grid overflow-hidden rounded-[28px] md:grid-cols-2" style={{background:section.backgroundColor,color:section.textColor}}><div className="p-8"><span className="text-[10px] font-black opacity-60">پیشنهاد فروشگاه</span><h3 className="mt-2 text-2xl font-black">{section.title}</h3><p className="mt-3 text-sm opacity-70">{section.subtitle}</p></div><div className="relative min-h-48 bg-white/10">{section.imageUrl?<img src={section.imageUrl} alt="" className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-sm opacity-50">از + همین‌جا تصویر را اضافه کنید</div>}{props.interactive!==false && <InlineMediaControl target={{kind:"banner",id:section.id}} onUpload={props.onImageUpload} busy={props.imageBusy} label={section.imageUrl ? "تعویض بنر" : "افزودن بنر"}/>}</div></div></section></SectionShell>; return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="rounded-[28px] border bg-white p-7"><h3 className="text-xl font-black text-slate-900">{section.title}</h3><p className="mt-3 text-sm text-slate-500">{section.subtitle}</p></div></section></SectionShell>; })}<InsertBetween index={visible.length} onInsert={props.interactive===false?undefined:props.onInsertSection}/><Footer config={props.config}/></div>; }
+function ProductSectionView({ section, props }: { section: SectionConfig; props: CanvasProps }) {
+  const settings = section.productSettings || defaultProductSettings;
+  const source = productsForSection(props.products, settings);
+  const shown = (source.length ? source : settings.source === "manual" ? [] : props.products).slice(0, 12);
+  const columns = props.device === "mobile" ? settings.columnsMobile : props.device === "tablet" ? settings.columnsTablet : settings.columnsDesktop;
+  return (
+    <section id="products" className="mx-auto px-5 py-10" style={{ maxWidth: props.config.design.containerWidth }}>
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <span className="text-[10px] font-black" style={{ color: props.config.design.primaryColor }}>منتخب فروشگاه</span>
+          <h3 className="mt-2 text-2xl font-black text-slate-900">{section.title}</h3>
+          <p className="mt-2 text-xs text-slate-400">{section.subtitle}</p>
+        </div>
+        {props.interactive === false && <button type="button" onClick={() => props.onRuntimePage?.("collection")} className="text-xs font-black" style={{ color: props.config.design.primaryColor }}>مشاهده همه ←</button>}
+      </div>
+      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${columns},minmax(0,1fr))` }}>
+        {shown.map((product) => <ProductCard key={product.id} product={product} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId={section.id} interactive={props.interactive !== false} onReorderProduct={props.onReorderProduct} onRuntimePage={props.onRuntimePage} onEditElement={props.onEditElement} onImageUpload={props.onImageUpload} imageBusy={props.imageBusy} />)}
+        {props.interactive !== false && <button type="button" onClick={(event) => { event.stopPropagation(); props.onAddProduct?.(section.id); }} className="grid min-h-64 place-items-center rounded-3xl border-2 border-dashed border-violet-300 bg-violet-50 text-violet-700"><span><Plus size={32} className="mx-auto" /><b className="mt-2 block">افزودن محصول</b><small>از کاتالوگ واقعی</small></span></button>}
+      </div>
+    </section>
+  );
+}
+
+function BannerSectionView({ section, props }: { section: SectionConfig; props: CanvasProps }) {
+  return (
+    <section className="mx-auto px-5 py-8" style={{ maxWidth: props.config.design.containerWidth }} data-banner-section-layout={section.banner?.layout || "image-text"}>
+      <div className="overflow-hidden rounded-[28px]" style={{ background: section.backgroundColor, color: section.textColor }}>
+        <BannerLayoutRenderer
+          section={section}
+          config={props.config}
+          device={props.device}
+          renderMediaControl={props.interactive !== false ? (slot, hasImage) => (
+            <InlineMediaControl
+              target={{ kind: "banner", id: section.id, slot }}
+              onUpload={props.onImageUpload}
+              busy={props.imageBusy}
+              label={hasImage ? "تغییر تصویر" : "افزودن تصویر"}
+            />
+          ) : undefined}
+        />
+      </div>
+    </section>
+  );
+}
+
+function StorefrontCanvas(props: CanvasProps) {
+  const visible = props.config.sections.filter((section) => section.enabled);
+  return (
+    <div className="min-h-full bg-slate-50" style={{ color: props.config.design.textColor }}>
+      <Header {...props} />
+      <Hero {...props} />
+      <TrustStrip config={props.config} />
+      {visible.map((section, index) => {
+        if (section.type === "spacer") return <SectionShell key={section.id} section={section} index={index} props={props}><div style={{ height: section.spacingTop + section.spacingBottom }} /></SectionShell>;
+        if (section.type === "products") return <SectionShell key={section.id} section={section} index={index} props={props}><ProductSectionView section={section} props={props} /></SectionShell>;
+        if (section.type === "banner") return <SectionShell key={section.id} section={section} index={index} props={props}><BannerSectionView section={section} props={props} /></SectionShell>;
+        return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{ maxWidth: props.config.design.containerWidth }}><div className="rounded-[28px] border bg-white p-7"><h3 className="text-xl font-black text-slate-900">{section.title}</h3><p className="mt-3 text-sm text-slate-500">{section.subtitle}</p></div></section></SectionShell>;
+      })}
+      <InsertBetween index={visible.length} onInsert={props.interactive === false ? undefined : props.onInsertSection} />
+      <Footer config={props.config} />
+    </div>
+  );
+}
 
 function CollectionCanvas(props: CanvasProps) { const settings: ProductSettings = { ...defaultProductSettings, columnsDesktop: 4, columnsTablet: 3, columnsMobile: 2, showCompareAt: true, showCartButton: true, showPromotionBadge: true }; return <div className="min-h-full bg-slate-50 text-slate-900"><Header {...props}/><section className="mx-auto px-5 py-10" style={{maxWidth:props.config.design.containerWidth}}><div className="rounded-[32px] bg-slate-950 p-7 text-white md:p-10"><span className="text-[10px] font-black text-emerald-300">COLLECTION</span><h2 className="mt-2 text-3xl font-black md:text-4xl">همه محصولات فروشگاه</h2><p className="mt-3 max-w-xl text-sm leading-7 text-white/55">محصولات واقعی کاتالوگ Loadder؛ آماده فیلتر، دسته‌بندی و اتصال به کمپین‌ها.</p></div><div className="mt-7 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-2"><button className="rounded-full bg-slate-950 px-4 py-2 text-xs font-black text-white">همه</button><button className="rounded-full border bg-white px-4 py-2 text-xs font-bold">جدیدترین</button><button className="rounded-full border bg-white px-4 py-2 text-xs font-bold">تخفیف‌دار</button></div><button className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-bold"><SlidersHorizontal/>فیلتر و مرتب‌سازی</button></div><div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">{props.products.map(p=><ProductCard key={p.id} product={p} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId="collection" interactive={false} onRuntimePage={props.onRuntimePage}/>)}</div></section><Footer config={props.config}/></div>; }
 

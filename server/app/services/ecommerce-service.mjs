@@ -47,6 +47,23 @@ const productMetadata = (value, fallback = "{}", { allowLocal = false } = {}) =>
 
 export function createEcommerceService({ db, env = process.env }) {
   const workspaceId = () => requireWorkspaceId();
+  const uniqueProductSlug = (siteProjectId, value, excludeProductId = null) => {
+    const ownerWorkspaceId = workspaceId();
+    const base = slugify(value) || `product-${crypto.randomBytes(6).toString("hex")}`;
+    const collision = db.prepare(`
+      SELECT 1
+      FROM ecommerce_products
+      WHERE workspace_id=? AND site_project_id=? AND slug=? AND (? IS NULL OR id<>?)
+      LIMIT 1
+    `);
+    let candidate = base;
+    let suffix = 2;
+    while (collision.get(ownerWorkspaceId, siteProjectId, candidate, excludeProductId, excludeProductId)) {
+      const suffixText = String(suffix++);
+      candidate = `${base.slice(0, Math.max(1, 99 - suffixText.length))}-${suffixText}`;
+    }
+    return candidate;
+  };
   const ownedSite = (siteProjectId) => db.prepare("SELECT id,site_type AS siteType,name FROM site_projects WHERE id=? AND workspace_id=?").get(siteProjectId, workspaceId());
   const requireSite = (siteProjectId) => {
     const site = ownedSite(siteProjectId);
@@ -137,7 +154,7 @@ export function createEcommerceService({ db, env = process.env }) {
       const productId = id("prod"), stamp = now();
       const ownerWorkspaceId = workspaceId();
       const productCurrency = currency(input.currency);
-      const slug = slugify(input.slug || name) || productId.toLowerCase();
+      const slug = uniqueProductSlug(siteProjectId, input.slug || name);
       const price = nonNegativeInt(input.basePriceMinor, "basePriceMinor");
       const compareAtPrice = input.compareAtPriceMinor == null ? null : nonNegativeInt(input.compareAtPriceMinor, "compareAtPriceMinor");
       const inventoryQuantity = nonNegativeInt(input.inventoryQuantity, "inventoryQuantity");
@@ -159,7 +176,7 @@ export function createEcommerceService({ db, env = process.env }) {
       const p = requireProduct(productId); requireSite(p.site_project_id);
       const next = {
         name: input.name === undefined ? p.name : String(input.name).trim(),
-        slug: input.slug === undefined ? p.slug : slugify(input.slug),
+        slug: input.slug === undefined ? p.slug : uniqueProductSlug(p.site_project_id, input.slug, productId),
         description: input.description === undefined ? p.description : String(input.description),
         category: input.category === undefined ? p.category : input.category || null,
         brand: input.brand === undefined ? p.brand : input.brand || null,
