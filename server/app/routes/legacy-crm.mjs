@@ -1,10 +1,7 @@
 import express from "express";
-import { createCrmPipelineRouter } from "./crm-pipeline.mjs";
 
 export function createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }) {
   const router = express.Router();
-
-  router.use("/crm/pipeline", createCrmPipelineRouter());
 
   router.get("/crm/stats", (req, res) => res.json({ ok: true, data: getCRMStats() }));
 
