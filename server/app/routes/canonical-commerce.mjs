@@ -7,17 +7,20 @@ import { createFinancialLedgerService } from "../commerce/v2/financial-ledger.mj
 import { createRefundService } from "../commerce/v2/refund-service.mjs";
 import { createEcommerceRouter } from "./ecommerce.mjs";
 
-export function createCanonicalCommerceRouter({ db = defaultDb } = {}) {
+export function createCanonicalCommerceRouter({
+  db = defaultDb,
+  auditRepository = null,
+} = {}) {
   const router = express.Router();
   let commerceRouter = null;
 
   router.use((req, res, next) => {
     if (!commerceRouter) {
-      const identityRepository = createIdentityRepository(db);
+      const financialAuditRepository = auditRepository || createIdentityRepository(db);
       const ecommerceService = createEcommerceService({ db });
       const financialLedgerService = createFinancialLedgerService({
         db,
-        auditRepository: identityRepository,
+        auditRepository: financialAuditRepository,
       });
       const refundService = createRefundService({ db });
 
