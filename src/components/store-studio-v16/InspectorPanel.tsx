@@ -6,9 +6,14 @@ import {
   Plus,
   Trash,
 } from "@phosphor-icons/react";
-import { defaultProductSettings, productView } from "./config";
+import { activeMediaSlots, bannerConfigForSection, defaultProductSettings, productView } from "./config";
 import type {
+  BannerLayout,
+  LayoutDirection,
+  LayoutHeight,
+  LayoutRatio,
   MediaAsset,
+  MediaSlotKey,
   Product,
   SectionConfig,
   StudioActions,
@@ -64,8 +69,56 @@ function HeaderEditor({ config, assets, actions }: Props) {
   return <div className="space-y-4"><PanelTitle eyebrow="HEADER" title="سربرگ فروشگاه" text="این بخش را مستقیماً روی بوم انتخاب کرده‌اید."/><MediaSelect label="لوگو از Media Library" value={config.header.logoUrl} assets={assets} onChange={(logoUrl) => actions.patchHeader({ logoUrl })}/><Field label="نام فروشگاه" value={config.header.storeName} onChange={(storeName) => actions.patchHeader({ storeName })}/><div className="grid grid-cols-2 gap-2"><Toggle label="جستجو" checked={config.header.showSearch} onChange={(showSearch) => actions.patchHeader({ showSearch })}/><Toggle label="حساب کاربر" checked={config.header.showAccount} onChange={(showAccount) => actions.patchHeader({ showAccount })}/><Toggle label="سبد" checked={config.header.showCart} onChange={(showCart) => actions.patchHeader({ showCart })}/><Toggle label="چسبان" checked={config.header.sticky} onChange={(sticky) => actions.patchHeader({ sticky })}/></div><Range label="ارتفاع" value={config.header.height} min={56} max={110} onChange={(height) => actions.patchHeader({ height })}/><div className="grid grid-cols-2 gap-2"><Color label="پس‌زمینه" value={config.header.backgroundColor} onChange={(backgroundColor) => actions.patchHeader({ backgroundColor })}/><Color label="متن" value={config.header.textColor} onChange={(textColor) => actions.patchHeader({ textColor })}/></div></div>;
 }
 
+const heroLayoutOptions = [
+  ["full-image", "تصویر تمام‌عرض"],
+  ["image-text", "تصویر + متن"],
+  ["main-two", "بنر اصلی + دو بنر کوچک"],
+  ["main-secondary", "بنر اصلی + بنر ثانویه"],
+  ["text-led", "متن‌محور"],
+] as const;
+
+const heightOptions: Array<[LayoutHeight, string]> = [
+  ["compact", "جمع‌وجور"],
+  ["medium", "متوسط"],
+  ["large", "بزرگ"],
+  ["extra-large", "خیلی بزرگ"],
+];
+
+const ratioOptions: Array<[LayoutRatio, string]> = [[50, "۵۰ / ۵۰"], [60, "۶۰ / ۴۰"], [70, "۷۰ / ۳۰"], [80, "۸۰ / ۲۰"]];
+
+function MediaSlotSelect({ label, slot, value, assets, onChange }: { label: string; slot: MediaSlotKey; value: string; assets: MediaAsset[]; onChange: (slot: MediaSlotKey, value: string) => void }) {
+  return <div className="rounded-xl border border-white/10 bg-white/[.025] p-3"><MediaSelect label={label} value={value} assets={assets} onChange={(next) => onChange(slot, next)} /><Field label="یا URL تصویر" value={value} onChange={(next) => onChange(slot, next)} /></div>;
+}
+
 function HeroEditor({ config, assets, actions }: Props) {
-  return <div className="space-y-4"><PanelTitle eyebrow="HERO" title="ویترین اصلی" text="متن، تصویر و ترکیب‌بندی Hero به‌صورت زنده به‌روزرسانی می‌شود."/><div className="rounded-2xl border border-white/10 bg-white/[.03] p-3"><b className="text-xs">چیدمان‌های آماده</b><p className="mt-1 text-[10px] text-white/35">یک الگو را بزنید و بعد جزئیاتش را روی همان صفحه تنظیم کنید.</p><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => actions.patchHero({ layout: "split", alignment: "right", height: 480 })} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:border-emerald-400/40">بنر بزرگ + متن</button><button type="button" onClick={() => actions.patchHero({ layout: "background", alignment: "right", height: 520, overlayOpacity: 45 })} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:border-emerald-400/40">بنر تمام‌عرض</button><button type="button" onClick={() => actions.patchHero({ layout: "centered", alignment: "center", height: 440 })} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:border-emerald-400/40">کمپین مرکزی</button><button type="button" onClick={() => actions.patchHero({ layout: "minimal", alignment: "right", height: 340 })} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:border-emerald-400/40">مینیمال سبک</button></div></div><Toggle label="نمایش Hero" checked={config.hero.enabled} onChange={(enabled) => actions.patchHero({ enabled })}/><Select label="چیدمان" value={config.hero.layout} onChange={(layout) => actions.patchHero({ layout: layout as typeof config.hero.layout })}><option value="centered">مرکزی</option><option value="split">متن و تصویر</option><option value="background">تصویر پس‌زمینه</option><option value="minimal">مینیمال</option></Select><Field label="Eyebrow" value={config.hero.eyebrow} onChange={(eyebrow) => actions.patchHero({ eyebrow })}/><Field label="عنوان" value={config.hero.title} onChange={(title) => actions.patchHero({ title })}/><TextArea label="زیرعنوان" value={config.hero.subtitle} onChange={(subtitle) => actions.patchHero({ subtitle })}/><div className="grid grid-cols-2 gap-3"><Field label="متن CTA" value={config.hero.ctaLabel} onChange={(ctaLabel) => actions.patchHero({ ctaLabel })}/><Field label="مقصد CTA" value={config.hero.ctaHref} onChange={(ctaHref) => actions.patchHero({ ctaHref })}/></div><MediaSelect label="تصویر از Media Library" value={config.hero.imageUrl} assets={assets} onChange={(imageUrl) => actions.patchHero({ imageUrl })}/><Field label="یا URL تصویر" value={config.hero.imageUrl} onChange={(imageUrl) => actions.patchHero({ imageUrl })}/><div className="grid grid-cols-2 gap-2"><Color label="پس‌زمینه" value={config.hero.backgroundColor} onChange={(backgroundColor) => actions.patchHero({ backgroundColor })}/><Color label="متن" value={config.hero.textColor} onChange={(textColor) => actions.patchHero({ textColor })}/></div><Range label="ارتفاع" value={config.hero.height} min={280} max={720} onChange={(height) => actions.patchHero({ height })}/><Range label="Overlay" value={config.hero.overlayOpacity} min={0} max={90} onChange={(overlayOpacity) => actions.patchHero({ overlayOpacity })}/><Select label="تراز متن" value={config.hero.alignment} onChange={(alignment) => actions.patchHero({ alignment: alignment as typeof config.hero.alignment })}><option value="right">راست</option><option value="center">مرکز</option><option value="left">چپ</option></Select></div>;
+  const hero = config.hero;
+  const layout = hero.layout === "split" ? "image-text" : hero.layout === "background" ? "full-image" : hero.layout === "centered" || hero.layout === "minimal" ? "text-led" : hero.layout;
+  const setSlot = (slot: MediaSlotKey, imageUrl: string) => actions.patchHero({
+    ...(slot === "main" ? { imageUrl } : {}),
+    mediaSlots: { ...hero.mediaSlots, [slot]: { ...hero.mediaSlots[slot], imageUrl } },
+  });
+  const usesText = layout !== "main-two" && layout !== "main-secondary";
+  return <div className="space-y-4" data-hero-layout-inspector="true">
+    <PanelTitle eyebrow="HERO LAYOUT ENGINE" title="ویترین اصلی" text="چیدمان، نسبت و هر تصویر مستقل ذخیره می‌شود و روی موبایل به‌صورت واقعی بازچینی خواهد شد." />
+    <Toggle label="نمایش Hero" checked={hero.enabled} onChange={(enabled) => actions.patchHero({ enabled })} />
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {heroLayoutOptions.map(([value, label]) => <button key={value} type="button" onClick={() => actions.patchHero({ layout: value })} className={`min-h-11 rounded-xl border px-3 py-2 text-xs font-bold ${layout === value ? "border-emerald-400 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5"}`}>{label}</button>)}
+    </div>
+    {layout !== "full-image" && <Select label={layout === "text-led" ? "جایگاه تصویر نسبت به متن" : "جایگاه تصویر / بنر اصلی"} value={hero.direction} onChange={(direction) => actions.patchHero({ direction: direction as LayoutDirection })}><option value="media-right">تصویر راست</option><option value="media-left">تصویر چپ</option></Select>}
+    {layout !== "full-image" && <Select label={layout === "text-led" ? "عرض بخش متن" : "عرض تصویر / بنر اصلی"} value={String(hero.ratio)} onChange={(ratio) => actions.patchHero({ ratio: Number(ratio) as LayoutRatio })}>{ratioOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>}
+    <Select label="ارتفاع Hero" value={hero.heightPreset} onChange={(heightPreset) => actions.patchHero({ heightPreset: heightPreset as LayoutHeight })}>{heightOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>
+    {usesText && <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[.025] p-3">
+      <Field label="Eyebrow / برچسب کوچک" value={hero.eyebrow} onChange={(eyebrow) => actions.patchHero({ eyebrow })} />
+      <Field label="عنوان اصلی" value={hero.title} onChange={(title) => actions.patchHero({ title })} />
+      <TextArea label="زیرعنوان / توضیح" value={hero.subtitle} onChange={(subtitle) => actions.patchHero({ subtitle })} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="متن CTA اصلی" value={hero.ctaLabel} onChange={(ctaLabel) => actions.patchHero({ ctaLabel })} /><Field label="لینک CTA اصلی" value={hero.ctaHref} onChange={(ctaHref) => actions.patchHero({ ctaHref })} /></div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="متن CTA دوم" value={hero.secondaryCtaLabel} onChange={(secondaryCtaLabel) => actions.patchHero({ secondaryCtaLabel })} /><Field label="لینک CTA دوم" value={hero.secondaryCtaHref} onChange={(secondaryCtaHref) => actions.patchHero({ secondaryCtaHref })} /></div>
+    </div>}
+    <div className="space-y-3">{activeMediaSlots(layout).map((slot, index) => <MediaSlotSelect key={slot} label={index === 0 ? "تصویر / بنر اصلی" : `تصویر جانبی ${index}`} slot={slot} value={hero.mediaSlots[slot].imageUrl} assets={assets} onChange={setSlot} />)}</div>
+    <div className="grid grid-cols-2 gap-2"><Color label="پس‌زمینه" value={hero.backgroundColor} onChange={(backgroundColor) => actions.patchHero({ backgroundColor })} /><Color label="متن" value={hero.textColor} onChange={(textColor) => actions.patchHero({ textColor })} /></div>
+    {layout === "full-image" && <Range label="شدت Overlay متن" value={hero.overlayOpacity} min={0} max={90} onChange={(overlayOpacity) => actions.patchHero({ overlayOpacity })} />}
+    {usesText && <Select label="تراز متن" value={hero.alignment} onChange={(alignment) => actions.patchHero({ alignment: alignment as typeof hero.alignment })}><option value="right">راست</option><option value="center">مرکز</option><option value="left">چپ</option></Select>}
+  </div>;
 }
 
 function ProductSectionEditor({ section, products, actions }: { section: SectionConfig; products: Product[]; actions: StudioActions }) {
@@ -81,7 +134,46 @@ function ProductCardEditor({ product, config, assets, actions }: { product: Prod
 
 function SectionStyle({ section, actions }: { section: SectionConfig; actions: StudioActions }) { return <div className="space-y-4"><div className="grid grid-cols-2 gap-2"><Color label="پس‌زمینه" value={section.backgroundColor} onChange={(backgroundColor) => actions.patchSection(section.id, { backgroundColor })}/><Color label="متن" value={section.textColor} onChange={(textColor) => actions.patchSection(section.id, { textColor })}/></div><Range label="فاصله بالا" value={section.spacingTop} min={0} max={120} onChange={(spacingTop) => actions.patchSection(section.id, { spacingTop })}/><Range label="فاصله پایین" value={section.spacingBottom} min={0} max={120} onChange={(spacingBottom) => actions.patchSection(section.id, { spacingBottom })}/></div>; }
 
-function GenericSectionEditor({ section, assets, actions }: { section: SectionConfig; assets: MediaAsset[]; actions: StudioActions }) { return <div className="space-y-4"><PanelTitle eyebrow={section.type.toUpperCase()} title="ویرایش بخش"/><Field label="عنوان" value={section.title} onChange={(title) => actions.patchSection(section.id, { title })}/><TextArea label="متن" value={section.subtitle} onChange={(subtitle) => actions.patchSection(section.id, { subtitle })}/>{section.type === "banner" && <><MediaSelect label="تصویر بنر" value={section.imageUrl || ""} assets={assets} onChange={(imageUrl) => actions.patchSection(section.id, { imageUrl })}/><Field label="متن CTA" value={section.ctaLabel || ""} onChange={(ctaLabel) => actions.patchSection(section.id, { ctaLabel })}/></>}<SectionStyle section={section} actions={actions}/></div>; }
+const bannerLayoutOptions: Array<[BannerLayout, string]> = [
+  ["full-width", "بنر تمام‌عرض"],
+  ["two-up", "دو بنر کنار هم"],
+  ["main-two", "یک بنر بزرگ + دو کوچک"],
+  ["image-text", "تصویر + متن"],
+  ["text-image", "متن + تصویر"],
+];
+
+function BannerEditor({ section, assets, actions }: { section: SectionConfig; assets: MediaAsset[]; actions: StudioActions }) {
+  const banner = bannerConfigForSection(section);
+  const patchBanner = (patch: Partial<typeof banner>) => actions.patchSection(section.id, { banner: { ...banner, ...patch } });
+  const setSlot = (slot: MediaSlotKey, imageUrl: string) => actions.patchSection(section.id, {
+    ...(slot === "main" ? { imageUrl } : {}),
+    banner: {
+      ...banner,
+      mediaSlots: { ...banner.mediaSlots, [slot]: { ...banner.mediaSlots[slot], imageUrl } },
+    },
+  });
+  const usesText = banner.layout === "image-text" || banner.layout === "text-image";
+
+  return <div className="space-y-4" data-banner-layout-inspector="true">
+    <PanelTitle eyebrow="BANNER LAYOUT ENGINE" title="بنر صفحه" text="این بخش را می‌توانید در هر جای صفحه قرار دهید؛ هر تصویر مستقل و قابل تعویض است." />
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {bannerLayoutOptions.map(([value, label]) => <button key={value} type="button" onClick={() => patchBanner({ layout: value, ...(value === "image-text" ? { direction: "media-left" as const } : value === "text-image" ? { direction: "media-right" as const } : {}) })} className={`min-h-11 rounded-xl border px-3 py-2 text-xs font-bold ${banner.layout === value ? "border-emerald-400 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5"}`}>{label}</button>)}
+    </div>
+    {banner.layout !== "full-width" && <Select label={usesText ? "جایگاه تصویر" : "جایگاه بنر اصلی"} value={banner.direction} onChange={(direction) => patchBanner({ direction: direction as LayoutDirection })}><option value="media-right">تصویر / بنر اصلی راست</option><option value="media-left">تصویر / بنر اصلی چپ</option></Select>}
+    {banner.layout !== "full-width" && <Select label={usesText ? "عرض تصویر" : "عرض بنر اصلی"} value={String(banner.ratio)} onChange={(ratio) => patchBanner({ ratio: Number(ratio) as LayoutRatio })}>{ratioOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>}
+    <Select label="ارتفاع بنر" value={banner.height} onChange={(height) => patchBanner({ height: height as LayoutHeight })}>{heightOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>
+    {usesText && <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[.025] p-3">
+      <Field label="Eyebrow / برچسب کوچک" value={section.eyebrow || ""} onChange={(eyebrow) => actions.patchSection(section.id, { eyebrow })} />
+      <Field label="عنوان" value={section.title} onChange={(title) => actions.patchSection(section.id, { title })} />
+      <TextArea label="متن" value={section.subtitle} onChange={(subtitle) => actions.patchSection(section.id, { subtitle })} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="متن CTA" value={section.ctaLabel || ""} onChange={(ctaLabel) => actions.patchSection(section.id, { ctaLabel })} /><Field label="لینک CTA" value={section.ctaHref || ""} onChange={(ctaHref) => actions.patchSection(section.id, { ctaHref })} /></div>
+    </div>}
+    <div className="space-y-3">{activeMediaSlots(banner.layout).map((slot, index) => <MediaSlotSelect key={slot} label={index === 0 ? "بنر اصلی" : `بنر جانبی ${index}`} slot={slot} value={banner.mediaSlots[slot].imageUrl} assets={assets} onChange={setSlot} />)}</div>
+    <SectionStyle section={section} actions={actions} />
+  </div>;
+}
+
+function GenericSectionEditor({ section, actions }: { section: SectionConfig; actions: StudioActions }) { return <div className="space-y-4"><PanelTitle eyebrow={section.type.toUpperCase()} title="ویرایش بخش"/><Field label="عنوان" value={section.title} onChange={(title) => actions.patchSection(section.id, { title })}/><TextArea label="متن" value={section.subtitle} onChange={(subtitle) => actions.patchSection(section.id, { subtitle })}/><SectionStyle section={section} actions={actions}/></div>; }
 
 function CommerceEditor({ config, actions, kind }: { config: StudioConfig; actions: StudioActions; kind: "cart" | "checkout" | "success" }) { return <div className="space-y-4"><PanelTitle eyebrow={kind.toUpperCase()} title={kind === "cart" ? "تجربه سبد" : kind === "checkout" ? "تجربه تسویه" : "صفحه موفقیت"}/>{kind === "cart" && <Toggle label="بخش کد تخفیف" checked={config.commerce.showCoupon} onChange={(showCoupon) => actions.patchCommerce({ showCoupon })}/>}<Field label="عنوان ارسال" value={config.commerce.shippingLabel} onChange={(shippingLabel) => actions.patchCommerce({ shippingLabel })}/><Field label="آستانه ارسال رایگان" type="number" value={config.commerce.freeShippingThresholdMinor} onChange={(value) => actions.patchCommerce({ freeShippingThresholdMinor: Math.max(0, Number(value)) })}/>{kind !== "success" && <Field label="متن دکمه Checkout" value={config.commerce.checkoutButtonLabel} onChange={(checkoutButtonLabel) => actions.patchCommerce({ checkoutButtonLabel })}/>}<Select label="حالت پرداخت" value={config.commerce.paymentMode} onChange={(paymentMode) => actions.patchCommerce({ paymentMode: paymentMode as "MANUAL" | "ONLINE" })}><option value="MANUAL">هماهنگی دستی</option><option value="ONLINE">آنلاین (فقط preview)</option></Select>{kind === "success" && <Field label="عنوان موفقیت" value={config.commerce.orderSuccessTitle} onChange={(orderSuccessTitle) => actions.patchCommerce({ orderSuccessTitle })}/>}<p className="rounded-xl border border-amber-300/20 bg-amber-300/5 p-3 text-[11px] leading-6 text-amber-100/60">این کنترل‌ها فقط preview/configuration هستند؛ runtime عمومی Cart/Checkout/Order تغییر نمی‌کند.</p></div>; }
 
@@ -94,5 +186,5 @@ export default function InspectorPanel(props: Props & { tab: "context" | "sectio
   const selection = config.selectedElement;
   const section = config.sections.find((item) => item.id === selection.id);
   const product = products.find((item) => item.id === selection.id);
-  return <aside className="flex h-full min-h-0 flex-col border-r border-white/10 bg-[#0d1520] text-white"><div className="grid grid-cols-3 gap-1 border-b border-white/10 p-3">{(["context", "sections", "design"] as const).map((value) => <button key={value} type="button" onClick={() => onTab(value)} className={`min-h-11 rounded-xl text-xs font-black ${tab === value ? "bg-emerald-400 text-slate-950" : "bg-white/5 text-white/50"}`}>{value === "context" ? "ویرایش" : value === "sections" ? "بخش‌ها" : "طراحی"}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto p-5">{tab === "sections" ? <SectionTree {...props}/> : tab === "design" ? <DesignEditor {...props}/> : selection.type === "header" ? <HeaderEditor {...props}/> : selection.type === "hero" ? <HeroEditor {...props}/> : selection.type === "product-card" && product ? <ProductCardEditor product={product} config={config} assets={assets} actions={actions}/> : section?.type === "products" ? <ProductSectionEditor section={section} products={products} actions={actions}/> : section ? <GenericSectionEditor section={section} assets={assets} actions={actions}/> : selection.type === "cart" ? <CommerceEditor config={config} actions={actions} kind="cart"/> : selection.type === "checkout" ? <CommerceEditor config={config} actions={actions} kind="checkout"/> : selection.type === "success" ? <CommerceEditor config={config} actions={actions} kind="success"/> : <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm leading-7 text-white/35">یک عنصر را روی بوم انتخاب کنید تا کنترل‌های مرتبط همین‌جا نمایش داده شوند.</div>}</div></aside>;
+  return <aside className="flex h-full min-h-0 flex-col border-r border-white/10 bg-[#0d1520] text-white"><div className="grid grid-cols-3 gap-1 border-b border-white/10 p-3">{(["context", "sections", "design"] as const).map((value) => <button key={value} type="button" onClick={() => onTab(value)} className={`min-h-11 rounded-xl text-xs font-black ${tab === value ? "bg-emerald-400 text-slate-950" : "bg-white/5 text-white/50"}`}>{value === "context" ? "ویرایش" : value === "sections" ? "بخش‌ها" : "طراحی"}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto p-5">{tab === "sections" ? <SectionTree {...props}/> : tab === "design" ? <DesignEditor {...props}/> : selection.type === "header" ? <HeaderEditor {...props}/> : selection.type === "hero" ? <HeroEditor {...props}/> : selection.type === "product-card" && product ? <ProductCardEditor product={product} config={config} assets={assets} actions={actions}/> : section?.type === "products" ? <ProductSectionEditor section={section} products={products} actions={actions}/> : section?.type === "banner" ? <BannerEditor section={section} assets={assets} actions={actions}/> : section ? <GenericSectionEditor section={section} actions={actions}/> : selection.type === "cart" ? <CommerceEditor config={config} actions={actions} kind="cart"/> : selection.type === "checkout" ? <CommerceEditor config={config} actions={actions} kind="checkout"/> : selection.type === "success" ? <CommerceEditor config={config} actions={actions} kind="success"/> : <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm leading-7 text-white/35">یک عنصر را روی بوم انتخاب کنید تا کنترل‌های مرتبط همین‌جا نمایش داده شوند.</div>}</div></aside>;
 }

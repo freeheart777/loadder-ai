@@ -1,15 +1,90 @@
 import { productMainImage } from "../../lib/productMedia";
 import type {
+  BannerLayout,
+  BannerLayoutConfig,
   CommerceConfig,
   DesignConfig,
   HeaderConfig,
   HeroConfig,
+  HeroLayout,
+  LayoutHeight,
+  LayoutRatio,
+  MediaSlotKey,
+  MediaSlots,
   Product,
   ProductSettings,
   ProductView,
   SectionConfig,
   StudioConfig,
 } from "./types";
+
+const layoutRatios = new Set<LayoutRatio>([50, 60, 70, 80]);
+const layoutHeights = new Set<LayoutHeight>(["compact", "medium", "large", "extra-large"]);
+const heroLayouts = new Set<HeroLayout>(["full-image", "image-text", "main-two", "main-secondary", "text-led"]);
+const bannerLayouts = new Set<BannerLayout>(["full-width", "two-up", "main-two", "image-text", "text-image"]);
+
+export const emptyMediaSlots = (): MediaSlots => ({
+  main: { imageUrl: "" },
+  secondary: { imageUrl: "" },
+  tertiary: { imageUrl: "" },
+});
+
+export const layoutHeightPixels: Record<LayoutHeight, number> = {
+  compact: 280,
+  medium: 380,
+  large: 500,
+  "extra-large": 620,
+};
+
+export function activeMediaSlots(layout: HeroLayout | BannerLayout): MediaSlotKey[] {
+  if (layout === "main-two") return ["main", "secondary", "tertiary"];
+  if (layout === "main-secondary" || layout === "two-up") return ["main", "secondary"];
+  return ["main"];
+}
+
+function safeRatio(value: unknown, fallback: LayoutRatio = 50): LayoutRatio {
+  const ratio = Number(value) as LayoutRatio;
+  return layoutRatios.has(ratio) ? ratio : fallback;
+}
+
+function safeHeight(value: unknown, legacyHeight?: unknown): LayoutHeight {
+  if (layoutHeights.has(value as LayoutHeight)) return value as LayoutHeight;
+  const pixels = Number(legacyHeight || 0);
+  if (pixels >= 560) return "extra-large";
+  if (pixels >= 450) return "large";
+  if (pixels > 0 && pixels <= 320) return "compact";
+  return "medium";
+}
+
+function normalizedMediaSlots(value: unknown, legacyMain = ""): MediaSlots {
+  const raw = value && typeof value === "object" ? value as Partial<MediaSlots> : {};
+  return {
+    main: { imageUrl: raw.main?.imageUrl || legacyMain || "", altText: raw.main?.altText || "" },
+    secondary: { imageUrl: raw.secondary?.imageUrl || "", altText: raw.secondary?.altText || "" },
+    tertiary: { imageUrl: raw.tertiary?.imageUrl || "", altText: raw.tertiary?.altText || "" },
+  };
+}
+
+export const bannerDefaults = (legacyMain = ""): BannerLayoutConfig => ({
+  layout: "image-text",
+  direction: "media-left",
+  ratio: 50,
+  height: "medium",
+  mediaSlots: normalizedMediaSlots(undefined, legacyMain),
+});
+
+export function bannerConfigForSection(section: SectionConfig): BannerLayoutConfig {
+  const stored = section.banner || bannerDefaults(section.imageUrl || "");
+  return {
+    ...bannerDefaults(section.imageUrl || ""),
+    ...stored,
+    layout: bannerLayouts.has(stored.layout) ? stored.layout : "image-text",
+    direction: stored.direction === "media-right" ? "media-right" : "media-left",
+    ratio: safeRatio(stored.ratio),
+    height: safeHeight(stored.height),
+    mediaSlots: normalizedMediaSlots(stored.mediaSlots, section.imageUrl || ""),
+  };
+}
 
 const fallbackHeroVisual = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
@@ -88,13 +163,22 @@ export const headerDefaults: HeaderConfig = {
 
 export const heroDefaults: HeroConfig = {
   enabled: true,
-  layout: "split",
+  layout: "image-text",
+  direction: "media-left",
+  ratio: 50,
+  heightPreset: "medium",
   eyebrow: "پیشنهادهای منتخب این هفته",
   title: "خریدی ساده، سریع و مطمئن",
   subtitle: "محصولات منتخب را با تجربه‌ای حرفه‌ای، شفاف و سازگار با موبایل کشف کنید.",
   ctaLabel: "مشاهده محصولات",
   ctaHref: "#products",
+  secondaryCtaLabel: "",
+  secondaryCtaHref: "",
   imageUrl: fallbackHeroVisual,
+  mediaSlots: {
+    ...emptyMediaSlots(),
+    main: { imageUrl: fallbackHeroVisual, altText: "تصویر اصلی کمپین" },
+  },
   backgroundColor: "#0f172a",
   textColor: "#ffffff",
   overlayOpacity: 28,
@@ -134,6 +218,8 @@ export const sectionDefaults: SectionConfig[] = [
     title: "ارسال رایگان برای خریدهای ویژه",
     subtitle: "سفارش خود را امروز کامل کنید.",
     ctaLabel: "شروع خرید",
+    ctaHref: "#products",
+    banner: bannerDefaults(),
     backgroundColor: "#6d5dfc",
     textColor: "#ffffff",
     spacingTop: 28,
@@ -158,20 +244,24 @@ function legacySections(content: Record<string, any>): SectionConfig[] {
   return source.map((section: any, index: number) => {
     const type = section.type === "product-slider" ? "products" : section.type === "banner-grid" ? "banner" : section.type === "trust" ? "trust" : section.type;
     const safeType = ["products", "banner", "trust", "text", "spacer"].includes(type) ? type : "text";
-    return {
+    const imageUrl = typeof section.imageUrl === "string" ? section.imageUrl : "";
+    const next = {
       id: String(section.id || `section-${index}`),
       type: safeType,
       enabled: section.enabled !== false,
       title: String(section.title || "بخش فروشگاه"),
       subtitle: String(section.subtitle || ""),
-      imageUrl: typeof section.imageUrl === "string" ? section.imageUrl : "",
+      eyebrow: typeof section.eyebrow === "string" ? section.eyebrow : "پیشنهاد فروشگاه",
+      imageUrl,
       ctaLabel: typeof section.ctaLabel === "string" ? section.ctaLabel : "",
+      ctaHref: typeof section.ctaHref === "string" ? section.ctaHref : "",
       backgroundColor: section.backgroundColor || designDefaults.backgroundColor,
       textColor: section.textColor || designDefaults.textColor,
       spacingTop: Number(section.spacingTop ?? designDefaults.sectionSpacing),
       spacingBottom: Number(section.spacingBottom ?? designDefaults.sectionSpacing),
       ...(safeType === "products" ? { productSettings: { ...defaultProductSettings, ...(section.productSettings || {}) } } : {}),
     } as SectionConfig;
+    return safeType === "banner" ? { ...next, banner: bannerConfigForSection({ ...next, banner: section.banner }) } : next;
   });
 }
 
@@ -180,6 +270,7 @@ function modernizeSections(sections: SectionConfig[]) {
     ...section,
     spacingTop: Math.min(Number(section.spacingTop ?? 32), section.type === "products" ? 32 : 36),
     spacingBottom: Math.min(Number(section.spacingBottom ?? 32), 36),
+    ...(section.type === "banner" ? { banner: bannerConfigForSection(section) } : {}),
     ...(section.type === "products"
       ? {
           productSettings: {
@@ -203,6 +294,10 @@ export function restoreConfig(content: Record<string, any>): StudioConfig {
   const oldV11Design = v11.design || {};
   const restoredSections = Array.isArray(v16.sections) ? v16.sections : legacySections(content);
   const storedHero = v16.hero || {};
+  const legacyHeroLayout = ({ split: "image-text", background: "full-image", centered: "text-led", minimal: "text-led" } as const)[storedHero.layout as "split" | "background" | "centered" | "minimal"];
+  const candidateHeroLayout = (legacyHeroLayout || storedHero.layout || heroDefaults.layout) as HeroLayout;
+  const heroLayout = heroLayouts.has(candidateHeroLayout) ? candidateHeroLayout : heroDefaults.layout;
+  const heroMainImage = storedHero.mediaSlots?.main?.imageUrl || storedHero.imageUrl || heroDefaults.imageUrl;
 
   return {
     version: 16,
@@ -231,8 +326,13 @@ export function restoreConfig(content: Record<string, any>): StudioConfig {
     hero: {
       ...heroDefaults,
       ...storedHero,
-      imageUrl: storedHero.imageUrl || heroDefaults.imageUrl,
-      height: Math.min(Number(storedHero.height || heroDefaults.height), 360),
+      layout: heroLayout,
+      direction: storedHero.direction === "media-right" ? "media-right" : "media-left",
+      ratio: safeRatio(storedHero.ratio),
+      heightPreset: safeHeight(storedHero.heightPreset, storedHero.height),
+      imageUrl: heroMainImage,
+      mediaSlots: normalizedMediaSlots(storedHero.mediaSlots, heroMainImage),
+      height: Number(storedHero.height || heroDefaults.height),
     },
     sections: modernizeSections(restoredSections),
     commerce: {
