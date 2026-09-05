@@ -47,14 +47,25 @@ function observe(page: Page) {
   return { network, consoleErrors, pageErrors };
 }
 
+function isExpectedAnonymousAuthProbe(entry: NetworkEntry) {
+  return entry.method === "GET"
+    && entry.status === 401
+    && new URL(entry.url).pathname === "/api/auth/me";
+}
+
 async function assertAndon(evidence: ReturnType<typeof observe>, testInfo: TestInfo) {
   await testInfo.attach("network-summary.json", {
     body: Buffer.from(JSON.stringify(evidence.network, null, 2)),
     contentType: "application/json",
   });
   expect(evidence.pageErrors, "uncaught browser errors").toEqual([]);
-  expect(evidence.consoleErrors, "browser console errors").toEqual([]);
-  expect(evidence.network.filter(({ status }) => status >= 400), "unexpected API 4xx/5xx responses").toEqual([]);
+  const unexpectedNetwork = evidence.network.filter(({ status }) => status >= 400).filter((entry) => !isExpectedAnonymousAuthProbe(entry));
+  expect(unexpectedNetwork, "unexpected API 4xx/5xx responses").toEqual([]);
+  const authProbe401s = evidence.network.filter(isExpectedAnonymousAuthProbe).length;
+  const generic401ConsoleErrors = evidence.consoleErrors.filter((message) => message === "Failed to load resource: the server responded with a status of 401 (Unauthorized)");
+  const unexpectedConsoleErrors = evidence.consoleErrors.filter((message) => message !== "Failed to load resource: the server responded with a status of 401 (Unauthorized)");
+  expect(unexpectedConsoleErrors, "unexpected browser console errors").toEqual([]);
+  expect(generic401ConsoleErrors.length, "anonymous auth-probe console errors must be accounted for by GET /api/auth/me 401 responses").toBeLessThanOrEqual(authProbe401s);
 }
 
 async function addFixtureProductThroughUi(page: Page) {
