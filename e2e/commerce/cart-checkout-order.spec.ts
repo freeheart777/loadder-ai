@@ -127,7 +127,7 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
       && new URL(response.url()).pathname === `/api/auth/storefront/carts/${cartId}/items/${product.variants[0].id}`
       && response.status() === 200,
     );
-    await cartItem.getByRole("button").last().click();
+    await cartItem.getByRole("button").filter({ hasNotText: "حذف" }).last().click();
     const updateBody = await (await quantityUpdated).json();
     expect(updateBody.cart.items[0].quantity).toBe(2);
     await expect(cartItem).toContainText("۲");
