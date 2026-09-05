@@ -1,0 +1,54 @@
+name: Business Builder PostgreSQL Integration
+on:
+  push:
+    branches: ["feat/**"]
+    paths:
+      - "server/app/business-builder/postgres-*.mjs"
+      - "server/test/business-builder-postgres*.test.mjs"
+      - ".github/workflows/business-builder-postgres-integration.yml"
+  pull_request:
+    paths:
+      - "server/app/business-builder/postgres-*.mjs"
+      - "server/test/business-builder-postgres*.test.mjs"
+      - ".github/workflows/business-builder-postgres-integration.yml"
+  workflow_dispatch:
+concurrency:
+  group: bb-postgres-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loadder
+          POSTGRES_PASSWORD: loadder_test
+          POSTGRES_DB: loadder
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U loadder -d loadder"
+          --health-interval=5s --health-timeout=3s --health-retries=20
+    env:
+      PGPASSWORD: loadder_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Materialize canonical runtime schema
+        run: node -e "import('./server/app/business-builder/postgres-schema.mjs').then(m=>process.stdout.write(m.LOADDER_POSTGRES_DDL))" > /tmp/loadder-runtime.sql
+      - name: Apply schema to real PostgreSQL
+        run: psql -h 127.0.0.1 -U loadder -d loadder -v ON_ERROR_STOP=1 -f /tmp/loadder-runtime.sql
+      - name: Verify tenant-aware JSONB runtime behavior
+        run: |
+          psql -h 127.0.0.1 -U loadder -d loadder -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO business_builder_runtime_records(id,workspace_id,app_id,entity_id,data_json,created_at,updated_at)
+          VALUES ('r1','w1','a1','lead','{"name":"Alpha"}'::jsonb,now(),now()),('r2','w2','a1','lead','{"name":"Beta"}'::jsonb,now(),now());
+          DO $$ BEGIN
+            IF (SELECT count(*) FROM business_builder_runtime_records WHERE workspace_id='w1' AND app_id='a1' AND entity_id='lead') <> 1 THEN RAISE EXCEPTION 'tenant scope failed'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM business_builder_runtime_records WHERE data_json @> '{"name":"Alpha"}'::jsonb) THEN RAISE EXCEPTION 'jsonb query failed'; END IF;
+          END $$;
+          SQL

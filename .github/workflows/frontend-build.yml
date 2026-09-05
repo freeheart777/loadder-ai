@@ -2,7 +2,6 @@ name: Frontend Build
 
 on:
   pull_request:
-    branches: [main]
     paths:
       - "src/**"
       - "package.json"
@@ -12,7 +11,7 @@ on:
       - "tailwind.config.*"
       - ".github/workflows/frontend-build.yml"
   push:
-    branches: [main]
+    branches: [main, "feat/**"]
     paths:
       - "src/**"
       - "package.json"
@@ -53,6 +52,8 @@ jobs:
           src/pages/StoreCommerceManagerPage.tsx
           src/pages/StoreCommerceManagerPageCore.tsx
           src/pages/StoreProductDetailPage.tsx
+          src/pages/BusinessBuilderPage.tsx
+          src/pages/GeneratedBusinessAppPage.tsx
           src/components/commerce/ProductMediaEditor.tsx
           src/lib/activeStoreProject.ts
           src/lib/siteMediaUpload.ts

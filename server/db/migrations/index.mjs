@@ -47,18 +47,103 @@ import { migration046SiteMediaLibrary } from "./046_site_media_library.mjs";
 import { migration047GoogleAdsCampaignDrafts } from "./047_google_ads_campaign_drafts.mjs";
 import { migration048GoogleAdsOauthConnections } from "./048_google_ads_oauth_connections.mjs";
 import { migration049EcommerceCore } from "./049_ecommerce_core.mjs";
+import { migration050BusinessBuilderProjects } from "./050_business_builder_projects.mjs";
+import { migration051BusinessBuilderRuntimeRecords } from "./051_business_builder_runtime_records.mjs";
+import { migration052BusinessBuilderActionLedger } from "./052_business_builder_action_ledger.mjs";
+import { migration053BusinessBuilderActionEvents } from "./053_business_builder_action_events.mjs";
+import { migration054BusinessBuilderDeploymentHistory } from "./054_business_builder_deployment_history.mjs";
+import { migration055BusinessBuilderIntegrations } from "./055_business_builder_integrations.mjs";
+import { migration056BusinessBuilderEnvironments } from "./056_business_builder_environments.mjs";
+import { migration057BusinessBuilderAppUsers } from "./057_business_builder_app_users.mjs";
+import { migration058BusinessBuilderPaymentEvents } from "./058_business_builder_payment_events.mjs";
+import { migration059BusinessBuilderAppInvites } from "./059_business_builder_app_invites.mjs";
+import { migration060BusinessBuilderFiles } from "./060_business_builder_files.mjs";
+import { migration061BusinessBuilderCollaboration } from "./061_business_builder_collaboration.mjs";
+import { migration062BusinessBuilderAppStoreInstallations } from "./062_business_builder_app_store_installations.mjs";
+import { migration063BusinessBuilderGitSync } from "./063_business_builder_git_sync.mjs";
+import { migration064BusinessBuilderDeploymentTenantGuards } from "./064_business_builder_deployment_tenant_guards.mjs";
+import { migration065BusinessBuilderPreviewQualityEvidence } from "./065_business_builder_preview_quality_evidence.mjs";
+import { migration066BusinessBuilderReleaseEvidence } from "./066_business_builder_release_evidence.mjs";
+import { migration067BusinessBuilderGitPullProposals } from "./067_business_builder_git_pull_proposals.mjs";
+import { migration068BusinessBuilderCommerceEventReceipts } from "./068_business_builder_commerce_event_receipts.mjs";
+import { migration069BusinessBuilderCommerceBindings } from "./069_business_builder_commerce_bindings.mjs";
+import { migration070BusinessBuilderCommerceOutbox } from "./070_business_builder_commerce_outbox.mjs";
+import { migration071CommerceTransactionalOutboxTriggers } from "./071_commerce_transactional_outbox_triggers.mjs";
+import { migration072CommerceFinancialLedger } from "./072_commerce_financial_ledger.mjs";
+import { migration073CommerceCustomerAccounts } from "./073_commerce_customer_accounts.mjs";
 
 export const migrations = [
-  migration001Identity,migration002TenantDomainData,migration003TenantRelationshipGuards,migration004WorkspaceManagementAudit,
-  migration005BusinessProfiles,migration006BusinessDnaVersions,migration007BusinessDnaImmutability,migration008BrandBookVersions,
-  migration009BrandBookImmutability,migration010BusinessContextVersions,migration011BusinessContextImmutability,migration012BusinessContextLifecycleGuards,
-  migration013BusinessContextUsage,migration014BusinessEventsObservationsSignals,migration015IntelligenceDataGuards,migration016FeatureValues,
-  migration017FeatureValueGuards,migration018ModelInputSnapshots,migration019Evaluations,migration020ModelEvaluationGuards,
-  migration021ForecastRecords,migration022IntegrationFoundation,migration023KnowledgeKpiFoundation,migration024ForecastIntegrationGuards,
-  migration025KnowledgeCandidates,migration026ParsingExtraction,migration027FieldCandidatesReviews,migration028ImportedFactEventMapping,
-  migration029Phase4bGuards,migration030ListeningMonitors,migration031ListeningCollectionRecords,migration032ListeningEventLinks,
-  migration033ListeningGuards,migration034ListeningIntelligence,migration035SemanticFindings,migration036IntelligenceRecommendations,
-  migration037HumanGovernance,migration038Experiments,migration039ExperimentRuns,migration040ExperimentRunIdempotency,migration041ExperimentRunLeases,
-  migration042SiteBuilderControlPlane,migration043SitePublishVersions,migration044SiteDomains,migration045SitePreviewTokens,migration046SiteMediaLibrary,
-  migration047GoogleAdsCampaignDrafts,migration048GoogleAdsOauthConnections,migration049EcommerceCore,
+  migration001Identity,
+  migration002TenantDomainData,
+  migration003TenantRelationshipGuards,
+  migration004WorkspaceManagementAudit,
+  migration005BusinessProfiles,
+  migration006BusinessDnaVersions,
+  migration007BusinessDnaImmutability,
+  migration008BrandBookVersions,
+  migration009BrandBookImmutability,
+  migration010BusinessContextVersions,
+  migration011BusinessContextImmutability,
+  migration012BusinessContextLifecycleGuards,
+  migration013BusinessContextUsage,
+  migration014BusinessEventsObservationsSignals,
+  migration015IntelligenceDataGuards,
+  migration016FeatureValues,
+  migration017FeatureValueGuards,
+  migration018ModelInputSnapshots,
+  migration019Evaluations,
+  migration020ModelEvaluationGuards,
+  migration021ForecastRecords,
+  migration022IntegrationFoundation,
+  migration023KnowledgeKpiFoundation,
+  migration024ForecastIntegrationGuards,
+  migration025KnowledgeCandidates,
+  migration026ParsingExtraction,
+  migration027FieldCandidatesReviews,
+  migration028ImportedFactEventMapping,
+  migration029Phase4bGuards,
+  migration030ListeningMonitors,
+  migration031ListeningCollectionRecords,
+  migration032ListeningEventLinks,
+  migration033ListeningGuards,
+  migration034ListeningIntelligence,
+  migration035SemanticFindings,
+  migration036IntelligenceRecommendations,
+  migration037HumanGovernance,
+  migration038Experiments,
+  migration039ExperimentRuns,
+  migration040ExperimentRunIdempotency,
+  migration041ExperimentRunLeases,
+  migration042SiteBuilderControlPlane,
+  migration043SitePublishVersions,
+  migration044SiteDomains,
+  migration045SitePreviewTokens,
+  migration046SiteMediaLibrary,
+  migration047GoogleAdsCampaignDrafts,
+  migration048GoogleAdsOauthConnections,
+  migration049EcommerceCore,
+  migration050BusinessBuilderProjects,
+  migration051BusinessBuilderRuntimeRecords,
+  migration052BusinessBuilderActionLedger,
+  migration053BusinessBuilderActionEvents,
+  migration054BusinessBuilderDeploymentHistory,
+  migration055BusinessBuilderIntegrations,
+  migration056BusinessBuilderEnvironments,
+  migration057BusinessBuilderAppUsers,
+  migration058BusinessBuilderPaymentEvents,
+  migration059BusinessBuilderAppInvites,
+  migration060BusinessBuilderFiles,
+  migration061BusinessBuilderCollaboration,
+  migration062BusinessBuilderAppStoreInstallations,
+  migration063BusinessBuilderGitSync,
+  migration064BusinessBuilderDeploymentTenantGuards,
+  migration065BusinessBuilderPreviewQualityEvidence,
+  migration066BusinessBuilderReleaseEvidence,
+  migration067BusinessBuilderGitPullProposals,
+  migration068BusinessBuilderCommerceEventReceipts,
+  migration069BusinessBuilderCommerceBindings,
+  migration070BusinessBuilderCommerceOutbox,
+  migration071CommerceTransactionalOutboxTriggers,
+  migration072CommerceFinancialLedger,
+  migration073CommerceCustomerAccounts,
 ];

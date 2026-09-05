@@ -4,6 +4,13 @@ import DemoModePreserver from "./components/DemoModePreserver";
 import { AuthProvider, RequireAuth } from "./lib/auth";
 
 const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
+const PublicBusinessAppPage = lazy(() => import("./pages/PublicBusinessAppPage"));
+const StoreFinancialsPage = lazy(() => import("./pages/StoreFinancialsPage"));
+const BusinessBuilderPage = lazy(() => import("./pages/BusinessBuilderPage"));
+const BusinessBuilderOperationsPage = lazy(() => import("./pages/BusinessBuilderOperationsPage"));
+const BusinessBuilderAdminPage = lazy(() => import("./pages/BusinessBuilderAdminPage"));
+const BusinessBuilderIntegrationsPage = lazy(() => import("./pages/BusinessBuilderIntegrationsPage"));
+const GeneratedBusinessAppPage = lazy(() => import("./pages/GeneratedBusinessAppPage"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -48,6 +55,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<OriginalLandingPage />} />
             <Route path="/signup" element={<AuthPage />} />
+            <Route path="/app/:projectId" element={<PublicBusinessAppPage />} />
             <Route path="/store/:siteProjectId" element={<PublicStorefrontPage />} />
             <Route path="/store/:siteProjectId/product/:slug" element={<PublicProductPage />} />
             <Route path="/store/:siteProjectId/cart" element={<PublicCartPage />} />
@@ -70,12 +78,18 @@ export default function App() {
               <Route path="/dashboard/predictive" element={<PredictivePage />} />
               <Route path="/dashboard/automation" element={<AutomationPage />} />
               <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
+              <Route path="/dashboard/business-builder" element={<BusinessBuilderPage />} />
+              <Route path="/dashboard/business-builder/operations" element={<BusinessBuilderOperationsPage />} />
+              <Route path="/dashboard/business-builder/admin" element={<BusinessBuilderAdminPage />} />
+              <Route path="/dashboard/business-builder/integrations" element={<BusinessBuilderIntegrationsPage />} />
+              <Route path="/dashboard/business-builder/apps/:projectId" element={<GeneratedBusinessAppPage />} />
 
               <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
               <Route path="/dashboard/websites/admin" element={<StoreAdminDashboardPage />} />
               <Route path="/dashboard/websites/commerce" element={<StoreCommerceManagerPage />} />
               <Route path="/dashboard/websites/commerce/operations" element={<StoreCatalogOperationsPage />} />
+              <Route path="/dashboard/websites/commerce/financials" element={<StoreFinancialsPage />} />
               <Route path="/dashboard/websites/commerce/product/:id" element={<StoreProductDetailPage />} />
               <Route path="/dashboard/websites/storefront-test" element={<StorefrontTestPage />} />
 

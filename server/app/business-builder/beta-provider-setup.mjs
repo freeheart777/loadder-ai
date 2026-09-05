@@ -1,0 +1,5 @@
+const REQUIRED=Object.freeze({postgres:["connectionSecretRef"],externalSecrets:["provider","healthCheck"],objectStorage:["provider","bucket","credentialSecretRef"],oauth:["provider","clientIdSecretRef","clientSecretRef","redirectUri"]});
+const present=v=>typeof v==="string"?v.trim().length>0:v===true||typeof v==="function";
+export function evaluateBetaProviderSetup(config={}){const providers={},blockers=[];for(const[id,fields]of Object.entries(REQUIRED)){const source=config[id]||{},checks=fields.map(field=>({id:field,passed:present(source[field])}));providers[id]={ready:checks.every(x=>x.passed),checks};for(const check of checks)if(!check.passed)blockers.push(`${id}.${check.id}`);}return Object.freeze({ready:blockers.length===0,providers,blockers});}
+export function publicBetaProviderSetup(config={}){const r=evaluateBetaProviderSetup(config);return{ready:r.ready,blockers:r.blockers,providers:Object.fromEntries(Object.entries(r.providers).map(([id,p])=>[id,{ready:p.ready,checks:p.checks.map(c=>({id:c.id,passed:c.passed}))}]))};}
+export const BETA_PROVIDER_SETUP_FIELDS=REQUIRED;

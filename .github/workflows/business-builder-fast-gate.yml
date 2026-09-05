@@ -1,0 +1,56 @@
+name: Business Builder Fast Gate
+
+on:
+  push:
+    branches: ["feat/**"]
+    paths:
+      - "server/app/business-builder/**"
+      - "server/app/routes/business-builder.mjs"
+      - "server/db/migrations/05*.mjs"
+      - "server/db/migrations/06*.mjs"
+      - "server/test/business-builder-*.test.mjs"
+      - "src/components/business-builder/**"
+      - "src/pages/BusinessBuilder*.tsx"
+      - "src/pages/GeneratedBusinessAppPage.tsx"
+      - ".github/workflows/business-builder-fast-gate.yml"
+  pull_request:
+    paths:
+      - "server/app/business-builder/**"
+      - "server/app/routes/business-builder.mjs"
+      - "server/db/migrations/05*.mjs"
+      - "server/db/migrations/06*.mjs"
+      - "server/test/business-builder-*.test.mjs"
+      - "src/components/business-builder/**"
+      - "src/pages/BusinessBuilder*.tsx"
+      - "src/pages/GeneratedBusinessAppPage.tsx"
+  workflow_dispatch:
+
+concurrency:
+  group: business-builder-fast-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci --prefer-offline --no-audit
+      - name: Install server dependencies
+        run: npm ci --prefix server --prefer-offline --no-audit
+      - name: Critical module import smoke
+        run: |
+          node -e "Promise.all(['business-compiler','app-renderer','editor-patch','navigator','publish-readiness','postgres-data-adapter','operations-dashboard','app-user-auth','integration-runtime','oauth-flow','oauth-provider-registry','oauth-credential-vault','object-storage-runtime','s3-object-storage-adapter','beta-readiness','beta-operations-readiness','beta-readiness-router','file-router','realtime-hub','environment-router','native-source-generator','collaboration-store','app-store-installation-store'].map(x=>import('./server/app/business-builder/'+x+'.mjs'))).then(()=>import('./server/app/routes/business-builder.mjs')).then(()=>console.log('critical imports ok'))"
+      - name: Targeted business builder tests
+        run: node --test --test-concurrency=1 server/test/business-builder-*.test.mjs
+      - name: Targeted builder UI typecheck
+        run: >-
+          npx tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution bundler
+          --jsx react-jsx --skipLibCheck --verbatimModuleSyntax true --types vite/client
+          src/pages/BusinessBuilderPage.tsx src/pages/BusinessBuilderOperationsPage.tsx src/pages/BusinessBuilderAdminPage.tsx src/pages/BusinessBuilderIntegrationsPage.tsx src/pages/GeneratedBusinessAppPage.tsx
+          src/components/business-builder/ApprovalCenter.tsx src/components/business-builder/PublishCenter.tsx src/components/business-builder/AppUserAccessPanel.tsx src/components/business-builder/AppInviteExchangePanel.tsx src/components/business-builder/EnvironmentPanel.tsx src/components/business-builder/CollaborationPanel.tsx src/components/business-builder/FileManagerPanel.tsx src/components/business-builder/NativeBuildPanel.tsx src/components/business-builder/VisualEditorPanel.tsx src/components/business-builder/GeneratedAppRuntime.tsx src/components/business-builder/AppStorePanel.tsx

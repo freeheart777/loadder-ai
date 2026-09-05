@@ -5,7 +5,7 @@ This document defines behavior, not implementation.
 ## Domain primitives
 - `Money`: integer minor units plus ISO/provider-neutral currency code.
 - `Product`: sellable concept with slug, status, content, classification and metadata.
-- `Variant`: purchasable SKU with options, price override, inventory policy and lifecycle state.
+- `Variant`: purchasable SKU with options, price override, lifecycle state and inventory policy.
 - `InventoryUnit`: on-hand, reserved and committed quantities per variant/location.
 - `Cart`: mutable collection of priced lines before order creation.
 - `Order`: immutable commercial snapshot created from a validated cart.
@@ -84,6 +84,140 @@ Inventory is modeled per `(workspace, store, variant, location)`.
 - inactive/expired/exhausted promotions return zero discount with a reason code.
 - exclusions win over inclusions.
 - no mutation of cart input is allowed during evaluation.
+
+## Fulfillment v0
+A Fulfillment is a provider-neutral allocation of one or more immutable Order lines to a shipment/delivery lifecycle. It does not mutate the Order snapshot and it does not perform returns or refunds.
+
+### Creation
+A new fulfillment:
+- belongs to exactly one workspace, store and order;
+- may be created only for orders in a fulfillable state (`CONFIRMED` or `PROCESSING` in v0);
+- references existing immutable order-line IDs;
+- uses positive integer quantities;
+- rejects duplicate order-line references inside the same fulfillment;
+- counts active pending/packing/shipped/delivered allocations when checking remaining quantity;
+- rejects any allocation that would exceed the ordered quantity across active fulfillments.
+
+Existing/persisted fulfillment history is treated as untrusted input at the domain boundary: ownership, order-line references and quantities are revalidated before allocation or summary calculations. Negative, zero or fractional fulfillment quantities are rejected instead of being allowed to corrupt remaining-quantity calculations.
+
+A cancelled fulfillment releases its unshipped allocation so a replacement fulfillment may be created without over-fulfilling the order.
+
+### Lifecycle
+Fulfillment states are forward-only:
+
+`PENDING -> PACKING -> SHIPPED -> DELIVERED`
+
+Cancellation is allowed only before shipping:
+
+- `PENDING -> CANCELLED`
+- `PACKING -> CANCELLED`
+
+`SHIPPED`, `DELIVERED` and `CANCELLED` cannot move backward. Shipping carrier, tracking number and tracking URL are provider-neutral optional metadata because local/manual delivery may legitimately have no carrier tracking number.
+
+Lifecycle timestamps must be valid timestamps and may not move the fulfillment clock backward. A transition cannot occur before fulfillment creation or before its current `updatedAt`; delivery cannot occur before shipment. This keeps persisted history internally chronological even when callers provide explicit timestamps.
+
+### Tracking
+Tracking events are append-only immutable facts identified by a unique event ID within a fulfillment. Recording a tracking event returns a new fulfillment value and never mutates earlier snapshots. Duplicate event IDs are rejected. Cancelled fulfillments cannot receive new tracking events.
+
+A tracking event cannot predate fulfillment creation. Carrier events may arrive out of chronological delivery order, so appending an older valid tracking fact does not rewrite history or move the fulfillment aggregate `updatedAt` backward.
+
+### Derived order fulfillment status
+Order fulfillment status is derived from shipped/delivered quantities, not from merely allocating a pending fulfillment:
+
+- `UNFULFILLED`: no ordered quantity has shipped;
+- `PARTIAL`: some but not all ordered quantity has shipped;
+- `FULFILLED`: all ordered quantity has shipped.
+
+The fulfillment summary separately exposes ordered, allocated, fulfilled/shipped and delivered quantities per order line. This distinction is required so partial shipments and later Returns / Refunds can reason from physical delivery facts instead of mutable catalog data.
+
+### Returns boundary
+Fulfillment v0 intentionally does not create return or refund records. Returns / Refunds v0 must reference real fulfilled/delivered quantities and must not rewrite fulfillment or financial history.
+
+## Returns / Refunds v0
+Returns and refunds are separate provider-neutral facts. A Return owns physical-item eligibility and lifecycle. A Refund Request owns a requested monetary amount and an immutable financial-capacity snapshot. Neither domain is allowed to rewrite Order, Fulfillment, or Financial Ledger history.
+
+### Return eligibility
+A return request:
+- belongs to exactly one workspace, store and order;
+- references immutable order-line IDs;
+- uses positive safe-integer quantities;
+- is limited by quantities actually `DELIVERED`, not merely ordered, allocated or shipped;
+- subtracts quantities already consumed by active return requests (`REQUESTED`, `APPROVED`, `RECEIVED`);
+- rejects duplicate order-line references inside one return request;
+- snapshots SKU, product/variant identity, unit price and currency from the immutable order line;
+- rejects a return ID already present in the supplied order return history.
+
+Persisted return history is treated as untrusted domain input. Before it can consume or release eligibility, workspace/store/order ownership, status, order-line references, duplicate lines, quantities and any supplied immutable snapshot fields are revalidated. Malformed negative, zero or fractional history cannot be used to manufacture additional return eligibility.
+
+`REJECTED` or `CANCELLED` return requests release their quantity eligibility. `RECEIVED` remains consumed historical return quantity.
+
+### Return lifecycle
+Return state is forward-only:
+
+- `REQUESTED -> APPROVED -> RECEIVED`
+- `REQUESTED -> REJECTED`
+- `REQUESTED -> CANCELLED`
+- `APPROVED -> CANCELLED`
+
+`RECEIVED`, `REJECTED`, and `CANCELLED` are terminal in v0.
+
+Return lifecycle timestamps must be valid and monotonic. A transition may not predate the request `createdAt` or current `updatedAt`.
+
+### Financial authority boundary
+The returns engine does not calculate authoritative captured/refunded money from mutable order state. A refund request receives an immutable financial snapshot from the authoritative financial read model:
+
+- `capturedMinor`
+- `refundedMinor`
+- `refundableMinor = capturedMinor - refundedMinor`
+- `currency`
+
+All amounts are non-negative safe integer minor units. Refunded amount may not exceed captured amount. If a caller supplies `refundableMinor`, it must exactly equal `capturedMinor - refundedMinor`; an internally inconsistent snapshot is rejected. The financial currency must match the immutable order currency.
+
+A known `SUCCEEDED` refund is committed financial history and therefore must already be represented by the authoritative `refundedMinor` snapshot before another refund is authorized. If supplied refund history proves more successful refunds than the financial snapshot contains, the snapshot is stale and the request fails closed.
+
+### In-flight refund reservation
+Financial capture capacity and request concurrency are separate concerns.
+
+Refund requests in `REQUESTED`, `APPROVED`, or `PROCESSING` reserve their amount against the current authoritative refundable capacity. A new request therefore must satisfy:
+
+`requested <= captured - refunded - inFlightReserved`
+
+`REJECTED`, `FAILED`, and `CANCELLED` refund requests release their in-flight reservation. `SUCCEEDED` is no longer an in-flight reservation because it must be represented in the refreshed authoritative refunded snapshot.
+
+Callers/persistence adapters must supply the complete relevant refund history when creating a new request. A later persistent implementation must enforce the same invariant transactionally so concurrent writers cannot both reserve the same remaining capture capacity.
+
+### Refund request rules
+A refund request:
+- may be created only for an `APPROVED` or `RECEIVED` return;
+- requires a positive safe-integer amount;
+- may not exceed the authoritative financial refundable capacity after in-flight reservations;
+- may not exceed the gross merchandise value represented by the returned immutable order-line snapshots;
+- revalidates the Return snapshot against the immutable Order before using quantity, price, identity or currency for financial authorization;
+- rejects a refund ID already present in supplied refund history;
+- stores both the authoritative financial-capacity snapshot and the reservation state that authorized the request;
+- does not infer shipping/tax/promotion allocation policy in v0.
+
+Multiple active or successful refunds for the same Return cumulatively consume that Return's merchandise value. A second refund request may only use the remaining merchandise value after `REQUESTED`, `APPROVED`, `PROCESSING`, and `SUCCEEDED` refund requests for that Return are counted. `FAILED`, `REJECTED`, and `CANCELLED` requests release that Return-level request capacity.
+
+The merchandise-value cap is intentionally conservative. A future explicit refund-allocation policy may version support for shipping, tax, promotion allocation, goodwill credits, or other adjustments rather than silently inventing those rules.
+
+### Refund lifecycle
+Refund request state is forward-only:
+
+- `REQUESTED -> APPROVED -> PROCESSING -> SUCCEEDED`
+- `REQUESTED -> REJECTED`
+- `REQUESTED -> CANCELLED`
+- `APPROVED -> CANCELLED`
+- `PROCESSING -> FAILED`
+
+`SUCCEEDED`, `FAILED`, `REJECTED`, and `CANCELLED` are terminal in v0. A transition to `SUCCEEDED` requires a non-empty provider reference so provider success cannot be represented without an external execution fact.
+
+Refund lifecycle timestamps must be valid and monotonic. A transition may not predate the request `createdAt` or current `updatedAt`.
+
+### Ledger bridge boundary
+Returns / Refunds v0 does not directly append or mutate Commerce Financial Ledger entries. After a provider-confirmed refund succeeds, an explicit accounting/payment bridge must append a new immutable `REFUND` ledger entry with its own deterministic idempotency boundary and provider reference. The original `PAYMENT_CAPTURED` entry must never be updated, deleted, negated in place, or rewritten.
+
+The future bridge/persistence transaction must coordinate refund-request success, financial-ledger idempotency and any downstream outbox event without weakening the immutable ledger boundary.
 
 ## V2 compatibility goal
 The V2 core must eventually satisfy the existing Loadder Commerce Provider Contract for product, variant, inventory, cart, coupon/shipping, checkout and order operations. New capabilities may extend the contract only through explicit versioning.

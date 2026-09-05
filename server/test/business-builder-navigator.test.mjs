@@ -1,0 +1,3 @@
+import test from "node:test";import assert from "node:assert/strict";import{navigateLoadder}from"../app/business-builder/navigator.mjs";
+test("navigator recommends tools with zero token cost",()=>{const r=navigateLoadder({goal:"CRM فروش",screen:"builder"});assert.equal(r.aiRequired,false);assert.equal(r.tokenCost,0);assert.equal(r.mode,"deterministic");assert.ok(r.recommendations.length>=1);});
+test("navigator guides existing project to preview edit and live test",()=>{const r=navigateLoadder({goal:"",screen:"builder",project:{id:"p1"}});assert.deepEqual(r.steps.map(x=>x.action),["open-preview","open-visual-editor","open-live-app"]);});

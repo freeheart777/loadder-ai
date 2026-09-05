@@ -3,7 +3,8 @@ name: Security Supply Chain Gate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "feat/**"]
+  workflow_dispatch:
 
 permissions:
   contents: read
