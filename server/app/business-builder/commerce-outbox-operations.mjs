@@ -5,9 +5,18 @@ import { LO_ADDRESSER_COMMERCE_CONSUMERS } from "./commerce-event-processor.mjs"
 const now = () => new Date().toISOString();
 const clampLimit = (value, fallback = 100) => Math.min(Math.max(Number(value) || fallback, 1), 200);
 
-function operationalState(row) {
+function claimState(row, at = now()) {
+  if (!row.claim_token) return "unclaimed";
+  if (!row.claim_expires_at) return "unknown";
+  return row.claim_expires_at > at ? "active" : "stale";
+}
+
+function operationalState(row, at = now()) {
   if (row.dead_lettered_at) return "dead_letter";
   if (row.status === "delivered") return "delivered";
+  const claim = claimState(row, at);
+  if (claim === "active") return "processing";
+  if (claim === "stale") return "stale_claim";
   if (row.last_error) return "retrying";
   return "pending";
 }
@@ -15,6 +24,15 @@ function operationalState(row) {
 function parsePayload(value) {
   try { return JSON.parse(value || "{}"); }
   catch { return null; }
+}
+
+function decorateEvent(row, at = now()) {
+  return {
+    ...row,
+    operational_state: operationalState(row, at),
+    claim_state: claimState(row, at),
+    payload: parsePayload(row.payload_json),
+  };
 }
 
 export class CommerceOutboxOperations {
@@ -26,36 +44,40 @@ export class CommerceOutboxOperations {
 
   list({ state = "all", projectId = null, limit = 100 } = {}) {
     const workspaceId = requireWorkspaceId();
-    const normalizedState = ["all", "pending", "retrying", "delivered", "dead_letter"].includes(state) ? state : "all";
+    const at = now();
+    const normalizedState = ["all", "pending", "processing", "stale_claim", "retrying", "delivered", "dead_letter"].includes(state) ? state : "all";
     const where = ["workspace_id=?"];
     const params = [workspaceId];
     if (projectId) { where.push("business_builder_project_id=?"); params.push(projectId); }
-    if (normalizedState === "pending") where.push("status='pending' AND last_error IS NULL AND dead_lettered_at IS NULL");
-    if (normalizedState === "retrying") where.push("status='pending' AND last_error IS NOT NULL AND dead_lettered_at IS NULL");
+    if (normalizedState === "pending") where.push("status='pending' AND last_error IS NULL AND dead_lettered_at IS NULL AND claim_token IS NULL");
+    if (normalizedState === "processing") { where.push("status='pending' AND dead_lettered_at IS NULL AND claim_token IS NOT NULL AND claim_expires_at>?"); params.push(at); }
+    if (normalizedState === "stale_claim") { where.push("status='pending' AND dead_lettered_at IS NULL AND claim_token IS NOT NULL AND claim_expires_at<=?"); params.push(at); }
+    if (normalizedState === "retrying") where.push("status='pending' AND last_error IS NOT NULL AND dead_lettered_at IS NULL AND claim_token IS NULL");
     if (normalizedState === "delivered") where.push("status='delivered'");
     if (normalizedState === "dead_letter") where.push("dead_lettered_at IS NOT NULL");
     params.push(clampLimit(limit));
-    return this.db.prepare(`SELECT * FROM business_builder_commerce_outbox WHERE ${where.join(" AND ")} ORDER BY created_at DESC LIMIT ?`).all(...params).map((row) => ({
-      ...row,
-      operational_state: operationalState(row),
-      payload: parsePayload(row.payload_json),
-    }));
+    return this.db.prepare(`SELECT * FROM business_builder_commerce_outbox WHERE ${where.join(" AND ")} ORDER BY created_at DESC LIMIT ?`).all(...params).map((row) => decorateEvent(row, at));
   }
 
   summary() {
     const workspaceId = requireWorkspaceId();
+    const at = now();
     const row = this.db.prepare(`SELECT
       COUNT(*) total,
-      SUM(CASE WHEN status='pending' AND last_error IS NULL AND dead_lettered_at IS NULL THEN 1 ELSE 0 END) pending,
-      SUM(CASE WHEN status='pending' AND last_error IS NOT NULL AND dead_lettered_at IS NULL THEN 1 ELSE 0 END) retrying,
+      SUM(CASE WHEN status='pending' AND last_error IS NULL AND dead_lettered_at IS NULL AND claim_token IS NULL THEN 1 ELSE 0 END) pending,
+      SUM(CASE WHEN status='pending' AND last_error IS NOT NULL AND dead_lettered_at IS NULL AND claim_token IS NULL THEN 1 ELSE 0 END) retrying,
+      SUM(CASE WHEN status='pending' AND dead_lettered_at IS NULL AND claim_token IS NOT NULL AND claim_expires_at>? THEN 1 ELSE 0 END) processing,
+      SUM(CASE WHEN status='pending' AND dead_lettered_at IS NULL AND claim_token IS NOT NULL AND claim_expires_at<=? THEN 1 ELSE 0 END) stale_claim,
       SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END) delivered,
       SUM(CASE WHEN dead_lettered_at IS NOT NULL THEN 1 ELSE 0 END) dead_letter,
       MAX(CASE WHEN status='pending' AND last_error IS NOT NULL THEN attempts ELSE 0 END) max_attempts
-      FROM business_builder_commerce_outbox WHERE workspace_id=?`).get(workspaceId) || {};
+      FROM business_builder_commerce_outbox WHERE workspace_id=?`).get(at, at, workspaceId) || {};
     return {
       total: Number(row.total || 0),
       pending: Number(row.pending || 0),
       retrying: Number(row.retrying || 0),
+      processing: Number(row.processing || 0),
+      staleClaim: Number(row.stale_claim || 0),
       delivered: Number(row.delivered || 0),
       deadLetter: Number(row.dead_letter || 0),
       maxAttempts: Number(row.max_attempts || 0),
@@ -65,6 +87,7 @@ export class CommerceOutboxOperations {
   reconcile(id) {
     const event = this.get(id);
     if (!event) return null;
+    const at = now();
     const receipts = this.db.prepare("SELECT consumer,status,details_json,processed_at FROM business_builder_commerce_event_receipts WHERE workspace_id=? AND project_id=? AND event_id=? ORDER BY processed_at ASC").all(requireWorkspaceId(), event.business_builder_project_id, event.event_id);
     const byConsumer = new Map(receipts.map((receipt) => [receipt.consumer, receipt]));
     const consumers = LO_ADDRESSER_COMMERCE_CONSUMERS.map((consumer) => {
@@ -75,8 +98,15 @@ export class CommerceOutboxOperations {
         processedAt: receipt?.processed_at || null,
       };
     });
+    const decorated = decorateEvent(event, at);
     return {
-      event: { ...event, operational_state: operationalState(event), payload: parsePayload(event.payload_json) },
+      event: decorated,
+      lease: {
+        state: decorated.claim_state,
+        claimedAt: event.claimed_at || null,
+        expiresAt: event.claim_expires_at || null,
+        retrySafeNow: decorated.claim_state !== "active",
+      },
       consumers,
       processed: consumers.filter((consumer) => consumer.status === "processed").length,
       missing: consumers.filter((consumer) => consumer.status === "missing").map((consumer) => consumer.consumer),
@@ -87,19 +117,21 @@ export class CommerceOutboxOperations {
   retry(id) {
     const event = this.get(id);
     if (!event) return { ok: false, code: "COMMERCE_OUTBOX_EVENT_NOT_FOUND" };
-    if (event.status === "delivered") return { ok: false, code: "COMMERCE_OUTBOX_ALREADY_DELIVERED", event };
-    if (event.dead_lettered_at) return { ok: false, code: "COMMERCE_OUTBOX_DEAD_LETTERED", event };
-    this.db.prepare("UPDATE business_builder_commerce_outbox SET available_at=? WHERE id=? AND workspace_id=? AND status='pending' AND dead_lettered_at IS NULL").run(now(), id, requireWorkspaceId());
-    return { ok: true, event: this.get(id) };
+    if (event.status === "delivered") return { ok: false, code: "COMMERCE_OUTBOX_ALREADY_DELIVERED", event: decorateEvent(event) };
+    if (event.dead_lettered_at) return { ok: false, code: "COMMERCE_OUTBOX_DEAD_LETTERED", event: decorateEvent(event) };
+    if (claimState(event) === "active") return { ok: false, code: "COMMERCE_OUTBOX_IN_FLIGHT", event: decorateEvent(event) };
+    this.db.prepare("UPDATE business_builder_commerce_outbox SET available_at=? WHERE id=? AND workspace_id=? AND status='pending' AND dead_lettered_at IS NULL AND (claim_token IS NULL OR claim_expires_at<=?)").run(now(), id, requireWorkspaceId(), now());
+    return { ok: true, event: decorateEvent(this.get(id)) };
   }
 
   requeue(id) {
     const event = this.get(id);
     if (!event) return { ok: false, code: "COMMERCE_OUTBOX_EVENT_NOT_FOUND" };
-    if (event.status === "delivered") return { ok: false, code: "COMMERCE_OUTBOX_ALREADY_DELIVERED", event };
-    if (!event.dead_lettered_at) return { ok: false, code: "COMMERCE_OUTBOX_NOT_DEAD_LETTERED", event };
-    this.db.prepare("UPDATE business_builder_commerce_outbox SET attempts=0,last_error=NULL,available_at=?,dead_lettered_at=NULL,dead_letter_reason=NULL,requeue_count=requeue_count+1 WHERE id=? AND workspace_id=? AND status='pending' AND dead_lettered_at IS NOT NULL").run(now(), id, requireWorkspaceId());
-    return { ok: true, event: this.get(id) };
+    if (event.status === "delivered") return { ok: false, code: "COMMERCE_OUTBOX_ALREADY_DELIVERED", event: decorateEvent(event) };
+    if (claimState(event) === "active") return { ok: false, code: "COMMERCE_OUTBOX_IN_FLIGHT", event: decorateEvent(event) };
+    if (!event.dead_lettered_at) return { ok: false, code: "COMMERCE_OUTBOX_NOT_DEAD_LETTERED", event: decorateEvent(event) };
+    this.db.prepare("UPDATE business_builder_commerce_outbox SET attempts=0,last_error=NULL,available_at=?,dead_lettered_at=NULL,dead_letter_reason=NULL,requeue_count=requeue_count+1,claim_token=NULL,claimed_at=NULL,claim_expires_at=NULL WHERE id=? AND workspace_id=? AND status='pending' AND dead_lettered_at IS NOT NULL AND (claim_token IS NULL OR claim_expires_at<=?)").run(now(), id, requireWorkspaceId(), now());
+    return { ok: true, event: decorateEvent(this.get(id)) };
   }
 }
 
