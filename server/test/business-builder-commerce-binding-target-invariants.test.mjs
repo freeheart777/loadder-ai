@@ -5,12 +5,20 @@ import { migration076CommerceBindingTargetInvariants } from "../db/migrations/07
 
 function setup(){
   const db=new Database(":memory:");
+  db.pragma("foreign_keys=ON");
   db.exec(`
-    CREATE TABLE site_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_type TEXT NOT NULL,status TEXT NOT NULL);
-    CREATE TABLE business_builder_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,status TEXT NOT NULL,active_version_id TEXT,name TEXT);
-    CREATE TABLE business_builder_commerce_bindings(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_project_id TEXT NOT NULL,business_builder_project_id TEXT NOT NULL,status TEXT NOT NULL);
+    CREATE TABLE workspaces(id TEXT PRIMARY KEY);
+    CREATE TABLE site_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_type TEXT NOT NULL,status TEXT NOT NULL,FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
+    CREATE TABLE business_builder_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,status TEXT NOT NULL,active_version_id TEXT,name TEXT,FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
+    CREATE TABLE business_builder_commerce_bindings(
+      id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_project_id TEXT NOT NULL,business_builder_project_id TEXT NOT NULL,status TEXT NOT NULL,
+      FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+      FOREIGN KEY(site_project_id) REFERENCES site_projects(id) ON DELETE CASCADE,
+      FOREIGN KEY(business_builder_project_id) REFERENCES business_builder_projects(id) ON DELETE CASCADE
+    );
   `);
   migration076CommerceBindingTargetInvariants.up(db);
+  db.prepare("INSERT INTO workspaces(id) VALUES('w1')").run();
   const site=db.prepare("INSERT INTO site_projects(id,workspace_id,site_type,status) VALUES(?,?,?,?)");
   site.run("s-live","w1","STORE","PUBLISHED");
   site.run("s-draft","w1","STORE","DRAFT");
@@ -24,7 +32,7 @@ function setup(){
   return db;
 }
 
-test("published Store binding prevents target archive active-version removal and deletion",()=>{
+test("published Store binding prevents target archive active-version removal and direct deletion",()=>{
   const db=setup();
   try{
     assert.throws(()=>db.prepare("UPDATE business_builder_projects SET active_version_id=NULL WHERE id='p-live'").run(),/commerce target active version required while published storefront bound/);
@@ -67,5 +75,16 @@ test("disabled binding does not block target lifecycle",()=>{
     db.prepare("UPDATE business_builder_commerce_bindings SET status='disabled' WHERE id='b-live'").run();
     db.prepare("UPDATE business_builder_projects SET status='archived',active_version_id=NULL WHERE id='p-live'").run();
     assert.deepEqual(db.prepare("SELECT status,active_version_id FROM business_builder_projects WHERE id='p-live'").get(),{status:"archived",active_version_id:null});
+  }finally{db.close();}
+});
+
+test("workspace deletion still cascades through published Store bindings",()=>{
+  const db=setup();
+  try{
+    db.prepare("DELETE FROM workspaces WHERE id='w1'").run();
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM workspaces").get().c,0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM site_projects").get().c,0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM business_builder_commerce_bindings").get().c,0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM business_builder_projects").get().c,0);
   }finally{db.close();}
 });
