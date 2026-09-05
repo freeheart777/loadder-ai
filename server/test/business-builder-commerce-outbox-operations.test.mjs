@@ -3,17 +3,19 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { CommerceOutboxOperations } from "../app/business-builder/commerce-outbox-operations.mjs";
+import { CommerceOutboxStore } from "../app/business-builder/commerce-runtime-bridge.mjs";
 import { createBusinessBuilderAdminHealth } from "../app/business-builder/admin-health.mjs";
 import { migration001Identity } from "../db/migrations/001_identity.mjs";
 import { migration042SiteBuilderControlPlane } from "../db/migrations/042_site_builder_control_plane.mjs";
 import { migration050BusinessBuilderProjects } from "../db/migrations/050_business_builder_projects.mjs";
 import { migration068BusinessBuilderCommerceEventReceipts } from "../db/migrations/068_business_builder_commerce_event_receipts.mjs";
 import { migration070BusinessBuilderCommerceOutbox } from "../db/migrations/070_business_builder_commerce_outbox.mjs";
+import { migration074CommerceOutboxDeadLetter } from "../db/migrations/074_commerce_outbox_dead_letter.mjs";
 
 function setup() {
   const db = new Database(":memory:");
   db.pragma("foreign_keys=OFF");
-  [migration001Identity, migration042SiteBuilderControlPlane, migration050BusinessBuilderProjects, migration068BusinessBuilderCommerceEventReceipts, migration070BusinessBuilderCommerceOutbox].forEach((migration) => migration.up(db));
+  [migration001Identity, migration042SiteBuilderControlPlane, migration050BusinessBuilderProjects, migration068BusinessBuilderCommerceEventReceipts, migration070BusinessBuilderCommerceOutbox, migration074CommerceOutboxDeadLetter].forEach((migration) => migration.up(db));
   db.exec("CREATE TABLE IF NOT EXISTS business_context_versions(id TEXT PRIMARY KEY);");
   db.pragma("foreign_keys=ON");
   const t = "2026-09-05T00:00:00.000Z";
@@ -64,13 +66,45 @@ test("manual retry only re-arms an undelivered event without changing immutable 
   db.close();
 });
 
-test("admin health surfaces commerce retry failures while older schemas stay safe", () => {
+test("poison events dead-letter at the retry ceiling and require explicit admin requeue", () => {
+  const db = setup();
+  runWithWorkspace("w1", () => {
+    db.prepare("UPDATE business_builder_commerce_outbox SET attempts=4,last_error=NULL,available_at=? WHERE id='ob1'").run("2020-01-01T00:00:00.000Z");
+    const store = new CommerceOutboxStore(db, { maxAttempts:5 });
+    const failed = store.failed("ob1", new Error("permanent accounting rejection"));
+    assert.equal(failed.attempts, 5);
+    assert.ok(failed.dead_lettered_at);
+    assert.equal(failed.dead_letter_reason, "permanent accounting rejection");
+    assert.equal(store.pending().some((row) => row.id === "ob1"), false);
+
+    const operations = new CommerceOutboxOperations(db);
+    assert.equal(operations.list({ state:"dead_letter" }).length, 1);
+    assert.equal(operations.retry("ob1").code, "COMMERCE_OUTBOX_DEAD_LETTERED");
+    const requeued = operations.requeue("ob1");
+    assert.equal(requeued.ok, true);
+    assert.equal(requeued.event.dead_lettered_at, null);
+    assert.equal(requeued.event.dead_letter_reason, null);
+    assert.equal(requeued.event.attempts, 0);
+    assert.equal(requeued.event.requeue_count, 1);
+    assert.equal(store.pending().some((row) => row.id === "ob1"), true);
+  });
+  db.close();
+});
+
+test("admin health surfaces commerce retry and dead-letter failures while older schemas stay safe", () => {
   const db = setup();
   runWithWorkspace("w1", () => {
     const health = createBusinessBuilderAdminHealth(db).summary();
     assert.equal(health.counters.commerceOutboxRetrying, 1);
+    assert.equal(health.counters.commerceOutboxDeadLetter, 0);
     assert.equal(health.status, "degraded");
     assert.ok(health.incidents.some((incident) => incident.code === "COMMERCE_OUTBOX_RETRYING"));
+
+    db.prepare("UPDATE business_builder_commerce_outbox SET dead_lettered_at=?,dead_letter_reason=? WHERE id='ob1'").run("2026-09-05T02:00:00.000Z","poison");
+    const deadLetterHealth = createBusinessBuilderAdminHealth(db).summary();
+    assert.equal(deadLetterHealth.counters.commerceOutboxRetrying, 0);
+    assert.equal(deadLetterHealth.counters.commerceOutboxDeadLetter, 1);
+    assert.ok(deadLetterHealth.incidents.some((incident) => incident.code === "COMMERCE_OUTBOX_DEAD_LETTER"));
   });
   db.close();
 });
