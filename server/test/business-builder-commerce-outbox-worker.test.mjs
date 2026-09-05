@@ -85,6 +85,48 @@ test("worker coalesces overlapping ticks into one drain pass", async () => {
   db.close();
 });
 
+test("graceful shutdown waits for the active drain and blocks new polling", async () => {
+  const db = createDb();
+  insert(db, { id: "a", workspaceId: "workspace-a" });
+
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let drains = 0;
+  const runtimeBridge = {
+    async drain() {
+      drains += 1;
+      await gate;
+      return [{ ok: true }];
+    },
+  };
+  const worker = createCommerceOutboxWorker({ db, runtimeBridge, intervalMs: 60_000, logger: null });
+
+  assert.equal(worker.start(), true);
+  assert.equal(worker.running, true);
+  assert.equal(worker.draining, true);
+
+  let shutdownFinished = false;
+  const shutdown = worker.shutdown().then((result) => {
+    shutdownFinished = true;
+    return result;
+  });
+
+  await Promise.resolve();
+  assert.equal(worker.running, false);
+  assert.equal(worker.stopping, true);
+  assert.equal(shutdownFinished, false);
+  assert.equal(worker.start(), false);
+  assert.equal((await worker.tick()).skipped, "shutting_down");
+  assert.equal(drains, 1);
+
+  release();
+  assert.equal(await shutdown, true);
+  assert.equal(shutdownFinished, true);
+  assert.equal(worker.draining, false);
+  assert.equal(await worker.shutdown(), false);
+  db.close();
+});
+
 test("worker stays idle until the claim-lease schema is available", async () => {
   const db = new Database(":memory:");
   db.exec(`CREATE TABLE business_builder_commerce_outbox(id TEXT PRIMARY KEY, workspace_id TEXT, status TEXT, available_at TEXT, dead_lettered_at TEXT);`);
