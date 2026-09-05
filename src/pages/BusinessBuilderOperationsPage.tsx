@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import CommerceBindingDiagnosticsPanel from "../components/business-builder/CommerceBindingDiagnosticsPanel";
 import CommerceOutboxOperationsPanel from "../components/business-builder/CommerceOutboxOperationsPanel";
 import { apiFetch } from "../lib/api";
 
@@ -66,21 +67,7 @@ export default function BusinessBuilderOperationsPage() {
         </div>)}
       </section>
 
-      <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs text-slate-500">STORE ↔ APP BUILDER</p>
-            <h2 className="mt-1 font-medium">سلامت Binding فروشگاه</h2>
-          </div>
-          <Link to="/dashboard/business-builder/admin" className="text-xs text-slate-400 underline underline-offset-4">جزئیات سلامت سیستم</Link>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl bg-slate-950/60 p-4"><b className="text-2xl">{summary?.commerceBindings?.active ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Binding فعال</p></div>
-          <div className="rounded-xl bg-slate-950/60 p-4"><b className="text-2xl">{summary?.commerceBindings?.disabled ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Binding غیرفعال</p></div>
-          <div className="rounded-xl bg-slate-950/60 p-4"><b className={summary?.commerceBindings?.publishedUnbound ? "text-2xl text-rose-300" : "text-2xl"}>{summary?.commerceBindings?.publishedUnbound ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Store منتشرشده بدون Binding</p></div>
-          <div className="rounded-xl bg-slate-950/60 p-4"><b className={summary?.commerceBindings?.publishedDisabled ? "text-2xl text-amber-300" : "text-2xl"}>{summary?.commerceBindings?.publishedDisabled ?? "—"}</b><p className="mt-1 text-xs text-slate-500">Store منتشرشده با Binding غیرفعال</p></div>
-        </div>
-      </section>
+      <CommerceBindingDiagnosticsPanel counters={summary?.commerceBindings} />
 
       <CommerceOutboxOperationsPanel />
 
