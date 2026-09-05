@@ -72,6 +72,7 @@ import { migration071CommerceTransactionalOutboxTriggers } from "./071_commerce_
 import { migration072CommerceFinancialLedger } from "./072_commerce_financial_ledger.mjs";
 import { migration073CommerceCustomerAccounts } from "./073_commerce_customer_accounts.mjs";
 import { migration074CommerceOutboxDeadLetter } from "./074_commerce_outbox_dead_letter.mjs";
+import { migration075CommerceOutboxClaimLease } from "./075_commerce_outbox_claim_lease.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -148,4 +149,5 @@ export const migrations = [
   migration072CommerceFinancialLedger,
   migration073CommerceCustomerAccounts,
   migration074CommerceOutboxDeadLetter,
+  migration075CommerceOutboxClaimLease,
 ];
