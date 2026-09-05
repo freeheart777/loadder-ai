@@ -12,7 +12,10 @@ import { migration070BusinessBuilderCommerceOutbox } from "../db/migrations/070_
 
 function setup() {
   const db = new Database(":memory:");
+  db.pragma("foreign_keys=OFF");
   [migration001Identity, migration042SiteBuilderControlPlane, migration050BusinessBuilderProjects, migration068BusinessBuilderCommerceEventReceipts, migration070BusinessBuilderCommerceOutbox].forEach((migration) => migration.up(db));
+  db.exec("CREATE TABLE IF NOT EXISTS business_context_versions(id TEXT PRIMARY KEY);");
+  db.pragma("foreign_keys=ON");
   const t = "2026-09-05T00:00:00.000Z";
   db.prepare("INSERT INTO workspaces(id,name,slug,status,created_at,updated_at) VALUES(?,?,?,?,?,?),(?,?,?,?,?,?)").run("w1","W1","w1","active",t,t,"w2","W2","w2","active",t,t);
   db.prepare("INSERT INTO site_projects(id,workspace_id,name,site_type,slug,status,content_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?),(?,?,?,?,?,?,?,?,?)").run("s1","w1","S1","STORE","s1","PUBLISHED","{}",t,t,"s2","w2","S2","STORE","s2","PUBLISHED","{}",t,t);
