@@ -52,8 +52,8 @@ async function finishJourney(journey: Journey, testInfo: TestInfo) {
   expect(journey.consoleErrors, "browser console errors").toEqual([]);
   const unexpected = journey.network.filter(({ status }) => status >= 400);
   expect(unexpected, "unexpected API 4xx/5xx responses").toEqual([]);
-  await journey.context.close();
-  await journey.api.dispose();
+  await journey.context.close().catch(() => undefined);
+  await journey.api.dispose().catch(() => undefined);
 }
 
 async function openStudio(page: Page) {
@@ -69,7 +69,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
   try {
     await test.step("authenticated Studio load and Hero persistence", async () => {
       await openStudio(journey.page);
-      await journey.page.locator('[data-editor-element="hero"]').click({ position: { x: 24, y: 24 } });
+      await journey.page.getByRole("heading", { name: "خریدی ساده، سریع و مطمئن", exact: true }).click();
       await journey.page.getByLabel("عنوان", { exact: true }).fill("قهرمان فارسی فروشگاه");
       await journey.page.getByLabel("چیدمان", { exact: true }).selectOption("background");
       await expect(journey.page.locator('[data-editor-element="hero"]')).toContainText("قهرمان فارسی فروشگاه");
@@ -85,7 +85,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
 
       await journey.page.reload();
       await expect(journey.page.locator('[data-editor-element="hero"]')).toContainText("قهرمان فارسی فروشگاه");
-      await journey.page.locator('[data-editor-element="hero"]').click({ position: { x: 24, y: 24 } });
+      await journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true }).click();
       await expect(journey.page.getByLabel("عنوان", { exact: true })).toHaveValue("قهرمان فارسی فروشگاه");
       await expect(journey.page.getByLabel("چیدمان", { exact: true })).toHaveValue("background");
     });
