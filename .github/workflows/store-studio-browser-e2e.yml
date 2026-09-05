@@ -66,9 +66,17 @@ jobs:
       - name: Run canonical journey five consecutive times
         shell: bash
         run: |
+          set -o pipefail
           for run in 1 2 3 4 5; do
             echo "Store Studio browser journey run $run/5"
-            npm run test:e2e:store
+            if ! npm run test:e2e:store 2>&1 | tee "$RUNNER_TEMP/loadder-store-e2e/browser-run-$run.log"; then
+              message="$(tail -80 "$RUNNER_TEMP/loadder-store-e2e/browser-run-$run.log")"
+              message="${message//'%'/'%25'}"
+              message="${message//$'\r'/'%0D'}"
+              message="${message//$'\n'/'%0A'}"
+              echo "::error file=e2e/store/store-studio-v16.spec.ts,line=1::$message"
+              exit 1
+            fi
           done
       - name: Upload failure evidence
         if: failure()

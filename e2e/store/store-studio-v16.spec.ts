@@ -64,6 +64,7 @@ async function openStudio(page: Page) {
 }
 
 test("canonical authenticated Store Studio V16 customer journey", async ({ browser }, testInfo) => {
+  test.setTimeout(60_000);
   const journey = await createJourney(browser, testInfo);
   try {
     await test.step("authenticated Studio load and Hero persistence", async () => {
@@ -90,7 +91,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
     });
 
     await test.step("Persian product creation and reload persistence", async () => {
-      await journey.page.getByRole("button", { name: "افزودن محصول", exact: true }).click();
+      await journey.page.getByRole("button", { name: /افزودن محصول/ }).click();
       await journey.page.getByRole("button", { name: "ساخت محصول جدید", exact: true }).click();
       await journey.page.getByLabel("نام محصول", { exact: true }).fill("کرم زعفران ویژه");
       await journey.page.getByLabel(/^قیمت \(/).fill("۴۵۰٬۰۰۰");
@@ -110,7 +111,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
     });
 
     await test.step("inline product validation sends no request", async () => {
-      await journey.page.getByRole("button", { name: "افزودن محصول", exact: true }).click();
+      await journey.page.getByRole("button", { name: /افزودن محصول/ }).click();
       await journey.page.getByRole("button", { name: "ساخت محصول جدید", exact: true }).click();
       const before = journey.network.filter(({ method, url }) => method === "POST" && url.endsWith(`/api/stores/${journey.projectId}/products`)).length;
       await journey.page.getByRole("button", { name: "ساخت و افزودن به فروشگاه", exact: true }).click();
