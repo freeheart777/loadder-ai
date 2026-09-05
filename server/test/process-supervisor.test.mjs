@@ -19,6 +19,9 @@ class FakeChild extends EventEmitter {
     this.signalCode = signal;
     this.emit("exit", this.exitCode, signal);
   }
+  fail(error = new Error("spawn failed")) {
+    this.emit("error", error);
+  }
 }
 
 function fakeSchedule() {
@@ -79,6 +82,28 @@ test("unexpected signal exit is fatal and signal-terminated children count as co
   api.exit(null, "SIGTERM");
   assert.equal(supervisor.remaining().length, 0);
   assert.equal(clock.timers[0].cancelled, true);
+});
+
+test("child spawn error is terminal and shuts down already-running siblings", () => {
+  const api = new FakeChild();
+  const commerce = new FakeChild();
+  const clock = fakeSchedule();
+  const exitCodes = [];
+  const supervisor = createProcessSupervisor({
+    children: [{ name: "api", child: api }, { name: "commerce", child: commerce }],
+    setExitCode: (code) => exitCodes.push(code),
+    schedule: clock.schedule,
+    cancelSchedule: clock.cancel,
+    logger: null,
+  });
+
+  commerce.fail();
+
+  assert.equal(supervisor.shuttingDown, true);
+  assert.deepEqual(exitCodes, [1]);
+  assert.deepEqual(supervisor.remaining().map(({ name }) => name), ["api"]);
+  assert.deepEqual(api.kills, ["SIGTERM"]);
+  assert.deepEqual(commerce.kills, []);
 });
 
 test("external shutdown preserves graceful signal and cancels force-kill once all children exit", () => {
