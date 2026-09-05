@@ -1,0 +1,54 @@
+name: Browser E2E Infrastructure
+
+on:
+  push:
+    branches: ["test/browser-e2e-infrastructure"]
+  pull_request:
+    branches: [main]
+    paths:
+      - "e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/browser-e2e-infrastructure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e-infrastructure:
+    name: Browser E2E Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies from lockfile
+        run: npm ci
+      - name: Verify Playwright package policy
+        run: |
+          node --input-type=module -e "import pkg from '@playwright/test/package.json' with { type: 'json' }; if (pkg.license !== 'Apache-2.0') throw new Error('Unexpected Playwright license'); if (!pkg.engines?.node) throw new Error('Missing Node engine contract'); console.log(JSON.stringify({version:pkg.version,license:pkg.license,node:pkg.engines.node}))"
+      - name: Install official Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run deterministic browser smoke
+        run: npm run test:e2e:infra
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-infrastructure-failure
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
