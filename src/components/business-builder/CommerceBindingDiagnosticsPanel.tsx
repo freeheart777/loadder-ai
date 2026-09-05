@@ -50,6 +50,7 @@ const errorText: Record<string,string> = {
   COMMERCE_BINDING_TARGET_NOT_RUNNABLE: "این App هنوز Active Version ندارد و قابل اتصال عملیاتی نیست.",
   COMMERCE_BINDING_REBIND_CONFIRMATION_REQUIRED: "تغییر App مقصد نیاز به تأیید صریح دارد.",
   COMMERCE_BINDING_REBIND_REASON_REQUIRED: "برای تغییر App مقصد باید دلیل عملیاتی ثبت شود.",
+  COMMERCE_BINDING_BUSY_RETRY: "یک عملیات Commerce دیگر هم‌زمان در حال نوشتن است. چند لحظه بعد دوباره تلاش کنید؛ هیچ تغییر ناقصی ثبت نشده است.",
 };
 
 function fmt(value?: string | null) {
