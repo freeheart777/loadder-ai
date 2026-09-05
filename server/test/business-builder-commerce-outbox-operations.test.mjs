@@ -112,3 +112,26 @@ test("admin health surfaces commerce retry and dead-letter failures while older 
   });
   db.close();
 });
+
+test("admin health distinguishes active claims from claims stale beyond the recovery grace", () => {
+  const db = setup();
+  runWithWorkspace("w1", () => {
+    db.prepare("UPDATE business_builder_commerce_outbox SET last_error=NULL,available_at=?,claim_token=?,claimed_at=?,claim_expires_at=? WHERE id='ob1'").run(
+      "2020-01-01T00:00:00.000Z",
+      "claim-active",
+      new Date().toISOString(),
+      new Date(Date.now()+5*60_000).toISOString(),
+    );
+    const active = createBusinessBuilderAdminHealth(db).summary();
+    assert.equal(active.counters.commerceOutboxClaimsActive, 1);
+    assert.equal(active.counters.commerceOutboxClaimsStale, 0);
+    assert.equal(active.incidents.some((incident) => incident.code === "COMMERCE_OUTBOX_STALE_CLAIM"), false);
+
+    db.prepare("UPDATE business_builder_commerce_outbox SET claim_expires_at=? WHERE id='ob1'").run(new Date(Date.now()-2*60_000).toISOString());
+    const stale = createBusinessBuilderAdminHealth(db).summary();
+    assert.equal(stale.counters.commerceOutboxClaimsActive, 0);
+    assert.equal(stale.counters.commerceOutboxClaimsStale, 1);
+    assert.ok(stale.incidents.some((incident) => incident.code === "COMMERCE_OUTBOX_STALE_CLAIM" && incident.severity === "medium"));
+  });
+  db.close();
+});
