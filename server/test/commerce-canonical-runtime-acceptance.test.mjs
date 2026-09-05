@@ -35,7 +35,10 @@ function fixture() {
     req.user = { id: "beta-owner" };
     return runWithWorkspace("ws-1", next);
   });
-  app.use(createCanonicalCommerceRouter({ db }));
+  app.use(createCanonicalCommerceRouter({
+    db,
+    auditRepository: { createAuditLog() { return "audit-beta"; } },
+  }));
 
   return { db, store, app };
 }
