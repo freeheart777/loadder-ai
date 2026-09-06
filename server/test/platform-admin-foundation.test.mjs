@@ -3,13 +3,13 @@ import express from "express";
 import test from "node:test";
 import { createPlatformAdminRouter, createPlatformGrantResolver } from "../app/routes/platform-admin.mjs";
 
-function startApp({ user, grants, overview = { users:{ total:1, active:1, evidence:"persisted" } } }) {
+function startApp({ user, grants, overview = { users:{ total:1, active:1, evidence:"persisted" } }, auditRepository } }) {
   const audits = [];
   const app = express();
   app.use((req, _res, next) => { req.user = user; next(); });
   app.use("/api/platform-admin", createPlatformAdminRouter({
     readModel:{ overview:() => overview },
-    auditRepository:{ createAuditLog(entry){ audits.push(entry); return "audit-1"; } },
+    auditRepository:auditRepository || { createAuditLog(entry){ audits.push(entry); return "audit-1"; } },
     resolvePlatformGrant:createPlatformGrantResolver(JSON.stringify(grants || {})),
     now:() => "2026-09-06T00:00:00.000Z",
   }));
@@ -62,4 +62,17 @@ test("valid platform grant can read overview and the cross-tenant read is audite
   assert.equal(audits[0].userId,"platform-user");
   assert.equal(audits[0].action,"platform_admin.read_overview");
   assert.deepEqual(audits[0].metadata.roles,["platform_ops"]);
+});
+
+test("platform overview fails closed when audit evidence cannot be persisted", async (t) => {
+  const { server, port } = await startApp({
+    user:{id:"platform-user"},
+    grants:{"platform-user":["platform_security"]},
+    auditRepository:{ createAuditLog(){ throw new Error("audit unavailable"); } },
+  });
+  t.after(() => close(server));
+  const response = await fetch(`http://127.0.0.1:${port}/api/platform-admin/overview`);
+  const body = await response.json();
+  assert.equal(response.status, 500);
+  assert.equal(body.code, "PLATFORM_ADMIN_INTERNAL_ERROR");
 });
