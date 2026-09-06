@@ -1,0 +1,56 @@
+name: Platform Admin One Shot Mount
+
+on:
+  push:
+    branches:
+      - feat/platform-admin-readonly-foundation
+    paths:
+      - .github/workflows/platform-admin-one-shot-mount.yml
+
+permissions:
+  contents: write
+
+jobs:
+  mount:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/platform-admin-readonly-foundation
+          fetch-depth: 0
+      - name: Mount Platform Admin before workspace middleware
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('server/index.mjs')
+          s = p.read_text()
+          import_needle = 'import { createWorkspaceRouter } from "./app/routes/workspaces.mjs";\n'
+          import_line = 'import { createPlatformAdminRouter, createPlatformAdminReadModel } from "./app/routes/platform-admin.mjs";\n'
+          if import_line not in s:
+              if import_needle not in s:
+                  raise SystemExit('workspace router import anchor missing')
+              s = s.replace(import_needle, import_needle + import_line, 1)
+
+          mount_needle = '''app.use(\n  "/api/workspaces",\n  createWorkspaceRouter({ authService })\n);\napp.use(createRequireWorkspace(identityRepository));'''
+          mount_block = '''app.use(\n  "/api/workspaces",\n  createWorkspaceRouter({ authService })\n);\napp.use(\n  "/api/platform-admin",\n  createPlatformAdminRouter({\n    readModel: createPlatformAdminReadModel(db),\n    auditRepository: identityRepository,\n  })\n);\napp.use(createRequireWorkspace(identityRepository));'''
+          if '"/api/platform-admin"' not in s:
+              if mount_needle not in s:
+                  raise SystemExit('workspace middleware anchor missing')
+              s = s.replace(mount_needle, mount_block, 1)
+          p.write_text(s)
+          PY
+      - name: Verify intended delta
+        run: |
+          git diff --check
+          git diff -- server/index.mjs
+          grep -q 'createPlatformAdminRouter' server/index.mjs
+          grep -q '"/api/platform-admin"' server/index.mjs
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/platform-admin-one-shot-mount.yml
+      - name: Commit mount
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/index.mjs .github/workflows/platform-admin-one-shot-mount.yml
+          git commit -m "feat(platform-admin): mount read-only control plane before workspace guard"
+          git push origin HEAD:feat/platform-admin-readonly-foundation
