@@ -3,7 +3,7 @@ import express from "express";
 import test from "node:test";
 import { createPlatformAdminRouter, createPlatformGrantResolver } from "../app/routes/platform-admin.mjs";
 
-function startApp({ user, grants, overview = { users:{ total:1, active:1, evidence:"persisted" } }, auditRepository } }) {
+function startApp({ user, grants, overview = { users:{ total:1, active:1, evidence:"persisted" } }, auditRepository }) {
   const audits = [];
   const app = express();
   app.use((req, _res, next) => { req.user = user; next(); });
