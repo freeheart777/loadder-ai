@@ -16,6 +16,10 @@ Before planning, editing, committing, reviewing, or merging work in this reposit
 
 **Do not rely on chat/session memory as the source of truth.**
 
+## Mandatory engineering standard
+
+Before substantial Loadder engineering work, read and obey [docs/LOADDER_ENGINEERING_SYSTEM.md](docs/LOADDER_ENGINEERING_SYSTEM.md), the canonical permanent engineering and agent operating standard. Preserve the Issue #98 and Issue #159 preflight above; report source-of-truth conflicts before implementation.
+
 ## Commerce non-negotiables (short form)
 
 - **Medusa is a reference architecture / roadmap / UX benchmark, not a required Loadder runtime dependency.**
