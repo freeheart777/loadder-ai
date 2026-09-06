@@ -63,6 +63,7 @@ export function createPlatformAdminReadModel(db) {
   };
 }
 
+// This router is intentionally mounted after global auth and before workspace resolution.
 export function createPlatformAdminRouter({
   readModel,
   auditRepository,
