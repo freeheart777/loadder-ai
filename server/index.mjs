@@ -6,6 +6,7 @@ import { environment } from "./app/config/environment.mjs";
 import aiRouter from "./app/routes/ai.mjs";
 import { createAuthRouter } from "./app/routes/auth.mjs";
 import { createWorkspaceRouter } from "./app/routes/workspaces.mjs";
+import { createPlatformAdminRouter, createPlatformAdminReadModel } from "./app/routes/platform-admin.mjs";
 import { createBusinessProfileRouter } from "./app/routes/business-profile.mjs";
 import { createBusinessDnaRouter } from "./app/routes/business-dna.mjs";
 import { createBrandBookRouter } from "./app/routes/brand-book.mjs";
@@ -359,6 +360,13 @@ app.use(createRequireAuth(authService));
 app.use(
   "/api/workspaces",
   createWorkspaceRouter({ authService })
+);
+app.use(
+  "/api/platform-admin",
+  createPlatformAdminRouter({
+    readModel: createPlatformAdminReadModel(db),
+    auditRepository: identityRepository,
+  })
 );
 app.use(createRequireWorkspace(identityRepository));
 app.use((req, res, next) =>
