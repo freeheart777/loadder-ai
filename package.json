@@ -16,7 +16,8 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:infra": "playwright test e2e/infrastructure/browser-smoke.spec.ts",
-    "test:e2e:store": "playwright test e2e/store/store-studio-v16.spec.ts"
+    "test:e2e:store": "playwright test e2e/store/store-studio-v16.spec.ts",
+    "test:e2e:commerce": "playwright test e2e/commerce/cart-checkout-order.spec.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
