@@ -113,6 +113,7 @@ test("active returns consume delivered eligibility while cancelled returns relea
     order,
     fulfillments: [delivered],
     lines: [{ orderLineId: "line-1", quantity: 1 }],
+    createdAt: "2026-09-06T09:00:00.000Z",
   });
 
   assert.throws(
@@ -148,6 +149,7 @@ test("return lifecycle is forward-only, frozen and tenant-bound", () => {
     order,
     fulfillments: [delivered],
     lines: [{ orderLineId: "line-1", quantity: 1 }],
+    createdAt: "2026-09-06T10:00:00.000Z",
   });
   const before = structuredClone(requested);
   const approved = transitionReturnRequest(requested, "APPROVED", {

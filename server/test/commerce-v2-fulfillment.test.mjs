@@ -179,6 +179,7 @@ test("tracking is append-only and fulfillment transitions are forward-only witho
     id: "track-2",
     status: "IN_TRANSIT",
     location: "Tehran Hub",
+    occurredAt: "2026-09-05T02:00:00.000Z",
   });
   const delivered = transitionFulfillment(inTransit, "DELIVERED", {
     occurredAt: "2026-09-06T09:00:00.000Z",
@@ -197,7 +198,8 @@ test("tracking is append-only and fulfillment transitions are forward-only witho
       lines: [{ orderLineId: "line-1", quantity: 1 }],
       createdAt: fulfillmentCreatedAt,
     }),
-    "CANCELLED"
+    "CANCELLED",
+    { occurredAt: "2026-09-05T00:30:00.000Z" }
   );
   assert.throws(
     () => recordTrackingEvent(cancelled, { id: "x", status: "IN_TRANSIT" }),
