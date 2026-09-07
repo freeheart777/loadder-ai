@@ -249,25 +249,28 @@ test("refund success requires a provider reference and never mutates earlier req
   const approvedReturn = transitionReturnRequest(
     createReturnRequest({
       id: "return-provider",
+      createdAt: "2026-09-07T10:00:00.000Z",
       order,
       fulfillments: [delivered],
       lines: [{ orderLineId: "line-1", quantity: 1 }],
     }),
-    "APPROVED"
+    "APPROVED",
+    { occurredAt: "2026-09-07T10:01:00.000Z" }
   );
   const requested = createRefundRequest({
     id: "refund-provider",
+    createdAt: "2026-09-07T11:00:00.000Z",
     order,
     returnRequest: approvedReturn,
     amountMinor: 50000,
     financialSnapshot: { capturedMinor: 100000, refundedMinor: 0, currency: "IRT" },
   });
   const before = structuredClone(requested);
-  const approved = transitionRefundRequest(requested, "APPROVED");
-  const processing = transitionRefundRequest(approved, "PROCESSING");
+  const approved = transitionRefundRequest(requested, "APPROVED", { occurredAt: "2026-09-07T11:01:00.000Z" });
+  const processing = transitionRefundRequest(approved, "PROCESSING", { occurredAt: "2026-09-07T11:02:00.000Z" });
 
   assert.throws(
-    () => transitionRefundRequest(processing, "SUCCEEDED"),
+    () => transitionRefundRequest(processing, "SUCCEEDED", { occurredAt: "2026-09-07T11:03:00.000Z" }),
     /REFUND_PROVIDER_REFERENCE_REQUIRED/
   );
   const succeeded = transitionRefundRequest(processing, "SUCCEEDED", {
@@ -280,7 +283,7 @@ test("refund success requires a provider reference and never mutates earlier req
   assert.equal(succeeded.providerReference, "provider-ref-001");
   assert.ok(Object.isFrozen(succeeded));
   assert.throws(
-    () => transitionRefundRequest(succeeded, "PROCESSING"),
+    () => transitionRefundRequest(succeeded, "PROCESSING", { occurredAt: "2026-09-07T12:01:00.000Z" }),
     /INVALID_REFUND_TRANSITION/
   );
 });
