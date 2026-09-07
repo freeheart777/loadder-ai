@@ -7,6 +7,10 @@ on:
     branches: [main]
     paths:
       - "e2e/**"
+      - "src/pages/PlatformAdminPage.tsx"
+      - "src/components/platform-admin/**"
+      - "server/app/routes/platform-admin.mjs"
+      - "server/app/repositories/platform-admin-inventory.mjs"
       - "playwright.config.ts"
       - "package.json"
       - "package-lock.json"
@@ -34,7 +38,9 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install dependencies from lockfile
-        run: npm ci
+        run: |
+          npm ci
+          npm --prefix server ci
       - name: Verify Playwright package policy
         run: |
           node --input-type=module -e "import pkg from '@playwright/test/package.json' with { type: 'json' }; if (pkg.license !== 'Apache-2.0') throw new Error('Unexpected Playwright license'); if (!pkg.engines?.node) throw new Error('Missing Node engine contract'); console.log(JSON.stringify({version:pkg.version,license:pkg.license,node:pkg.engines.node}))"
@@ -42,6 +48,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run deterministic browser smoke
         run: npm run test:e2e:infra
+      - name: Run real Platform Admin Command Center journey
+        run: npx playwright test e2e/infrastructure/platform-admin.spec.ts
       - name: Upload failure evidence
         if: failure()
         uses: actions/upload-artifact@v4

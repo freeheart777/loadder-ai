@@ -1,118 +1,42 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useAdminRead } from "../components/platform-admin/useAdminRead";
 
-type CountMetric = { total?: number; active?: number; evidence?: string };
-type StatusMetric = { status?: string; reason?: string };
-type Overview = {
-  users?: CountMetric;
-  workspaces?: CountMetric;
-  sessions?: { active?: number; evidence?: string };
-  projects?: StatusMetric;
-  readiness?: StatusMetric;
-};
-
-type AdminResponse = {
-  success: boolean;
-  mode?: string;
-  roles?: string[];
-  overview?: Overview;
-  code?: string;
-  message?: string;
-};
-
-function MetricCard({ title, value, hint }: { title: string; value: string | number; hint?: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/[.04] p-5 shadow-sm">
-    <div className="text-xs font-bold text-white/50">{title}</div>
-    <div className="mt-2 text-3xl font-black tracking-tight text-white">{value}</div>
-    {hint ? <div className="mt-2 text-xs leading-5 text-white/40">{hint}</div> : null}
-  </div>;
+type Overview={overview:{users?:{total?:number;active?:number};workspaces?:{total?:number;active?:number};sessions?:{active?:number};projects?:{status:string};readiness?:{status:string}}};
+type Item={id:string;name:string;status:string;createdAt:string;workspaceCount?:number;activeWorkspaceCount?:number;memberCount?:number;activeMemberCount?:number;ownerCount?:number;lastActivity?:{status:string;at:string|null}};
+type Inventory={items:Item[];pagination:{page:number;total:number;totalPages:number}};
+const num=(v:number|undefined)=>v===undefined?"نامشخص":v.toLocaleString("fa-IR");
+const date=(v:string|null)=>v&&Number.isFinite(Date.parse(v))?new Date(v).toLocaleString("fa-IR"):"نامشخص";
+const button="min-h-11 rounded-xl border border-white/20 px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300 disabled:opacity-40";
+function Status({value}:{value:string}){
+  const labels:Record<string,string>={active:"فعال",inactive:"غیرفعال",disabled:"غیرفعال",unknown:"نامشخص",unavailable:"در دسترس نیست",blocked:"مسدود",healthy:"سالم",ready:"آماده"};
+  return <span className={`inline-block rounded-lg border px-2 py-1 text-xs ${value==="active"?"border-emerald-300/30 text-emerald-200":"border-amber-300/30 text-amber-200"}`}>{labels[value]||value}</span>;
 }
-
-function StatusPanel({ title, metric }: { title: string; metric?: StatusMetric }) {
-  const status = metric?.status || "unknown";
-  const blocked = status === "blocked" || status === "error";
-  const healthy = status === "healthy" || status === "ready";
-  const tone = blocked
-    ? "border-rose-400/30 bg-rose-500/10 text-rose-100"
-    : healthy
-      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
-      : "border-amber-400/20 bg-amber-400/10 text-amber-100";
-
-  return <div className={`rounded-2xl border p-5 ${tone}`}>
-    <div className="flex items-center justify-between gap-3">
-      <h2 className="text-sm font-black text-white">{title}</h2>
-      <span className="rounded-full border border-current/20 px-3 py-1 text-[11px] font-black uppercase tracking-wide">{status}</span>
-    </div>
-    <p className="mt-3 text-xs leading-6 opacity-70">{metric?.reason || "منبع معتبر هنوز به این نما متصل نشده است."}</p>
-  </div>;
-}
-
-export default function PlatformAdminPage() {
-  const [data, setData] = useState<AdminResponse | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const response = await fetch("/api/platform-admin/overview", { credentials:"include" });
-        const body = await response.json().catch(() => ({})) as AdminResponse;
-        if (!response.ok) throw new Error(body.message || body.code || "دسترسی به پنل مدیریت پلتفرم ممکن نیست.");
-        if (active) setData(body);
-      } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "خطای نامشخص در پنل مدیریت.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
-
-  return <main dir="rtl" className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-8">
-    <div className="mx-auto max-w-7xl">
-      <header className="mb-8 flex flex-col gap-4 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs font-black tracking-[.2em] text-emerald-300">LOADDER INTERNAL CONTROL PLANE</div>
-          <h1 className="mt-2 text-3xl font-black">مرکز فرمان پلتفرم لودر</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-white/50">نسخهٔ اول فقط خواندنی است. وضعیت‌های ناموجود، ناشناخته و خطا از دادهٔ سالم تفکیک می‌شوند.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-xs font-bold text-emerald-200">READ ONLY</span>
-          <span className="rounded-xl border border-white/10 bg-white/[.04] px-4 py-2 text-xs font-bold text-white/60">COMMAND CENTER</span>
-        </div>
-      </header>
-
-      {loading ? <div className="rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-white/50">در حال دریافت وضعیت پلتفرم…</div> : null}
-      {error ? <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-5 text-sm leading-7 text-rose-100"><strong className="ml-2">ANDON:</strong>{error}</div> : null}
-
-      {data?.overview ? <>
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-white/50">
-          <span>سطح دسترسی:</span>
-          {(data.roles || []).map((role) => <span key={role} className="rounded-full bg-white/10 px-3 py-1 font-bold text-white/70">{role}</span>)}
-        </div>
-
-        <section aria-label="Platform metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard title="کل کاربران" value={data.overview.users?.total ?? "ناموجود"} hint={data.overview.users?.evidence} />
-          <MetricCard title="کاربران فعال" value={data.overview.users?.active ?? "ناموجود"} hint={data.overview.users?.evidence} />
-          <MetricCard title="فضاهای کاری فعال" value={data.overview.workspaces?.active ?? "ناموجود"} hint={data.overview.workspaces?.evidence} />
-          <MetricCard title="نشست‌های فعال" value={data.overview.sessions?.active ?? "ناموجود"} hint={data.overview.sessions?.evidence} />
-        </section>
-
-        <section className="mt-6 grid gap-4 lg:grid-cols-2">
-          <StatusPanel title="پروژه‌ها" metric={data.overview.projects} />
-          <StatusPanel title="آمادگی پلتفرم" metric={data.overview.readiness} />
-        </section>
-
-        <section className="mt-6 rounded-2xl border border-white/10 bg-white/[.03] p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-black">گام بعدی مرکز فرمان</h2>
-              <p className="mt-2 text-xs leading-6 text-white/40">دایرکتوری کاربران و فضاهای کاری فقط بعد از اتصال API صفحه‌بندی‌شده و redacted نمایش داده می‌شود.</p>
-            </div>
-            <div className="text-xs font-bold text-white/40">Issue #197 → #198</div>
-          </div>
-        </section>
-      </> : null}
-    </div>
-  </main>;
+export default function PlatformAdminPage(){
+  const [tab,setTab]=useState<"overview"|"users"|"workspaces">("overview");
+  const [page,setPage]=useState(1);
+  const [revision,setRevision]=useState(0);
+  const overview=useAdminRead<Overview>("/api/platform-admin/overview",revision);
+  const inventory=useAdminRead<Inventory>(tab==="overview"?null:`/api/platform-admin/${tab}?page=${page}&pageSize=25`,revision);
+  const current=tab==="overview"?overview:inventory;
+  const stats=overview.data?.overview;
+  const navigate=(target:typeof tab)=>{setPage(1);setTab(target);};
+  return <main dir="rtl" className="min-h-screen bg-slate-950 px-4 py-6 text-slate-100 sm:px-8"><div className="mx-auto max-w-7xl">
+    <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-6"><div><p className="text-xs tracking-widest text-emerald-300">LOADDER / CONTROL PLANE</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">مرکز فرمان پلتفرم</h1><p className="mt-2 text-sm text-slate-400">فقط مشاهده · خواندن داده‌های بین‌فضایی در سرور ثبت می‌شود.</p></div><Link className={button} to="/dashboard">بازگشت به داشبورد</Link></header>
+    {overview.denied||inventory.denied?<section role="alert" className="mt-6 rounded-2xl border border-rose-400 p-6"><h2 className="font-bold">دسترسی مجاز نیست</h2><p>نقش مالک یا مدیر فضای کاری، دسترسی مدیریت پلتفرم ایجاد نمی‌کند.</p></section>:<>
+      <nav aria-label="بخش‌های مدیریت پلتفرم" className="my-5 flex flex-wrap gap-2">{([["overview","نمای کلی"],["users","کاربران"],["workspaces","فضاهای کاری"]] as const).map(([key,label])=><button key={key} className={`${button} ${tab===key?"bg-emerald-300/10":""}`} aria-current={tab===key?"page":undefined} onClick={()=>navigate(key)}>{label}</button>)}</nav>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"><p>دریافت این نما: {date(current.receivedAt)} · زمان دریافت است، نه تضمین تازگی منبع.</p><button className={button} disabled={current.loading} onClick={()=>setRevision(v=>v+1)}>تازه‌سازی داده‌ها</button></div>
+      {current.loading?<p role="status" className="rounded-2xl border border-white/10 p-6">در حال دریافت داده‌های معتبر…</p>:null}
+      {current.error?<section role="alert" className="rounded-2xl border border-rose-400/50 bg-rose-500/10 p-5"><h2 className="font-bold">نیازمند توجه · دریافت داده متوقف شد</h2><p className="mt-2">{current.error}</p><p className="mt-2 text-sm">وضعیت نامعلوم است؛ خطا به معنای سلامت یا صفر بودن آمار نیست.</p><button className={`${button} mt-3`} onClick={()=>setRevision(v=>v+1)}>تلاش دوباره</button></section>:null}
+      {tab==="overview"&&stats&&!current.loading&&!current.error?<>
+        <section aria-label="آمار ثبت‌شده" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{([["کاربران",stats.users?.total,"users"],["کاربران فعال",stats.users?.active,"users"],["فضاهای کاری",stats.workspaces?.total,"workspaces"],["فضاهای فعال",stats.workspaces?.active,"workspaces"],["نشست‌های فعال",stats.sessions?.active,null]] as const).map(([title,value,target])=><article key={title} className="rounded-2xl border border-white/10 bg-white/[.03] p-5"><h2 className="text-sm text-slate-300">{title}</h2><p className="my-3 text-3xl font-bold tabular-nums">{num(value)}</p><p className="text-xs text-slate-400">منبع: overview سرور / داده ثبت‌شده</p>{target?<button className={`${button} mt-4`} onClick={()=>navigate(target)}>مشاهده {target==="users"?"کاربران":"فضاهای کاری"}</button>:null}</article>)}</section>
+        <section aria-label="وضعیت شواهد عملیاتی" className="mt-5 rounded-2xl border border-amber-300/30 bg-amber-300/[.04] p-5"><h2 className="font-bold text-amber-100">چه چیزی نیازمند توجه است؟</h2><p className="my-3 text-sm leading-7 text-slate-300">این نما شواهد کامل سلامت کل پلتفرم را در اختیار ندارد.</p><div className="flex flex-wrap gap-5"><p>آمادگی پلتفرم: <Status value={stats.readiness?.status||"unknown"}/></p><p>پروژه‌ها: <Status value={stats.projects?.status||"unavailable"}/></p></div><p className="mt-4 text-xs text-slate-400">تاریخچه audit و پایش سرویس‌ها API خواندنی متصل ندارند؛ داده‌ای برای آن‌ها ساخته نمی‌شود.</p></section>
+      </>:null}
+      {tab!=="overview"&&inventory.data&&!current.loading&&!current.error?<section aria-label={tab==="users"?"فهرست کاربران":"فهرست فضاهای کاری"}>
+        <p className="mb-3 text-sm leading-7 text-slate-400">{tab==="users"?"آخرین فعالیت مستند از sessions.last_seen_at است؛ زمان آخرین ورود نیست و ممکن است متعلق به نشست منقضی یا لغوشده باشد.":"اعضای فعال: عضویت و کاربر فعال. تعداد مالکان شامل همه عضویت‌های owner است، نه فقط مالکان فعال."}</p>
+        {inventory.data.items.length===0?<p role="status" className="rounded-xl border border-white/10 p-6">در این صفحه رکوردی وجود ندارد.</p>:<div className="overflow-x-auto rounded-xl border border-white/10" tabIndex={0} aria-label="جدول قابل پیمایش"><table className="w-full min-w-[720px] text-right text-sm"><caption className="sr-only">{tab==="users"?"کاربران پلتفرم":"فضاهای کاری پلتفرم"}</caption><thead className="bg-white/5 text-slate-300"><tr>{["نام / شناسه","وضعیت","ایجاد",...(tab==="users"?["فضاها / فعال","آخرین فعالیت مستند"]:["اعضا / فعال","مالکان"])].map(label=><th scope="col" className="p-4" key={label}>{label}</th>)}</tr></thead><tbody>{inventory.data.items.map(item=><tr key={item.id} className="border-t border-white/10"><td className="p-4"><span className="font-medium">{item.name}</span><bdi className="mt-1 block text-xs text-slate-400">{item.id}</bdi></td><td className="p-4"><Status value={item.status}/></td><td className="p-4 whitespace-nowrap">{date(item.createdAt)}</td><td className="p-4 tabular-nums">{num(tab==="users"?item.workspaceCount:item.memberCount)} / {num(tab==="users"?item.activeWorkspaceCount:item.activeMemberCount)}</td><td className="p-4">{tab==="users"?(item.lastActivity?.status==="evidenced"?date(item.lastActivity.at):"نامشخص؛ بدون شاهد نشست"):num(item.ownerCount)}</td></tr>)}</tbody></table></div>}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><p aria-live="polite" className="text-sm text-slate-300">صفحه {num(inventory.data.pagination.page)} · کل رکوردها: {num(inventory.data.pagination.total)}</p><div className="flex gap-2"><button className={button} disabled={page<=1} onClick={()=>setPage(v=>v-1)}>صفحه قبل</button><button className={button} disabled={page>=inventory.data.pagination.totalPages} onClick={()=>setPage(v=>v+1)}>صفحه بعد</button></div></div>
+      </section>:null}
+    </>}
+  </div></main>;
 }
