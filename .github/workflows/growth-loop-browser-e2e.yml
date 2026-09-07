@@ -28,7 +28,6 @@ jobs:
     env:
       E2E_BASE_URL: http://127.0.0.1:4176
       E2E_API_BASE_URL: http://127.0.0.1:3202
-      E2E_DATABASE_PATH: ${{ runner.temp }}/loadder-growth-e2e/test.sqlite
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,7 +46,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/loadder-growth-e2e/media"
-          DATABASE_PATH="$E2E_DATABASE_PATH" \
+          DATABASE_PATH="$RUNNER_TEMP/loadder-growth-e2e/test.sqlite" \
           SITE_MEDIA_LOCAL_DIR="$RUNNER_TEMP/loadder-growth-e2e/media" \
           NODE_ENV=test API_HOST=127.0.0.1 API_PORT=3202 \
           AUTH_EXPOSE_DEV_OTP=true AUTH_HASH_SECRET=growth-e2e-secret \
