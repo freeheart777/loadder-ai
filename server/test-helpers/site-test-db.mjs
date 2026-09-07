@@ -19,7 +19,12 @@ export function createSiteTestDb() {
   `);
   db.prepare("INSERT INTO workspaces(id) VALUES (?), (?)").run("ws-1", "ws-2");
   db.prepare("INSERT INTO business_context_versions(id) VALUES (?)").run("ctx-1");
-  // Later evidence rebuilds require the real event and experiment owner tables.
-  runMigrations(db, migrations.filter((migration) => [14, 38].includes(migration.version) || migration.version >= 42));
+  // This commerce fixture omits listening calculations, but SQLite validates their
+  // semantic guard references during later table rebuilds. No observations are seeded.
+  for (const table of ['feature_values','listening_aggregates','listening_topic_matches','listening_trend_signals','listening_anomaly_results']) {
+    db.exec(`CREATE TABLE ${table}(id TEXT PRIMARY KEY,workspace_id TEXT)`);
+  }
+  // Later evidence migrations require the real event, semantic and experiment owners.
+  runMigrations(db, migrations.filter((migration) => [14, 35, 38].includes(migration.version) || migration.version >= 42));
   return db;
 }

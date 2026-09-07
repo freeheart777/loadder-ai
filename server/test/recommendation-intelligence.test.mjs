@@ -78,8 +78,8 @@ test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
     assert.equal(db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c, tableCountBefore + 1);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='intelligence_recommendations'").get().c, 1);
   });
-  await t.test("registry contains exactly two bounded contracts", () => {
-    assert.deepEqual(recommendationContractRegistry.list().map((item) => item.recommendationType), ["attention_evidence_review", "competitive_visibility_evidence_review"]);
+  await t.test("registry contains the approved listening and Growth review contracts", () => {
+    assert.deepEqual(recommendationContractRegistry.list().map((item) => item.recommendationType), ["EXPERIMENT_OUTCOME_REVIEW", "attention_evidence_review", "competitive_visibility_evidence_review"]);
     assert.equal(recommendationContractRegistry.get("execute_campaign"), null);
     assert.deepEqual(recommendationContractRegistry.get("attention_evidence_review").scopeKeys, ["window"]);
   });
