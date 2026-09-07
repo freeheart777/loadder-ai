@@ -1,10 +1,25 @@
 name: Growth Loop Browser E2E
+
 on:
   pull_request:
     branches: [main]
-    paths: ["src/**", "server/**", "e2e/growth/**", "playwright.config.ts", "package.json", "package-lock.json", ".github/workflows/growth-loop-browser-e2e.yml"]
-permissions: { contents: read }
-concurrency: { group: "${{ github.workflow }}-${{ github.ref }}", cancel-in-progress: true }
+    paths:
+      - "src/**"
+      - "server/**"
+      - "e2e/growth/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/growth-loop-browser-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   growth-loop-browser-e2e:
     name: Growth Loop Browser E2E
@@ -15,33 +30,64 @@ jobs:
       E2E_API_BASE_URL: http://127.0.0.1:3202
       E2E_DATABASE_PATH: ${{ runner.temp }}/loadder-growth-e2e/test.sqlite
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci && npm --prefix server ci
-      - run: npx playwright install --with-deps chromium
-      - name: Start isolated modular monolith
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies from lockfiles
         run: |
-          mkdir -p "$RUNNER_TEMP/loadder-growth-e2e"
-          DATABASE_PATH="$E2E_DATABASE_PATH" NODE_ENV=test API_HOST=127.0.0.1 API_PORT=3202 AUTH_EXPOSE_DEV_OTP=true AUTH_HASH_SECRET=growth-e2e-secret CLIENT_ORIGINS=http://127.0.0.1:4176 node server/index.mjs >"$RUNNER_TEMP/loadder-growth-e2e/backend.log" 2>&1 &
+          npm ci
+          npm --prefix server ci
+      - name: Install official Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start isolated application
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/loadder-growth-e2e/media"
+          DATABASE_PATH="$E2E_DATABASE_PATH" \
+          SITE_MEDIA_LOCAL_DIR="$RUNNER_TEMP/loadder-growth-e2e/media" \
+          NODE_ENV=test API_HOST=127.0.0.1 API_PORT=3202 \
+          AUTH_EXPOSE_DEV_OTP=true AUTH_HASH_SECRET=growth-e2e-secret \
+          CLIENT_ORIGINS=http://127.0.0.1:4176 \
+          node server/index.mjs >"$RUNNER_TEMP/loadder-growth-e2e/backend.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/loadder-growth-e2e/backend.pid"
-          VITE_API_BASE_URL=http://127.0.0.1:3202 npx vite --host 127.0.0.1 --port 4176 --strictPort >"$RUNNER_TEMP/loadder-growth-e2e/frontend.log" 2>&1 &
+          VITE_API_BASE_URL=http://127.0.0.1:3202 \
+          npx vite --host 127.0.0.1 --port 4176 --strictPort \
+          >"$RUNNER_TEMP/loadder-growth-e2e/frontend.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/loadder-growth-e2e/frontend.pid"
-          for attempt in {1..40}; do curl -fsS http://127.0.0.1:3202/api/health >/dev/null && curl -fsS http://127.0.0.1:4176/ >/dev/null && exit 0; sleep 1; done
-          cat "$RUNNER_TEMP/loadder-growth-e2e/backend.log"; cat "$RUNNER_TEMP/loadder-growth-e2e/frontend.log"; exit 1
-      - name: Run focused journey five times with zero retries
-        run: for run in {1..5}; do npx playwright test e2e/growth/growth-loop.spec.ts --project=chromium; done
-      - if: failure()
+          for attempt in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:3202/api/health >/dev/null \
+              && curl --fail --silent http://127.0.0.1:4176/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/loadder-growth-e2e/backend.log"
+          cat "$RUNNER_TEMP/loadder-growth-e2e/frontend.log"
+          exit 1
+      - name: Run focused journey five consecutive times
+        shell: bash
+        run: |
+          set -o pipefail
+          for run in {1..5}; do
+            echo "Growth browser journey run $run/5"
+            npx playwright test e2e/growth/growth-loop.spec.ts --project=chromium
+          done
+      - name: Upload failure evidence
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: growth-loop-e2e-failure
+          name: growth-loop-browser-e2e-failure
           path: |
             playwright-report/
             test-results/
           if-no-files-found: ignore
           retention-days: 7
-      - if: always()
+      - name: Stop isolated application and remove temporary state
+        if: always()
+        shell: bash
         run: |
-          kill "$(cat "$RUNNER_TEMP/loadder-growth-e2e/frontend.pid")" 2>/dev/null || true
-          kill "$(cat "$RUNNER_TEMP/loadder-growth-e2e/backend.pid")" 2>/dev/null || true
+          if [[ -f "$RUNNER_TEMP/loadder-growth-e2e/frontend.pid" ]]; then kill "$(cat "$RUNNER_TEMP/loadder-growth-e2e/frontend.pid")" 2>/dev/null || true; fi
+          if [[ -f "$RUNNER_TEMP/loadder-growth-e2e/backend.pid" ]]; then kill "$(cat "$RUNNER_TEMP/loadder-growth-e2e/backend.pid")" 2>/dev/null || true; fi
           rm -rf "$RUNNER_TEMP/loadder-growth-e2e"
