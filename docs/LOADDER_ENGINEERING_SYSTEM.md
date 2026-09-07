@@ -1072,6 +1072,21 @@ or:
 
 SAFE_TO_COMMIT: NO
 
+#### Gap & Solution Mode
+
+During assigned work, assess relevant evidence against product vision, roadmap, launch readiness, architecture, security/tenant isolation, performance/cost, scalability, observability/recovery, UX/operator efficiency and AI readiness. Report only substantiated gaps, citing repository/runtime/test evidence and distinguishing missing proof from proven defects; this is not permission for an unrelated platform-wide audit.
+
+Actively check for duplicated architecture, expensive infrastructure patterns, hidden single points of failure, false/unknown data presented as truth, missing production evidence or monitoring/recovery, unnecessary complexity, and opportunities to simplify while increasing capability. Prefer root-cause fixes over additional layers. Explicitly recognize strong existing design; never manufacture problems or changes to appear useful.
+
+For each meaningful gap use:
+
+- **GAP:** problem / evidence / user-business impact / technical impact / severity **P0 (critical), P1 (high), P2 (lower priority)**, justified by impact.
+- **SOLUTION:** recommended fix / smallest safe implementation / likely files-systems affected / schema-dependency impact / required tests-evidence / complexity **S–M–L** / timing **NOW–NEXT–LATER**.
+
+Implement only when **all** are true: in current scope, low-risk, backward-compatible, architecture-consistent and testable. Existing authorization and stop-line rules still apply. Put broader work under **LOADDER_IMPROVEMENT_BACKLOG** without expanding implementation scope; reuse the same evidence rather than duplicating proposal reports.
+
+End substantial implementation audits with **TOP_5_LOADDER_GAPS**, ranked by launch impact, customer impact, security/reliability risk, cost to fix and strategic value; give an exact next action for each. Report fewer than five (or none) when evidence supports fewer; do not imply uninspected areas were validated.
+
 ### 38. STOP-LINE REPORT
 
 When stopping because of a real defect:
