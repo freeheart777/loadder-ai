@@ -1,4 +1,6 @@
 import express from "express";
+import { createExperimentRepository } from "./app/repositories/experiment-repository.mjs";
+import { createExperimentAuthoringRouter } from "./app/routes/experiment-authoring.mjs";
 import cors from "cors";
 import crypto from "crypto";
 
@@ -414,6 +416,7 @@ app.use("/api", createListeningIntelligenceRouter({ service: listeningIntelligen
 app.use("/api", createSemanticIntelligenceRouter({ service: semanticIntelligenceService }));
 app.use("/api", createRecommendationIntelligenceRouter({ service: recommendationIntelligenceService }));
 app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService }));
+app.use("/api", createExperimentAuthoringRouter({ repository: createExperimentRepository(db, { currentContextState: () => { const c=businessContextService.getCurrent(); return {contextVersionId:c.activeContext?.id || null,isStale:c.isStale}; } }) }));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));

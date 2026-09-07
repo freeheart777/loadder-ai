@@ -78,6 +78,7 @@ import { migration077CommerceLifecycleOutboxTriggers } from "./077_commerce_life
 import { migration078CommerceFullRefundFinancialLedger } from "./078_commerce_full_refund_financial_ledger.mjs";
 import { migration079CommerceRefundRecords } from "./079_commerce_refund_records.mjs";
 import { migration080GrowthEvidenceLinks } from "./080_growth_evidence_links.mjs";
+import { migration081ExperimentGoalContract } from "./081_experiment_goal_contract.mjs";
 
 export const migrations = [
   migration001Identity,
@@ -160,4 +161,5 @@ export const migrations = [
   migration078CommerceFullRefundFinancialLedger,
   migration079CommerceRefundRecords,
   migration080GrowthEvidenceLinks,
+  migration081ExperimentGoalContract,
 ];
