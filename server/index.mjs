@@ -1,4 +1,6 @@
 import express from "express";
+import { createGrowthCopilotRepository } from './app/repositories/growth-copilot-repository.mjs';
+import { createGrowthCopilotRouter } from './app/routes/growth-copilot.mjs';
 import { createGrowthLeadEvidenceRepository } from './app/repositories/growth-lead-evidence-repository.mjs';
 import { createGrowthLeadEvidenceRouter } from './app/routes/growth-lead-evidence.mjs';
 import { createGrowthEvidenceRepository } from './app/repositories/growth-evidence-repository.mjs';
@@ -424,6 +426,7 @@ app.use("/api", createRecommendationIntelligenceRouter({ service: recommendation
 app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService }));
 app.use("/api", createExperimentAuthoringRouter({ repository: createExperimentRepository(db, { currentContextState: () => { const c=businessContextService.getCurrent(); return {contextVersionId:c.activeContext?.id || null,isStale:c.isStale}; } }) }));
 const growthContentRepository=createGrowthContentRepository(db,{contextGateway:businessContextConsumerGateway});
+app.use('/api',createGrowthCopilotRouter({repository:createGrowthCopilotRepository(db,{currentContextState:()=>{const c=businessContextService.getCurrent();return {contextVersionId:c.activeContext?.id||null,isStale:c.isStale};}})}));
 app.use('/api',createGrowthLeadEvidenceRouter({repository:createGrowthLeadEvidenceRepository(db,{convertLeadToCustomer,eventService:businessEventService,eventRepository:businessEventRepository,evidenceRepository:createGrowthEvidenceRepository(db)})}));
 app.use('/api',createGrowthContentRouter({repository:growthContentRepository,service:createGrowthContentService({repository:growthContentRepository})}));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
