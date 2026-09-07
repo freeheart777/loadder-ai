@@ -1,4 +1,6 @@
 import { migration001Identity } from "./001_identity.mjs";
+import { migration082GrowthContent } from './082_growth_content.mjs';
+import { migration083GrowthCandidateEvidence } from './083_growth_candidate_evidence.mjs';
 import { migration002TenantDomainData } from "./002_tenant_domain_data.mjs";
 import { migration003TenantRelationshipGuards } from "./003_tenant_relationship_guards.mjs";
 import { migration004WorkspaceManagementAudit } from "./004_workspace_management_audit.mjs";
@@ -162,4 +164,6 @@ export const migrations = [
   migration079CommerceRefundRecords,
   migration080GrowthEvidenceLinks,
   migration081ExperimentGoalContract,
+  migration082GrowthContent,
+  migration083GrowthCandidateEvidence,
 ];

@@ -25,6 +25,7 @@ export async function runCloudflare({
   user,
   maxTokens = 500,
   temperature = 0.7,
+  signal,
 }) {
   if (!ACCOUNT_ID || !API_TOKEN) {
     throw new Error(
@@ -36,6 +37,7 @@ export async function runCloudflare({
     `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/${MODEL}`,
     {
       method: "POST",
+      signal,
       headers: {
         Authorization: `Bearer ${API_TOKEN}`,
         "Content-Type": "application/json",
@@ -64,7 +66,9 @@ export async function runCloudflare({
       data?.errors?.[0]?.message ||
       "Cloudflare AI request failed.";
 
-    throw new Error(errorMessage);
+    const error = new Error(errorMessage);
+    if (response.status >= 400 && response.status < 500) error.code = 'AI_PROVIDER_REJECTED';
+    throw error;
   }
 
   const answer =

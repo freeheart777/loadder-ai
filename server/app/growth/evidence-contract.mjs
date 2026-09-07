@@ -24,7 +24,7 @@ export function normalizeEvidenceLink(input) {
   return {
     contractVersion: 1, contextVersionId,
     goal: { reference: input.goal.reference, version: contextVersionId },
-    subject: reference(input.subject, ["CAMPAIGN", "EXPERIMENT"]), relation: "HAS_EVIDENCE",
+    subject: reference(input.subject, ["CAMPAIGN", "EXPERIMENT", "CONTENT_CANDIDATE"]), relation: "HAS_EVIDENCE",
     object: input.object == null ? null : reference(input.object, ["EVENT", "ORDER", "FINANCIAL_ENTRY"]),
     evidenceKind: input.evidenceKind, producer: text(input.producer, 100), source: text(input.source),
     sourceEventId: optional(input.sourceEventId), correlationId: optional(input.correlationId), causationId: optional(input.causationId),

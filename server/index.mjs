@@ -1,4 +1,7 @@
 import express from "express";
+import { createGrowthContentRepository } from './app/repositories/growth-content-repository.mjs';
+import { createGrowthContentService } from './app/services/growth-content-service.mjs';
+import { createGrowthContentRouter } from './app/routes/growth-content.mjs';
 import { createExperimentRepository } from "./app/repositories/experiment-repository.mjs";
 import { createExperimentAuthoringRouter } from "./app/routes/experiment-authoring.mjs";
 import cors from "cors";
@@ -417,6 +420,8 @@ app.use("/api", createSemanticIntelligenceRouter({ service: semanticIntelligence
 app.use("/api", createRecommendationIntelligenceRouter({ service: recommendationIntelligenceService }));
 app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService }));
 app.use("/api", createExperimentAuthoringRouter({ repository: createExperimentRepository(db, { currentContextState: () => { const c=businessContextService.getCurrent(); return {contextVersionId:c.activeContext?.id || null,isStale:c.isStale}; } }) }));
+const growthContentRepository=createGrowthContentRepository(db,{contextGateway:businessContextConsumerGateway});
+app.use('/api',createGrowthContentRouter({repository:growthContentRepository,service:createGrowthContentService({repository:growthContentRepository})}));
 app.use("/api", createLegacyCrmRouter({ getCRMStats, getCustomers, getCustomerById, createCustomer, getCustomer360 }));
 app.use("/api", createLegacyAutomationsRouter({ getAutomations, getAutomationById, createAutomation, updateAutomation, deleteAutomation }));
 app.use("/api", createLegacyMarketingRouter({ getMarketingChannels, getMarketingPlatforms, getAdvertisingServices, getMarketingCampaigns }));

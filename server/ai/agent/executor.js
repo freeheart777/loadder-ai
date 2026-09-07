@@ -1,10 +1,11 @@
 import { routeTask } from "./router.js";
 import { runAI } from "../providers/index.js";
 
-export async function executeAgentTask(input) {
+export async function executeAgentTask(input, { signal } = {}) {
   const task = routeTask(input);
 
   const result = await runAI({
+    signal,
     provider: input.provider || "cloudflare",
     system: task.system,
     user: task.user,
