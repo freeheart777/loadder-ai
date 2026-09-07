@@ -46,6 +46,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/loadder-growth-e2e/media"
+          echo "E2E_DATABASE_PATH=$RUNNER_TEMP/loadder-growth-e2e/test.sqlite" >> "$GITHUB_ENV"
           DATABASE_PATH="$RUNNER_TEMP/loadder-growth-e2e/test.sqlite" \
           SITE_MEDIA_LOCAL_DIR="$RUNNER_TEMP/loadder-growth-e2e/media" \
           NODE_ENV=test API_HOST=127.0.0.1 API_PORT=3202 \
