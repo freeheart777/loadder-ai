@@ -1,4 +1,5 @@
 import express from "express";
+import { createPlatformAdminInventory, parseInventoryPagination } from "../repositories/platform-admin-inventory.mjs";
 
 const PLATFORM_ROLES = new Set([
   "platform_super_admin",
@@ -34,6 +35,7 @@ export function createPlatformGrantResolver(raw = process.env.LOADDER_PLATFORM_A
 export function createPlatformAdminReadModel(db) {
   const count = (sql) => Number(db.prepare(sql).get()?.count || 0);
   return {
+    ...createPlatformAdminInventory(db),
     overview() {
       return {
         users: {
@@ -113,5 +115,22 @@ export function createPlatformAdminRouter({
     }
   });
 
+  for (const resource of ["users", "workspaces"]) {
+    router.get(`/${resource}`, (req, res) => {
+      const pagination = parseInventoryPagination(req.query);
+      if (!pagination) return res.status(400).json({success:false,code:"PLATFORM_ADMIN_INVALID_PAGINATION"});
+      try {
+        const result = readModel[resource](pagination);
+        auditRepository.createAuditLog({workspaceId:null,userId:req.user.id,
+          action:`platform_admin.read_${resource}`,resourceType:"platform_admin",resourceId:resource,
+          metadata:{roles:req.platformGrant.roles,page:pagination.page,pageSize:pagination.pageSize,resultCount:result.items.length},
+          createdAt:now()});
+        return res.json({success:true,mode:"read-only",...result});
+      } catch {
+        // Do not log database errors: driver messages can contain sensitive values.
+        return res.status(500).json({success:false,code:"PLATFORM_ADMIN_INTERNAL_ERROR",message:"Unable to load platform inventory."});
+      }
+    });
+  }
   return router;
 }
