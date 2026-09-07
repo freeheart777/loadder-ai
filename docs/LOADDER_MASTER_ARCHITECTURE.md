@@ -2,12 +2,10 @@
 
 ## Vision
 
-Loadder is not a collection of AI tools.
-Loadder is a Business Improvement Operating System.
-
-Core loop:
-
-UNDERSTAND → OBSERVE → DIAGNOSE → DECIDE → ACT → MEASURE → LEARN → repeat
+Loadder is the Business Growth Operating System. Its canonical product loop and
+governance boundaries are defined in [Project Memory — Vision](LOADDER_PROJECT_MEMORY.md#1-vision).
+The technical observation/decision loop below serves that product vision; it does
+not introduce replacement owners for existing domains.
 
 ## Core Principles
 
