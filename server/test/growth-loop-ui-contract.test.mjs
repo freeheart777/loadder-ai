@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+const page=readFileSync(new URL('../../src/pages/GrowthLoopPage.tsx',import.meta.url),'utf8'),app=readFileSync(new URL('../../src/App.tsx',import.meta.url),'utf8');
+test('Growth Loop surface uses canonical route and owner APIs',()=>{assert.match(app,/dashboard\/growth-loop\/:experimentId/);for(const path of ['/api/experiments/','/api/growth/content/briefs/','/api/growth/copilot/runs','/api/growth/leads/','/api/growth/assessments','/api/intelligence/recommendations/'])assert.ok(page.includes(path),path);});
+test('Growth Loop communicates truth and no execution permission',()=>{for(const truth of ['ACTIONABLE فقط یعنی','هیچ اقدام خارجی هنوز اجرا نشده است','Execution authorized: FALSE','Financial mutation: NONE','UNKNOWN'])assert.ok(page.includes(truth));for(const forbidden of ['publish(','payment','ad spend'])assert.equal(page.toLowerCase().includes(forbidden),false);});
+test('Growth Loop is RTL and mobile-touch safe',()=>{assert.match(page,/dir="rtl"/);assert.ok((page.match(/min-h-11/g)||[]).length>=5);assert.ok(page.includes('sm:'));});
