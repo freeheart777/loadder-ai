@@ -52,6 +52,7 @@ import { createSemanticFindingRepository } from "./app/repositories/semantic-fin
 import { createIntelligenceRecommendationRepository } from "./app/repositories/intelligence-recommendation-repository.mjs";
 import { createHumanGovernanceRepository } from "./app/repositories/human-governance-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
+import { createOtpDelivery } from "./app/services/otp-delivery.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
 import { createBrandBookService } from "./app/services/brand-book-service.mjs";
@@ -241,6 +242,7 @@ const intelligenceRecommendationRepository = createIntelligenceRecommendationRep
 const authService = createAuthService({
   repository: identityRepository,
   otpHashSecret: environment.authHashSecret,
+  otpDelivery: createOtpDelivery(),
 });
 const businessProfileService = createBusinessProfileService({
   repository: businessProfileRepository,
@@ -350,7 +352,7 @@ app.get("/api/health", (req, res) => {
     auth: {
       mode: "persistent-session",
       productionReady: false,
-      otpDelivery: "not-connected",
+      otpDelivery: authService.otpDeliveryStatus(),
     },
     timestamp: new Date().toISOString(),
   });

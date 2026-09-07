@@ -39,6 +39,7 @@ export function createAuthService({
   otpTtlMs = 2 * 60 * 1000,
   sessionTtlMs = 30 * 24 * 60 * 60 * 1000,
   maxOtpAttempts = 5,
+  otpDelivery,
 }) {
   if (!otpHashSecret) {
     throw new Error("AUTH_HASH_SECRET is required for OTP hashing.");
@@ -65,7 +66,7 @@ export function createAuthService({
     };
   }
 
-  function requestOtp({ mobile: rawMobile, name: rawName }) {
+  function prepareOtp({ mobile: rawMobile, name: rawName }) {
     const mobile = normalizeMobile(rawMobile);
     const name = String(rawName || "").trim();
 
@@ -86,15 +87,32 @@ export function createAuthService({
     const createdAt = now();
     const expiresAt = new Date(createdAt.getTime() + otpTtlMs);
 
-    const challenge = repository.createOtpChallenge({
+    return { code, record: {
       mobile,
       name: existingUser?.name || name,
       codeHash: hashOtp(mobile, code),
       expiresAt: expiresAt.toISOString(),
       createdAt: createdAt.toISOString(),
-    });
+    } };
+  }
 
+  function requestOtp(input) {
+    const { code, record } = prepareOtp(input);
+    const challenge = repository.createOtpChallenge(record);
     return { challenge, code };
+  }
+
+  const pending = new Set();
+  async function sendOtp(input) {
+    if (!otpDelivery?.configured) throw new AuthError("ارسال کد در دسترس نیست.", 503, "OTP_DELIVERY_NOT_CONFIGURED");
+    const { code, record } = prepareOtp(input);
+    if (pending.has(record.mobile) || pending.size >= 16) throw new AuthError("کمی بعد دوباره تلاش کنید.", 429, "OTP_DELIVERY_BUSY");
+    pending.add(record.mobile);
+    try {
+      await otpDelivery.send({ mobile: record.mobile, code });
+      if (now().getTime() >= Date.parse(record.expiresAt)) throw new AuthError("ارسال کد ناموفق بود.", 503, "OTP_DELIVERY_FAILED");
+      return { challenge: repository.createOtpChallenge(record) };
+    } finally { pending.delete(record.mobile); }
   }
 
   function verifyOtp({ mobile: rawMobile, code: rawCode }) {
@@ -287,6 +305,8 @@ export function createAuthService({
 
   return {
     requestOtp,
+    sendOtp,
+    otpDeliveryStatus: () => otpDelivery?.configured ? "configured-live-validation-pending" : "not-connected",
     verifyOtp,
     resolveSession,
     revokeSession,
