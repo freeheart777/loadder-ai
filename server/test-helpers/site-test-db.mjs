@@ -16,6 +16,7 @@ export function createSiteTestDb() {
   `);
   db.prepare("INSERT INTO workspaces(id) VALUES (?), (?)").run("ws-1", "ws-2");
   db.prepare("INSERT INTO business_context_versions(id) VALUES (?)").run("ctx-1");
-  runMigrations(db, migrations.filter((migration) => migration.version >= 42));
+  // Later experiment extensions require the real pre-42 owner table.
+  runMigrations(db, migrations.filter((migration) => migration.version === 38 || migration.version >= 42));
   return db;
 }
