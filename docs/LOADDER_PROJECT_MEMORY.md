@@ -3,15 +3,38 @@
 > Canonical strategic memory for Loadder. This document exists so product intent survives chat sessions, contributors, agents, and implementation cycles.
 
 ## 1. Vision
-Loadder becomes the Business Growth Operating System for businesses: a context-aware platform that understands a business once, then uses that understanding across brand, website, commerce, content, CRM, marketing, analytics, automation, and AI-assisted execution.
+**LOADDER PRODUCT VISION — BUSINESS GROWTH OPERATING SYSTEM**
 
-Loadder is not merely a website builder, store builder, CRM, or AI wrapper.
+Loadder is not a collection of disconnected tools. It evolves from a toolbox and
+dashboard into a governed decision-and-execution system:
+
+**UNDERSTAND → BUILD → ACQUIRE → CONVERT → MEASURE → LEARN → IMPROVE.**
+
+Canonical product loop:
+
+Business DNA + Brand Book → Goal → Strategy → Content / Creative → Site / Store / App
+→ Ads / Social / SMS / Media → Traffic / Leads → CRM / Orders / Payments
+→ Evidence / Attribution → Experiment Assessment → Next Best Action → Human Approval
+→ Next Growth Cycle.
+
+Existing canonical domains retain ownership. A future Growth Orchestrator coordinates
+them; it does not replace them. AI proposes and assists; server policy authorizes;
+authoritative domain services execute; evidence records what actually happened.
+Humans retain control over consequential actions.
+
+Future Google Ads, Social, SMS, Dart, Tavos and Loadder Ad Network capabilities belong
+to this loop as distribution/provider capabilities, not disconnected architectures.
+This is product direction, not a claim that these integrations already exist.
+
+Remain modular-monolith first, normal-VPS viable, low-cost, evidence-driven,
+tenant-safe, human-governed and provider-neutral where practical. Preserve truthful
+UNKNOWN / INCONCLUSIVE states; follow the engineering standard rather than adding
+speculative infrastructure.
 
 ## 2. Mission
 Remove the friction between understanding a business and executing its digital growth.
 
-Core loop:
-Business Data -> Business Profile -> Brand Book -> Business DNA -> Business Context -> Website/Store -> Content -> CRM -> Marketing -> Analytics -> Learn -> Improve.
+The canonical product loop is defined in the Vision above.
 
 ## 3. Product Promise
 Simple to do, hard to outgrow.
