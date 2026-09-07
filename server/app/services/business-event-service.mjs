@@ -1,6 +1,7 @@
 import { decodeCursor, CursorPaginationError } from "../query/cursor-pagination.mjs";
 import { createOperationMetrics } from "../observability/operation-metrics.mjs";
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { CRM_GROWTH_SOURCE, CRM_GROWTH_EVENT_KEY, isCrmGrowthSource } from '../growth/crm-evidence-contract.mjs';
 
 const ALLOWED_INPUT_FIELDS = new Set([
   "eventType", "eventVersion", "occurredAt", "actorType", "actorId",
@@ -60,6 +61,7 @@ export function createBusinessEventService({ repository, eventRegistry, contextG
       if (unknownFields.length) throw new BusinessEventError(`Unknown event fields: ${unknownFields.join(", ")}.`);
       const eventType = identifier(payload.eventType, "eventType", { required: true, max: 120 });
       const sourceType = identifier(payload.sourceType, "sourceType", { required: true, max: 100 });
+      if (isCrmGrowthSource(sourceType)) throw new BusinessEventError('CRM domain sources cannot be client reported.', 403, 'EVENT_SOURCE_RESERVED');
       const sourceId = identifier(payload.sourceId, "sourceId");
       const idempotencyKey = identifier(payload.idempotencyKey, "idempotencyKey", { max: 200 });
       const duplicate = repository.findIdempotent(sourceType, sourceId, idempotencyKey);
@@ -112,6 +114,23 @@ export function createBusinessEventService({ repository, eventRegistry, contextG
         }
         throw error;
       }
+    },
+    // Internal domain bridge only. Not exposed by the ingestion route. The caller
+    // owns the SQLite transaction and verifies the actual CRM transition first.
+    recordCrmConversion({ leadId, customerId, contextVersionId, requestHash, candidateId, experimentId, goalRef, occurredAt }, userId) {
+      const payload = { actorType:'user', subjectType:'lead', properties:{customerId} };
+      const definition=eventRegistry.validate('lead.converted',payload);
+      const stored=repository.create({
+        eventType:'lead.converted',eventVersion:definition.eventVersion,
+        occurredAt,ingestedAt:now().toISOString(),actorType:'user',actorId:userId,
+        subjectType:'lead',subjectId:leadId,sourceType:CRM_GROWTH_SOURCE,sourceId:leadId,
+        channel:null,campaignId:null,customerId,sessionId:null,correlationId:leadId,causationId:null,
+        contextVersionId,schemaVersion:`business-event/lead.converted/v${definition.eventVersion}`,
+        idempotencyKey:CRM_GROWTH_EVENT_KEY,properties:{customerId},
+        metadata:{growth:{contractVersion:1,requestHash,candidateId,experimentId,goalRef}},
+      });
+      if(stored.duplicate)throw new BusinessEventError('Conflicting CRM transition.',409,'CRM_FACT_CONFLICT');
+      return stored.event;
     },
     list: (query) => repository.list(filters(query)),
     listPage(query) { const started=performance.now();try{const page=repository.listPage(filters(query));operationMetrics.record({operation:"business_events.list",workspaceId:requireWorkspaceId(),durationMs:performance.now()-started,rowsRead:page.items.length+(page.nextCursor?1:0),rowsWritten:0,resultCount:page.items.length,reusedResult:false});return page;}catch(error){operationMetrics.record({operation:"business_events.list",workspaceId:requireWorkspaceId(),durationMs:performance.now()-started,rowsRead:0,rowsWritten:0,resultCount:0,reusedResult:false,errorCode:error.code||"UNEXPECTED_ERROR"});throw error;}},

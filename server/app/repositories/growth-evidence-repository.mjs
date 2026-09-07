@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { CRM_GROWTH_SOURCE } from '../growth/crm-evidence-contract.mjs';
 import { requireWorkspaceId } from "../tenant-context.mjs";
 import { GrowthEvidenceError, normalizeEvidenceLink, evidencePayloadHash } from "../growth/evidence-contract.mjs";
 
@@ -36,8 +37,16 @@ export function createGrowthEvidenceRepository(db, { now = () => new Date() } = 
     }
     if (n.sourceEventId) resolve("EVENT", n.sourceEventId, ws);
     let authority = "UNKNOWN";
+    if(n.producer===CRM_GROWTH_SOURCE && (!n.object || n.object.type!=='EVENT'))reject('GROWTH_CRM_LINKAGE_MISMATCH');
     if (n.object) {
       const object = resolve(n.object.type, n.object.id, ws);
+      if(n.producer===CRM_GROWTH_SOURCE && object.source_type!==CRM_GROWTH_SOURCE)reject('GROWTH_CRM_LINKAGE_MISMATCH');
+      if(n.object.type==='EVENT' && object.source_type===CRM_GROWTH_SOURCE) {
+        const growth=JSON.parse(object.metadata_json)?.growth;
+        if(n.evidenceKind!=='CRM_CONVERSION'||object.event_type!=='lead.converted'||n.subject.type!=='CONTENT_CANDIDATE'||growth?.candidateId!==n.subject.id||growth?.goalRef!==n.goal.reference||object.context_version_id!==n.contextVersionId)reject('GROWTH_CRM_LINKAGE_MISMATCH');
+        const lead=db.prepare("SELECT l.id FROM leads l JOIN customers c ON c.id=l.customer_id AND c.workspace_id=l.workspace_id WHERE l.id=? AND l.workspace_id=? AND l.status='converted' AND c.id=?").get(object.subject_id,ws,object.customer_id);
+        if(!lead||object.subject_type!=='lead'||JSON.parse(object.properties_json)?.customerId!==object.customer_id)reject('GROWTH_CRM_FACT_INVALID');
+      }
       if (["PAYMENT", "VERIFIED_REVENUE"].includes(n.evidenceKind)) {
         if (n.object.type !== "FINANCIAL_ENTRY" || object.entry_type !== "PAYMENT_CAPTURED" || object.source_type !== "ORDER_PAYMENT") reject("GROWTH_FINANCIAL_EVIDENCE_REQUIRED");
         const order = resolve("ORDER", object.order_id, ws);
