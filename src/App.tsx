@@ -12,6 +12,7 @@ const BusinessBuilderAdminPage = lazy(() => import("./pages/BusinessBuilderAdmin
 const BusinessBuilderIntegrationsPage = lazy(() => import("./pages/BusinessBuilderIntegrationsPage"));
 const GeneratedBusinessAppPage = lazy(() => import("./pages/GeneratedBusinessAppPage"));
 const CRMSalesPipelinePage = lazy(() => import("./pages/CRMSalesPipelinePage"));
+const PlatformAdminPage = lazy(() => import("./pages/PlatformAdminPage"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="/store/:siteProjectId/order-success/:orderId" element={<PublicOrderSuccessPage />} />
             <Route element={<RequireAuth />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard/platform-admin" element={<PlatformAdminPage />} />
               <Route path="/legacy-dashboard" element={<HomePage />} />
               <Route path="/dashboard/brand-book" element={<BrandBookPage />} />
               <Route path="/dashboard/business-proposal" element={<BusinessProposalPage />} />
