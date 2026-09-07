@@ -3,7 +3,7 @@ import { requireWorkspaceId } from "../tenant-context.mjs";
 import { GrowthEvidenceError, normalizeEvidenceLink, evidencePayloadHash } from "../growth/evidence-contract.mjs";
 
 // Closed resolver map: no caller-provided table, SQL, resolver or authority.
-const tables = Object.freeze({ CAMPAIGN: "marketing_campaigns", EXPERIMENT: "experiments", EVENT: "business_events", ORDER: "ecommerce_orders", FINANCIAL_ENTRY: "ecommerce_financial_ledger" });
+const tables = Object.freeze({ CAMPAIGN: "marketing_campaigns", EXPERIMENT: "experiments", EVENT: "business_events", ORDER: "ecommerce_orders", FINANCIAL_ENTRY: "ecommerce_financial_ledger", CONTENT_CANDIDATE: "growth_content_candidates" });
 const reject = code => { throw new GrowthEvidenceError(code); };
 export function createGrowthEvidenceRepository(db, { now = () => new Date() } = {}) {
   const resolve = (type, id, ws) => {
@@ -30,6 +30,10 @@ export function createGrowthEvidenceRepository(db, { now = () => new Date() } = 
     if (!Array.isArray(goals) || index >= goals.length || goals[index] == null) reject("GROWTH_GOAL_NOT_FOUND");
     const subject = resolve(n.subject.type, n.subject.id, ws);
     if (n.subject.type === "EXPERIMENT" && subject.context_version_id !== n.contextVersionId) reject("GROWTH_CONTEXT_MISMATCH");
+    if (n.subject.type === "CONTENT_CANDIDATE") {
+      const brief=db.prepare('SELECT b.id FROM growth_content_briefs b JOIN experiments e ON e.id=b.experiment_id AND e.workspace_id=b.workspace_id WHERE b.id=? AND b.workspace_id=? AND b.goal_context_version_id=? AND b.goal_ref=? AND e.goal_context_version_id=b.goal_context_version_id AND e.goal_ref=b.goal_ref').get(subject.brief_id,ws,n.contextVersionId,n.goal.reference);
+      if(subject.state!=='APPROVED'||!brief)reject('GROWTH_APPROVED_TREATMENT_REQUIRED');
+    }
     if (n.sourceEventId) resolve("EVENT", n.sourceEventId, ws);
     let authority = "UNKNOWN";
     if (n.object) {

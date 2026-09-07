@@ -10,10 +10,12 @@ export async function runAI({
   user,
   maxTokens,
   temperature,
+  signal,
 }) {
   const entry = routeProvider({ provider, capability });
 
   return entry.run({
+    signal,
     system,
     user,
     maxTokens,
