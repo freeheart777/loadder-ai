@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "../../db/workspace-database.mjs";
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { enqueueCrmAutomationEvent } from "./crm-automation-repository.mjs";
 
 let initialized = false;
 
@@ -226,6 +227,18 @@ export function transitionDeal(id, { toStage, reason = null, expectedVersion, ac
   const wonAt = toStage === 'converted' ? timestamp : current.wonAt;
   const lostAt = toStage === 'lost' ? timestamp : current.lostAt;
   const lostReason = toStage === 'lost' ? reason : null;
+  const eventPayload = {
+    dealId: id,
+    title: current.title,
+    company: current.company,
+    amount: current.amount,
+    currency: current.currency,
+    owner: current.owner,
+    fromStage: current.stage,
+    toStage,
+    reason,
+    occurredAt: timestamp,
+  };
 
   const transaction = db.transaction(() => {
     const updated = db.prepare(`
@@ -262,6 +275,21 @@ export function transitionDeal(id, { toStage, reason = null, expectedVersion, ac
       timestamp,
       nextVersion
     );
+
+    enqueueCrmAutomationEvent({
+      workspaceId,
+      eventType: 'deal.stage_changed',
+      dealId: id,
+      dealVersion: nextVersion,
+      payload: eventPayload,
+      createdAt: timestamp,
+    });
+    if (toStage === 'converted') {
+      enqueueCrmAutomationEvent({ workspaceId, eventType: 'deal.won', dealId: id, dealVersion: nextVersion, payload: eventPayload, createdAt: timestamp });
+    }
+    if (toStage === 'lost') {
+      enqueueCrmAutomationEvent({ workspaceId, eventType: 'deal.lost', dealId: id, dealVersion: nextVersion, payload: eventPayload, createdAt: timestamp });
+    }
     return true;
   });
 
