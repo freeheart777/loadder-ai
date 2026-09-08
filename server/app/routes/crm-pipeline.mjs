@@ -3,8 +3,10 @@ import {
   CrmPipelineError,
   createCrmPipelineService,
 } from "../services/crm-pipeline-service.mjs";
+import { createCrmPipelineAnalyticsService } from "../services/crm-pipeline-analytics-service.mjs";
 
 let servicePromise;
+let analyticsPromise;
 
 function getPipelineService() {
   if (!servicePromise) {
@@ -13,6 +15,15 @@ function getPipelineService() {
     );
   }
   return servicePromise;
+}
+
+function getAnalyticsService() {
+  if (!analyticsPromise) {
+    analyticsPromise = import("../repositories/crm-deal-repository.mjs").then((repository) =>
+      createCrmPipelineAnalyticsService(repository)
+    );
+  }
+  return analyticsPromise;
 }
 
 function handlePipelineError(error, res, fallbackCode, fallbackMessage) {
@@ -32,6 +43,15 @@ export function createCrmPipelineRouter() {
       return res.json({ ok: true, data: service.board() });
     } catch (error) {
       return handlePipelineError(error, res, "CRM_PIPELINE_READ_FAILED", "خطا در دریافت Pipeline فروش.");
+    }
+  });
+
+  router.get("/analytics", async (_req, res) => {
+    try {
+      const service = await getAnalyticsService();
+      return res.json({ ok: true, data: service.snapshot() });
+    } catch (error) {
+      return handlePipelineError(error, res, "CRM_PIPELINE_ANALYTICS_FAILED", "خطا در محاسبه تحلیل Pipeline.");
     }
   });
 
