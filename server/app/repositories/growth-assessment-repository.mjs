@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { requireWorkspaceId } from '../tenant-context.mjs';
+import { isWorkspaceOperator } from '../workspace-authorization.mjs';
 import { CRM_GROWTH_SOURCE } from '../growth/crm-evidence-contract.mjs';
 import { GROWTH_ASSESSMENT_POLICY as policy, assessGrowthReadiness } from '../growth/assessment-policy.mjs';
 import { recommendationContractRegistry } from '../recommendations/recommendation-contract-registry.mjs';
@@ -14,7 +15,7 @@ const id=v=>typeof v==='string'&&v.trim()&&v.length<=200?v.trim():reject('ASSESS
 export function createGrowthAssessmentRepository(db,{semanticRepository,recommendationRepository,currentContextState,now=()=>new Date()}) {
   const calculate=db.transaction((input,actor)=>{
     const ws=requireWorkspaceId();
-    if(!actor?.userId || !db.prepare("SELECT id FROM workspace_memberships WHERE workspace_id=? AND user_id=? AND status='active' AND role IN('owner','admin')").get(ws,actor.userId))reject('ASSESSMENT_FORBIDDEN',403);
+    if(!isWorkspaceOperator(db,ws,actor?.userId))reject('ASSESSMENT_FORBIDDEN',403);
     if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['experimentId','contextVersionId','candidateId'].includes(k)))reject('ASSESSMENT_INPUT_INVALID',400);
     const experimentId=id(input.experimentId),contextVersionId=id(input.contextVersionId),candidateId=id(input.candidateId);
     const current=currentContextState();
