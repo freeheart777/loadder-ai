@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { requireWorkspaceId } from '../tenant-context.mjs';
+import { isWorkspaceOperator } from '../workspace-authorization.mjs';
 import { decodeCursor, pageResult, CursorPaginationError } from '../query/cursor-pagination.mjs';
 import { CopilotError, copilotId, normalizeCopilotInput, copilotHash } from '../growth/copilot-contract.mjs';
 import { CRM_GROWTH_SOURCE } from '../growth/crm-evidence-contract.mjs';
@@ -13,7 +14,7 @@ const map=row=>row && ({id:row.id, actorId:row.actor_id, status:row.status,
 export function createGrowthCopilotRepository(db,{currentContextState,now=()=>new Date()}={}) {
   function authorize(actor) {
     const ws=requireWorkspaceId();
-    if(!actor?.userId || !db.prepare("SELECT id FROM workspace_memberships WHERE workspace_id=? AND user_id=? AND status='active' AND role IN('owner','admin')").get(ws,actor.userId)) fail('COPILOT_FORBIDDEN',403);
+    if(!isWorkspaceOperator(db,ws,actor?.userId)) fail('COPILOT_FORBIDDEN',403);
     return ws;
   }
   function validateReferences(refs,ws) {
