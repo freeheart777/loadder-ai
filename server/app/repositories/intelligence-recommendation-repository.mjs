@@ -50,5 +50,11 @@ export function createIntelligenceRecommendationRepository(db) {
   function findNewerForIdentity(item) {
     return map(db.prepare(`SELECT * FROM intelligence_recommendations WHERE workspace_id=? AND recommendation_type=? AND subject_type=? AND subject_id IS ? AND subject_key=? AND (calculated_at>? OR(calculated_at=? AND id>?)) ORDER BY calculated_at DESC,id DESC LIMIT 1`).get(workspace(),item.recommendationType,item.subjectType,item.subjectId,item.subjectKey,item.calculatedAt,item.calculatedAt,item.id));
   }
-  return Object.freeze({ findByProducerKey, create, listPage, findNewerForIdentity, getById: (id) => map(db.prepare("SELECT * FROM intelligence_recommendations WHERE id=? AND workspace_id=?").get(id, workspace())) });
+  function listUndecided(limit=25) {
+    const rows=db.prepare(`SELECT r.id FROM intelligence_recommendations r WHERE r.workspace_id=?
+      AND NOT EXISTS(SELECT 1 FROM decision_records d WHERE d.workspace_id=r.workspace_id AND d.recommendation_id=r.id)
+      ORDER BY r.calculated_at DESC,r.id DESC LIMIT ?`).all(workspace(),limit+1);
+    return {items:rows.slice(0,limit).map(row=>row.id),truncated:rows.length>limit};
+  }
+  return Object.freeze({ findByProducerKey, create, listPage, listUndecided, findNewerForIdentity, getById: (id) => map(db.prepare("SELECT * FROM intelligence_recommendations WHERE id=? AND workspace_id=?").get(id, workspace())) });
 }

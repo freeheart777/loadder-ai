@@ -44,6 +44,12 @@ function publicSources(sources) {
 }
 
 export function createBusinessContextService({ repository, auditRepository, now = () => new Date() }) {
+  function currentState() {
+    const activeContext=repository.getActiveVersion();
+    const sources=repository.getCurrentSources();
+    const staleReasons=activeContext?getStaleReasons(activeContext.sourceManifest,sources):[];
+    return{activeContext,isStale:staleReasons.length>0,staleReasons,currentSources:publicSources(sources)};
+  }
   function requireSources() {
     const sources = repository.getCurrentSources();
     if (!sources.profile) {
@@ -84,20 +90,10 @@ export function createBusinessContextService({ repository, auditRepository, now 
 
   return {
     getCurrent() {
-      const activeContext = repository.getActiveVersion();
       const latestDraft = repository.getLatestDraft();
-      const sources = repository.getCurrentSources();
-      const staleReasons = activeContext
-        ? getStaleReasons(activeContext.sourceManifest, sources)
-        : [];
-      return {
-        activeContext,
-        latestDraft,
-        isStale: staleReasons.length > 0,
-        staleReasons,
-        currentSources: publicSources(sources),
-      };
+      return {...currentState(),latestDraft};
     },
+    getCurrentState:currentState,
     listVersions: () => repository.listVersions(),
     createDraft(payload, userId) {
       if (payload && (Object.hasOwn(payload, "snapshot_json") || Object.hasOwn(payload, "snapshot") ||

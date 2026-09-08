@@ -66,5 +66,9 @@ export function createExperimentRepository(db, { currentContextState, now = () =
     db.prepare(`INSERT INTO experiments(id,workspace_id,decision_id,context_version_id,hypothesis,objective,success_metric,baseline_value,treatment_definition,status,starts_at,ends_at,created_at,updated_at,goal_contract_version,goal_context_version_id,goal_ref,goal_contract_json,supersedes_experiment_id) VALUES(?,?,?,?,?,?,?,?,?,'DRAFT',?,?,?,?,1,?,?,?,?)`).run(id,ws,n.decisionId,n.contextVersionId,n.hypothesis,goals[index],n.goalContract.metric,baseline.state==='EVIDENCED'?baseline.value:null,n.treatment,n.goalContract.measurementWindow.start,n.goalContract.measurementWindow.end,at,at,n.contextVersionId,n.goalRef,json,n.supersedesExperimentId);
     return {experiment:get(id),created:true};
   });
-  return Object.freeze({ get, author:(input,actor)=>author.immediate(input,actor) });
+  const listOpen=(limit=25)=>{
+    const rows=db.prepare("SELECT * FROM experiments WHERE workspace_id=? AND status IN('DRAFT','READY','RUNNING') ORDER BY created_at DESC,id DESC LIMIT ?").all(workspace(),limit+1);
+    return {items:rows.slice(0,limit).map(mapExperiment),truncated:rows.length>limit};
+  };
+  return Object.freeze({ get, listOpen, author:(input,actor)=>author.immediate(input,actor) });
 }

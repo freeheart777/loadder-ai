@@ -37,6 +37,7 @@ import { createListeningIntelligenceRouter } from "./app/routes/listening-intell
 import { createSemanticIntelligenceRouter } from "./app/routes/semantic-intelligence.mjs";
 import { createRecommendationIntelligenceRouter } from "./app/routes/recommendation-intelligence.mjs";
 import { createHumanGovernanceRouter } from "./app/routes/human-governance.mjs";
+import { createBusinessStateRouter } from "./app/routes/business-state.mjs";
 import { createLegacyCrmRouter } from "./app/routes/legacy-crm.mjs";
 import { createLegacyAutomationsRouter } from "./app/routes/legacy-automations.mjs";
 import { createLegacyMarketingRouter } from "./app/routes/legacy-marketing.mjs";
@@ -103,6 +104,7 @@ import { createSemanticIntelligenceService } from "./app/services/semantic-intel
 import { semanticContractRegistry } from "./app/semantic/semantic-contract-registry.mjs";
 import { createRecommendationIntelligenceService } from "./app/services/recommendation-intelligence-service.mjs";
 import { createHumanGovernanceService } from "./app/services/human-governance-service.mjs";
+import { createBusinessStateService } from "./app/services/business-state-service.mjs";
 import { createDecisionRecordReadService } from "./app/services/decision-record-read-service.mjs";
 import { createRecommendationFreshnessQuery } from "./app/recommendations/recommendation-freshness-query.mjs";
 import { recommendationContractRegistry } from "./app/recommendations/recommendation-contract-registry.mjs";
@@ -335,6 +337,9 @@ const humanGovernanceRepository = createHumanGovernanceRepository(db);
 const recommendationFreshnessQuery = createRecommendationFreshnessQuery({ recommendationRepository: intelligenceRecommendationRepository, currentContextState: () => { const current = businessContextService.getCurrent(); return { contextVersionId: current.activeContext?.id || null, isStale: current.isStale }; } });
 const humanGovernanceService = createHumanGovernanceService({ repository: humanGovernanceRepository, recommendationRepository: intelligenceRecommendationRepository, freshnessQuery: recommendationFreshnessQuery });
 const decisionRecordReadService=createDecisionRecordReadService({repository:createDecisionRecordReadRepository(db)});
+const experimentRepository=createExperimentRepository(db,{currentContextState:()=>{const c=businessContextService.getCurrent();return{contextVersionId:c.activeContext?.id||null,isStale:c.isStale};}});
+const growthContentRepository=createGrowthContentRepository(db,{contextGateway:businessContextConsumerGateway});
+const businessStateService=createBusinessStateService({businessProfileService,businessContextService,experimentRepository,recommendationRepository:intelligenceRecommendationRepository,contentRepository:growthContentRepository});
 
 app.use(
   "/api/auth",
@@ -429,8 +434,8 @@ app.use("/api", createListeningIntelligenceRouter({ service: listeningIntelligen
 app.use("/api", createSemanticIntelligenceRouter({ service: semanticIntelligenceService }));
 app.use("/api", createRecommendationIntelligenceRouter({ service: recommendationIntelligenceService }));
 app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService, decisionRecordService:decisionRecordReadService }));
-app.use("/api", createExperimentAuthoringRouter({ repository: createExperimentRepository(db, { currentContextState: () => { const c=businessContextService.getCurrent(); return {contextVersionId:c.activeContext?.id || null,isStale:c.isStale}; } }) }));
-const growthContentRepository=createGrowthContentRepository(db,{contextGateway:businessContextConsumerGateway});
+app.use('/api',createBusinessStateRouter({service:businessStateService}));
+app.use("/api", createExperimentAuthoringRouter({ repository:experimentRepository }));
 app.use('/api',createGrowthAssessmentRouter({repository:createGrowthAssessmentRepository(db,{semanticRepository:semanticFindingRepository,recommendationRepository:intelligenceRecommendationRepository,currentContextState:()=>{const c=businessContextService.getCurrent();return {contextVersionId:c.activeContext?.id||null,isStale:c.isStale};}})}));
 app.use('/api',createGrowthCopilotRouter({repository:createGrowthCopilotRepository(db,{currentContextState:()=>{const c=businessContextService.getCurrent();return {contextVersionId:c.activeContext?.id||null,isStale:c.isStale};}})}));
 app.use('/api',createGrowthLeadEvidenceRouter({repository:createGrowthLeadEvidenceRepository(db,{convertLeadToCustomer,eventService:businessEventService,eventRepository:businessEventRepository,evidenceRepository:createGrowthEvidenceRepository(db)})}));
