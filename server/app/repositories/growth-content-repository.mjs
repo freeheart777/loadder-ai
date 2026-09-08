@@ -78,5 +78,11 @@ export function createGrowthContentRepository(db,{contextGateway,now=()=>new Dat
     getBrief(id,a){authorize(a);return brief(id);},getCandidate(id,a){authorize(a);return candidate(id);},
     listBriefs(experimentId,p,a){authorize(a);const {page,pageSize}=pageInput(p);return db.prepare('SELECT * FROM growth_content_briefs WHERE workspace_id=? AND experiment_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').all(ws(),experimentId,pageSize,(page-1)*pageSize);},
     listCandidates(briefId,p,a){authorize(a);const {page,pageSize}=pageInput(p);return db.prepare('SELECT * FROM growth_content_candidates WHERE workspace_id=? AND brief_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').all(ws(),briefId,pageSize,(page-1)*pageSize);},
+    listOperationalState(a,limit=25){authorize(a);const rows=db.prepare(`WITH ranked AS (
+      SELECT id,state,ROW_NUMBER() OVER(PARTITION BY state ORDER BY created_at DESC,id DESC) AS position
+      FROM growth_content_candidates WHERE workspace_id=? AND state IN('PENDING','RECONCILIATION_REQUIRED'))
+      SELECT id,state,position FROM ranked WHERE position<=? ORDER BY state,position`).all(ws(),limit+1);
+      const select=state=>{const matches=rows.filter(row=>row.state===state);return{ids:matches.slice(0,limit).map(row=>row.id),truncated:matches.length>limit};};
+      return{pending:select('PENDING'),reconciliationRequired:select('RECONCILIATION_REQUIRED')};},
   });
 }
