@@ -69,7 +69,6 @@ export function createCrmPipelineRouter() {
   router.get("/automation", async (_req, res) => {
     try {
       const service = await getAutomationService();
-      service.processPending();
       return res.json({ ok: true, data: { summary: service.summary(), actions: service.actions() } });
     } catch (error) {
       return handlePipelineError(error, res, "CRM_AUTOMATION_READ_FAILED", "خطا در دریافت Automation فروش.");
