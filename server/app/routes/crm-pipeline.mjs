@@ -4,9 +4,11 @@ import {
   createCrmPipelineService,
 } from "../services/crm-pipeline-service.mjs";
 import { createCrmPipelineAnalyticsService } from "../services/crm-pipeline-analytics-service.mjs";
+import { createCrmAutomationService } from "../services/crm-automation-service.mjs";
 
 let servicePromise;
 let analyticsPromise;
+let automationPromise;
 
 function getPipelineService() {
   if (!servicePromise) {
@@ -24,6 +26,15 @@ function getAnalyticsService() {
     );
   }
   return analyticsPromise;
+}
+
+function getAutomationService() {
+  if (!automationPromise) {
+    automationPromise = import("../repositories/crm-automation-repository.mjs").then((repository) =>
+      createCrmAutomationService(repository)
+    );
+  }
+  return automationPromise;
 }
 
 function handlePipelineError(error, res, fallbackCode, fallbackMessage) {
@@ -52,6 +63,35 @@ export function createCrmPipelineRouter() {
       return res.json({ ok: true, data: service.snapshot() });
     } catch (error) {
       return handlePipelineError(error, res, "CRM_PIPELINE_ANALYTICS_FAILED", "خطا در محاسبه تحلیل Pipeline.");
+    }
+  });
+
+  router.get("/automation", async (_req, res) => {
+    try {
+      const service = await getAutomationService();
+      service.processPending();
+      return res.json({ ok: true, data: { summary: service.summary(), actions: service.actions() } });
+    } catch (error) {
+      return handlePipelineError(error, res, "CRM_AUTOMATION_READ_FAILED", "خطا در دریافت Automation فروش.");
+    }
+  });
+
+  router.post("/automation/sweep", async (req, res) => {
+    try {
+      const service = await getAutomationService();
+      const result = service.sweepStuck({ afterDays: req.body?.afterDays ?? 3 });
+      return res.json({ ok: true, data: result });
+    } catch (error) {
+      return handlePipelineError(error, res, "CRM_AUTOMATION_SWEEP_FAILED", "خطا در اجرای بررسی Dealهای متوقف‌شده.");
+    }
+  });
+
+  router.post("/automation/process", async (_req, res) => {
+    try {
+      const service = await getAutomationService();
+      return res.json({ ok: true, data: service.processPending() });
+    } catch (error) {
+      return handlePipelineError(error, res, "CRM_AUTOMATION_PROCESS_FAILED", "خطا در پردازش Automation فروش.");
     }
   });
 
@@ -93,7 +133,9 @@ export function createCrmPipelineRouter() {
         actorType: req.body?.actorType || "user",
         actorId: req.user?.id || null,
       });
-      return res.json({ ok: true, data: deal });
+      const automation = await getAutomationService();
+      const automationResult = automation.processPending();
+      return res.json({ ok: true, data: deal, automation: automationResult });
     } catch (error) {
       return handlePipelineError(error, res, "CRM_PIPELINE_TRANSITION_FAILED", "خطا در جابه‌جایی فرصت فروش.");
     }
