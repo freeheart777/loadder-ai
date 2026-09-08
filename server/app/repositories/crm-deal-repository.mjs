@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { db } from "../../db/workspace-database.mjs";
 import { requireWorkspaceId } from "../tenant-context.mjs";
-import { enqueueCrmAutomationEvent } from "./crm-automation-repository.mjs";
+import { ensureCrmAutomationSchema, enqueueCrmAutomationEvent } from "./crm-automation-repository.mjs";
 
 let initialized = false;
 
@@ -217,6 +217,7 @@ export function updateDealMetadata(id, { ownerId, owner, nextAction, nextActionD
 
 export function transitionDeal(id, { toStage, reason = null, expectedVersion, actorType = 'user', actorId = null }) {
   ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   const current = getDealById(id);
   if (!current) return { kind: 'not_found' };
