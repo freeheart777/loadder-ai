@@ -63,6 +63,7 @@ import { createListeningIntelligenceRepository } from "./app/repositories/listen
 import { createSemanticFindingRepository } from "./app/repositories/semantic-finding-repository.mjs";
 import { createIntelligenceRecommendationRepository } from "./app/repositories/intelligence-recommendation-repository.mjs";
 import { createHumanGovernanceRepository } from "./app/repositories/human-governance-repository.mjs";
+import { createDecisionRecordReadRepository } from "./app/repositories/decision-record-read-repository.mjs";
 import { createAuthService } from "./app/services/auth-service.mjs";
 import { createBusinessProfileService } from "./app/services/business-profile-service.mjs";
 import { createBusinessDnaService } from "./app/services/business-dna-service.mjs";
@@ -102,6 +103,7 @@ import { createSemanticIntelligenceService } from "./app/services/semantic-intel
 import { semanticContractRegistry } from "./app/semantic/semantic-contract-registry.mjs";
 import { createRecommendationIntelligenceService } from "./app/services/recommendation-intelligence-service.mjs";
 import { createHumanGovernanceService } from "./app/services/human-governance-service.mjs";
+import { createDecisionRecordReadService } from "./app/services/decision-record-read-service.mjs";
 import { createRecommendationFreshnessQuery } from "./app/recommendations/recommendation-freshness-query.mjs";
 import { recommendationContractRegistry } from "./app/recommendations/recommendation-contract-registry.mjs";
 import {
@@ -332,6 +334,7 @@ const recommendationIntelligenceService = createRecommendationIntelligenceServic
 const humanGovernanceRepository = createHumanGovernanceRepository(db);
 const recommendationFreshnessQuery = createRecommendationFreshnessQuery({ recommendationRepository: intelligenceRecommendationRepository, currentContextState: () => { const current = businessContextService.getCurrent(); return { contextVersionId: current.activeContext?.id || null, isStale: current.isStale }; } });
 const humanGovernanceService = createHumanGovernanceService({ repository: humanGovernanceRepository, recommendationRepository: intelligenceRecommendationRepository, freshnessQuery: recommendationFreshnessQuery });
+const decisionRecordReadService=createDecisionRecordReadService({repository:createDecisionRecordReadRepository(db)});
 
 app.use(
   "/api/auth",
@@ -425,7 +428,7 @@ app.use("/api", createListeningRouter({ service: listeningService, mapper: liste
 app.use("/api", createListeningIntelligenceRouter({ service: listeningIntelligenceService }));
 app.use("/api", createSemanticIntelligenceRouter({ service: semanticIntelligenceService }));
 app.use("/api", createRecommendationIntelligenceRouter({ service: recommendationIntelligenceService }));
-app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService }));
+app.use("/api", createHumanGovernanceRouter({ service: humanGovernanceService, decisionRecordService:decisionRecordReadService }));
 app.use("/api", createExperimentAuthoringRouter({ repository: createExperimentRepository(db, { currentContextState: () => { const c=businessContextService.getCurrent(); return {contextVersionId:c.activeContext?.id || null,isStale:c.isStale}; } }) }));
 const growthContentRepository=createGrowthContentRepository(db,{contextGateway:businessContextConsumerGateway});
 app.use('/api',createGrowthAssessmentRouter({repository:createGrowthAssessmentRepository(db,{semanticRepository:semanticFindingRepository,recommendationRepository:intelligenceRecommendationRepository,currentContextState:()=>{const c=businessContextService.getCurrent();return {contextVersionId:c.activeContext?.id||null,isStale:c.isStale};}})}));
