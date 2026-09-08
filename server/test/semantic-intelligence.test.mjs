@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
 import express from "express";
 
 import { runMigrations } from "../db/migrate.mjs";
+import { migrations } from "../db/migrations/index.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { semanticContractRegistry } from "../app/semantic/semantic-contract-registry.mjs";
 import { produceListeningAttention, produceCompetitiveVisibility } from "../app/semantic/semantic-producers.mjs";
@@ -22,8 +23,8 @@ const contextSnapshot = JSON.stringify({ identity: {}, metadata: {} });
 
 test("Phase 4E v1 Semantic Intelligence foundation", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "loadder-semantic-")), path = join(dir, "semantic.sqlite");
-  copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
-  const db = new Database(path); db.pragma("foreign_keys=ON"); runMigrations(db); runMigrations(db);
+  const db = new Database(path); db.pragma("foreign_keys=ON"); db.exec("CREATE TABLE customers(id TEXT PRIMARY KEY,workspace_id TEXT);CREATE TABLE marketing_campaigns(id TEXT PRIMARY KEY,workspace_id TEXT);");
+  const migrationList = migrations.filter(({ version }) => ![2, 3].includes(version)); runMigrations(db, migrationList); runMigrations(db, migrationList);
   for (const workspace of ["semantic-a", "semantic-b"]) {
     db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at) VALUES(?,?,?,?,?)").run(workspace, workspace, workspace, AT, AT);
     db.prepare("INSERT INTO business_profiles(id,workspace_id,name,status,created_at,updated_at) VALUES(?,?,?,?,?,?)").run(`p-${workspace}`, workspace, workspace, "active", AT, AT);

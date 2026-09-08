@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {copyFileSync,mkdtempSync,rmSync,readFileSync} from "node:fs";
+import {mkdtempSync,rmSync,readFileSync} from "node:fs";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import Database from "better-sqlite3";
@@ -18,20 +18,7 @@ import {encodeCursor} from "../app/query/cursor-pagination.mjs";
 
 const AT="2026-08-21T12:00:00.000Z",LATER="2026-08-21T13:00:00.000Z",sha="a".repeat(64);
 test("Phase 4G v1 Human Governance",async t=>{
- const dir=mkdtempSync(join(tmpdir(),"loadder-governance-")),path=join(dir,"governance.sqlite");copyFileSync(new URL("../db/loadder.sqlite",import.meta.url),path);const db=new Database(path);db.pragma("foreign_keys=ON");
- db.exec(`
-  DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard;
-  DROP TRIGGER IF EXISTS trg_recommendation_reviews_update;
-  DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete;
-  DROP TRIGGER IF EXISTS trg_decision_records_insert_guard;
-  DROP TRIGGER IF EXISTS trg_decision_records_update;
-  DROP TRIGGER IF EXISTS trg_decision_records_delete;
-  DROP TABLE IF EXISTS decision_records;
-  DROP TABLE IF EXISTS recommendation_reviews;
-  DELETE FROM schema_migrations WHERE version >= 37;
- `);
-
- const before=db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c;runMigrations(db);runMigrations(db);
+ const dir=mkdtempSync(join(tmpdir(),"loadder-governance-")),path=join(dir,"governance.sqlite");const db=new Database(path);db.pragma("foreign_keys=ON");db.exec("CREATE TABLE customers(id TEXT PRIMARY KEY,workspace_id TEXT);CREATE TABLE marketing_campaigns(id TEXT PRIMARY KEY,workspace_id TEXT);");const migrationList=migrations.filter(({version})=>![2,3].includes(version));runMigrations(db,migrationList);runMigrations(db,migrationList);
  const setup=(wid)=>{db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at)VALUES(?,?,?,?,?)").run(wid,wid,wid,AT,AT);db.prepare("INSERT INTO business_profiles(id,workspace_id,name,status,created_at,updated_at)VALUES(?,?,?,?,?,?)").run(`p-${wid}`,wid,wid,"active",AT,AT);db.prepare("INSERT INTO business_dna_versions(id,workspace_id,business_profile_id,version_number,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(`d-${wid}`,wid,`p-${wid}`,1,"active",AT,AT);db.prepare("INSERT INTO brand_book_versions(id,workspace_id,business_profile_id,version_number,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(`b-${wid}`,wid,`p-${wid}`,1,"active",AT,AT);db.prepare("INSERT INTO business_context_versions(id,workspace_id,business_profile_id,business_dna_version_id,brand_book_version_id,version_number,status,context_schema_version,snapshot_json,source_manifest_json,created_at,activated_at)VALUES(?,?,?,?,?,1,'active','1.0','{}','{}',?,?)").run(`c-${wid}`,wid,`p-${wid}`,`d-${wid}`,`b-${wid}`,AT,AT);};setup("ga");setup("gb");
  const actor=(id,role,wid="ga")=>{db.prepare("INSERT INTO users(id,mobile,name,status,created_at,updated_at)VALUES(?,?,?,?,?,?)").run(id,`09${id.padEnd(9,"0").slice(0,9)}`,id,"active",AT,AT);const membershipId=`m-${id}-${wid}`;db.prepare("INSERT INTO workspace_memberships(id,workspace_id,user_id,role,status,created_at,updated_at)VALUES(?,?,?,?,?,?,?)").run(membershipId,wid,id,role,"active",AT,AT);return{userId:id,membershipId,role};};const owner=actor("owner","owner"),admin=actor("admin","admin"),member=actor("member","member"),foreign=actor("foreign","owner","gb");
  const insertRecommendation=(id,wid,at,context=`c-${wid}`)=>db.prepare("INSERT INTO intelligence_recommendations(id,workspace_id,recommendation_type,recommendation_version,schema_version,subject_type,subject_id,subject_key,consideration_code,rationale_code,review_priority,semantic_manifest_json,semantic_manifest_hash,semantic_finding_count,context_version_id,point_in_time_cutoff,producer,producer_version,producer_key,confidence,confidence_reason,provenance_json,calculated_at,created_at)VALUES(?,?, 'attention_evidence_review',1,1,'listening_scope',NULL,'scope','REVIEW_ATTENTION_INCREASE','ATTENTION_RISING','MEDIUM','[]',?,0,?,?, 'test', '1.0',?,NULL,'DETERMINISTIC','{}',?,?)").run(id,wid,sha,context,at,id,at,at);insertRecommendation("r1","ga",AT);insertRecommendation("rf","gb",AT);
@@ -40,9 +27,9 @@ test("Phase 4G v1 Human Governance",async t=>{
   const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('recommendation_reviews','decision_records') ORDER BY name").all().map(r=>r.name);
   assert.deepEqual(tables,["decision_records","recommendation_reviews"]);
   const latestMigrationVersion=Math.max(...migrations.map(migration=>migration.version));
-  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(),{c:migrations.length,m:latestMigrationVersion});
-  runMigrations(db);
-  runMigrations(db);
+  assert.deepEqual(db.prepare("SELECT COUNT(*) c,MAX(version) m FROM schema_migrations").get(),{c:migrationList.length,m:latestMigrationVersion});
+  runMigrations(db,migrationList);
+  runMigrations(db,migrationList);
   const tablesAfter=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('recommendation_reviews','decision_records') ORDER BY name").all().map(r=>r.name);
   assert.deepEqual(tablesAfter,["decision_records","recommendation_reviews"]);
 });

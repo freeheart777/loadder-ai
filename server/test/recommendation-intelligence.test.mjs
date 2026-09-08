@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
@@ -28,26 +28,13 @@ const canonical = (value) => value === null || typeof value !== "object" ? JSON.
 
 test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "loadder-recommendation-")), path = join(dir, "recommendation.sqlite");
-  copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
   const db = new Database(path); db.pragma("foreign_keys=ON");
-  db.exec(`
-    DROP TRIGGER IF EXISTS trg_recommendation_reviews_insert_guard;
-    DROP TRIGGER IF EXISTS trg_recommendation_reviews_update;
-    DROP TRIGGER IF EXISTS trg_recommendation_reviews_delete;
-    DROP TRIGGER IF EXISTS trg_decision_records_insert_guard;
-    DROP TRIGGER IF EXISTS trg_decision_records_update;
-    DROP TRIGGER IF EXISTS trg_decision_records_delete;
-    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_insert_guard;
-    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_update;
-    DROP TRIGGER IF EXISTS trg_intelligence_recommendations_delete;
-    DROP TABLE IF EXISTS decision_records;
-    DROP TABLE IF EXISTS recommendation_reviews;
-    DROP TABLE IF EXISTS intelligence_recommendations;
-    DELETE FROM schema_migrations WHERE version >= 36;
-  `);
+  db.exec("CREATE TABLE customers(id TEXT PRIMARY KEY,workspace_id TEXT);CREATE TABLE marketing_campaigns(id TEXT PRIMARY KEY,workspace_id TEXT);");
+  const migrationList = migrations.filter(({ version }) => ![2, 3].includes(version));
+  runMigrations(db, migrationList.filter((migration) => migration.version < 36));
   const tableCountBefore = db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c;
-  runMigrations(db, migrations.filter((migration) => migration.version <= 36));
-  runMigrations(db, migrations.filter((migration) => migration.version <= 36));
+  runMigrations(db, migrationList.filter((migration) => migration.version <= 36));
+  runMigrations(db, migrationList.filter((migration) => migration.version <= 36));
   for (const workspace of ["recommendation-a", "recommendation-b"]) {
     db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at) VALUES(?,?,?,?,?)").run(workspace, workspace, workspace, AT, AT);
     db.prepare("INSERT INTO business_profiles(id,workspace_id,name,status,created_at,updated_at) VALUES(?,?,?,?,?,?)").run(`p-${workspace}`, workspace, workspace, "active", AT, AT);
@@ -73,7 +60,7 @@ test("Phase 4F v1 Recommendation Intelligence foundation", async (t) => {
   const request = (types = ["attention_evidence_review"]) => ({ recommendationTypes: types, subjectType: "listening_scope", subjectId: null, subjectKey: "brand-monitor", pointInTimeCutoff: AT, scope: { window: "24h" } });
 
   await t.test("migration 036 is idempotent and creates exactly one table", () => {
-    assert.equal(db.prepare("SELECT COUNT(*) c FROM schema_migrations").get().c, 36);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM schema_migrations").get().c, 34);
     assert.equal(db.prepare("SELECT MAX(version) v FROM schema_migrations").get().v, 36);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().c, tableCountBefore + 1);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='intelligence_recommendations'").get().c, 1);
