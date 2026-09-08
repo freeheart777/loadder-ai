@@ -4,7 +4,7 @@ import { requireWorkspaceId } from "../tenant-context.mjs";
 
 let initialized = false;
 
-function ensureSchema() {
+export function ensureCrmAutomationSchema() {
   if (initialized) return;
   db.exec(`
     CREATE TABLE IF NOT EXISTS crm_automation_outbox (
@@ -46,7 +46,7 @@ function ensureSchema() {
 function nowIso() { return new Date().toISOString(); }
 
 export function enqueueCrmAutomationEvent({ workspaceId, eventType, dealId, dealVersion, payload, createdAt = nowIso() }) {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const id = crypto.randomUUID();
   const result = db.prepare(`
     INSERT OR IGNORE INTO crm_automation_outbox (
@@ -57,7 +57,7 @@ export function enqueueCrmAutomationEvent({ workspaceId, eventType, dealId, deal
 }
 
 export function enqueueStuckEvents({ thresholdIso, occurredAt = nowIso() }) {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   const deals = db.prepare(`
     SELECT id, title, stage, owner_name, amount_minor, currency, version, updated_at
@@ -93,7 +93,7 @@ export function enqueueStuckEvents({ thresholdIso, occurredAt = nowIso() }) {
 }
 
 export function listPendingOutbox(limit = 50) {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   return db.prepare(`
     SELECT * FROM crm_automation_outbox
@@ -112,7 +112,7 @@ export function listPendingOutbox(limit = 50) {
 }
 
 export function markOutboxProcessed(id, processedAt = nowIso()) {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   db.prepare(`
     UPDATE crm_automation_outbox
@@ -122,7 +122,7 @@ export function markOutboxProcessed(id, processedAt = nowIso()) {
 }
 
 export function markOutboxFailed(id, errorMessage) {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   db.prepare(`
     UPDATE crm_automation_outbox
@@ -132,7 +132,7 @@ export function markOutboxFailed(id, errorMessage) {
 }
 
 export function createAutomationAction({ dealId, actionType, title, payload, idempotencyKey, status = 'pending', createdAt = nowIso() }) {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   const id = crypto.randomUUID();
   const result = db.prepare(`
@@ -144,7 +144,7 @@ export function createAutomationAction({ dealId, actionType, title, payload, ide
 }
 
 export function listAutomationActions(limit = 100) {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   return db.prepare(`
     SELECT id, deal_id, action_type, status, title, payload_json, idempotency_key, created_at, updated_at
@@ -166,7 +166,7 @@ export function listAutomationActions(limit = 100) {
 }
 
 export function automationSummary() {
-  ensureSchema();
+  ensureCrmAutomationSchema();
   const workspaceId = requireWorkspaceId();
   const pendingEvents = db.prepare(`SELECT COUNT(*) AS count FROM crm_automation_outbox WHERE workspace_id = ? AND status = 'pending'`).get(workspaceId).count;
   const actions = db.prepare(`SELECT action_type, status, COUNT(*) AS count FROM crm_automation_actions WHERE workspace_id = ? GROUP BY action_type, status`).all(workspaceId);
