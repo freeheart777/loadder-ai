@@ -14,7 +14,7 @@ test("Mission Control is a bounded mobile-safe dashboard front door",async({page
   await page.route("**/api/mission-control",route=>route.fulfill({json:{success:true,missionControl:{contractVersion:1,generatedAt:"2026-09-09T12:00:00.000Z",items,banners:[{code:"STALE_BUSINESS_CONTEXT",staleReasons:["BUSINESS_PROFILE_CHANGED"]}],signalStatus:[{signalId:"S1",status:"ok"},{signalId:"S2",status:"ok"},{signalId:"S3",status:"ok"},{signalId:"S4",status:"failed"}],bounds:{maxItems:7,truncated:false}}}}));
   await page.goto("/dashboard");
   await expect(page.getByRole("heading",{name:/آزاده، چه چیزی الان به توجهت نیاز دارد/})).toBeVisible();
-  await expect(page.getByText("بخشی از سیگنال‌ها در دسترس نیست",{exact:false})).toBeVisible();
+  await expect(page.getByText("بخشی از بررسی‌های هوشمند فعلاً در دسترس نیست",{exact:false})).toBeVisible();
   await expect(page.getByText("پروفایل کسب‌وکار تغییر کرده است")).toBeVisible();
   await expect(page.getByText("نمایش ۳ مورد دیگر")).toBeVisible();
   await expect(page.getByText("امروز تصمیم بگیرید")).toBeVisible();
