@@ -1,62 +1,16 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { db, createLead } from '../../server/db/workspace-database.mjs';
-import { runWithWorkspace } from '../../server/app/tenant-context.mjs';
-import { createIdentityRepository } from '../../server/app/repositories/identity-repository.mjs';
-import { createBusinessProfileRepository } from '../../server/app/repositories/business-profile-repository.mjs';
-import { createBusinessDnaRepository } from '../../server/app/repositories/business-dna-repository.mjs';
-import { createBrandBookRepository } from '../../server/app/repositories/brand-book-repository.mjs';
-import { createBusinessContextRepository } from '../../server/app/repositories/business-context-repository.mjs';
-import { createBusinessContextUsageRepository } from '../../server/app/repositories/business-context-usage-repository.mjs';
-import { createBusinessProfileService } from '../../server/app/services/business-profile-service.mjs';
-import { createBusinessDnaService } from '../../server/app/services/business-dna-service.mjs';
-import { createBrandBookService } from '../../server/app/services/brand-book-service.mjs';
-import { createBusinessContextService } from '../../server/app/services/business-context-service.mjs';
-import { createBusinessContextConsumerGateway } from '../../server/app/context-consumers/business-context-consumer-gateway.mjs';
-import { contextCapabilityRegistry } from '../../server/app/context-consumers/capability-registry.mjs';
-import { createIntelligenceRecommendationRepository } from '../../server/app/repositories/intelligence-recommendation-repository.mjs';
-import { createHumanGovernanceRepository } from '../../server/app/repositories/human-governance-repository.mjs';
-import { createHumanGovernanceService } from '../../server/app/services/human-governance-service.mjs';
-import { createExperimentRepository } from '../../server/app/repositories/experiment-repository.mjs';
-import { createGrowthContentRepository } from '../../server/app/repositories/growth-content-repository.mjs';
-import { createGrowthContentService } from '../../server/app/services/growth-content-service.mjs';
+import { db } from '../../server/db/workspace-database.mjs';
+import { seedGrowthLoopFixture } from '../../server/test-helpers/growth-loop-fixture.mjs';
 
-const args=process.argv.slice(2);
-if(args[0]==='inspect'){
-  const [,workspaceId,candidateId,leadId]=args;
-  const events=db.prepare("SELECT count(*) n FROM business_events WHERE workspace_id=? AND subject_type='lead' AND subject_id=? AND event_type='lead.converted'").get(workspaceId,leadId).n;
-  const evidence=db.prepare("SELECT count(*) n FROM growth_evidence_links WHERE workspace_id=? AND subject_type='CONTENT_CANDIDATE' AND subject_id=? AND evidence_kind='CRM_CONVERSION'").get(workspaceId,candidateId).n;
-  const financial=db.prepare('SELECT count(*) n FROM ecommerce_financial_ledger WHERE workspace_id=?').get(workspaceId).n;
-  console.log(JSON.stringify({events,evidence,financial}));process.exit(0);
+const args = process.argv.slice(2);
+if (args[0] === 'inspect') {
+  const [, workspaceId, candidateId, leadId] = args;
+  const events = db.prepare("SELECT count(*) n FROM business_events WHERE workspace_id=? AND subject_type='lead' AND subject_id=? AND event_type='lead.converted'").get(workspaceId, leadId).n;
+  const evidence = db.prepare("SELECT count(*) n FROM growth_evidence_links WHERE workspace_id=? AND subject_type='CONTENT_CANDIDATE' AND subject_id=? AND evidence_kind='CRM_CONVERSION'").get(workspaceId, candidateId).n;
+  const financial = db.prepare('SELECT count(*) n FROM ecommerce_financial_ledger WHERE workspace_id=?').get(workspaceId).n;
+  console.log(JSON.stringify({ events, evidence, financial })); process.exit(0);
 }
-const [workspaceId,userId,membershipId]=args;
-if(!workspaceId||!userId||!membershipId)throw Error('workspace, user and membership are required');
-const sha=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const now=()=>new Date();
-const result=runWithWorkspace(workspaceId,()=>{
-  const identities=createIdentityRepository(db);
-  const profiles=createBusinessProfileService({repository:createBusinessProfileRepository(db),auditRepository:identities,now});
-  const dna=createBusinessDnaService({repository:createBusinessDnaRepository(db),auditRepository:identities,now});
-  const brand=createBrandBookService({repository:createBrandBookRepository(db),auditRepository:identities,now});
-  const contexts=createBusinessContextService({repository:createBusinessContextRepository(db),auditRepository:identities,now});
-  profiles.createBusinessProfile({name:'کسب‌وکار آزمایشی چرخه رشد',industry:'Services'},userId);
-  let version=dna.createDraft({valueProposition:'مشاوره شفاف',goals:['افزایش لیدهای واجد شرایط']},userId);dna.activateVersion(version.id,userId);
-  version=brand.createDraft({toneOfVoice:'شفاف و حرفه‌ای'},userId);brand.activateVersion(version.id,userId);
-  const context=contexts.activateVersion(contexts.createDraft({},userId).id,userId);
-  const recommendationRepository=createIntelligenceRecommendationRepository(db),at=now().toISOString();
-  const seedRecommendation=recommendationRepository.create({recommendationType:'attention_evidence_review',recommendationVersion:1,schemaVersion:1,subjectType:'listening_scope',subjectId:null,subjectKey:'growth-e2e-setup',considerationCode:'REVIEW_ATTENTION_INCREASE',rationaleCode:'ATTENTION_RISING',reviewPriority:'MEDIUM',semanticFindingReferences:[],semanticManifestHash:sha([]),contextVersionId:context.id,pointInTimeCutoff:at,producer:'growth_e2e_setup',producerVersion:'1',producerKey:randomUUID(),confidence:null,confidenceReason:'E2E prerequisite only',provenance:{setupOnly:true},calculatedAt:at,createdAt:at}).recommendation;
-  const governance=createHumanGovernanceService({repository:createHumanGovernanceRepository(db),recommendationRepository,freshnessQuery:{resolve:()=> 'CURRENT'},now});
-  const decision=governance.createDecision(seedRecommendation.id,{decisionType:'ADOPT',allowStale:false,supersedesDecisionId:null},{userId,membershipId,role:'owner'},'growth-e2e-goal').decision;
-  const start=new Date(Date.now()-86400000).toISOString(),end=new Date(Date.now()-60000).toISOString();
-  const experiments=createExperimentRepository(db,{currentContextState:()=>({contextVersionId:context.id,isStale:false}),now});
-  const experiment=experiments.author({decisionId:decision.id,contextVersionId:context.id,goalRef:'/strategy/goals/0',goalContractVersion:1,hypothesis:'محتوای شفاف درخواست مشاوره را بیشتر می‌کند',treatment:'دعوت روشن به مشاوره',goalContract:{metric:'lead_count',direction:'INCREASE',target:1,unit:'COUNT',measurementWindow:{start,end},baseline:{state:'UNKNOWN'}},supersedesExperimentId:null},{userId}).experiment;
-  const gateway=createBusinessContextConsumerGateway({businessContextService:contexts,usageRepository:createBusinessContextUsageRepository(db),capabilityRegistry:contextCapabilityRegistry,now});
-  const content=createGrowthContentRepository(db,{contextGateway:gateway,now});
-  const brief=content.createBrief({experimentId:experiment.id,contextVersionId:context.id,goalRef:'/strategy/goals/0',audience:'مدیر کسب‌وکار کوچک',message:'رزرو مشاوره',channel:'SOCIAL',contentType:'instagram',constraints:['بدون ادعای تضمینی'],idempotencyKey:'growth-e2e-brief'},{userId}).brief;
-  const generated=createGrowthContentService({repository:content,execute:async()=>({success:true,answer:'برای بررسی مسیر رشد کسب‌وکارتان، یک جلسه مشاوره رزرو کنید.',provider:'deterministic-e2e',model:'fixture-v1',usage:{inputTokens:0,outputTokens:0,totalTokens:0}})});
-  return generated.generate(brief.id,{idempotencyKey:'growth-e2e-candidate'},{userId}).then(({candidate})=>{
-    const approved=content.decide(candidate.id,{decision:'APPROVED'},{userId});
-    const lead=createLead({name:'لید واقعی آزمون مرورگر',phone:'09120000001',source:'growth-e2e',score:80,status:'new',opportunityValue:0});
-    return {experimentId:experiment.id,contextId:context.id,candidateId:approved.id,leadId:lead.id};
-  });
-});
-console.log(JSON.stringify(await result));
+const [workspaceId, userId, membershipId] = args;
+if (!workspaceId || !userId || !membershipId) throw Error('workspace, user and membership are required');
+
+const result = await seedGrowthLoopFixture({ db, workspaceId, userId, membershipId, mode: 'create' });
+console.log(JSON.stringify(result));

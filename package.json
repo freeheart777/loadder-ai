@@ -10,6 +10,7 @@
     "start:server": "node server/index.mjs",
     "test:server": "npm --prefix server test",
     "check:db-boundary": "node server/scripts/check-db-boundaries.mjs",
+    "demo:growth": "node server/scripts/demo-growth-bootstrap.mjs",
     "workspace:assign-legacy-owner": "node server/scripts/assign-legacy-owner.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
