@@ -1,4 +1,5 @@
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { isWorkspaceOperator } from "../workspace-authorization.mjs";
 import { randomUUID } from "node:crypto";
 import { ExperimentAuthoringError, normalizeExperimentGoal } from "../growth/experiment-goal-contract.mjs";
 
@@ -29,7 +30,7 @@ export function createExperimentRepository(db, { currentContextState, now = () =
   const get = (id) => mapExperiment(db.prepare("SELECT * FROM experiments WHERE id=? AND workspace_id=?").get(id, workspace()));
   const fail = (code, status=400) => { throw new ExperimentAuthoringError(code,status); };
   const authorize = actor => {
-    if(!actor?.userId || !db.prepare("SELECT id FROM workspace_memberships WHERE workspace_id=? AND user_id=? AND status='active' AND role IN('owner','admin')").get(workspace(),actor.userId)) fail("EXPERIMENT_AUTHOR_FORBIDDEN",403);
+    if(!isWorkspaceOperator(db,workspace(),actor?.userId)) fail("EXPERIMENT_AUTHOR_FORBIDDEN",403);
   };
   const author=db.transaction((input,actor)=>{
     authorize(actor);

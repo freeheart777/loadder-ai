@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { requireWorkspaceId } from '../tenant-context.mjs';
+import { isWorkspaceOperator } from '../workspace-authorization.mjs';
 import { CRM_GROWTH_SOURCE, CRM_GROWTH_EVENT_KEY } from '../growth/crm-evidence-contract.mjs';
 
 export class GrowthLeadError extends Error {
@@ -11,7 +12,7 @@ const string=v=>typeof v==='string'&&v.trim()&&v.length<=200?v.trim():fail('GROW
 export function createGrowthLeadEvidenceRepository(db,{convertLeadToCustomer,eventService,eventRepository,evidenceRepository}) {
   const convert=db.transaction((leadId,input,actor)=>{
     const ws=requireWorkspaceId();
-    if(!db.prepare("SELECT id FROM workspace_memberships WHERE workspace_id=? AND user_id=? AND status='active' AND role IN('owner','admin')").get(ws,actor?.userId??''))fail('GROWTH_LEAD_FORBIDDEN',403);
+    if(!isWorkspaceOperator(db,ws,actor?.userId))fail('GROWTH_LEAD_FORBIDDEN',403);
     if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['candidateId','experimentId','contextVersionId','goalRef','idempotencyKey'].includes(k)))fail('GROWTH_LEAD_INVALID');
     leadId=string(leadId);
     const request={leadId,idempotencyKey:string(input.idempotencyKey),candidateId:null,experimentId:null,contextVersionId:null,goalRef:null};
