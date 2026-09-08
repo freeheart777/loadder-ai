@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -24,12 +24,13 @@ const validDraft = {
 test("Google Ads Persian Search drafts validate, project to Google resources, and stay tenant-scoped", () => {
   const dir = mkdtempSync(join(tmpdir(), "loadder-google-ads-"));
   const path = join(dir, "google-ads.sqlite");
-  copyFileSync(new URL("../db/loadder.sqlite", import.meta.url), path);
   const db = new Database(path);
   db.pragma("foreign_keys=ON");
   try {
-    db.exec("DROP TABLE IF EXISTS google_ads_campaign_drafts; DELETE FROM schema_migrations WHERE version >= 47;");
-    runMigrations(db, migrations);
+    db.exec("CREATE TABLE customers(id TEXT PRIMARY KEY,workspace_id TEXT);CREATE TABLE marketing_campaigns(id TEXT PRIMARY KEY,workspace_id TEXT);");
+    const migrationList = migrations.filter(({ version }) => ![2, 3].includes(version));
+    runMigrations(db, migrationList);
+    runMigrations(db, migrationList);
     const at = "2026-08-29T10:00:00.000Z";
     for (const id of ["ws-a", "ws-b"]) db.prepare("INSERT INTO workspaces(id,name,slug,created_at,updated_at) VALUES(?,?,?,?,?)").run(id,id,id,at,at);
     const service = createGoogleAdsDraftService({ repository: createGoogleAdsDraftRepository(db), now: () => new Date(at) });
