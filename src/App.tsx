@@ -13,6 +13,7 @@ const BusinessBuilderIntegrationsPage = lazy(() => import("./pages/BusinessBuild
 const GeneratedBusinessAppPage = lazy(() => import("./pages/GeneratedBusinessAppPage"));
 const CRMSalesPipelinePage = lazy(() => import("./pages/CRMSalesPipelinePage"));
 const PlatformAdminPage = lazy(() => import("./pages/PlatformAdminPage"));
+const GrowthLoopPage = lazy(() => import("./pages/GrowthLoopPage"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="/dashboard/predictive" element={<PredictivePage />} />
               <Route path="/dashboard/automation" element={<AutomationPage />} />
               <Route path="/dashboard/business-brain" element={<BusinessBrainPage />} />
+              <Route path="/dashboard/growth-loop/:experimentId" element={<GrowthLoopPage />} />
               <Route path="/dashboard/business-builder" element={<BusinessBuilderPage />} />
               <Route path="/dashboard/business-builder/operations" element={<BusinessBuilderOperationsPage />} />
               <Route path="/dashboard/business-builder/admin" element={<BusinessBuilderAdminPage />} />
