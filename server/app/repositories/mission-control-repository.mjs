@@ -6,23 +6,42 @@ export function createMissionControlRepository(db) {
 
   function undecidedRecommendations(limit) {
     const rows = db.prepare(`SELECT r.id,r.recommendation_type,r.consideration_code,r.rationale_code,
-      r.context_version_id,r.subject_type,r.subject_id,r.calculated_at,r.confidence_reason
+      r.context_version_id,r.subject_type,r.subject_id,r.subject_key,r.calculated_at,r.confidence_reason
       FROM intelligence_recommendations r WHERE r.workspace_id=?
       AND NOT EXISTS(SELECT 1 FROM decision_records d WHERE d.workspace_id=r.workspace_id AND d.recommendation_id=r.id)
       ORDER BY r.calculated_at ASC,r.id ASC LIMIT ?`).all(workspace(), limit + 1);
     return { items: rows.slice(0, limit), truncated: rows.length > limit };
   }
 
-  function closedExperimentsWithoutDecision(at, limit) {
-    const rows = db.prepare(`SELECT e.id,e.status,e.ends_at,e.context_version_id,e.goal_ref
-      FROM experiments e WHERE e.workspace_id=? AND e.ends_at IS NOT NULL AND e.ends_at<=? AND e.status<>'CANCELLED'
-      AND NOT EXISTS(
-        SELECT 1 FROM intelligence_recommendations r JOIN decision_records d
-          ON d.workspace_id=r.workspace_id AND d.recommendation_id=r.id
-        WHERE r.workspace_id=e.workspace_id AND r.recommendation_type='EXPERIMENT_OUTCOME_REVIEW'
-          AND r.subject_type='experiment' AND r.subject_id=e.id)
-      ORDER BY e.ends_at ASC,e.id ASC LIMIT ?`).all(workspace(), at, limit + 1);
-    return { items: rows.slice(0, limit), truncated: rows.length > limit };
+  function closedExperimentDecisionState(at, limit, recommendationLimit) {
+    const rows = db.prepare(`WITH ended AS (
+        SELECT e.id,e.status,e.context_version_id,e.goal_ref,
+          COALESCE(json_extract(e.goal_contract_json,'$.measurementWindow.end'),e.ends_at) AS window_end
+        FROM experiments e WHERE e.workspace_id=? AND e.status<>'CANCELLED'
+          AND COALESCE(json_extract(e.goal_contract_json,'$.measurementWindow.end'),e.ends_at) IS NOT NULL
+          AND COALESCE(json_extract(e.goal_contract_json,'$.measurementWindow.end'),e.ends_at)<=?
+        ORDER BY window_end ASC,e.id ASC LIMIT ?
+      ), ranked_recommendations AS (
+        SELECT r.id,r.subject_id,r.subject_key,r.calculated_at,
+          ROW_NUMBER() OVER(PARTITION BY r.subject_id ORDER BY r.calculated_at DESC,r.id DESC) AS position
+        FROM intelligence_recommendations r JOIN ended e ON e.id=r.subject_id
+        WHERE r.workspace_id=? AND r.recommendation_type='EXPERIMENT_OUTCOME_REVIEW' AND r.subject_type='experiment'
+      )
+      SELECT e.*,r.id AS recommendation_id,r.subject_key,r.position AS recommendation_position,
+        d.id AS decision_id,d.decision_type
+      FROM ended e LEFT JOIN ranked_recommendations r ON r.subject_id=e.id AND r.position<=?
+      LEFT JOIN decision_records d ON d.workspace_id=? AND d.recommendation_id=r.id
+        AND NOT EXISTS(SELECT 1 FROM decision_records successor WHERE successor.workspace_id=d.workspace_id AND successor.supersedes_decision_id=d.id)
+      ORDER BY e.window_end ASC,e.id ASC,r.position ASC,d.id ASC`).all(workspace(), at, limit + 1, workspace(), recommendationLimit + 1, workspace());
+    const grouped = new Map();
+    for (const row of rows) {
+      let item = grouped.get(row.id);
+      if (!item) { item={id:row.id,status:row.status,window_end:row.window_end,context_version_id:row.context_version_id,goal_ref:row.goal_ref,recommendations:[],recommendationsTruncated:false}; grouped.set(row.id,item); }
+      if (row.recommendation_position > recommendationLimit) item.recommendationsTruncated=true;
+      else if (row.recommendation_id) item.recommendations.push({id:row.recommendation_id,subjectKey:row.subject_key,decisionId:row.decision_id,decisionType:row.decision_type});
+    }
+    const experiments=[...grouped.values()];
+    return { items: experiments.slice(0, limit), truncated: experiments.length > limit };
   }
 
   function stuckCandidates(pendingBefore, limit) {
@@ -45,5 +64,5 @@ export function createMissionControlRepository(db) {
     return { items: rows.slice(0, limit), truncated: rows.length > limit };
   }
 
-  return Object.freeze({ undecidedRecommendations, closedExperimentsWithoutDecision, stuckCandidates, unlinkedCrmConversions });
+  return Object.freeze({ undecidedRecommendations, closedExperimentDecisionState, stuckCandidates, unlinkedCrmConversions });
 }
