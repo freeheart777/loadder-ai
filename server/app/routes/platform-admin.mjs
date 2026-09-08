@@ -1,5 +1,6 @@
 import express from "express";
 import { createPlatformAdminInventory, parseInventoryPagination } from "../repositories/platform-admin-inventory.mjs";
+import { createPlatformAdminCrmTelemetry } from "../repositories/platform-admin-crm-telemetry.mjs";
 
 const PLATFORM_ROLES = new Set([
   "platform_super_admin",
@@ -34,8 +35,10 @@ export function createPlatformGrantResolver(raw = process.env.LOADDER_PLATFORM_A
 
 export function createPlatformAdminReadModel(db) {
   const count = (sql) => Number(db.prepare(sql).get()?.count || 0);
+  const crm = createPlatformAdminCrmTelemetry(db);
   return {
     ...createPlatformAdminInventory(db),
+    ...crm,
     overview() {
       return {
         users: {
@@ -52,6 +55,7 @@ export function createPlatformAdminReadModel(db) {
           active: count("SELECT COUNT(*) AS count FROM sessions WHERE revoked_at IS NULL AND expires_at > datetime('now')"),
           evidence: "persisted",
         },
+        crm: crm.crmTelemetry(),
         projects: {
           status: "unavailable",
           reason: "project aggregation is intentionally deferred from the authorization foundation",
