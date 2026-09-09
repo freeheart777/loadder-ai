@@ -103,8 +103,11 @@ test('read projection reconstructs canonical evidence without creating a receipt
 test('eligible CRM selector is bounded, tenant-scoped, masked, and carries no inferred treatment link',t=>{
   const f=fixture(t);for(let i=0;i<30;i++)f.db.prepare('INSERT INTO leads VALUES(?,?,?,?,?,?,?,?)').run(`lead-${i}`,'a',null,'new',`نام ${i}`,'شرکت','09123456789',`2026-09-08T11:${String(i).padStart(2,'0')}:00.000Z`);
   f.db.prepare('INSERT INTO leads VALUES(?,?,?,?,?,?,?,?)').run('foreign','b',null,'new','خارجی','شرکت','09120000000',time);
-  const rows=f.within(()=>f.repository.listEligibleLeads(input(),actor));
-  assert.equal(rows.length,25);assert.ok(rows.every(row=>row.maskedPhone==='0912•••789'&&!row.treatmentLinked&&row.name!=='خارجی'));
+  f.db.prepare('INSERT INTO leads VALUES(?,?,?,?,?,?,?,?)').run('lost','a',null,'lost','نام نامناسب','شرکت','09120000000',time);
+  const first=f.within(()=>f.repository.listEligibleLeads({...input(),limit:10},actor));
+  const second=f.within(()=>f.repository.listEligibleLeads({...input(),limit:10,cursor:first.nextCursor},actor));
+  assert.equal(first.items.length,10);assert.equal(second.items.length,10);assert.ok(first.nextCursor);
+  assert.ok([...first.items,...second.items].every(row=>row.maskedPhone==='0912•••789'&&!row.treatmentLinked&&row.name!=='خارجی'&&row.name!=='نام نامناسب'));
 });
 test('mismatched canonical event provenance is excluded',t=>{
   const f=fixture(t);f.fact();f.db.exec("UPDATE business_events SET metadata_json='{}'");
