@@ -87,6 +87,22 @@ export function createGrowthCopilotRepository(db,{currentContextState,now=()=>ne
   });
   return Object.freeze({
     prepare:(input,actor)=>prepare.immediate(input,actor),
+    readEvidence(input,actor) {
+      const ws=authorize(actor);
+      const {refs}=normalizeCopilotInput({...input,capability:'READ_CRM_OUTCOME_EVIDENCE',idempotencyKey:'read-only'});
+      validateReferences(refs,ws);
+      return evidence(refs,ws);
+    },
+    listEligibleLeads(input,actor) {
+      const ws=authorize(actor);
+      const {refs}=normalizeCopilotInput({...input,capability:'READ_CRM_OUTCOME_EVIDENCE',idempotencyKey:'read-only'});
+      validateReferences(refs,ws);
+      return db.prepare(`SELECT id,name,company,
+        CASE WHEN phone IS NULL OR length(phone)<7 THEN NULL ELSE substr(phone,1,4)||'•••'||substr(phone,-3) END AS masked_phone,
+        status FROM leads WHERE workspace_id=? AND customer_id IS NULL
+        ORDER BY updated_at DESC,id DESC LIMIT 25`).all(ws).map(row=>({id:row.id,name:row.name,company:row.company,
+          maskedPhone:row.masked_phone,status:row.status,treatmentLinked:false}));
+    },
     get(id,actor) {
       const ws=authorize(actor);
       return map(db.prepare('SELECT * FROM growth_copilot_runs WHERE id=? AND workspace_id=?').get(copilotId(id),ws));

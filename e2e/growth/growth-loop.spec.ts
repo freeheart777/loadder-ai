@@ -20,11 +20,12 @@ test.describe.serial('human-governed Growth Loop',()=>{
  test('completes canonical evidence, assessment and adoption without execution, then reloads',async({page},info)=>{
   test.setTimeout(60_000);const evidence=observe(page);await page.setViewportSize({width:390,height:844});await page.context().addCookies(authCookies);
   await page.goto(`/dashboard/growth-loop/${experimentId}`);await expect(page.getByRole('heading',{name:'چرخهٔ رشد قابل توضیح'})).toBeVisible();
-  await expect(page.getByText('نامشخص').first()).toBeVisible();await page.getByRole('button',{name:'خواندن شواهد موجود'}).click();await expect(page.getByText('نامشخص').last()).toBeVisible();
-  await page.getByLabel('شناسه سرنخ در CRM').fill(leadId);await page.getByRole('button',{name:'ثبت تبدیل در CRM'}).click();await expect(page.getByText('مشاهده‌شده')).toBeVisible();
-  await page.getByRole('button',{name:'ارزیابی شواهد'}).click();await expect(page.getByText('شواهد ناکافی')).toBeVisible();await expect(page.getByText('خط مبنا معتبر یا قابل مقایسه نیست')).toBeVisible();
-  await page.getByRole('button',{name:'پذیرش برای بررسی'}).click();await expect(page.getByText('پیشنهاد پذیرفته شد؛ هیچ اقدام خارجی هنوز اجرا نشده است.')).toBeVisible();
-  await page.reload();await expect(page.getByText('پیشنهاد پذیرفته شد؛ هیچ اقدام خارجی هنوز اجرا نشده است.')).toBeVisible();
+  await expect(page.getByTestId('observed-count')).toContainText('۰');
+  await page.getByTestId('growth-lead-select').selectOption(leadId);expect(await page.getByTestId('growth-lead-select').locator('option:checked').textContent()).not.toContain(leadId);
+  await page.getByRole('button',{name:'ثبت تبدیل در CRM'}).click();await expect(page.getByTestId('observed-count')).toContainText('۱');
+  await page.getByRole('button',{name:'ارزیابی شواهد'}).click();await expect(page.getByText('لودر هنوز نتیجه‌گیری نمی‌کند.')).toBeVisible();await expect(page.getByTestId('eligible-count')).toContainText('۰');await expect(page.getByText('خط مبنا معتبر یا قابل مقایسه نیست')).toBeVisible();
+  await page.getByRole('button',{name:'پذیرش برای بررسی'}).click();await expect(page.getByText('تصمیم ثبت شد.')).toBeVisible();await expect(page.getByText('هیچ تبلیغی اجرا نشده است.')).toBeVisible();
+  await page.reload();await expect(page.getByText('تصمیم ثبت شد.')).toBeVisible();await expect(page.getByTestId('observed-count')).toContainText('۱');await expect(page.getByTestId('eligible-count')).toContainText('۰');
   const duplicate=await json(await api.post(`/api/growth/leads/${leadId}/convert`,{data:{candidateId,experimentId,contextVersionId:(await json(await api.get(`/api/experiments/${experimentId}`))).experiment.goalContextVersionId,goalRef:'/strategy/goals/0',idempotencyKey:`growth-ui-convert:${leadId}`}}));expect(duplicate.result.duplicate).toBe(true);
   const counts=JSON.parse(execFileSync(process.execPath,['e2e/growth/seed-growth-loop.mjs','inspect',workspaceId,candidateId,leadId],{cwd:process.cwd(),env:{...process.env,DATABASE_PATH:dbPath},encoding:'utf8'}).trim().split('\n').at(-1)!);expect(counts).toEqual({events:1,evidence:1,financial:0});
   expect(evidence.errors).toEqual([]);expect(evidence.network.filter(x=>x.status>=400)).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);

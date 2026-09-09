@@ -14,6 +14,8 @@ export function createGrowthCopilotRouter({repository}) {
     }
   };
   router.post('/growth/copilot/runs',handler((r,a)=>repository.prepare(r.body,a)));
+  router.get('/growth/copilot/evidence',handler((r,a)=>repository.readEvidence(r.query,a)));
+  router.get('/growth/copilot/leads',handler((r,a)=>repository.listEligibleLeads(r.query,a)));
   router.get('/growth/copilot/runs',handler((r,a)=>repository.list(r.query,a)));
   router.get('/growth/copilot/runs/:id',handler((r,a)=>repository.get(r.params.id,a)));
   return router;

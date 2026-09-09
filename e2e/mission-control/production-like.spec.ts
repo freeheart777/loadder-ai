@@ -76,11 +76,11 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   const internalTokens = growthBody.match(/\b[A-Z][A-Z0-9_]{2,}\b/g)?.filter((token) => token !== "CRM") ?? [];
   expect(internalTokens).toEqual([]);
   await page.getByRole("button", { name: "ارزیابی شواهد" }).click();
-  await expect(page.getByText("شواهد ناکافی")).toBeVisible();
+  await expect(page.getByText("لودر هنوز نتیجه‌گیری نمی‌کند.")).toBeVisible();
   await page.getByRole("button", { name: "پذیرش برای بررسی" }).click();
-  await expect(page.getByText("هیچ اقدام خارجی هنوز اجرا نشده است")).toBeVisible();
+  await expect(page.getByText("تصمیم ثبت شد.")).toBeVisible();
   await page.reload();
-  await expect(page.getByText("هیچ اقدام خارجی هنوز اجرا نشده است")).toBeVisible();
+  await expect(page.getByText("تصمیم ثبت شد.")).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: /چه چیزی الان به توجهت نیاز دارد/ })).toBeVisible();
 
