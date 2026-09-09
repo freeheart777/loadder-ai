@@ -71,6 +71,10 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   await growthLink.click();
   await expect(page).toHaveURL(`/dashboard/growth-loop/${first.experimentId}`);
   await expect(page.getByRole("heading", { name: "چرخهٔ رشد قابل توضیح" })).toBeVisible();
+  const growthBody = await page.locator("body").innerText();
+  expect(growthBody).not.toMatch(/EXPERIMENT_OUTCOME_REVIEW|RECONCILIATION_REQUIRED|growth-e2e|fixture-v1|deterministic-e2e|آزمون مرورگر|آزمایشی/);
+  const internalTokens = growthBody.match(/\b[A-Z][A-Z0-9_]{2,}\b/g)?.filter((token) => token !== "CRM") ?? [];
+  expect(internalTokens).toEqual([]);
   await page.getByRole("button", { name: "ارزیابی شواهد" }).click();
   await expect(page.getByText("شواهد ناکافی")).toBeVisible();
   await page.getByRole("button", { name: "پذیرش برای بررسی" }).click();
