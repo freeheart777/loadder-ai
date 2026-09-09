@@ -16,7 +16,7 @@ const copy:Record<string,string>={
   INSPECT_FUNNEL_BOTTLENECK:"بررسی گلوگاه تبدیل", INCOMPLETE_WINDOW:"پنجرهٔ اندازه‌گیری کامل نشده است",
   INSUFFICIENT_EVIDENCE:"شواهد معتبر کافی ثبت نشده است", BASELINE_UNKNOWN_OR_UNVERIFIED:"خط مبنا معتبر یا قابل مقایسه نیست",
   STALE_OR_UNSUPPORTED_EVIDENCE:"بخشی از شواهد قدیمی یا فاقد مرجع معتبر است", TRUNCATED_EVIDENCE:"فهرست شواهد از حد مجاز بزرگ‌تر است",
-  UNKNOWN:"نامشخص", APPROVED:"تأییدشده", PENDING:"در انتظار", REJECTED:"ردشده", VALIDATION_FAILED:"نامعتبر",
+  UNKNOWN:"نامشخص", OBSERVED:"مشاهده‌شده", APPROVED:"تأییدشده", PENDING:"در انتظار", REJECTED:"ردشده", VALIDATION_FAILED:"نامعتبر",
   RECONCILIATION_REQUIRED:"نیازمند تطبیق انسانی", HUMAN_REVIEW:"بازبینی انسانی",
 };
 
