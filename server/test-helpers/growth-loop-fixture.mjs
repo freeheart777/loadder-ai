@@ -20,17 +20,27 @@ import { createGrowthContentRepository } from "../app/repositories/growth-conten
 import { createGrowthContentService } from "../app/services/growth-content-service.mjs";
 
 const sha = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const deterministicId = (namespace, workspaceId) => {
+  const value = sha({ namespace, workspaceId });
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-4${value.slice(13, 16)}-a${value.slice(17, 20)}-${value.slice(20, 32)}`;
+};
 
 // Reuse-or-create mode needs a byte-identical goal contract across reruns so
 // experiment-repository's (workspace_id, decision_id) idempotency check
 // matches. A Date.now()-relative window (as E2E uses) would differ every run.
 const DEMO_WINDOW_START = "2025-01-01T00:00:00.000Z";
 const DEMO_WINDOW_END = "2025-01-02T00:00:00.000Z";
-const DEMO_LEAD_PHONE = "09120000001";
+const DEMO_LEADS = Object.freeze([
+  { key: "growth-demo-lead-1", name: "نیلوفر پارسا", phone: "09120000001", company: "استودیو سپهر", source: "referral", score: 86 },
+  { key: "growth-demo-lead-2", name: "کیان مهرگان", phone: "09120000002", company: "راهکار نوین", source: "website", score: 78 },
+  { key: "growth-demo-lead-3", name: "رها نیک‌فر", phone: "09120000003", company: "خانه خلاقیت آبان", source: "social", score: 72 },
+]);
 const DEMO_SUBJECT_KEY = "growth-demo-setup";
 const DEMO_DECISION_KEY = "growth-demo-goal";
 const DEMO_BRIEF_KEY = "growth-demo-brief";
 const DEMO_CANDIDATE_KEY = "growth-demo-candidate";
+const DEMO_ATTENTION_BRIEF_KEY = "growth-demo-attention-brief";
+const DEMO_ATTENTION_CANDIDATE_KEY = "growth-demo-attention-candidate";
 
 /**
  * Author the canonical Growth Loop prerequisites (business profile -> DNA ->
@@ -70,8 +80,15 @@ export async function seedGrowthLoopFixture({
     const brand = createBrandBookService({ repository: createBrandBookRepository(db), auditRepository: identities, now });
     const contexts = createBusinessContextService({ repository: createBusinessContextRepository(db), auditRepository: identities, now });
 
-    if (!reuse || !profiles.getBusinessProfile()) {
-      profiles.createBusinessProfile({ name: "کسب‌وکار آزمایشی چرخه رشد", industry: "Services" }, userId);
+    const currentProfile = profiles.getBusinessProfile();
+    if (!reuse || !currentProfile) {
+      profiles.createBusinessProfile({ name: reuse ? "استودیو رشد سپهر" : "کسب‌وکار آزمایشی چرخه رشد", industry: "Services" }, userId);
+    } else if (/آزمایش|آزمون|test|e2e/i.test(currentProfile.name)) {
+      // This is a DEV-only display-fixture correction. Using the production
+      // update operation would truthfully stale the already pinned context
+      // and change the demo's business-state scenario for a cosmetic rename.
+      db.prepare("UPDATE business_profiles SET name=? WHERE id=? AND workspace_id=?")
+        .run("استودیو رشد سپهر", currentProfile.id, workspaceId);
     }
 
     let dnaVersion = reuse ? dna.getCurrent().activeVersion : null;
@@ -206,15 +223,63 @@ export async function seedGrowthLoopFixture({
     );
     const approved = content.decide(candidate.id, { decision: "APPROVED" }, { userId });
 
+    // Persistent local demos also need one truthful operational attention
+    // item. The create-mode browser fixture remains unchanged. An uncertain
+    // provider outcome is represented explicitly and is never regenerated on
+    // replay, so Mission Control can surface S3 without inventing success.
+    let attentionCandidateId = null;
+    if (reuse) {
+      const attentionBrief = content.createBrief(
+        {
+          experimentId: experiment.id,
+          contextVersionId: context.id,
+          goalRef: "/strategy/goals/0",
+          audience: "مدیر کسب‌وکار کوچک",
+          message: "پیگیری نتیجه نامشخص ارائه‌دهنده",
+          channel: "SOCIAL",
+          contentType: "instagram",
+          constraints: ["نیازمند تطبیق انسانی"],
+          idempotencyKey: DEMO_ATTENTION_BRIEF_KEY,
+        },
+        { userId }
+      ).brief;
+      const uncertain = createGrowthContentService({
+        repository: content,
+        execute: async () => { throw new Error("DEMO_PROVIDER_OUTCOME_UNKNOWN"); },
+      });
+      const attention = await uncertain.generate(
+        attentionBrief.id,
+        { idempotencyKey: DEMO_ATTENTION_CANDIDATE_KEY },
+        { userId }
+      );
+      attentionCandidateId = attention.candidate.id;
+    }
+
     // Leads are created via raw SQL against the injected `db` rather than
     // server/db/database.mjs's createLead(), which is bound to that module's
     // own singleton connection (opened as a side effect of import) instead
     // of whatever `db` this fixture was called with.
     let lead = null;
-    if (reuse) {
-      lead = db
+    const demoLeadInputs = reuse
+      ? DEMO_LEADS
+      : [{ key: randomUUID(), name: "لید واقعی آزمون مرورگر", phone: "09120000001", company: null, source: "growth-e2e", score: 80 }];
+    for (const input of demoLeadInputs) {
+      let current = db
         .prepare("SELECT id, workspace_id AS workspaceId, name, phone FROM leads WHERE workspace_id=? AND phone=?")
-        .get(workspaceId, DEMO_LEAD_PHONE);
+        .get(workspaceId, input.phone);
+      if (current && reuse) {
+        db.prepare("UPDATE leads SET name=?, company=?, source=?, score=? WHERE id=? AND workspace_id=?")
+          .run(input.name, input.company, input.source, input.score, current.id, workspaceId);
+      } else if (!current) {
+        const id = reuse ? deterministicId(input.key, workspaceId) : randomUUID();
+        const timestamp = now().toISOString();
+        db.prepare(
+          `INSERT INTO leads (id, workspace_id, name, phone, email, company, source, score, status, opportunity_value, customer_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, NULL, ?, ?, ?, 'new', 0, NULL, ?, ?)`
+        ).run(id, workspaceId, input.name, input.phone, input.company, input.source, input.score, timestamp, timestamp);
+        current = { id, phone: input.phone };
+      }
+      if (input.phone === DEMO_LEADS[0].phone) lead = current;
     }
     if (!lead) {
       const id = randomUUID();
@@ -222,10 +287,10 @@ export async function seedGrowthLoopFixture({
       db.prepare(
         `INSERT INTO leads (id, workspace_id, name, phone, email, company, source, score, status, opportunity_value, customer_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, 'new', 0, NULL, ?, ?)`
-      ).run(id, workspaceId, "لید واقعی آزمون مرورگر", DEMO_LEAD_PHONE, reuse ? "growth-demo" : "growth-e2e", 80, timestamp, timestamp);
+      ).run(id, workspaceId, "لید واقعی آزمون مرورگر", "09120000001", "growth-e2e", 80, timestamp, timestamp);
       lead = { id };
     }
 
-    return { experimentId: experiment.id, contextId: context.id, candidateId: approved.id, leadId: lead.id };
+    return { experimentId: experiment.id, contextId: context.id, candidateId: approved.id, attentionCandidateId, leadId: lead.id };
   });
 }

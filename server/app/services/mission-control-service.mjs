@@ -58,7 +58,7 @@ export function createMissionControlService({ repository, businessContextService
       signalId: "CONTENT_CANDIDATE_STUCK", relevantAt: row.created_at, score: (row.state === "RECONCILIATION_REQUIRED" ? 2 : 0) + 2,
       facts: [fact("CANDIDATE_STATE", row.state, "CONTENT_CANDIDATE", row.id), fact("CREATED_AT", row.created_at, "CONTENT_CANDIDATE", row.id)],
       beliefs: [], unknown: [...UNKNOWN, "PROVIDER_OUTCOME"],
-      action: { label: "REVIEW_CONTENT_CANDIDATE", requiredApproval: "HUMAN_REVIEW", executable: false, deepLink: "/dashboard/content" },
+      action: { label: "REVIEW_CONTENT_CANDIDATE", requiredApproval: "HUMAN_REVIEW", executable: false, deepLink: `/dashboard/growth-loop/${row.experiment_id}` },
       explainability: { candidateId: row.id, experimentId: row.experiment_id }, whyThisIsHere: row.state === "RECONCILIATION_REQUIRED" ? "PROVIDER_OUTCOME_REQUIRES_RECONCILIATION" : "CANDIDATE_PENDING_BEYOND_AGE_FLOOR",
     }));
 

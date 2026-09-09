@@ -9,8 +9,9 @@ if (args[0] === 'inspect') {
   const financial = db.prepare('SELECT count(*) n FROM ecommerce_financial_ledger WHERE workspace_id=?').get(workspaceId).n;
   console.log(JSON.stringify({ events, evidence, financial })); process.exit(0);
 }
-const [workspaceId, userId, membershipId] = args;
+const mode = args[0] === 'reuse' ? 'reuse-or-create' : 'create';
+const [workspaceId, userId, membershipId] = mode === 'reuse-or-create' ? args.slice(1) : args;
 if (!workspaceId || !userId || !membershipId) throw Error('workspace, user and membership are required');
 
-const result = await seedGrowthLoopFixture({ db, workspaceId, userId, membershipId, mode: 'create' });
+const result = await seedGrowthLoopFixture({ db, workspaceId, userId, membershipId, mode });
 console.log(JSON.stringify(result));

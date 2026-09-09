@@ -92,6 +92,12 @@ test("resolves workspaceId/userId/membershipId from the verify-otp response — 
   assert.equal(seedCalls[0].membershipId, membershipId, "membershipId must come from the auth response");
   assert.equal(seedCalls[0].mode, "reuse-or-create");
   assert.equal(result.url, "http://localhost:5173/dashboard/growth-loop/exp-1", "must print the exact Growth Loop URL");
+  assert.equal(result.dashboardUrl, "http://localhost:5173/dashboard");
+  assert.deepEqual(result.missionControlSignals, [
+    "EXPERIMENT_WINDOW_CLOSED_NO_DECISION",
+    "CONTENT_CANDIDATE_STUCK",
+  ]);
+  assert.equal(result.staleContextPrepared, false);
   assert.equal(result.developmentOtp, "11111");
 });
 

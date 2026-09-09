@@ -20,9 +20,9 @@ test.describe.serial('human-governed Growth Loop',()=>{
  test('completes canonical evidence, assessment and adoption without execution, then reloads',async({page},info)=>{
   test.setTimeout(60_000);const evidence=observe(page);await page.setViewportSize({width:390,height:844});await page.context().addCookies(authCookies);
   await page.goto(`/dashboard/growth-loop/${experimentId}`);await expect(page.getByRole('heading',{name:'چرخهٔ رشد قابل توضیح'})).toBeVisible();
-  await expect(page.getByText('UNKNOWN').first()).toBeVisible();await page.getByRole('button',{name:'خواندن شواهد موجود'}).click();await expect(page.getByText('UNKNOWN').last()).toBeVisible();
-  await page.getByLabel('شناسه لید').fill(leadId);await page.getByRole('button',{name:'تبدیل canonical'}).click();await expect(page.getByText('OBSERVED')).toBeVisible();
-  await page.getByRole('button',{name:'اجرای سیاست deterministic'}).click();await expect(page.getByText('شواهد ناکافی')).toBeVisible();await expect(page.getByText('خط مبنا معتبر یا قابل مقایسه نیست')).toBeVisible();
+  await expect(page.getByText('نامشخص').first()).toBeVisible();await page.getByRole('button',{name:'خواندن شواهد موجود'}).click();await expect(page.getByText('نامشخص').last()).toBeVisible();
+  await page.getByLabel('شناسه سرنخ در CRM').fill(leadId);await page.getByRole('button',{name:'ثبت تبدیل در CRM'}).click();await expect(page.getByText('مشاهده‌شده')).toBeVisible();
+  await page.getByRole('button',{name:'ارزیابی شواهد'}).click();await expect(page.getByText('شواهد ناکافی')).toBeVisible();await expect(page.getByText('خط مبنا معتبر یا قابل مقایسه نیست')).toBeVisible();
   await page.getByRole('button',{name:'پذیرش برای بررسی'}).click();await expect(page.getByText('پیشنهاد پذیرفته شد؛ هیچ اقدام خارجی هنوز اجرا نشده است.')).toBeVisible();
   await page.reload();await expect(page.getByText('پیشنهاد پذیرفته شد؛ هیچ اقدام خارجی هنوز اجرا نشده است.')).toBeVisible();
   const duplicate=await json(await api.post(`/api/growth/leads/${leadId}/convert`,{data:{candidateId,experimentId,contextVersionId:(await json(await api.get(`/api/experiments/${experimentId}`))).experiment.goalContextVersionId,goalRef:'/strategy/goals/0',idempotencyKey:`growth-ui-convert:${leadId}`}}));expect(duplicate.result.duplicate).toBe(true);

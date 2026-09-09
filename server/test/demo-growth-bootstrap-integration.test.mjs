@@ -89,11 +89,32 @@ test("real end-to-end: dev OTP disabled fails clearly; dev OTP enabled succeeds 
     const first = parse(firstOutput);
     const second = parse(secondOutput);
 
-    assert.match(firstOutput, /URL: http:\/\/localhost:5173\/dashboard\/growth-loop\//, "must print the exact Growth Loop URL");
+    assert.match(firstOutput, /Dashboard: http:\/\/localhost:5173\/dashboard/, "must print the Dashboard URL");
+    assert.match(firstOutput, /Experiment: http:\/\/localhost:5173\/dashboard\/growth-loop\//, "must print the exact Growth Loop URL");
+    assert.match(firstOutput, /EXPERIMENT_WINDOW_CLOSED_NO_DECISION, CONTENT_CANDIDATE_STUCK/, "must report the prepared Mission Control signals");
     assert.equal(first.workspaceId, second.workspaceId, "the same bounded demo workspace must be reused");
     assert.equal(first.experimentId, second.experimentId, "the same canonical experiment must be reused across runs");
     assert.equal(first.leadId, second.leadId, "the same demo lead must be reused, not duplicated");
+    assert.equal(first.attentionCandidateId, second.attentionCandidateId, "the same reconciliation candidate must be reused, not regenerated");
     assert.equal(second.url, `http://localhost:5173/dashboard/growth-loop/${second.experimentId}`);
+    assert.equal(second.dashboardUrl, "http://localhost:5173/dashboard");
+
+    const verified = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mobile: second.mobile, code: second.developmentOtp }),
+    });
+    assert.equal(verified.status, 200);
+    const cookie = verified.headers.get("set-cookie")?.split(";")[0];
+    const missionResponse = await fetch(`${API_BASE_URL}/api/mission-control`, { headers: { cookie } });
+    assert.equal(missionResponse.status, 200);
+    const mission = (await missionResponse.json()).missionControl;
+    assert.deepEqual(
+      mission.items.map((item) => item.signalId),
+      ["EXPERIMENT_WINDOW_CLOSED_NO_DECISION", "CONTENT_CANDIDATE_STUCK"],
+      "the real Mission Control endpoint must expose the exact seeded attention signals"
+    );
+    assert.deepEqual(mission.banners, [], "the current seeded context must not be presented as stale");
   } finally {
     server.kill();
   }
