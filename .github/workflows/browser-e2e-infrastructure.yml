@@ -42,6 +42,17 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run deterministic browser smoke
         run: npm run test:e2e:infra
+      - name: Run Mission Control dashboard browser proof
+        run: |
+          npm run dev:frontend -- --host 127.0.0.1 --port 4178 > /tmp/loadder-mission-control-vite.log 2>&1 &
+          frontend_pid=$!
+          trap 'kill "$frontend_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4178/ > /dev/null; then break; fi
+            if [ "$attempt" = 30 ]; then cat /tmp/loadder-mission-control-vite.log; exit 1; fi
+            sleep 1
+          done
+          E2E_BASE_URL=http://127.0.0.1:4178 npx playwright test e2e/mission-control-dashboard.spec.ts --project=chromium
       - name: Upload failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
