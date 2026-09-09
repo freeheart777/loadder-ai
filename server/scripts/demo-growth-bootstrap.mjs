@@ -120,15 +120,18 @@ export async function runGrowthDemoBootstrap({
 }
 
 function printReport(result) {
-  console.log("Growth Loop local demo ready.");
+  console.log("Growth Loop local demo ready — use this sequence exactly:");
   console.log(`  workspaceId:  ${result.workspaceId}`);
   console.log(`  experimentId: ${result.experimentId}`);
   console.log(`  candidateId:  ${result.candidateId}`);
   console.log(`  leadId:       ${result.leadId}`);
   console.log(`  attentionId:  ${result.attentionCandidateId}`);
   console.log("");
-  console.log(`  Log in at ${new URL(result.url).origin}/signup with mobile ${result.mobile}`);
-  console.log(`  (the development OTP is shown inline on the login screen; current code: ${result.developmentOtp})`);
+  console.log(`  1. Keep the frontend on http://localhost:5173 (do not switch origins).`);
+  console.log(`  2. Log in at http://localhost:5173/signup with mobile ${result.mobile}`);
+  console.log(`  3. Enter the fresh development OTP: ${result.developmentOtp}`);
+  console.log("     It expires after 2 minutes; requesting another OTP invalidates this one.");
+  console.log("     This is the canonical OTP flow. No authentication bypass is used.");
   console.log("");
   console.log(`  Dashboard: ${result.dashboardUrl}`);
   console.log(`  Experiment: ${result.url}`);

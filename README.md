@@ -31,10 +31,14 @@ npm run dev:frontend
 npm run demo:growth
 ```
 
-The final command prints the login mobile, current development OTP, Dashboard
-URL, Growth experiment URL, and the exact Mission Control signals prepared.
-Log in through `/signup`; the script never forges a browser session. Repeating
-`npm run demo:growth` reuses the same canonical demo identities.
+Keep the frontend origin at `http://localhost:5173`. The final command prints
+the login mobile, current development OTP, Dashboard URL, Growth experiment
+URL, and the exact Mission Control signals prepared. Log in through `/signup`;
+the script never forges a browser session or bypasses authentication. The OTP
+expires after two minutes. The bootstrap consumes one OTP while resolving the
+canonical workspace, then requests and prints a fresh OTP; that new request
+invalidates the earlier active challenge. Repeating `npm run demo:growth`
+reuses the same canonical demo identities without duplicating CRM records.
 
 ## Canonical backend
 

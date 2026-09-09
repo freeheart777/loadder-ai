@@ -92,8 +92,10 @@ test("reuse-or-create: running the fixture twice returns the same bounded identi
       "the demo attention signal must preserve an explicit unknown provider outcome"
     );
 
-    const leadRows = db.prepare("SELECT count(*) n FROM leads WHERE workspace_id=? AND phone=?").get(workspaceId, "09120000001").n;
-    assert.equal(leadRows, 1, "only one demo lead should exist after two runs");
+    const demoLeads = db.prepare("SELECT id,name,phone FROM leads WHERE workspace_id=? ORDER BY phone").all(workspaceId);
+    assert.equal(demoLeads.length, 3, "the resolved demo workspace should have exactly three bounded CRM records");
+    assert.deepEqual(demoLeads.map((row) => row.name), ["نیلوفر پارسا", "کیان مهرگان", "رها نیک‌فر"]);
+    assert.equal(new Set(demoLeads.map((row) => row.id)).size, 3, "demo CRM identities must remain stable and unique");
   });
 });
 
