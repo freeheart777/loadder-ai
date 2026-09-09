@@ -31,6 +31,8 @@ const DEMO_SUBJECT_KEY = "growth-demo-setup";
 const DEMO_DECISION_KEY = "growth-demo-goal";
 const DEMO_BRIEF_KEY = "growth-demo-brief";
 const DEMO_CANDIDATE_KEY = "growth-demo-candidate";
+const DEMO_ATTENTION_BRIEF_KEY = "growth-demo-attention-brief";
+const DEMO_ATTENTION_CANDIDATE_KEY = "growth-demo-attention-candidate";
 
 /**
  * Author the canonical Growth Loop prerequisites (business profile -> DNA ->
@@ -206,6 +208,38 @@ export async function seedGrowthLoopFixture({
     );
     const approved = content.decide(candidate.id, { decision: "APPROVED" }, { userId });
 
+    // Persistent local demos also need one truthful operational attention
+    // item. The create-mode browser fixture remains unchanged. An uncertain
+    // provider outcome is represented explicitly and is never regenerated on
+    // replay, so Mission Control can surface S3 without inventing success.
+    let attentionCandidateId = null;
+    if (reuse) {
+      const attentionBrief = content.createBrief(
+        {
+          experimentId: experiment.id,
+          contextVersionId: context.id,
+          goalRef: "/strategy/goals/0",
+          audience: "مدیر کسب‌وکار کوچک",
+          message: "پیگیری نتیجه نامشخص ارائه‌دهنده",
+          channel: "SOCIAL",
+          contentType: "instagram",
+          constraints: ["نیازمند تطبیق انسانی"],
+          idempotencyKey: DEMO_ATTENTION_BRIEF_KEY,
+        },
+        { userId }
+      ).brief;
+      const uncertain = createGrowthContentService({
+        repository: content,
+        execute: async () => { throw new Error("DEMO_PROVIDER_OUTCOME_UNKNOWN"); },
+      });
+      const attention = await uncertain.generate(
+        attentionBrief.id,
+        { idempotencyKey: DEMO_ATTENTION_CANDIDATE_KEY },
+        { userId }
+      );
+      attentionCandidateId = attention.candidate.id;
+    }
+
     // Leads are created via raw SQL against the injected `db` rather than
     // server/db/database.mjs's createLead(), which is bound to that module's
     // own singleton connection (opened as a side effect of import) instead
@@ -226,6 +260,6 @@ export async function seedGrowthLoopFixture({
       lead = { id };
     }
 
-    return { experimentId: experiment.id, contextId: context.id, candidateId: approved.id, leadId: lead.id };
+    return { experimentId: experiment.id, contextId: context.id, candidateId: approved.id, attentionCandidateId, leadId: lead.id };
   });
 }

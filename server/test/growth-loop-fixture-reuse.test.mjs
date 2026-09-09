@@ -56,6 +56,7 @@ test("reuse-or-create: running the fixture twice returns the same bounded identi
   assert.equal(second.experimentId, first.experimentId, "experiment must be reused, not duplicated");
   assert.equal(second.contextId, first.contextId, "business context version must be reused");
   assert.equal(second.candidateId, first.candidateId, "approved candidate must be reused");
+  assert.equal(second.attentionCandidateId, first.attentionCandidateId, "attention candidate must be reused, not regenerated");
   assert.equal(second.leadId, first.leadId, "the demo lead must be reused, not duplicated");
 
   await runWithWorkspace(workspaceId, async () => {
@@ -81,10 +82,15 @@ test("reuse-or-create: running the fixture twice returns the same bounded identi
     assert.equal(decisions.items.length, 1, "only one ADOPT decision should exist after two runs");
 
     const briefRows = db.prepare("SELECT count(*) n FROM growth_content_briefs WHERE workspace_id=?").get(workspaceId).n;
-    assert.equal(briefRows, 1, "only one growth content brief should exist after two runs");
+    assert.equal(briefRows, 2, "the approved and attention briefs should each exist exactly once after two runs");
 
     const candidateRows = db.prepare("SELECT count(*) n FROM growth_content_candidates WHERE workspace_id=?").get(workspaceId).n;
-    assert.equal(candidateRows, 1, "only one growth content candidate should exist after two runs");
+    assert.equal(candidateRows, 2, "the approved and reconciliation candidates should each exist exactly once after two runs");
+    assert.equal(
+      db.prepare("SELECT state FROM growth_content_candidates WHERE id=?").get(second.attentionCandidateId).state,
+      "RECONCILIATION_REQUIRED",
+      "the demo attention signal must preserve an explicit unknown provider outcome"
+    );
 
     const leadRows = db.prepare("SELECT count(*) n FROM leads WHERE workspace_id=? AND phone=?").get(workspaceId, "09120000001").n;
     assert.equal(leadRows, 1, "only one demo lead should exist after two runs");

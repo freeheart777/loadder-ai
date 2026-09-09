@@ -108,7 +108,13 @@ export async function runGrowthDemoBootstrap({
     membershipId,
     mobile,
     developmentOtp: freshOtp.developmentOtp || null,
+    dashboardUrl: `${frontendBaseUrl}/dashboard`,
     url: `${frontendBaseUrl}/dashboard/growth-loop/${seeded.experimentId}`,
+    missionControlSignals: [
+      "EXPERIMENT_WINDOW_CLOSED_NO_DECISION",
+      "CONTENT_CANDIDATE_STUCK",
+    ],
+    staleContextPrepared: false,
     ...seeded,
   };
 }
@@ -119,11 +125,15 @@ function printReport(result) {
   console.log(`  experimentId: ${result.experimentId}`);
   console.log(`  candidateId:  ${result.candidateId}`);
   console.log(`  leadId:       ${result.leadId}`);
+  console.log(`  attentionId:  ${result.attentionCandidateId}`);
   console.log("");
   console.log(`  Log in at ${new URL(result.url).origin}/signup with mobile ${result.mobile}`);
   console.log(`  (the development OTP is shown inline on the login screen; current code: ${result.developmentOtp})`);
   console.log("");
-  console.log(`  URL: ${result.url}`);
+  console.log(`  Dashboard: ${result.dashboardUrl}`);
+  console.log(`  Experiment: ${result.url}`);
+  console.log(`  Mission Control: ${result.missionControlSignals.join(", ")}`);
+  console.log("  Stale context: intentionally absent; the seeded context is current.");
   console.log(`RESULT_JSON: ${JSON.stringify(result)}`);
 }
 

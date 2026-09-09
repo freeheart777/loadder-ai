@@ -19,6 +19,23 @@ This starts:
 
 The frontend uses `VITE_API_BASE_URL` for every backend request.
 
+### Local Growth and Mission Control demo
+
+Use a development database only. In three terminals run:
+
+```bash
+npm ci
+npm --prefix server ci
+AUTH_EXPOSE_DEV_OTP=true npm run dev:server
+npm run dev:frontend
+npm run demo:growth
+```
+
+The final command prints the login mobile, current development OTP, Dashboard
+URL, Growth experiment URL, and the exact Mission Control signals prepared.
+Log in through `/signup`; the script never forges a browser session. Repeating
+`npm run demo:growth` reuses the same canonical demo identities.
+
 ## Canonical backend
 
 `server/index.mjs` is the only supported backend entry point. It exposes CRM,
