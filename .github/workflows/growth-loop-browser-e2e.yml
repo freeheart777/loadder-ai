@@ -82,6 +82,23 @@ jobs:
               exit 1
             fi
           done
+      - name: Restart backend before the independent OTP acceptance matrix
+        shell: bash
+        run: |
+          kill "$(cat "$RUNNER_TEMP/loadder-growth-e2e/backend.pid")"
+          DATABASE_PATH="$E2E_DATABASE_PATH" \
+          SITE_MEDIA_LOCAL_DIR="$RUNNER_TEMP/loadder-growth-e2e/media" \
+          NODE_ENV=test API_HOST=127.0.0.1 API_PORT=3202 \
+          AUTH_EXPOSE_DEV_OTP=true AUTH_HASH_SECRET=growth-e2e-secret \
+          CLIENT_ORIGINS=http://127.0.0.1:4176 \
+          node server/index.mjs >"$RUNNER_TEMP/loadder-growth-e2e/backend-mission-control.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/loadder-growth-e2e/backend.pid"
+          for attempt in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:3202/api/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/loadder-growth-e2e/backend-mission-control.log"
+          exit 1
       - name: Run Mission Control production-like acceptance five consecutive times
         shell: bash
         run: |
