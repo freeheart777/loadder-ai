@@ -95,13 +95,26 @@ export function createGrowthCopilotRepository(db,{currentContextState,now=()=>ne
     },
     listEligibleLeads(input,actor) {
       const ws=authorize(actor);
-      const {refs}=normalizeCopilotInput({...input,capability:'READ_CRM_OUTCOME_EVIDENCE',idempotencyKey:'read-only'});
+      if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>![
+        'capability','experimentId','contextVersionId','goalRef','candidateId','idempotencyKey','limit','cursor',
+      ].includes(k))) fail('COPILOT_INVALID_PAGE',400);
+      const limit=input.limit===undefined?25:Number(input.limit);
+      if(!Number.isInteger(limit)||limit<1||limit>25) fail('COPILOT_INVALID_PAGE',400);
+      let cursor;
+      try { cursor=decodeCursor(input.cursor,'growth_eligible_leads',['updatedAt','id']); }
+      catch(e) { if(e instanceof CursorPaginationError) fail('COPILOT_INVALID_PAGE',400); throw e; }
+      const {refs}=normalizeCopilotInput({experimentId:input.experimentId,contextVersionId:input.contextVersionId,
+        goalRef:input.goalRef,candidateId:input.candidateId,capability:'READ_CRM_OUTCOME_EVIDENCE',idempotencyKey:'read-only'});
       validateReferences(refs,ws);
-      return db.prepare(`SELECT id,name,company,
+      const clause=cursor?' AND (updated_at<? OR (updated_at=? AND id<?))':'';
+      const args=cursor?[ws,cursor.updatedAt,cursor.updatedAt,cursor.id,limit+1]:[ws,limit+1];
+      const rows=db.prepare(`SELECT id,name,company,updated_at,
         CASE WHEN phone IS NULL OR length(phone)<7 THEN NULL ELSE substr(phone,1,4)||'•••'||substr(phone,-3) END AS masked_phone,
         status FROM leads WHERE workspace_id=? AND customer_id IS NULL
-        ORDER BY updated_at DESC,id DESC LIMIT 25`).all(ws).map(row=>({id:row.id,name:row.name,company:row.company,
-          maskedPhone:row.masked_phone,status:row.status,treatmentLinked:false}));
+        AND status IN ('new','hot','qualified','negotiating')${clause}
+        ORDER BY updated_at DESC,id DESC LIMIT ?`).all(...args).map(row=>({id:row.id,name:row.name,company:row.company,
+          maskedPhone:row.masked_phone,status:row.status,treatmentLinked:false,updatedAt:row.updated_at}));
+      return pageResult(rows,limit,'growth_eligible_leads',row=>({updatedAt:row.updatedAt,id:row.id}));
     },
     get(id,actor) {
       const ws=authorize(actor);
