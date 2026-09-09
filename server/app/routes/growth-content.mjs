@@ -7,6 +7,7 @@ export function createGrowthContentRouter({repository,service}) {
   router.post('/growth/content/briefs',route((r,a)=>repository.createBrief(r.body,a)));
   router.get('/growth/content/briefs/:id',route((r,a)=>repository.getBrief(r.params.id,a)));
   router.get('/growth/experiments/:id/briefs',route((r,a)=>repository.listBriefs(r.params.id,r.query,a)));
+  router.get('/growth/experiments/:id/candidates',route((r,a)=>repository.listExperimentCandidates(r.params.id,r.query,a)));
   router.post('/growth/content/briefs/:id/candidates',route((r,a)=>service.generate(r.params.id,r.body,a)));
   router.get('/growth/content/briefs/:id/candidates',route((r,a)=>repository.listCandidates(r.params.id,r.query,a)));
   router.get('/growth/content/candidates/:id',route((r,a)=>repository.getCandidate(r.params.id,a)));

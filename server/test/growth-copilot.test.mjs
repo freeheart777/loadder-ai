@@ -25,7 +25,7 @@ function fixture(t) {
     CREATE INDEX idx_growth_evidence_subject ON growth_evidence_links(workspace_id,subject_type,subject_id,recorded_at,id);
     CREATE UNIQUE INDEX idx_growth_evidence_successor ON growth_evidence_links(supersedes_id) WHERE supersedes_id IS NOT NULL;
     CREATE TABLE business_events(id TEXT PRIMARY KEY,workspace_id TEXT,source_type TEXT,event_type TEXT,context_version_id TEXT,subject_type TEXT,subject_id TEXT,customer_id TEXT,metadata_json TEXT,properties_json TEXT);
-    CREATE TABLE leads(id TEXT PRIMARY KEY,workspace_id TEXT,customer_id TEXT,status TEXT);
+    CREATE TABLE leads(id TEXT PRIMARY KEY,workspace_id TEXT,customer_id TEXT,status TEXT,name TEXT,company TEXT,phone TEXT,updated_at TEXT);
     CREATE TABLE customers(id TEXT PRIMARY KEY,workspace_id TEXT);
     CREATE TABLE ecommerce_financial_ledger(id TEXT PRIMARY KEY,amount INTEGER);
     INSERT INTO ecommerce_financial_ledger VALUES('unchanged',123);`);
@@ -46,7 +46,7 @@ function fixture(t) {
   const count=()=>db.prepare('SELECT count(*) n FROM growth_copilot_runs').get().n;
   const fact=(id='fact',source=CRM_GROWTH_SOURCE)=>{
     db.prepare('INSERT OR IGNORE INTO customers VALUES(?,?)').run('customer','a');
-    db.prepare('INSERT OR IGNORE INTO leads VALUES(?,?,?,?)').run('lead','a','customer','converted');
+    db.prepare('INSERT OR IGNORE INTO leads(id,workspace_id,customer_id,status) VALUES(?,?,?,?)').run('lead','a','customer','converted');
     db.prepare('INSERT INTO business_events VALUES(?,?,?,?,?,?,?,?,?,?)').run(id,'a',source,'lead.converted','ctx-a','lead','lead','customer',JSON.stringify({growth:{candidateId:'candidate-a',experimentId:'exp-a',goalRef:'/strategy/goals/0'}}),JSON.stringify({customerId:'customer'}));
     db.prepare('INSERT INTO growth_evidence_links VALUES(?,?,?,?,?,?,?,?,?,?,NULL)').run(id,'a','CONTENT_CANDIDATE','candidate-a',id,'EVENT','CRM_CONVERSION','ctx-a','/strategy/goals/0',time);
   };
@@ -94,6 +94,17 @@ test('authoritative CRM references are returned but client reports never upgrade
   f.fact('real');const r=f.prepare({idempotencyKey:'new'}).receipt;
   assert.deepEqual(r.result.evidence.references,[{evidenceLinkId:'real',eventId:'real'}]);
   assert.equal(r.result.evidence.attribution,'UNKNOWN');
+});
+test('read projection reconstructs canonical evidence without creating a receipt',t=>{
+  const f=fixture(t);f.fact('real');const before=f.count();
+  const result=f.within(()=>f.repository.readEvidence(input(),actor));
+  assert.equal(result.state,'OBSERVED');assert.equal(result.references.length,1);assert.equal(f.count(),before);
+});
+test('eligible CRM selector is bounded, tenant-scoped, masked, and carries no inferred treatment link',t=>{
+  const f=fixture(t);for(let i=0;i<30;i++)f.db.prepare('INSERT INTO leads VALUES(?,?,?,?,?,?,?,?)').run(`lead-${i}`,'a',null,'new',`نام ${i}`,'شرکت','09123456789',`2026-09-08T11:${String(i).padStart(2,'0')}:00.000Z`);
+  f.db.prepare('INSERT INTO leads VALUES(?,?,?,?,?,?,?,?)').run('foreign','b',null,'new','خارجی','شرکت','09120000000',time);
+  const rows=f.within(()=>f.repository.listEligibleLeads(input(),actor));
+  assert.equal(rows.length,25);assert.ok(rows.every(row=>row.maskedPhone==='0912•••789'&&!row.treatmentLinked&&row.name!=='خارجی'));
 });
 test('mismatched canonical event provenance is excluded',t=>{
   const f=fixture(t);f.fact();f.db.exec("UPDATE business_events SET metadata_json='{}'");

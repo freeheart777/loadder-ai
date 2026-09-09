@@ -77,6 +77,9 @@ export function createGrowthContentRepository(db,{contextGateway,now=()=>new Dat
     createBrief:(n,a)=>createBrief.immediate(n,a),reserve:(id,n,a)=>reserve.immediate(id,n,a),finish:(id,r)=>finish.immediate(id,r),decide:(id,n,a)=>decide.immediate(id,n,a),
     getBrief(id,a){authorize(a);return brief(id);},getCandidate(id,a){authorize(a);return candidate(id);},
     listBriefs(experimentId,p,a){authorize(a);const {page,pageSize}=pageInput(p);return db.prepare('SELECT * FROM growth_content_briefs WHERE workspace_id=? AND experiment_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').all(ws(),experimentId,pageSize,(page-1)*pageSize);},
+    listExperimentCandidates(experimentId,p,a){authorize(a);const {page,pageSize}=pageInput(p);return db.prepare(`SELECT c.* FROM growth_content_candidates c
+      JOIN growth_content_briefs b ON b.id=c.brief_id AND b.workspace_id=c.workspace_id
+      WHERE c.workspace_id=? AND b.experiment_id=? ORDER BY c.created_at DESC,c.id DESC LIMIT ? OFFSET ?`).all(ws(),experimentId,pageSize,(page-1)*pageSize);},
     listCandidates(briefId,p,a){authorize(a);const {page,pageSize}=pageInput(p);return db.prepare('SELECT * FROM growth_content_candidates WHERE workspace_id=? AND brief_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').all(ws(),briefId,pageSize,(page-1)*pageSize);},
     listOperationalState(a,limit=25){authorize(a);const rows=db.prepare(`WITH ranked AS (
       SELECT id,state,ROW_NUMBER() OVER(PARTITION BY state ORDER BY created_at DESC,id DESC) AS position
