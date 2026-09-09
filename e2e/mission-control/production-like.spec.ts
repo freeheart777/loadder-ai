@@ -44,11 +44,9 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   test.setTimeout(90_000);
   const mobile = `090${String(Date.now() + testInfo.workerIndex).slice(-8)}`;
   await loginThroughUi(page, mobile);
-  const identity = await page.evaluate(async () => {
-    const response = await fetch("/api/auth/me");
-    if (!response.ok) throw new Error("Authenticated identity unavailable");
-    return response.json();
-  });
+  const identityResponse = await page.request.get(`${apiBaseUrl}/api/auth/me`);
+  expect(identityResponse.ok()).toBeTruthy();
+  const identity = await identityResponse.json();
   const membership = identity.memberships.find((entry: { workspace: { id: string } }) => entry.workspace.id === identity.activeWorkspace.id);
   const first = seed(identity.activeWorkspace.id, identity.user.id, membership.id);
   const second = seed(identity.activeWorkspace.id, identity.user.id, membership.id);
