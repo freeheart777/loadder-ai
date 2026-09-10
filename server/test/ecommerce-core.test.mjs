@@ -127,6 +127,39 @@ test("product creation persists the complete storefront payload with URL or no i
   db.close();
 });
 
+test("product creation preserves Persian names and generates unique slugs without English input", () => {
+  const { db, store, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const names = ["سرم آبرسان پوست", "کفش ورزشی مردانه", "گوشی هوشمند"];
+    const created = names.map((name) => service.createProduct(store.id, {
+      name,
+      basePriceMinor: 45000000,
+      inventoryQuantity: 2,
+      status: "ACTIVE",
+    }));
+    const duplicate = service.createProduct(store.id, {
+      name: names[0],
+      basePriceMinor: 45000000,
+      inventoryQuantity: 1,
+      status: "ACTIVE",
+    });
+
+    assert.deepEqual(created.map((product) => product.name), names);
+    assert.ok(created.every((product) => product.slug && product.slug.length <= 100));
+    assert.notEqual(duplicate.slug, created[0].slug);
+    assert.match(duplicate.slug, /-2$/);
+
+    const afterRefresh = service.listProducts(store.id);
+    for (const product of created) {
+      const persisted = afterRefresh.find((item) => item.id === product.id);
+      assert.equal(persisted?.name, product.name);
+      assert.equal(persisted?.slug, product.slug);
+    }
+    assert.equal(afterRefresh.find((item) => item.id === duplicate.id)?.name, names[0]);
+  });
+  db.close();
+});
+
 test("product creation rejects unsafe image URLs and rolls back an incomplete duplicate-SKU write", () => {
   const { db, store } = fixture();
   const service = createEcommerceService({ db, env:{ NODE_ENV:"production" } });

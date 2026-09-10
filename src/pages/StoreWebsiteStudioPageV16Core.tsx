@@ -5,7 +5,7 @@ import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
 import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
 import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCanvas";
 import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
-import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
+import { bannerConfigForSection, bannerDefaults, defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
 import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, Selection, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { apiFetch } from "../lib/api";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
@@ -83,7 +83,7 @@ function withProductInSection(current: StudioConfig, sectionId: string, productI
 
 function newSection(type: SectionConfig["type"]): SectionConfig {
   const labels = { products: "محصولات جدید", banner: "بنر جدید", trust: "مزیت‌های خرید", text: "متن جدید", spacer: "فاصله" };
-  return {
+  const section: SectionConfig = {
     id: `${type}-${crypto.randomUUID()}`,
     type,
     enabled: true,
@@ -94,7 +94,9 @@ function newSection(type: SectionConfig["type"]): SectionConfig {
     spacingTop: type === "spacer" ? 32 : designDefaults.sectionSpacing,
     spacingBottom: type === "spacer" ? 32 : designDefaults.sectionSpacing,
     ...(type === "products" ? { productSettings: { ...defaultProductSettings } } : {}),
+    ...(type === "banner" ? { eyebrow: "پیشنهاد فروشگاه", ctaLabel: "مشاهده محصولات", ctaHref: "#products", banner: bannerDefaults() } : {}),
   };
+  return section;
 }
 
 function normalizeManual(settings: ProductSettings, products: Product[]) {
@@ -103,9 +105,28 @@ function normalizeManual(settings: ProductSettings, products: Product[]) {
 }
 
 function applyMediaToConfig(current: StudioConfig, target: InlineMediaTarget, url: string): StudioConfig {
-  if (target.kind === "hero") return { ...current, hero: { ...current.hero, imageUrl: url } };
+  const slot = target.slot || "main";
+  if (target.kind === "hero") return {
+    ...current,
+    hero: {
+      ...current.hero,
+      ...(slot === "main" ? { imageUrl: url } : {}),
+      mediaSlots: { ...current.hero.mediaSlots, [slot]: { ...current.hero.mediaSlots[slot], imageUrl: url } },
+    },
+  };
   if (target.kind === "logo") return { ...current, header: { ...current.header, logoUrl: url } };
-  if (target.kind === "banner" && target.id) return { ...current, sections: current.sections.map((section) => section.id === target.id ? { ...section, imageUrl: url } : section) };
+  if (target.kind === "banner" && target.id) return {
+    ...current,
+    sections: current.sections.map((section) => {
+      if (section.id !== target.id) return section;
+      const banner = bannerConfigForSection(section);
+      return {
+        ...section,
+        ...(slot === "main" ? { imageUrl: url } : {}),
+        banner: { ...banner, mediaSlots: { ...banner.mediaSlots, [slot]: { ...banner.mediaSlots[slot], imageUrl: url } } },
+      };
+    }),
+  };
   if (target.kind === "product" && target.id) return {
     ...current,
     commerce: {
@@ -171,7 +192,19 @@ export default function StoreWebsiteStudioPageV16() {
     },
     patchDesign: (p) => setConfig((c) => ({ ...c, design: { ...c.design, ...p } })),
     patchHeader: (p) => setConfig((c) => ({ ...c, header: { ...c.header, ...p } })),
-    patchHero: (p) => setConfig((c) => ({ ...c, hero: { ...c.hero, ...p } })),
+    patchHero: (p) => setConfig((c) => {
+      const mainImage = p.imageUrl;
+      return {
+        ...c,
+        hero: {
+          ...c.hero,
+          ...p,
+          mediaSlots: mainImage
+            ? { ...c.hero.mediaSlots, ...p.mediaSlots, main: { ...c.hero.mediaSlots.main, ...p.mediaSlots?.main, imageUrl: mainImage } }
+            : p.mediaSlots ? { ...c.hero.mediaSlots, ...p.mediaSlots } : c.hero.mediaSlots,
+        },
+      };
+    }),
     patchSection: (id, p) => setConfig((c) => ({ ...c, sections: c.sections.map((s) => s.id === id ? { ...s, ...p } : s) })),
     patchProduct: (id, p) => setConfig((c) => ({ ...c, commerce: { ...c.commerce, productOverrides: { ...c.commerce.productOverrides, [id]: { ...(c.commerce.productOverrides[id] || {}), ...p } } } })),
     patchCommerce: (p) => setConfig((c) => ({ ...c, commerce: { ...c.commerce, ...p } })),
@@ -355,7 +388,20 @@ export default function StoreWebsiteStudioPageV16() {
       const i = c.sections.findIndex((s) => s.id === id);
       if (i < 0) return c;
       const src = c.sections[i];
-      const copy = { ...src, id: `${src.type}-${crypto.randomUUID()}`, title: `${src.title} (کپی)`, productSettings: src.productSettings ? { ...src.productSettings, productIds: [...src.productSettings.productIds] } : undefined };
+      const copy = {
+        ...src,
+        id: `${src.type}-${crypto.randomUUID()}`,
+        title: `${src.title} (کپی)`,
+        productSettings: src.productSettings ? { ...src.productSettings, productIds: [...src.productSettings.productIds] } : undefined,
+        banner: src.banner ? {
+          ...src.banner,
+          mediaSlots: {
+            main: { ...src.banner.mediaSlots.main },
+            secondary: { ...src.banner.mediaSlots.secondary },
+            tertiary: { ...src.banner.mediaSlots.tertiary },
+          },
+        } : undefined,
+      };
       const sections = [...c.sections];
       sections.splice(i + 1, 0, copy);
       const type = copy.type === "banner" ? "banner" : copy.type === "trust" ? "trust" : "section";
