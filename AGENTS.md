@@ -34,6 +34,10 @@ Before substantial Loadder engineering work, read and obey [docs/LOADDER_ENGINEE
 - Required merge gates: Frontend Build, Server Tests, Security Supply Chain Gate.
 - Fix the canonical implementation; avoid parallel versions and duplicate runtimes unless an explicit architecture decision requires them.
 
+## Proposed growth-layer product direction (not canon)
+
+[docs/LOADDER_PRODUCT_NORTH_STAR.md](docs/LOADDER_PRODUCT_NORTH_STAR.md) is a **PROPOSED** product north star for the growth layer. It is a draft, not architecture and not implementation permission. Issue #98, Issue #159 and the Engineering System remain the source of truth; where they conflict with that document, they win.
+
 ## Durable decisions
 Issue #98 is the detailed, updateable architecture record. When a durable architectural decision changes, update Issue #98 (and this file if the mandatory preflight itself changes).
 
