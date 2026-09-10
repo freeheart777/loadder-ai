@@ -3,6 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DemoModePreserver from "./components/DemoModePreserver";
 import { AuthProvider, RequireAuth } from "./lib/auth";
 
+// Dev-only design prototype. The ternary lets Rollup drop the dynamic import
+// entirely from a production build, so no prototype chunk or copy ever ships.
+const EntryExperiencePrototype = import.meta.env.DEV
+  ? lazy(() => import("./prototype/entry/EntryExperiencePrototype"))
+  : null;
+
 const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
 const PublicBusinessAppPage = lazy(() => import("./pages/PublicBusinessAppPage"));
 const StoreFinancialsPage = lazy(() => import("./pages/StoreFinancialsPage"));
@@ -57,6 +63,11 @@ export default function App() {
         <DemoModePreserver />
         <Suspense fallback={null}>
           <Routes>
+            {/* Dev-only. Renders no data and calls no API; removable with the
+                whole src/prototype/ directory. */}
+            {EntryExperiencePrototype && (
+              <Route path="/prototype/entry-experience" element={<EntryExperiencePrototype />} />
+            )}
             <Route path="/" element={<OriginalLandingPage />} />
             <Route path="/signup" element={<AuthPage />} />
             <Route path="/app/:projectId" element={<PublicBusinessAppPage />} />
