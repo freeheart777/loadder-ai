@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const dashboard=readFileSync(new URL("../../src/pages/DashboardPage.tsx",import.meta.url),"utf8");
+// The expert surface (Mission Control + tool launcher) moved out of DashboardPage
+// so that beginner_home_v1 can swap the default body without removing capability.
+const expert=readFileSync(new URL("../../src/components/dashboard/ExpertToolsSurface.tsx",import.meta.url),"utf8");
 const mission=readFileSync(new URL("../../src/components/mission-control/MissionControlDashboard.tsx",import.meta.url),"utf8");
 
 test("Mission Control Dashboard UI V1",async t=>{
   await t.test("is the primary canonical dashboard block with Persian RTL identity",()=>{
-    assert.match(dashboard,/dir="rtl"/);assert.match(dashboard,/<MissionControlDashboard/);
-    assert.ok(dashboard.indexOf("<MissionControlDashboard")<dashboard.indexOf("<BusinessBrainMotion"));
+    assert.match(dashboard,/dir="rtl"/);assert.match(dashboard,/<ExpertToolsSurface/);assert.match(expert,/<MissionControlDashboard/);
+    assert.ok(expert.indexOf("<MissionControlDashboard")<expert.indexOf("<BusinessBrainMotion"));
     assert.match(mission,/چه چیزی الان به توجه/);assert.match(mission,/مرکز مأموریت رشد/);
   });
   await t.test("reads the canonical endpoint once and supports only manual refresh",()=>{

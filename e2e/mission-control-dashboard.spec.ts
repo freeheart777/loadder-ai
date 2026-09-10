@@ -13,6 +13,10 @@ test("Mission Control is a bounded mobile-safe dashboard front door",async({page
   const items=[item("EXPERIMENT_WINDOW_CLOSED_NO_DECISION",0,"DECIDE_TODAY","DEFERRED"),item("CONTENT_CANDIDATE_STUCK",1,"REVIEW"),item("EXPERIMENT_WINDOW_CLOSED_NO_DECISION",2,"REVIEW","AMBIGUOUS"),item("UNDECIDED_RECOMMENDATION",3,"FYI"),...Array.from({length:3},(_,i)=>item("CONTENT_CANDIDATE_STUCK",i+4,"FYI"))];
   await page.route("**/api/mission-control",route=>route.fulfill({json:{success:true,missionControl:{contractVersion:1,generatedAt:"2026-09-09T12:00:00.000Z",items,banners:[{code:"STALE_BUSINESS_CONTEXT",staleReasons:["BUSINESS_PROFILE_CHANGED"]}],signalStatus:[{signalId:"S1",status:"ok"},{signalId:"S2",status:"ok"},{signalId:"S3",status:"ok"},{signalId:"S4",status:"failed"}],bounds:{maxItems:7,truncated:false}}}}));
   await page.goto("/dashboard");
+  // beginner_home_v1 moved the expert surface behind "همه ابزارها" on the same
+  // route. Open it, then assert the unchanged Mission Control contract.
+  const allTools=page.locator("[data-all-tools]");
+  if(await allTools.count())await allTools.click();
   await expect(page.getByRole("heading",{name:/آزاده، چه چیزی الان به توجهت نیاز دارد/})).toBeVisible();
   await expect(page.getByText("بخشی از بررسی‌های هوشمند فعلاً در دسترس نیست",{exact:false})).toBeVisible();
   await expect(page.getByText("پروفایل کسب‌وکار تغییر کرده است")).toBeVisible();

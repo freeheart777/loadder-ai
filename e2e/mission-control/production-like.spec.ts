@@ -40,6 +40,19 @@ async function loginThroughUi(page: Page, mobile: string) {
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
+/**
+ * beginner_home_v1 keeps /dashboard but puts the expert surface behind
+ * "همه ابزارها". This opens it when the flag is on and no-ops when it is off,
+ * so the acceptance below proves the same expert capability either way.
+ */
+async function openExpertSurface(page: Page) {
+  const toggle = page.locator("[data-all-tools-toggle]");
+  const grid = page.getByText("ابزارهای کسب‌وکار");
+  await expect(toggle.or(grid).first()).toBeVisible();
+  if (await toggle.count()) await toggle.click();
+  await expect(grid).toBeVisible();
+}
+
 test("real OTP user reaches durable Mission Control attention and valid destinations", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const mobile = `090${String(Date.now() + testInfo.workerIndex).slice(-8)}`;
@@ -60,6 +73,7 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
     if (new URL(response.url()).pathname === "/api/mission-control" && response.ok()) missionReads += 1;
   });
   await page.reload();
+  await openExpertSurface(page);
   await expect(page.getByRole("heading", { name: /چه چیزی الان به توجهت نیاز دارد/ })).toBeVisible();
   await expect(page.getByText("پنجره سنجش آزمایش بسته شده است")).toBeVisible();
   await expect(page.getByText("نامزد محتوا نیازمند بررسی است")).toBeVisible();
@@ -82,6 +96,7 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   await page.reload();
   await expect(page.getByText("تصمیم ثبت شد.")).toBeVisible();
   await page.goBack();
+  await openExpertSurface(page);
   await expect(page.getByRole("heading", { name: /چه چیزی الان به توجهت نیاز دارد/ })).toBeVisible();
 
   const contentLink = page.getByRole("link", { name: "بررسی نامزد محتوا" });
@@ -90,12 +105,14 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   await expect(page).toHaveURL(`/dashboard/growth-loop/${first.experimentId}`);
   await expect(page.locator('[data-candidate-state="RECONCILIATION_REQUIRED"]')).toContainText("نیازمند تطبیق انسانی");
   await page.goto("/dashboard");
+  await openExpertSurface(page);
   await page.getByRole("link", { name: /CRM/ }).click();
   await expect(page).toHaveURL("/dashboard/crm");
   for (const name of ["نیلوفر پارسا", "کیان مهرگان", "رها نیک‌فر"]) await expect(page.getByText(name).first()).toBeVisible();
 
   await page.goto("/dashboard");
   await page.reload();
+  await openExpertSurface(page);
   await expect(page.getByText("نامزد محتوا نیازمند بررسی است")).toBeVisible();
   await expect(page.getByText("پنجره سنجش آزمایش بسته شده است")).toHaveCount(0);
   expect(missionReads).toBeGreaterThanOrEqual(3);
