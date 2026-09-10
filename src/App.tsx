@@ -8,6 +8,9 @@ import { AuthProvider, RequireAuth } from "./lib/auth";
 const EntryExperiencePrototype = import.meta.env.DEV
   ? lazy(() => import("./prototype/entry/EntryExperiencePrototype"))
   : null;
+const GrowthEntryPrototype = import.meta.env.DEV
+  ? lazy(() => import("./prototype/growth/GrowthEntryPrototype"))
+  : null;
 
 const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
 const PublicBusinessAppPage = lazy(() => import("./pages/PublicBusinessAppPage"));
@@ -67,6 +70,9 @@ export default function App() {
                 whole src/prototype/ directory. */}
             {EntryExperiencePrototype && (
               <Route path="/prototype/entry-experience" element={<EntryExperiencePrototype />} />
+            )}
+            {GrowthEntryPrototype && (
+              <Route path="/prototype/growth-entry" element={<GrowthEntryPrototype />} />
             )}
             <Route path="/" element={<OriginalLandingPage />} />
             <Route path="/signup" element={<AuthPage />} />
