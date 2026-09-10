@@ -1,114 +1,179 @@
 /**
- * LOADDER BRAIN — PROTOTYPE FIXTURES. Not production data.
+ * LOADDER BRAIN V2 — PROTOTYPE FIXTURES. Not production data.
  *
- * Three invented states of what Loadder knows about one business. Nothing here
- * reads or writes a canonical API. The whole `src/prototype/` tree is removable.
+ * Invented content for one business, used to validate the Brain's visual
+ * grammar. Nothing here reads or writes a canonical API. The whole
+ * `src/prototype/brain/` directory is removable.
  */
 
 export const BRAIN_DATA_ORIGIN = "FIXTURE_ONLY_NOT_CANONICAL";
 
 /**
- * `known`   — Loadder has a source for this.
- * `partial` — a source exists but it only tells part of the story.
- * `unknown` — Loadder has no source. Drawn detached, never as a warning.
+ * Four node kinds, each with its own visual weight:
+ *
+ *   human    — the owner gave it or did it. The most solid thing on the field.
+ *   observed — Loadder discovered it. Factual, outlined rather than filled.
+ *   belief   — Loadder's reading. Never solid, and always carries a confidence
+ *              indicator so it can never be mistaken for a fact.
+ *   unknown  — an empty node. A hole in the map, not a fault.
  */
-export type Knowledge = "known" | "partial" | "unknown";
+export type NodeKind = "human" | "observed" | "belief" | "unknown";
 
-export type Node = {
+/** Belief only. Deliberately coarse: no invented percentage. */
+export type Confidence = "low" | "medium" | "high";
+
+/**
+ * Three edge kinds:
+ *   source   — this came from that
+ *   built    — Loadder made this out of that
+ *   possible — a relation Loadder suspects but cannot show. Always dashed.
+ */
+export type EdgeKind = "source" | "built" | "possible";
+
+export type SourceEvent = { when: string; what: string };
+
+export type BrainNode = {
   id: string;
   label: string;
-  /** Percentage of the canvas, so layout is deterministic and screenshots are stable. */
   x: number;
   y: number;
-  knowledge: Knowledge;
-  /** Expert view only. Where this came from, in plain words. */
-  source?: string;
-  /** Expert view only. What Loadder still cannot say about it. */
+  kind: NodeKind;
+  confidence?: Confidence;
+  /** Deep view. Ordered oldest first. */
+  history?: SourceEvent[];
+  /** Deep view. What Loadder still cannot say. */
   gap?: string;
+  /** Deep view. A past decision that touched this, in the existing Decision Room. */
+  decisionRoom?: { label: string; href: string };
 };
 
-export type Edge = { from: string; to: string; knowledge: Exclude<Knowledge, "unknown"> };
+/**
+ * An edge with no `to` is incomplete: it leaves a node and fades out, because
+ * Loadder can see something leaves but not where it goes.
+ */
+export type BrainEdge = { from: string; to?: string; toX?: number; toY?: number; kind: EdgeKind };
 
-export type BrainState = {
-  id: string;
-  label: string;
-  /** One calm sentence. The Brain narrates; it never asks for a decision. */
-  summary: string;
-  nodes: Node[];
-  edges: Edge[];
+/** A region of the business Loadder has no way to observe at all. */
+export type UnknownArea = { x: number; y: number; w: number; h: number; label: string };
+
+export const CONFIDENCE_LABEL: Record<Confidence, string> = {
+  low: "با اطمینان کم",
+  medium: "با اطمینان متوسط",
+  high: "با اطمینان زیاد",
 };
 
-const KNOWN_LABEL: Record<Knowledge, string> = {
-  known: "می‌دانم",
-  partial: "تا حدی می‌دانم",
-  unknown: "هنوز نمی‌دانم",
+export const CONFIDENCE_STEPS: Record<Confidence, number> = { low: 1, medium: 2, high: 3 };
+
+export const KIND_LABEL: Record<NodeKind, string> = {
+  human: "شما این را به من دادید",
+  observed: "خودم این را دیدم",
+  belief: "این برداشت من است",
+  unknown: "این را هنوز نمی‌دانم",
 };
 
-export const KNOWLEDGE_LABEL = KNOWN_LABEL;
+/** Nine nodes, comfortably under the twelve the simple view allows. */
+export const NODES: BrainNode[] = [
+  {
+    id: "site", label: "سایت شما", x: 24, y: 16, kind: "human",
+    history: [{ when: "سه ماه پیش", what: "آدرس سایت را خودتان دادید" }, { when: "دو ماه پیش", what: "صفحه را با هم بازنویسی کردیم" }],
+    gap: "—",
+  },
+  {
+    id: "insta", label: "صفحهٔ اینستاگرام", x: 62, y: 12, kind: "human",
+    history: [{ when: "سه ماه پیش", what: "صفحه را خودتان وصل کردید" }],
+    gap: "—",
+  },
+  {
+    id: "list", label: "فهرست مشتری‌ها", x: 13, y: 55, kind: "human",
+    history: [{ when: "دو ماه پیش", what: "فهرست را خودتان وارد کردید" }],
+    gap: "—",
+  },
+  {
+    id: "content", label: "متن‌هایی که ساختیم", x: 84, y: 30, kind: "observed",
+    history: [{ when: "شش هفته پیش", what: "از روی سایت و لحن شما ساخته شد" }],
+    gap: "نمی‌دانم چند نفر تا آخرش را خواندند.",
+  },
+  {
+    id: "price", label: "قیمت روی صفحه", x: 40, y: 34, kind: "observed",
+    history: [{ when: "پنج هفته پیش", what: "روی صفحه اضافه شد" }],
+    gap: "—",
+    decisionRoom: { label: "تصمیم دربارهٔ نمایش قیمت", href: "/dashboard/growth-loop/experiment-1" },
+  },
+  {
+    id: "visits", label: "بازدیدها", x: 66, y: 48, kind: "observed",
+    history: [{ when: "هر روز", what: "خود صفحه می‌شمارد" }],
+    gap: "نمی‌دانم هر بازدید کدام آدم است.",
+  },
+  {
+    id: "calls", label: "شماره‌هایی که گرفتید", x: 34, y: 62, kind: "observed",
+    history: [{ when: "پنج هفته پیش", what: "اولین شماره ثبت شد" }, { when: "این هفته", what: "سه شمارهٔ تازه" }],
+    gap: "نمی‌دانم بعد از تماس چه شد.",
+  },
+  {
+    id: "why", label: "قیمت باعث تماس بیشتر شد", x: 46, y: 84, kind: "belief", confidence: "medium",
+    history: [{ when: "دو هفته پیش", what: "دو هفته را با هم مقایسه کردم" }],
+    gap: "همان هفته پستتان هم بیشتر دیده شد؛ مطمئن نیستم کدام.",
+    decisionRoom: { label: "تصمیم دربارهٔ نمایش قیمت", href: "/dashboard/growth-loop/experiment-1" },
+  },
+  {
+    id: "night", label: "شب‌ها بیشتر سر می‌زنند", x: 82, y: 68, kind: "belief", confidence: "low",
+    history: [{ when: "هفتهٔ پیش", what: "ساعت بازدیدها را نگاه کردم" }],
+    gap: "دادهٔ کمی دارم؛ ممکن است اتفاقی باشد.",
+  },
+];
 
-/** A — a business Loadder has only just met. */
-const NEW_BUSINESS: BrainState = {
-  id: "new",
-  label: "کسب‌وکار تازه",
-  summary: "دو چیز از کسب‌وکار شما را می‌شناسم و چند چیز را هنوز نه.",
-  nodes: [
-    { id: "site", label: "سایت", x: 34, y: 24, knowledge: "known", source: "آدرسی که خودتان دادید", gap: "نمی‌دانم چند نفر واقعاً بازش می‌کنند." },
-    { id: "insta", label: "اینستاگرام", x: 66, y: 34, knowledge: "known", source: "صفحه‌ای که خودتان دادید", gap: "نمی‌دانم چند نفر از آن‌جا به سایت می‌آیند." },
-    { id: "visitors", label: "بازدیدکننده‌ها", x: 48, y: 60, knowledge: "unknown", gap: "هیچ جایی ثبت نمی‌شود." },
-    { id: "customers", label: "مشتری‌ها", x: 20, y: 74, knowledge: "unknown", gap: "هنوز فهرستی از مشتری‌ها ندارم." },
-    { id: "sales", label: "فروش", x: 78, y: 78, knowledge: "unknown", gap: "هیچ فروشی به من گزارش نشده." },
-  ],
-  edges: [{ from: "site", to: "insta", knowledge: "partial" }],
+export const EDGES: BrainEdge[] = [
+  { from: "site", to: "price", kind: "source" },
+  { from: "site", to: "visits", kind: "source" },
+  { from: "insta", to: "visits", kind: "source" },
+  { from: "site", to: "content", kind: "built" },
+  { from: "insta", to: "content", kind: "built" },
+  { from: "list", to: "calls", kind: "source" },
+  { from: "price", to: "why", kind: "possible" },
+  { from: "calls", to: "why", kind: "possible" },
+  { from: "visits", to: "night", kind: "possible" },
+  // Incomplete: something leaves the calls, but Loadder cannot see where it lands.
+  { from: "calls", toX: 22, toY: 84, kind: "source" },
+];
+
+export const UNKNOWN_AREA: UnknownArea = {
+  x: 5, y: 70, w: 29, h: 24,
+  label: "فروش حضوری و معرفی دهان‌به‌دهان",
 };
 
-/** B — the same business after a few months of real use. */
-const GROWING_BUSINESS: BrainState = {
-  id: "growing",
-  label: "کسب‌وکار در حال رشد",
-  summary: "بیشتر مسیر را می‌بینم؛ یک حلقه هنوز جا افتاده است.",
-  nodes: [
-    { id: "site", label: "سایت", x: 28, y: 18, knowledge: "known", source: "صفحه‌ای که با لودر ساختید", gap: "—" },
-    { id: "insta", label: "اینستاگرام", x: 58, y: 12, knowledge: "known", source: "صفحه‌ای که وصل کردید", gap: "—" },
-    { id: "content", label: "محتوا", x: 82, y: 30, knowledge: "known", source: "متن‌هایی که با هم ساختیم", gap: "—" },
-    { id: "visitors", label: "بازدیدکننده‌ها", x: 46, y: 44, knowledge: "known", source: "شمارش خود صفحه", gap: "—" },
-    { id: "leads", label: "شماره‌هایی که گرفتید", x: 28, y: 70, knowledge: "known", source: "فهرست خودتان", gap: "—" },
-    { id: "customers", label: "مشتری‌ها", x: 56, y: 88, knowledge: "known", source: "فهرست خودتان", gap: "—" },
-    { id: "instore", label: "فروش حضوری", x: 84, y: 74, knowledge: "unknown", gap: "جایی ثبت نمی‌شود، پس نمی‌توانم بشمارمش." },
-    { id: "cause", label: "دلیل رشد", x: 12, y: 40, knowledge: "partial", source: "مقایسهٔ دو هفته", gap: "مطمئن نیستم کدام کار باعثش بوده." },
-  ],
-  edges: [
-    { from: "insta", to: "visitors", knowledge: "known" },
-    { from: "content", to: "insta", knowledge: "known" },
-    { from: "site", to: "visitors", knowledge: "known" },
-    { from: "visitors", to: "leads", knowledge: "known" },
-    { from: "leads", to: "customers", knowledge: "known" },
-    { from: "cause", to: "site", knowledge: "partial" },
-  ],
-};
-
-/** C — the same graph, with every node inspectable. */
-const EXPERT_VIEW: BrainState = { ...GROWING_BUSINESS, id: "expert", label: "نمای کامل", summary: "روی هر چیزی بزنید تا بگویم از کجا می‌دانمش." };
-
-export const BRAIN_STATES: readonly BrainState[] = Object.freeze([NEW_BUSINESS, GROWING_BUSINESS, EXPERT_VIEW]);
+/** The empty node that sits inside the unmapped region. */
+export const UNKNOWN_NODE: BrainNode = { id: "offline", label: "", x: 19, y: 87, kind: "unknown", gap: "هیچ راهی ندارم که این را ببینم." };
 
 export const BRAIN_COPY = Object.freeze({
   title: "چیزی که از کسب‌وکار شما می‌دانم",
-  lead: "این نقشه فقط نشان می‌دهد چه می‌دانم و چه نمی‌دانم. کاری از شما نمی‌خواهد.",
-  legendKnown: "می‌دانم",
-  legendPartial: "تا حدی می‌دانم",
-  legendUnknown: "هنوز نمی‌دانم",
-  unknownNote: "چیزهایی که وصل نیستند، خراب نیستند. فقط هنوز جایی ثبت نمی‌شوند.",
-  panelSource: "از کجا می‌دانم",
+  lead: "این صفحه فقط می‌گوید چه می‌دانم و چه نمی‌دانم. تصمیمی از شما نمی‌خواهد.",
+  simple: "سادهٔ روزمره",
+  deep: "نمای کامل",
+  summarySimple: "چند چیز را از شما دارم، چند چیز را خودم دیده‌ام، و چند چیز هنوز حدس است.",
+  summaryDeep: "روی هر چیزی بزنید تا بگویم از کجا آمده و چه چیزی را هنوز نمی‌دانم.",
+  legend: "راهنما",
+  incomplete: "خطی که به جایی نمی‌رسد یعنی چیزی از این‌جا بیرون می‌رود ولی نمی‌بینم کجا می‌رود.",
+  unknownNote: "جای خالی خرابی نیست. یعنی هنوز جایی ثبت نمی‌شود.",
+  panelEmpty: "روی یکی از چیزهای نقشه بزنید.",
+  panelHistory: "از کجا آمده",
   panelGap: "چه چیزی را هنوز نمی‌دانم",
   panelLinks: "به چه چیزهایی وصل است",
-  panelEmpty: "روی یکی از چیزهای نقشه بزنید.",
+  panelDecision: "تصمیم گذشته",
   noLinks: "به چیزی وصل نیست.",
+  roles: "مغز می‌گوید چه می‌دانم. خانه یک تصمیم می‌خواهد. اتاق تصمیم می‌گوید قبلاً چه تصمیمی گرفتید.",
+  roleBrain: "مغز",
+  roleBrainNote: "چه می‌دانم · تصمیمی نمی‌گیرد",
+  roleHome: "خانه",
+  roleHomeNote: "یک تصمیم از شما",
+  roleRoom: "اتاق تصمیم",
+  roleRoomNote: "تصمیم‌های گذشته",
 });
 
-export function edgesFor(state: BrainState, nodeId: string) {
-  return state.edges
-    .filter((edge) => edge.from === nodeId || edge.to === nodeId)
+export function neighbours(nodeId: string) {
+  const all = [...NODES, UNKNOWN_NODE];
+  return EDGES
+    .filter((edge) => edge.to && (edge.from === nodeId || edge.to === nodeId))
     .map((edge) => (edge.from === nodeId ? edge.to : edge.from))
-    .map((id) => state.nodes.find((node) => node.id === id)?.label)
+    .map((id) => all.find((node) => node.id === id)?.label)
     .filter((label): label is string => Boolean(label));
 }
