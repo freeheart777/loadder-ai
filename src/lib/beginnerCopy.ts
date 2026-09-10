@@ -234,3 +234,82 @@ const ALLOWED_LINKS = [/^\/dashboard\/growth-loop\/[^/?#]+$/, /^\/dashboard\/con
 export function safeDeepLink(link: string | undefined | null) {
   return typeof link === "string" && ALLOWED_LINKS.some((pattern) => pattern.test(link)) ? link : null;
 }
+
+// ---------------------------------------------------------------------------
+// Home V2 — four permanent zones
+// ---------------------------------------------------------------------------
+
+export const ZONE_LABELS = Object.freeze({
+  attention: "به شما نیاز دارد",
+  inProgress: "در حال انجام",
+  learned: "چیزی که یاد گرفته‌ام",
+  tools: "ابزارهای کسب‌وکار",
+});
+
+/**
+ * Zone 2. Sentences are chosen by which counts are non-zero; the counts come
+ * from the canonical business-state snapshot. No percentage, no invented step
+ * ladder, and no workflow state this surface owns.
+ */
+export const IN_PROGRESS_COPY = Object.freeze({
+  empty: "الان چیزی در جریان نیست.",
+  unreadable: "الان نمی‌توانم ببینم چه چیزی در جریان است.",
+  openWork: { one: "یک کار در جریان است که هنوز نتیجه‌اش نیامده.", many: "کار در جریان است که هنوز نتیجه‌شان نیامده." },
+  awaitingYou: { one: "یک پیش‌نویس منتظر نظر شماست.", many: "پیش‌نویس منتظر نظر شما هستند." },
+  needsSorting: { one: "یک پیش‌نویس هست که تکلیفش روشن نیست.", many: "پیش‌نویس هست که تکلیفشان روشن نیست." },
+});
+
+/**
+ * Zone 3. The only canonical findings today carry their own uncertainty, so the
+ * observed count is always paired with the boundary sentence.
+ */
+export const LEARNED_COPY = Object.freeze({
+  empty: "هنوز چیزی یاد نگرفته‌ام. باید اول نتیجهٔ یک کار را ببینم.",
+  unreadable: "الان نمی‌توانم آنچه را یاد گرفته‌ام بخوانم.",
+  boundary: "هنوز نمی‌دانم این نتیجهٔ کدام‌یک از کارهای شما بوده است.",
+  none: "تا این‌جا کسی از این راه مشتری شما نشده.",
+});
+
+export function learnedSentence(observedCount: number) {
+  if (observedCount <= 0) return LEARNED_COPY.none;
+  if (observedCount === 1) return "یک نفر از این راه مشتری شما شد.";
+  return `${new Intl.NumberFormat("fa-IR").format(observedCount)} نفر از این راه مشتری شما شدند.`;
+}
+
+/** Persian reads "یک" rather than the digit for a single item. */
+const counted = (value: number, phrase: { one: string; many: string }) =>
+  value === 1 ? phrase.one : `${new Intl.NumberFormat("fa-IR").format(value)} ${phrase.many}`;
+
+/** Zone 2 lines, ordered by how much they want from the owner. */
+export function inProgressLines(counts: { openWork: number; awaitingYou: number; needsSorting: number }) {
+  const lines: Array<{ key: string; text: string; wantsYou: boolean }> = [];
+  if (counts.awaitingYou > 0) lines.push({ key: "awaitingYou", text: counted(counts.awaitingYou, IN_PROGRESS_COPY.awaitingYou), wantsYou: true });
+  if (counts.needsSorting > 0) lines.push({ key: "needsSorting", text: counted(counts.needsSorting, IN_PROGRESS_COPY.needsSorting), wantsYou: true });
+  if (counts.openWork > 0) lines.push({ key: "openWork", text: counted(counts.openWork, IN_PROGRESS_COPY.openWork), wantsYou: false });
+  return lines;
+}
+
+/**
+ * Zone 4. Persian-first, no English subtitle and no internal product word.
+ * Direct access is preserved: opening any of these never requires a plan.
+ */
+export type HomeTool = { label: string; icon: string; route: string };
+
+export const HOME_TOOLS: readonly HomeTool[] = Object.freeze([
+  { label: "مشتری‌ها", icon: "users", route: "/dashboard/crm" },
+  { label: "ساخت محتوا", icon: "pen", route: "/dashboard/content" },
+  { label: "سایت‌ساز", icon: "globe", route: "/dashboard/websites" },
+  { label: "فروشگاه", icon: "bag", route: "/dashboard/websites/commerce" },
+  { label: "آمار و نتیجه‌ها", icon: "chart", route: "/dashboard/analytics" },
+  { label: "تبلیغات", icon: "megaphone", route: "/dashboard/ads" },
+  { label: "برند بوک", icon: "book", route: "/dashboard/brand-book" },
+  { label: "اپلیکیشن‌ساز", icon: "bolt", route: "/dashboard/business-builder" },
+  { label: "اینستاگرام", icon: "instagram", route: "/dashboard/social" },
+  { label: "پیشنهاد کاری", icon: "file", route: "/dashboard/business-proposal" },
+  { label: "کارهای تکراری", icon: "repeat", route: "/dashboard/automation" },
+  { label: "مدیریت سایت", icon: "gear", route: "/dashboard/site-operations" },
+  { label: "شاخص‌ها", icon: "gauge", route: "/dashboard/kpi" },
+  { label: "دانش کسب‌وکار", icon: "brain", route: "/dashboard/business-brain" },
+]);
+
+export const TOOLS_HINT = "مستقیم باز کنید";

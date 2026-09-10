@@ -21,19 +21,23 @@ test("Mission Control is a bounded mobile-safe dashboard front door",async({page
   await expect(page.locator('[data-recommendation="secondary"]')).toHaveCount(2);
   await expect(page.locator("[data-overflow-line]")).toHaveText("۴ مورد دیگر");
   await expect(page.locator('[data-signal-state="partial"]')).toBeVisible();
-  await expect(page.getByText("ابزارهای کسب‌وکار")).toHaveCount(0);
+  // Zone 4 now puts the tools on Home by design, so the marker for "expert
+  // surface not yet open" is the expert grid's own counter, not the heading.
+  await expect(page.locator("[data-zone='tools'] [data-tool]")).toHaveCount(14);
+  await expect(page.getByText("۱۳ ابزار فعال")).toHaveCount(0);
   await expect(page.getByRole("heading",{name:/آزاده، چه چیزی الان به توجهت نیاز دارد/})).toHaveCount(0);
   // 2. The expert surface is still reachable through "همه ابزارها". The entry
   //    renders only after the canonical read resolves, so this must be a
   //    retrying wait: locator.count() is a one-shot query and returns 0 on a
   //    cold runner, silently skipping the click.
-  const allTools=page.locator("[data-all-tools]");
+  const allTools=page.locator("[data-all-tools-toggle]");
   await expect(allTools).toBeVisible();
   await allTools.click();
   await expect(page.locator("[data-all-tools-toggle]")).toHaveAttribute("aria-expanded","true");
   // 3. Nothing in the Mission Control block was lost in the move.
   await expect(page.getByRole("heading",{name:/آزاده، چه چیزی الان به توجهت نیاز دارد/})).toBeVisible();
   await expect(page.getByRole("link",{name:"CRM"})).toHaveAttribute("href","/dashboard/crm");
+  await expect(page.getByText("۱۳ ابزار فعال")).toBeVisible();
   await expect(page.getByText("بخشی از بررسی‌های هوشمند فعلاً در دسترس نیست",{exact:false})).toBeVisible();
   await expect(page.getByText("پروفایل کسب‌وکار تغییر کرده است")).toBeVisible();
   await expect(page.getByText("نمایش ۳ مورد دیگر")).toBeVisible();

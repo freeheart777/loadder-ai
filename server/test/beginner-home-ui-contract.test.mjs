@@ -4,6 +4,13 @@ import { readFileSync } from "node:fs";
 import {
   BUTTON_LABELS,
   CARD_LABELS,
+  HOME_TOOLS,
+  IN_PROGRESS_COPY,
+  LEARNED_COPY,
+  TOOLS_HINT,
+  ZONE_LABELS,
+  inProgressLines,
+  learnedSentence,
   CONSEQUENCE_SENTENCE,
   MAPPED_SIGNAL_IDS,
   SIGNAL_MESSAGES,
@@ -24,6 +31,8 @@ const card = readFileSync(new URL("../../src/components/home/RecommendationCard.
 const copySource = readFileSync(new URL("../../src/lib/beginnerCopy.ts", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../../src/pages/DashboardPage.tsx", import.meta.url), "utf8");
 const flags = readFileSync(new URL("../../src/lib/featureFlags.ts", import.meta.url), "utf8");
+const zones = readFileSync(new URL("../../src/components/home/zones.tsx", import.meta.url), "utf8");
+const homeData = readFileSync(new URL("../../src/lib/homeData.ts", import.meta.url), "utf8");
 
 // The closed canonical signal set produced by mission-control-service.mjs.
 const CANONICAL_SIGNALS = [
@@ -48,6 +57,9 @@ const FORBIDDEN_TERMS = [
   "RECONCILIATION_",
   "DECIDE_TODAY",
   "CRM",
+  "Analytics",
+  "Automation",
+  "Mission Control",
   "تبدیل",
   "کمپین",
 ];
@@ -157,15 +169,18 @@ test("Beginner Home V1 contract", async (t) => {
   });
 
   await t.test("the surface reads the canonical contract only and never writes", () => {
-    assert.match(home, /apiFetch\("\/api\/mission-control"\)/);
-    for (const source of [home, card]) {
+    // Reads moved into lib/homeData.ts when Home grew to four zones.
+    assert.match(homeData, /apiFetch\(path\)/);
+    assert.match(homeData, /"\/api\/mission-control"/);
+    assert.match(home, /readMissionControl/);
+    for (const source of [home, card, homeData]) {
       assert.doesNotMatch(source, /method:\s*["'](POST|PUT|PATCH|DELETE)/);
       assert.doesNotMatch(source, /healthScore|revenue|uplift|confidence\s*=|successRate/);
     }
     // No client-side re-ranking: canonical array order is preserved.
     assert.doesNotMatch(home, /\.sort\(/);
     assert.doesNotMatch(home, /score/);
-    assert.match(home, /Canonical order is the array order returned by the server/);
+    assert.match(home, /preserves the canonical Mission Control order/);
   });
 
   await t.test("exactly one primary card, at most two secondary items and a bounded overflow line", () => {
@@ -190,6 +205,89 @@ test("Beginner Home V1 contract", async (t) => {
     assert.match(dashboard, /beginner\s*\?[\s\S]*?<BeginnerHome/);
     assert.match(dashboard, /:\s*<ExpertToolsSurface userName=\{user\?\.name\} \/>/);
     assert.match(dashboard, /data-all-tools-toggle/);
+  });
+
+  await t.test("Home V2 renders four permanent zones", () => {
+    assert.deepEqual(Object.keys(ZONE_LABELS), ["attention", "inProgress", "learned", "tools"]);
+    for (const [key, label] of Object.entries(ZONE_LABELS)) assertBeginnerSafe(label, `zone ${key}`);
+    for (const marker of ["<Zone label={ZONE_LABELS.attention}>", "<InProgressZone", "<LearnedZone", "<ToolsZone"]) {
+      assert.ok(home.includes(marker), `home is missing ${marker}`);
+    }
+    // Order is fixed: attention, in progress, learned, tools.
+    assert.ok(home.indexOf("ZONE_LABELS.attention") < home.indexOf("<InProgressZone"));
+    assert.ok(home.indexOf("<InProgressZone") < home.indexOf("<LearnedZone"));
+    assert.ok(home.indexOf("<LearnedZone") < home.indexOf("<ToolsZone"));
+  });
+
+  await t.test("every zone reads an existing endpoint and none of them writes", () => {
+    const allowed = ["/api/mission-control", "/api/business-state", "/api/intelligence/semantic/findings"];
+    const called = [...homeData.matchAll(/apiFetch\(|read<[^>]*>\("([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
+    for (const path of called) {
+      assert.ok(allowed.some((prefix) => path.startsWith(prefix)), `unexpected endpoint ${path}`);
+    }
+    for (const source of [homeData, zones, home]) {
+      assert.doesNotMatch(source, /method:\s*["'](POST|PUT|PATCH|DELETE)/);
+    }
+    // No zone invents a value the backend did not supply.
+    assert.doesNotMatch(zones, /healthScore|percent|progressPercent|Math\.round|estimate/i);
+  });
+
+  await t.test("zone 2 counts canonical records and never shows a step ladder", () => {
+    const lines = inProgressLines({ openWork: 2, awaitingYou: 1, needsSorting: 0 });
+    assert.equal(lines.length, 2);
+    // What wants the owner comes first.
+    assert.equal(lines[0].wantsYou, true);
+    for (const line of lines) assertBeginnerSafe(line.text, "in-progress line");
+    assert.deepEqual(inProgressLines({ openWork: 0, awaitingYou: 0, needsSorting: 0 }), []);
+    for (const [key, message] of Object.entries(IN_PROGRESS_COPY)) {
+      for (const text of typeof message === "string" ? [message] : Object.values(message)) assertBeginnerSafe(text, `in-progress ${key}`);
+    }
+    // Persian reads "یک", never the digit, for a single item.
+    assert.match(inProgressLines({ openWork: 0, awaitingYou: 1, needsSorting: 0 })[0].text, /^یک پیش‌نویس/);
+    assert.match(inProgressLines({ openWork: 0, awaitingYou: 3, needsSorting: 0 })[0].text, /^۳ پیش‌نویس/);
+    // A Jira-style ladder is exactly what this zone must not become.
+    assert.doesNotMatch(zones, /StepRow|"done"\s*\|\s*"waiting"\s*\|\s*"next"/);
+    assert.match(IN_PROGRESS_COPY.unreadable, /نمی‌توانم/);
+  });
+
+  await t.test("zone 3 states an observation only with its boundary, and never infers", () => {
+    for (const [key, message] of Object.entries(LEARNED_COPY)) assertBeginnerSafe(message, `learned ${key}`);
+    assert.match(learnedSentence(0), /کسی/);
+    assert.match(learnedSentence(1), /یک نفر/);
+    assert.match(learnedSentence(4), /۴ نفر/);
+    for (const count of [0, 1, 4]) assertBeginnerSafe(learnedSentence(count), `learned ${count}`);
+    // The boundary is rendered next to every finding, not as an optional extra.
+    assert.match(zones, /data-learned-boundary/);
+    assert.match(zones, /LEARNED_COPY\.boundary/);
+    assert.match(LEARNED_COPY.boundary, /هنوز نمی‌دانم/);
+    assert.match(LEARNED_COPY.empty, /هنوز چیزی یاد نگرفته‌ام/);
+  });
+
+  await t.test("zone 4 keeps every tool directly reachable with Persian-first labels", () => {
+    assert.ok(HOME_TOOLS.length >= 13, "the tool set must not shrink");
+    for (const tool of HOME_TOOLS) {
+      assertBeginnerSafe(tool.label, `tool ${tool.label}`);
+      assert.ok(tool.route.startsWith("/dashboard"), `tool ${tool.label} must link to a real route`);
+      assert.ok(!("en" in tool), `tool ${tool.label} must not carry an English subtitle`);
+    }
+    assertBeginnerSafe(TOOLS_HINT, "tools hint");
+    // Never gated: the grid renders unconditionally, with no plan or goal check.
+    assert.doesNotMatch(zones, /HOME_TOOLS[\s\S]{0,200}(plan|goal|hasPlan)/i);
+    assert.match(zones, /data-zone="tools"/);
+  });
+
+  await t.test("the permission primitive is visual only", () => {
+    assert.match(zones, /export function PermissionFacts/);
+    assert.match(zones, /data-permission-facts/);
+    // Stacked label and value: the prototype review found edge-aligned pairs unreadable.
+    assert.match(zones, /<dt[^>]*>\{fact\.label\}<\/dt>/);
+    assert.doesNotMatch(zones, /PermissionFacts[\s\S]{0,600}(apiFetch|fetch\(|onApprove|execute)/);
+  });
+
+  await t.test("no decorative assistant signalling on the beginner surface", () => {
+    for (const source of [home, card, zones]) {
+      assert.doesNotMatch(source, /Sparkle|Magic|Robot|Star\b|✨|🤖/);
+    }
   });
 
   await t.test("mobile stays first class: touch targets, RTL and no horizontal overflow", () => {
