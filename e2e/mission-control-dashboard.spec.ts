@@ -13,7 +13,27 @@ test("Mission Control is a bounded mobile-safe dashboard front door",async({page
   const items=[item("EXPERIMENT_WINDOW_CLOSED_NO_DECISION",0,"DECIDE_TODAY","DEFERRED"),item("CONTENT_CANDIDATE_STUCK",1,"REVIEW"),item("EXPERIMENT_WINDOW_CLOSED_NO_DECISION",2,"REVIEW","AMBIGUOUS"),item("UNDECIDED_RECOMMENDATION",3,"FYI"),...Array.from({length:3},(_,i)=>item("CONTENT_CANDIDATE_STUCK",i+4,"FYI"))];
   await page.route("**/api/mission-control",route=>route.fulfill({json:{success:true,missionControl:{contractVersion:1,generatedAt:"2026-09-09T12:00:00.000Z",items,banners:[{code:"STALE_BUSINESS_CONTEXT",staleReasons:["BUSINESS_PROFILE_CHANGED"]}],signalStatus:[{signalId:"S1",status:"ok"},{signalId:"S2",status:"ok"},{signalId:"S3",status:"ok"},{signalId:"S4",status:"failed"}],bounds:{maxItems:7,truncated:false}}}}));
   await page.goto("/dashboard");
+  // 1. Beginner Home is the default /dashboard experience once beginner_home_v1
+  //    is on, and the tool launcher is not in the first viewport.
+  await expect(page.locator("[data-status-sentence]")).toHaveText("امروز ۷ موضوع نیاز به توجه شما دارد.");
+  await expect(page.locator('[data-recommendation="primary"]')).toHaveCount(1);
+  await expect(page.locator('[data-recommendation="primary"]')).toHaveAttribute("data-signal","EXPERIMENT_WINDOW_CLOSED_NO_DECISION");
+  await expect(page.locator('[data-recommendation="secondary"]')).toHaveCount(2);
+  await expect(page.locator("[data-overflow-line]")).toHaveText("۴ مورد دیگر");
+  await expect(page.locator('[data-signal-state="partial"]')).toBeVisible();
+  await expect(page.getByText("ابزارهای کسب‌وکار")).toHaveCount(0);
+  await expect(page.getByRole("heading",{name:/آزاده، چه چیزی الان به توجهت نیاز دارد/})).toHaveCount(0);
+  // 2. The expert surface is still reachable through "همه ابزارها". The entry
+  //    renders only after the canonical read resolves, so this must be a
+  //    retrying wait: locator.count() is a one-shot query and returns 0 on a
+  //    cold runner, silently skipping the click.
+  const allTools=page.locator("[data-all-tools]");
+  await expect(allTools).toBeVisible();
+  await allTools.click();
+  await expect(page.locator("[data-all-tools-toggle]")).toHaveAttribute("aria-expanded","true");
+  // 3. Nothing in the Mission Control block was lost in the move.
   await expect(page.getByRole("heading",{name:/آزاده، چه چیزی الان به توجهت نیاز دارد/})).toBeVisible();
+  await expect(page.getByRole("link",{name:"CRM"})).toHaveAttribute("href","/dashboard/crm");
   await expect(page.getByText("بخشی از بررسی‌های هوشمند فعلاً در دسترس نیست",{exact:false})).toBeVisible();
   await expect(page.getByText("پروفایل کسب‌وکار تغییر کرده است")).toBeVisible();
   await expect(page.getByText("نمایش ۳ مورد دیگر")).toBeVisible();
