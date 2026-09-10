@@ -7,6 +7,7 @@
 | **Supersedes** | Nothing. |
 | **Relationship to canon** | [Issue #98](https://github.com/freeheart777/loadder-ai/issues/98), [Issue #159](https://github.com/freeheart777/loadder-ai/issues/159), [Issue #223](https://github.com/freeheart777/loadder-ai/issues/223) and [LOADDER_ENGINEERING_SYSTEM.md](LOADDER_ENGINEERING_SYSTEM.md) remain the source of truth for current architecture. This document does **not** override them. Where it conflicts with them, they win until an explicit later decision says otherwise. |
 | **Promotion rule** | Status may change `PROPOSED` → `ACCEPTED` only by an explicit owner decision recorded in this file and in Issue #98. |
+| **Living record** | [Issue #237](https://github.com/freeheart777/loadder-ai/issues/237) — open questions and status changes are tracked there. |
 | **Verified against** | `main` @ `c2b091b08cfbaf719a5f5dae95f3043160fa6402`. See the verification appendix. |
 
 > **برای عامل‌های بعدی:** این سند هنوز تأیید نشده است. از آن به‌عنوان مجوز پیاده‌سازی، تغییر schema، یا حذف قابلیت استفاده نکنید. برای معماری فعلی به Issue #98 و LES مراجعه کنید.
