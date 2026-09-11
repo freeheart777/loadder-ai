@@ -11,6 +11,9 @@ const EntryExperiencePrototype = import.meta.env.DEV
 const GrowthEntryPrototype = import.meta.env.DEV
   ? lazy(() => import("./prototype/growth/GrowthEntryPrototype"))
   : null;
+const ExperienceShell = import.meta.env.DEV
+  ? lazy(() => import("./prototype/shell/ExperienceShell"))
+  : null;
 
 const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
 const PublicBusinessAppPage = lazy(() => import("./pages/PublicBusinessAppPage"));
@@ -73,6 +76,9 @@ export default function App() {
             )}
             {GrowthEntryPrototype && (
               <Route path="/prototype/growth-entry" element={<GrowthEntryPrototype />} />
+            )}
+            {ExperienceShell && (
+              <Route path="/prototype/experience-shell" element={<ExperienceShell />} />
             )}
             <Route path="/" element={<OriginalLandingPage />} />
             <Route path="/signup" element={<AuthPage />} />
