@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -24,9 +24,10 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [developmentOtp, setDevelopmentOtp] = useState("");
+  const verificationRedirectPending = useRef(false);
 
   useEffect(() => {
-    if (!sessionLoading && user) {
+    if (!sessionLoading && user && !verificationRedirectPending.current) {
       navigate("/dashboard", { replace: true });
     }
   }, [navigate, sessionLoading, user]);
@@ -98,15 +99,19 @@ export default function AuthPage() {
         throw new Error(data.message || "کد تأیید معتبر نیست.");
       }
 
+      verificationRedirectPending.current = true;
       const authenticated = await refreshSession();
       if (!authenticated) {
+        verificationRedirectPending.current = false;
         throw new Error("نشست کاربری ایجاد نشد.");
       }
 
       const requestedPath =
         typeof location.state?.from === "string"
           ? location.state.from
-          : "/start";
+          : data.authDisposition === "RETURNING"
+            ? "/dashboard"
+            : "/start";
       navigate(requestedPath, { replace: true });
     } catch (requestError) {
       setError(

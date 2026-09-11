@@ -23,7 +23,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const executablePath = process.env.PW_CHROMIUM_PATH;
 if (executablePath) test.use({ launchOptions: { executablePath } });
 
-const ZONES = ["به شما نیاز دارد", "در جریان", "چیزی که یاد گرفته‌ایم", "ابزارهای شما"];
+const ZONES = ["به شما نیاز دارد", "در جریان", "تازه‌ترین چیزی که دیدم", "ابزارهای شما"];
 
 const IDENTITY = {
   user: { id: "user-1", name: "آزاده", mobile: "", email: null, status: "active" },
@@ -47,7 +47,7 @@ const ATTENTION_ITEM = {
 
 const SECOND_ITEM = { ...ATTENTION_ITEM, band: "REVIEW", signalId: "CONTENT_CANDIDATE_STUCK" };
 
-type Options = { items?: unknown[]; runs?: unknown[]; findings?: unknown[]; failAttention?: boolean };
+type Options = { items?: unknown[]; runs?: unknown[]; findings?: unknown[]; failAttention?: boolean; failFindings?: boolean };
 
 /**
  * The app talks to its API on another origin with credentials, so a stubbed
@@ -68,7 +68,7 @@ function reply(route: Route, body: unknown, status = 200) {
 }
 
 async function stub(page: Page, options: Options = {}) {
-  const { items = [ATTENTION_ITEM, SECOND_ITEM], runs = [], findings = [], failAttention = false } = options;
+  const { items = [ATTENTION_ITEM, SECOND_ITEM], runs = [], findings = [], failAttention = false, failFindings = false } = options;
   // One route that dispatches by path, so there is no question about which of
   // several overlapping patterns Playwright picks.
   await page.route("**/api/**", (route) => {
@@ -80,13 +80,13 @@ async function stub(page: Page, options: Options = {}) {
         : reply(route, { success: true, missionControl: { contractVersion: 1, generatedAt: "2026-09-09T12:00:00.000Z", items, banners: [], signalStatus: [], bounds: { maxItems: 7, truncated: false } } });
     }
     if (path === "/api/growth/copilot/runs") return reply(route, { success: true, items: runs });
-    if (path === "/api/intelligence/semantic/findings") return reply(route, { success: true, findings });
+    if (path === "/api/intelligence/semantic/findings") return failFindings ? reply(route, { success: false }, 503) : reply(route, { success: true, findings });
     return reply(route, { success: true });
   });
 }
 
 async function open(page: Page, path: string) {
-  await page.goto(path, { waitUntil: "commit" });
+  await page.goto(path, { waitUntil: "domcontentloaded" });
 }
 
 test.describe("home", () => {
@@ -146,7 +146,7 @@ test.describe("home", () => {
     }
   });
 
-  test("zone two lists only prepared work, and invents no progress", async ({ page }) => {
+  test("zone two excludes prepared human-review work even when zone one has the same business problem", async ({ page }) => {
     await stub(page, {
       runs: [
         { id: "r-1", capability: "CREATE_CONTENT_VARIANT", status: "PREPARED", createdAt: "2026-09-08T10:00:00.000Z" },
@@ -154,8 +154,9 @@ test.describe("home", () => {
       ],
     });
     await open(page, "/dashboard");
-    await expect(page.locator("[data-progress-row]")).toHaveCount(1);
-    await expect(page.locator("[data-progress-row]")).toContainText("منتظر نظر شماست");
+    await expect(page.locator("[data-attention-item]")).toHaveCount(1);
+    await expect(page.locator('[data-zone="در جریان"]')).toContainText("الان کاری در جریان نیست");
+    await expect(page.locator("[data-progress-row]")).toHaveCount(0);
     await expect(page.locator("progress, [role=progressbar]")).toHaveCount(0);
   });
 
@@ -172,7 +173,7 @@ test.describe("home", () => {
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText("بیشتر شده");
     await expect(rows.nth(1)).toContainText("هنوز برای گفتنش کافی نمی‌دانم");
-    await expect(page.locator('[data-zone="چیزی که یاد گرفته‌ایم"]')).toContainText("دلیلش را نمی‌دانم");
+    await expect(page.locator('[data-zone="تازه‌ترین چیزی که دیدم"]')).toContainText("دلیلش را نمی‌دانم");
   });
 
   test("tools stay reachable and stay below the decision", async ({ page }) => {
@@ -189,8 +190,16 @@ test.describe("home", () => {
     await stub(page, { failAttention: true, runs: [{ id: "r-1", capability: "CREATE_CONTENT_VARIANT", status: "PREPARED", createdAt: null }] });
     await open(page, "/dashboard");
     await expect(page.locator('[data-zone="به شما نیاز دارد"]')).toContainText("در دسترس نیست");
-    await expect(page.locator("[data-progress-row]")).toHaveCount(1);
+    await expect(page.locator('[data-zone="در جریان"]')).toContainText("الان کاری در جریان نیست");
     await expect(page.locator("[data-home-tool]")).toHaveCount(12);
+  });
+
+  test("all unavailable read sources remain visibly unavailable", async ({ page }) => {
+    await stub(page, { failAttention: true, failFindings: true });
+    await open(page, "/dashboard");
+    await expect(page.locator('[data-zone="به شما نیاز دارد"]')).toContainText("در دسترس نیست");
+    await expect(page.locator('[data-zone="تازه‌ترین چیزی که دیدم"]')).toContainText("در دسترس نیست");
+    await expect(page.locator('[data-zone="در جریان"]')).toContainText("الان کاری در جریان نیست");
   });
 
   test("navigation is Home, Tools and Account, with no module sidebar", async ({ page }) => {

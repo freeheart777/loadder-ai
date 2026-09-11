@@ -9,13 +9,13 @@ import type { Item, MissionControl } from "./missionControlCopy";
  * and leaves the rest of Home usable.
  *
  * Zone 1  GET /api/mission-control              the existing attention contract
- * Zone 2  GET /api/growth/copilot/runs          canonical prepared work
+ * Zone 2  no current source                     honest empty state
  * Zone 3  GET /api/intelligence/semantic/findings   canonical findings
  */
 
 export type ZoneState<T> = { status: "loading" | "ok" | "failed"; data: T | null };
 
-export type PreparedWork = { id: string; capability: string; createdAt: string | null };
+export type PreparedWork = never;
 
 export type Finding = {
   id: string;
@@ -49,17 +49,11 @@ export function primaryItem(missionControl: MissionControl | null): Item | null 
  * and a person has not answered yet. A succeeded run is finished, not in
  * progress, and nothing else in the record says how far along anything is.
  */
-export async function readPreparedWork(): Promise<PreparedWork[]> {
-  const body = await readJson("/api/growth/copilot/runs?limit=25");
-  const items = (body.items ?? body.runs) as Array<Record<string, unknown>> | undefined;
-  if (!Array.isArray(items)) throw new Error("READ_FAILED");
-  return items
-    .filter((row) => String(row.status) === "PREPARED")
-    .map((row) => ({
-      id: String(row.id),
-      capability: String(row.capability ?? ""),
-      createdAt: (row.createdAt ?? row.created_at ?? null) as string | null,
-    }));
+export function readPreparedWork(): Promise<PreparedWork[]> {
+  // PREPARED copilot receipts are complete proposals waiting for a person.
+  // They belong to attention, not work Loadder is currently doing. Until a
+  // canonical bounded source proves active execution, Zone 2 renders less.
+  return Promise.resolve([]);
 }
 
 /** Zone 3. Findings as recorded, newest first, including the ones that say too little. */

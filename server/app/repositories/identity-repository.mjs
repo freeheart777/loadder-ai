@@ -136,6 +136,7 @@ export function createIdentityRepository(db) {
   }) {
     return db.transaction(() => {
       let user = findUserByMobile(mobile);
+      let userCreated = false;
 
       if (!user) {
         const userId = crypto.randomUUID();
@@ -145,6 +146,7 @@ export function createIdentityRepository(db) {
           ) VALUES (?, ?, ?, NULL, 'active', ?, ?)
         `).run(userId, mobile, name, timestamp, timestamp);
         user = findUserById(userId);
+        userCreated = true;
       }
 
       let memberships = listMemberships(user.id);
@@ -176,7 +178,7 @@ export function createIdentityRepository(db) {
         memberships = listMemberships(user.id);
       }
 
-      return { user, memberships };
+      return { user, memberships, userCreated };
     })();
   }
 

@@ -38,14 +38,17 @@ async function loginThroughUi(page: Page, mobile: string) {
   await page.locator('input[maxlength="5"]').fill(code!);
   await page.getByRole("button", { name: "ورود به پنل" }).click();
   await expect(page).toHaveURL(/\/(start|dashboard)$/);
-  await page.goto("/dashboard");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  return new URL(page.url()).pathname;
 }
 
 test("real OTP user reaches durable Mission Control attention and valid destinations", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const mobile = `090${String(Date.now() + testInfo.workerIndex).slice(-8)}`;
-  await loginThroughUi(page, mobile);
+  expect(await loginThroughUi(page, mobile)).toBe("/start");
+  await page.reload();
+  await expect(page).toHaveURL(/\/start$/);
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/dashboard$/);
   const identityResponse = await page.request.get(`${apiBaseUrl}/api/auth/me`);
   expect(identityResponse.ok()).toBeTruthy();
   const identity = await identityResponse.json();
@@ -118,4 +121,11 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   await expect(mobileNav.getByRole("link", { name: "CRM" })).toBeVisible();
   await expect(mobileNav.getByRole("link", { name: "محتوا" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+
+  const logout = await page.request.post(`${apiBaseUrl}/api/auth/logout`);
+  expect(logout.ok()).toBeTruthy();
+  expect(await loginThroughUi(page, mobile)).toBe("/dashboard");
+  await page.reload();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.locator('[data-zone="به شما نیاز دارد"]')).toBeVisible();
 });

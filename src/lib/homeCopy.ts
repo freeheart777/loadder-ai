@@ -14,7 +14,7 @@
 export const ZONE_LABELS = Object.freeze({
   attention: "به شما نیاز دارد",
   inProgress: "در جریان",
-  learned: "چیزی که یاد گرفته‌ایم",
+  learned: "تازه‌ترین چیزی که دیدم",
   tools: "ابزارهای شما",
 });
 
@@ -55,15 +55,7 @@ export const FIRST_ACTIONS: { label: string; hint: string; route: string; icon: 
  * preparing something and is waiting for a person. Nothing is simulated, and
  * no progress bar is drawn for work whose progress is not recorded.
  */
-export const CAPABILITY_LABELS: Record<string, string> = {
-  PREPARE_NEXT_EXPERIMENT_DRAFT: "پیش‌نویس آزمایش بعدی آماده شد",
-  CREATE_CONTENT_VARIANT: "یک نسخهٔ تازهٔ محتوا آماده شد",
-  INSPECT_FUNNEL_BOTTLENECK: "بررسی گلوگاه آماده شد",
-  GATHER_MORE_EVIDENCE: "گردآوری شواهد آماده شد",
-};
-
 export const PROGRESS_COPY = Object.freeze({
-  waiting: "منتظر نظر شماست",
   empty: "الان کاری در جریان نیست.",
   failed: "این بخش الان در دسترس نیست.",
 });

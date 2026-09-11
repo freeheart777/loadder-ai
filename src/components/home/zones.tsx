@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "@phosphor-icons/react";
 import {
-  ATTENTION_COPY, CAPABILITY_LABELS, FIRST_ACTIONS, LEARNED_COPY, PROGRESS_COPY,
+  ATTENTION_COPY, FIRST_ACTIONS, LEARNED_COPY, PROGRESS_COPY,
   SEMANTIC_LABELS, SEMANTIC_STATES, TOOLS, TOOLS_COPY, UNKNOWN_COPY, whenLabel,
 } from "../../lib/homeCopy";
 import type { Finding, PreparedWork, ZoneState } from "../../lib/homeData";
@@ -112,21 +112,7 @@ function UnknownState() {
 export function InProgressZone({ state }: { state: ZoneState<PreparedWork[]> }) {
   if (state.status === "loading") return <Muted>{ATTENTION_COPY.loading}</Muted>;
   if (state.status === "failed") return <Muted>{PROGRESS_COPY.failed}</Muted>;
-  const rows = state.data ?? [];
-  if (rows.length === 0) return <Muted>{PROGRESS_COPY.empty}</Muted>;
-  return (
-    <div className="divide-y divide-white/[0.06]">
-      {rows.map((row) => (
-        <div key={row.id} data-progress-row className="flex flex-wrap items-center gap-x-4 gap-y-1 py-4">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-amber-300/70" />
-          <span className="text-[15.5px] text-white/75">
-            {CAPABILITY_LABELS[row.capability] || "یک کار آماده شده"}
-          </span>
-          <span className="w-full text-[13px] text-white/30 sm:mr-auto sm:w-auto">{PROGRESS_COPY.waiting}</span>
-        </div>
-      ))}
-    </div>
-  );
+  return <Muted>{PROGRESS_COPY.empty}</Muted>;
 }
 
 /**
