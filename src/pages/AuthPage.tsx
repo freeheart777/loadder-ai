@@ -106,7 +106,7 @@ export default function AuthPage() {
       const requestedPath =
         typeof location.state?.from === "string"
           ? location.state.from
-          : "/dashboard";
+          : "/start";
       navigate(requestedPath, { replace: true });
     } catch (requestError) {
       setError(

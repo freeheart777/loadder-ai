@@ -30,6 +30,8 @@ const GrowthLoopPage = lazy(() => import("./pages/GrowthLoopPage"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
+  StartPage = lazy(() => import("./pages/StartPage")),
+  AttentionPage = lazy(() => import("./pages/AttentionPage")),
   AuthPage = lazy(() => import("./pages/AuthPage")),
   BrandBookPage = lazy(() => import("./pages/BrandBookPage")),
   BusinessProposalPage = lazy(() => import("./pages/BusinessProposalPage")),
@@ -90,6 +92,8 @@ export default function App() {
             <Route path="/store/:siteProjectId/order-success/:orderId" element={<PublicOrderSuccessPage />} />
             <Route element={<RequireAuth />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/start" element={<StartPage />} />
+              <Route path="/dashboard/attention" element={<AttentionPage />} />
               <Route path="/dashboard/platform-admin" element={<PlatformAdminPage />} />
               <Route path="/legacy-dashboard" element={<HomePage />} />
               <Route path="/dashboard/brand-book" element={<BrandBookPage />} />

@@ -6,9 +6,13 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 test("dashboard no longer points to the external portal", () => {
   const dashboard = read("../../src/pages/DashboardPage.tsx");
+  const home = read("../../src/lib/homeCopy.ts");
   const app = read("../../src/App.tsx");
   assert.doesNotMatch(dashboard, /iportals?\.ir/i);
-  assert.match(dashboard, /\/dashboard\/websites\/new/);
+  // Home reaches the native builder at its canonical route; the legacy /new
+  // path still resolves there, and App must keep both registered.
+  assert.match(home, /\/dashboard\/websites/);
+  assert.doesNotMatch(home, /iportals?\.ir/i);
   assert.match(app, /path=\"\/dashboard\/websites\/new\"/);
   assert.match(app, /path=\"\/site-builder\"/);
 });

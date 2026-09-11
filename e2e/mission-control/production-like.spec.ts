@@ -37,6 +37,8 @@ async function loginThroughUi(page: Page, mobile: string) {
   expect(code).toBeTruthy();
   await page.locator('input[maxlength="5"]').fill(code!);
   await page.getByRole("button", { name: "ورود به پنل" }).click();
+  await expect(page).toHaveURL(/\/(start|dashboard)$/);
+  await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
@@ -60,6 +62,8 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
     if (new URL(response.url()).pathname === "/api/mission-control" && response.ok()) missionReads += 1;
   });
   await page.reload();
+  await expect(page.locator('[data-zone="به شما نیاز دارد"]')).toBeVisible();
+  await page.goto("/dashboard/attention");
   await expect(page.getByRole("heading", { name: /چه چیزی الان به توجهت نیاز دارد/ })).toBeVisible();
   await expect(page.getByText("پنجره سنجش آزمایش بسته شده است")).toBeVisible();
   await expect(page.getByText("نامزد محتوا نیازمند بررسی است")).toBeVisible();
@@ -83,6 +87,7 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   await expect(page.getByText("تصمیم ثبت شد.")).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: /چه چیزی الان به توجهت نیاز دارد/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard\/attention$/);
 
   const contentLink = page.getByRole("link", { name: "بررسی نامزد محتوا" });
   await expect(contentLink).toHaveAttribute("href", `/dashboard/growth-loop/${first.experimentId}`);
@@ -90,11 +95,11 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   await expect(page).toHaveURL(`/dashboard/growth-loop/${first.experimentId}`);
   await expect(page.locator('[data-candidate-state="RECONCILIATION_REQUIRED"]')).toContainText("نیازمند تطبیق انسانی");
   await page.goto("/dashboard");
-  await page.getByRole("link", { name: /CRM/ }).click();
+  await page.locator('[data-home-tool="/dashboard/crm"]').click();
   await expect(page).toHaveURL("/dashboard/crm");
   for (const name of ["نیلوفر پارسا", "کیان مهرگان", "رها نیک‌فر"]) await expect(page.getByText(name).first()).toBeVisible();
 
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/attention");
   await page.reload();
   await expect(page.getByText("نامزد محتوا نیازمند بررسی است")).toBeVisible();
   await expect(page.getByText("پنجره سنجش آزمایش بسته شده است")).toHaveCount(0);
@@ -103,8 +108,10 @@ test("real OTP user reaches durable Mission Control attention and valid destinat
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: /چه چیزی الان به توجهت نیاز دارد/ })).toBeVisible();
   await expect(page.getByRole("link", { name: "بررسی نامزد محتوا" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /CRM/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /تولید محتوا/ })).toBeVisible();
+  await page.goto("/dashboard");
+  await expect(page.locator('[data-home-tool="/dashboard/crm"]')).toBeVisible();
+  await expect(page.locator('[data-home-tool="/dashboard/content"]')).toBeVisible();
+  await page.goto("/dashboard/attention");
   await page.getByRole("link", { name: "بررسی نامزد محتوا" }).click();
   const mobileNav = page.getByRole("navigation", { name: "دسترسی سریع" });
   await expect(mobileNav.getByRole("link", { name: "داشبورد" })).toBeVisible();

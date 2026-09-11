@@ -2,17 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const dashboard=readFileSync(new URL("../../src/pages/DashboardPage.tsx",import.meta.url),"utf8");
-const mission=readFileSync(new URL("../../src/components/mission-control/MissionControlDashboard.tsx",import.meta.url),"utf8");
+const attention=readFileSync(new URL("../../src/pages/AttentionPage.tsx",import.meta.url),"utf8");
+const chrome=readFileSync(new URL("../../src/components/home/HomeChrome.tsx",import.meta.url),"utf8");
+const component=readFileSync(new URL("../../src/components/mission-control/MissionControlDashboard.tsx",import.meta.url),"utf8");
+const copy=readFileSync(new URL("../../src/lib/missionControlCopy.ts",import.meta.url),"utf8");
+// The surface is the component plus the vocabulary it renders through.
+const mission=component+copy;
 
 test("Mission Control Dashboard UI V1",async t=>{
   await t.test("is the primary canonical dashboard block with Persian RTL identity",()=>{
-    assert.match(dashboard,/dir="rtl"/);assert.match(dashboard,/<MissionControlDashboard/);
-    assert.ok(dashboard.indexOf("<MissionControlDashboard")<dashboard.indexOf("<BusinessBrainMotion"));
+    assert.match(chrome,/dir="rtl"/);assert.match(attention,/<MissionControlDashboard/);
     assert.match(mission,/چه چیزی الان به توجه/);assert.match(mission,/مرکز مأموریت رشد/);
   });
   await t.test("reads the canonical endpoint once and supports only manual refresh",()=>{
-    assert.match(mission,/apiFetch\("\/api\/mission-control"\)/);assert.match(mission,/useEffect\(\(\)=>\{void load\(\);\},\[load\]\)/);
+    assert.match(component,/apiFetch\("\/api\/mission-control"\)/);assert.match(mission,/useEffect\(\(\)=>\{void load\(\);\},\[load\]\)/);
     assert.doesNotMatch(mission,/setInterval|setTimeout|poll/i);assert.match(mission,/به‌روزرسانی/);
   });
   await t.test("shows four primary items, bounded overflow, count, and generated time",()=>{
@@ -38,9 +41,11 @@ test("Mission Control Dashboard UI V1",async t=>{
     assert.match(mission,/allowedLinks/);assert.match(mission,/requiredApproval/);assert.doesNotMatch(mission,/method:\s*["']POST|method:\s*["']PATCH|method:\s*["']DELETE/);assert.doesNotMatch(mission,/owner|admin|membership|role\s*===/i);
   });
   await t.test("keeps mobile layout bounded and touch targets accessible",()=>{
-    assert.match(dashboard,/overflow-x-hidden/);assert.match(dashboard,/hidden h-screen.*lg:flex/);assert.match(dashboard,/p-4 sm:p-8/);assert.match(mission,/min-h-11/);assert.match(mission,/sm:grid-cols-2/);
+    assert.match(chrome,/overflow-x-hidden/);assert.match(mission,/min-h-11/);assert.match(mission,/sm:grid-cols-2/);
+    // There is no module sidebar to keep bounded any more; there must not be one.
+    assert.doesNotMatch(chrome,/<aside/);assert.doesNotMatch(attention,/<aside/);
   });
   await t.test("does not reconstruct signals or add fake metrics",()=>{
-    assert.doesNotMatch(mission,/fetch\([^)]*experiments|fetch\([^)]*recommendations|fetch\([^)]*crm/i);assert.doesNotMatch(mission,/healthScore|successRate|uplift|causalEffect|revenueTotal/);assert.doesNotMatch(mission,/OpenAI|agent\/run|provider prompt/i);
+    assert.doesNotMatch(component,/fetch\([^)]*experiments|fetch\([^)]*recommendations|fetch\([^)]*crm/i);assert.doesNotMatch(mission,/healthScore|successRate|uplift|causalEffect|revenueTotal/);assert.doesNotMatch(mission,/OpenAI|agent\/run|provider prompt/i);
   });
 });
