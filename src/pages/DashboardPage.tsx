@@ -1,35 +1,70 @@
-import { Link, useLocation } from "react-router-dom";
-import type { ElementType } from "react";
-import BusinessBrainMotion from "../components/BusinessBrainMotion";
-import WorkspaceSelector from "../components/WorkspaceSelector";
-import { House, FolderOpen, Sparkle, ChartLineUp, Gear, Plus, BookOpenText, FileText, Globe, Gauge, InstagramLogo, Megaphone, UsersThree, Lightning, Brain } from "@phosphor-icons/react";
-import { useStagger } from "../lib/animations/useStagger";
-import { demoBusiness } from "../data/demoBusiness";
-import { withDemo } from "../lib/demoMode";
-import { useAuth } from "../lib/auth";
-import MissionControlDashboard from "../components/mission-control/MissionControlDashboard";
-type Tool = { title: string; icon: ElementType; status: string; route: string };
-const tools: Tool[] = [
-  { title: "اپلیکیشن‌ساز هوشمند", icon: Lightning, status: "آماده", route: "/dashboard/business-builder" },
-  { title: "Business Brain", icon: Brain, status: "آماده", route: "/dashboard/business-brain" },
-  { title: "برند بوک", icon: BookOpenText, status: "آماده", route: "/dashboard/brand-book" },
-  { title: "بیزنس پروپوزال", icon: FileText, status: "آماده", route: "/dashboard/business-proposal" },
-  { title: "سایت‌ساز هوشمند", icon: Globe, status: "آماده", route: "/dashboard/websites/new" },
-  { title: "مدیریت سایت", icon: Globe, status: "آماده", route: "/dashboard/site-operations" },
-  { title: "KPI", icon: Gauge, status: "آماده", route: "/dashboard/kpi" },
-  { title: "تولید محتوا", icon: Sparkle, status: "آماده", route: "/dashboard/content" },
-  { title: "مدیر سوشال", icon: InstagramLogo, status: "آماده", route: "/dashboard/social" },
-  { title: "تبلیغات هوشمند", icon: Megaphone, status: "آماده", route: "/dashboard/ads" },
-  { title: "CRM", icon: UsersThree, status: "آماده", route: "/dashboard/crm" },
-  { title: "تحلیل و گزارش", icon: ChartLineUp, status: "آماده", route: "/dashboard/analytics" },
-  { title: "اتوماسیون", icon: Lightning, status: "آماده", route: "/dashboard/automation" },
-];
-function ToolCard({ tool }: { tool: Tool }) { const Icon = tool.icon; return <Link data-stagger to={tool.route} className="group relative min-h-[190px] overflow-hidden rounded-[24px] border border-violet-300/20 bg-white/[0.035] p-5 text-right transition duration-300 hover:-translate-y-1 hover:border-violet-300/45 hover:bg-white/[0.06]"><div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-500/[0.08] via-transparent to-fuchsia-500/[0.05]" /><div className="relative z-10"><div className="flex items-start justify-between"><div className="flex h-12 w-12 items-center justify-center rounded-[15px] border border-violet-300/20 bg-black/25 text-cyan-300"><Icon size={22} weight="duotone" /></div><span className="rounded-full bg-emerald-400/10 px-3 py-1.5 text-sm text-emerald-300">{tool.status}</span></div><h3 className="mt-6 text-base font-semibold text-white">{tool.title}</h3><p className="mt-2 text-sm leading-7 text-white/45">برای شروع کلیک کن</p><div className="mt-4 flex items-center gap-2 text-sm text-violet-300/65"><span className="h-1.5 w-1.5 rounded-full bg-violet-300" /> آماده شروع</div></div></Link>; }
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import HomeChrome from "../components/home/HomeChrome";
+import { AttentionZone, InProgressZone, LearnedZone, ToolsZone, Zone } from "../components/home/zones";
+import { ATTENTION_COPY, ZONE_LABELS } from "../lib/homeCopy";
+import {
+  primaryItem, readAttention, readFindings, readPreparedWork,
+  type Finding, type PreparedWork, type ZoneState,
+} from "../lib/homeData";
+import type { MissionControl } from "../lib/missionControlCopy";
+
+/**
+ * HOME.
+ *
+ * Four zones, in one order: what needs you, what is under way, what we have
+ * learned, your tools. Every zone reads an endpoint that already existed, and
+ * each reads independently — one failing contract dims one zone and leaves the
+ * rest of Home usable.
+ *
+ * Home shows one attention item, the first the canonical contract emitted. It
+ * does not re-rank, and it does not summarise the rest: the full list is one
+ * click away behind «بقیهٔ موارد», which is also where «چرا؟» leads for depth.
+ */
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const location = useLocation(); const isDemo = new URLSearchParams(location.search).get("demo") === "1"; const business = isDemo ? demoBusiness : null; const dashboardRef = useStagger();
-  return <main ref={dashboardRef} dir="rtl" className="min-h-screen overflow-x-hidden bg-[#050507] text-white">
-    <aside className="fixed right-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-l border-white/[0.08] bg-black/60 p-5 backdrop-blur-2xl lg:flex"><div className="mb-10"><div dir="ltr" className="text-left text-xl font-semibold">Loadder AI</div><p className="mt-1 text-sm text-white/45">مرکز هوشمند کسب‌وکار</p></div><nav className="space-y-2"><div className="flex items-center gap-3 rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3.5 text-sm"><House size={20} weight="duotone" /> صفحه اصلی</div><Link to="/dashboard/business-builder" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><Lightning size={20} /> اپلیکیشن‌ساز</Link><Link to="/dashboard/websites" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><FolderOpen size={20} /> پروژه‌های سایت</Link><Link to="/dashboard/business-brain" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><Sparkle size={20} /> متخصص‌های هوش مصنوعی</Link><Link to={withDemo("/dashboard/analytics")} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><ChartLineUp size={20} /> تحلیل و گزارش‌ها</Link><Link to="/dashboard/site-operations" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><Globe size={20} /> مدیریت سایت</Link><button type="button" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm text-white/55 transition hover:bg-white/[0.04]"><Gear size={20} /> تنظیمات</button></nav><div className="mt-auto rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4"><div className="text-sm text-white/45">فضای کاری</div><div className="mt-2"><WorkspaceSelector /></div><div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.05]"><div className="h-full w-[35%] rounded-full bg-gradient-to-l from-violet-500 via-fuchsia-500 to-cyan-400" /></div><div className="mt-2 text-sm text-white/40">تکمیل پروفایل ۳۵٪</div></div></aside>
-    <section className="min-h-screen lg:mr-[260px]"><header className="sticky top-0 z-30 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.06] bg-[#050507]/85 px-4 py-4 sm:px-8 sm:py-5 backdrop-blur-2xl"><div><div className="flex items-center gap-3"><h1 className="text-2xl font-semibold">داشبورد</h1>{isDemo && <span className="rounded-full border border-cyan-300/15 bg-cyan-500/[0.08] px-3 py-1 text-xs text-cyan-200">نسخه دمو</span>}</div><p className="mt-1 text-sm text-white/45">{isDemo ? `${business?.name} — نمای یکپارچه کسب‌وکار` : "همه ابزارهای هوش مصنوعی کسب‌وکارت در یک جا"}</p></div><div className="flex items-center gap-3"><Link to="/dashboard/business-builder" className="flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-500/[0.08] px-5 py-3 text-sm"><Plus size={16} weight="bold" /> ساخت اپلیکیشن</Link><Link to="/dashboard/websites/new" className="flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-gradient-to-l from-violet-500/20 to-fuchsia-500/15 px-5 py-3 text-sm"><Plus size={16} weight="bold" /> ساخت سایت</Link></div></header><div className="p-4 sm:p-8"><MissionControlDashboard userName={user?.name} /><section className="relative mt-8 overflow-hidden rounded-[30px] border border-white/[0.08] bg-white/[0.035] p-8"><div className="pointer-events-none absolute -left-20 -top-20 h-[300px] w-[300px] rounded-full bg-violet-500/10 blur-[100px]" /><div className="relative z-10"><h2 className="text-3xl font-semibold">کسب‌وکارت را هوشمندتر مدیریت کن.</h2><p className="mt-4 max-w-3xl text-base leading-8 text-white/55">از ساخت اپلیکیشن و سایت تا برند، محتوا، CRM، Analytics و Automation؛ همه به Business Brain مشترک Loadder متصل می‌شوند.</p></div></section><section className="mt-8"><BusinessBrainMotion /></section><section className="mt-10"><div className="mb-5 flex items-end justify-between"><div><h2 className="text-xl font-semibold">ابزارهای کسب‌وکار</h2><p className="mt-1 text-sm text-white/45">ابزار موردنظرت را انتخاب کن.</p></div><span className="text-sm text-violet-300/70">۱۳ ابزار فعال</span></div><div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">{tools.map((tool) => <ToolCard key={tool.title} tool={tool} />)}</div></section><section className="mt-10"><div className="flex items-center justify-between"><h2 className="text-xl font-semibold">پروژه‌های اخیر</h2><div className="flex items-center gap-4"><Link to="/dashboard/business-builder" className="text-sm text-cyan-300">مشاهده اپ‌ها</Link><Link to="/dashboard/websites" className="text-sm text-violet-300">مشاهده سایت‌ها</Link></div></div><div data-stagger className="mt-5 rounded-[26px] border border-white/[0.07] bg-white/[0.025] p-10 text-center"><FolderOpen size={30} weight="duotone" className="mx-auto text-white/30" /><p className="mt-4 text-base text-white/50">از همین‌جا اولین اپلیکیشن یا سایت کسب‌وکارت را بساز</p><div className="mt-5 flex justify-center gap-3"><Link to="/dashboard/business-builder" className="inline-flex rounded-xl bg-cyan-600 px-5 py-3 text-sm font-bold">ساخت اولین اپلیکیشن</Link><Link to="/dashboard/websites/new" className="inline-flex rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold">ساخت اولین سایت</Link></div></div></section></div></section>
-  </main>;
+  const [attention, setAttention] = useState<ZoneState<MissionControl>>({ status: "loading", data: null });
+  const [prepared, setPrepared] = useState<ZoneState<PreparedWork[]>>({ status: "loading", data: null });
+  const [findings, setFindings] = useState<ZoneState<Finding[]>>({ status: "loading", data: null });
+
+  useEffect(() => {
+    let live = true;
+    void readAttention()
+      .then((data) => { if (live) setAttention({ status: "ok", data }); })
+      .catch(() => { if (live) setAttention({ status: "failed", data: null }); });
+    void readPreparedWork()
+      .then((data) => { if (live) setPrepared({ status: "ok", data }); })
+      .catch(() => { if (live) setPrepared({ status: "failed", data: null }); });
+    void readFindings()
+      .then((data) => { if (live) setFindings({ status: "ok", data }); })
+      .catch(() => { if (live) setFindings({ status: "failed", data: null }); });
+    return () => { live = false; };
+  }, []);
+
+  const item = primaryItem(attention.data);
+  const others = Math.max(0, (attention.data?.items.length ?? 0) - 1);
+
+  return (
+    <HomeChrome>
+      <Zone label={ZONE_LABELS.attention}>
+        <AttentionZone state={attention} item={item} />
+        {others > 0 && (
+          <Link data-attention-more to="/dashboard/attention" className="mt-5 inline-flex min-h-11 items-center text-[13.5px] text-white/40 underline decoration-white/15 underline-offset-[6px] transition hover:text-white/70">
+            {ATTENTION_COPY.more}
+          </Link>
+        )}
+      </Zone>
+
+      <Zone label={ZONE_LABELS.inProgress}>
+        <InProgressZone state={prepared} />
+      </Zone>
+
+      <Zone label={ZONE_LABELS.learned}>
+        <LearnedZone state={findings} />
+      </Zone>
+
+      <Zone id="tools" label={ZONE_LABELS.tools}>
+        <ToolsZone />
+      </Zone>
+    </HomeChrome>
+  );
 }

@@ -25,3 +25,7 @@ server/.env*
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright run artifacts
+test-results/
+playwright-report/
