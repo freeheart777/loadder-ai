@@ -203,8 +203,8 @@ export function createEcommerceService({ db, env = process.env }) {
     },
     createCart(siteProjectId, input = {}) {
       requireSite(siteProjectId); const cartId=id("cart"), stamp=now();
-      db.prepare(`INSERT INTO ecommerce_carts(id,workspace_id,site_project_id,customer_id,email,currency,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'ACTIVE',?,?)`)
-        .run(cartId,workspaceId(),siteProjectId,input.customerId||null,input.email||null,currency(input.currency),stamp,stamp);
+      db.prepare(`INSERT INTO ecommerce_carts(id,workspace_id,site_project_id,customer_id,email,currency,status,public_capability_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,'ACTIVE',?,?,?)`)
+        .run(cartId,workspaceId(),siteProjectId,input.customerId||null,input.email||null,currency(input.currency),input.publicCapabilityHash||null,stamp,stamp);
       return cartMap(recalcCart(cartId));
     },
     getCart(cartId) { return cartMap(recalcCart(cartId)); },
@@ -278,8 +278,8 @@ export function createEcommerceService({ db, env = process.env }) {
         if(!cart.items.length) throw new EcommerceError("Cart is empty.","EMPTY_CART",409);
         for(const item of cart.items){ const v=requireVariant(item.variantId); if(v.inventory_policy==="DENY"&&v.inventory_quantity<item.quantity) throw new EcommerceError(`Insufficient inventory for ${item.sku}.`,"INSUFFICIENT_INVENTORY",409); }
         const orderId=id("order"),stamp=now();
-        db.prepare(`INSERT INTO ecommerce_orders(id,workspace_id,site_project_id,cart_id,customer_id,email,currency,status,payment_status,fulfillment_status,payment_provider,payment_reference,shipping_method,shipping_address_json,subtotal_minor,discount_minor,shipping_minor,total_minor,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-          .run(orderId,workspaceId(),cart.site_project_id,cart.id,input.customerId||cart.customer_id||null,input.email||cart.email||null,cart.currency,"PENDING","UNPAID","UNFULFILLED",input.paymentProvider||null,null,input.shippingMethod||null,JSON.stringify(input.shippingAddress||{}),cart.subtotal_minor,cart.discount_minor,cart.shipping_minor,cart.total_minor,stamp,stamp);
+        db.prepare(`INSERT INTO ecommerce_orders(id,workspace_id,site_project_id,cart_id,customer_id,email,currency,status,payment_status,fulfillment_status,payment_provider,payment_reference,shipping_method,shipping_address_json,subtotal_minor,discount_minor,shipping_minor,total_minor,receipt_capability_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(orderId,workspaceId(),cart.site_project_id,cart.id,input.customerId||cart.customer_id||null,input.email||cart.email||null,cart.currency,"PENDING","UNPAID","UNFULFILLED",input.paymentProvider||null,null,input.shippingMethod||null,JSON.stringify(input.shippingAddress||{}),cart.subtotal_minor,cart.discount_minor,cart.shipping_minor,cart.total_minor,input.receiptCapabilityHash||null,stamp,stamp);
         for(const item of cart.items){ const v=requireVariant(item.variantId); db.prepare(`INSERT INTO ecommerce_order_items(id,workspace_id,order_id,product_id,variant_id,product_name,sku,quantity,unit_price_minor,line_total_minor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(id("oi"),workspaceId(),orderId,item.productId,item.variantId,item.productName,item.sku,item.quantity,item.unitPriceMinor,item.lineTotalMinor,stamp); if(v.inventory_policy==="DENY") db.prepare("UPDATE ecommerce_variants SET inventory_quantity=inventory_quantity-?,updated_at=? WHERE id=? AND workspace_id=?").run(item.quantity,stamp,item.variantId,workspaceId()); }
         if(cart.coupon_code) db.prepare("UPDATE ecommerce_coupons SET usage_count=usage_count+1,updated_at=? WHERE workspace_id=? AND site_project_id=? AND upper(code)=upper(?)").run(stamp,workspaceId(),cart.site_project_id,cart.coupon_code);
         db.prepare("UPDATE ecommerce_carts SET status='CONVERTED',updated_at=? WHERE id=? AND workspace_id=?").run(stamp,cartId,workspaceId());

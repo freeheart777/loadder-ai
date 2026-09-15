@@ -1,7 +1,32 @@
 type Cart = { id?: string; items?: Array<{ variantId: string }> };
 type CartResponse = { cart?: Cart; code?: string; message?: string };
+export type PublicCartReference = { id: string; capability: string };
 
-const RECOVERABLE_STALE_CART_CODES = new Set(["CART_NOT_FOUND", "CART_NOT_ACTIVE"]);
+export const cartStorageKey = (siteProjectId: string) => `loadder-public-cart:${siteProjectId}`;
+export const orderStorageKey = (orderId: string) => `loadder-public-order:${orderId}`;
+
+export function readPublicCartReference(siteProjectId: string): PublicCartReference | null {
+  const raw = localStorage.getItem(cartStorageKey(siteProjectId));
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as PublicCartReference;
+    return typeof value.id === "string" && typeof value.capability === "string" && value.id && value.capability ? value : null;
+  } catch { return null; }
+}
+
+export function writePublicCartReference(siteProjectId: string, reference: PublicCartReference) {
+  localStorage.setItem(cartStorageKey(siteProjectId), JSON.stringify(reference));
+}
+
+export function cartCapabilityHeaders(capability: string, json = false): HeadersInit {
+  return { ...(json ? { "Content-Type": "application/json" } : {}), "X-Loadder-Cart-Capability": capability };
+}
+
+export function orderCapabilityHeaders(capability: string): HeadersInit {
+  return { "X-Loadder-Order-Capability": capability };
+}
+
+const RECOVERABLE_STALE_CART_CODES = new Set(["CART_NOT_FOUND", "CART_NOT_ACTIVE", "PUBLIC_RESOURCE_NOT_FOUND"]);
 
 export class PublicCartApiError extends Error {
   readonly status: number;
@@ -38,8 +63,8 @@ export async function addPublicCartItem(
   variantId: string,
   quantity = 1,
 ) {
-  const key = `loadder-public-cart:${siteProjectId}`;
-  let cartId = localStorage.getItem(key) || "";
+  const key = cartStorageKey(siteProjectId);
+  let reference = readPublicCartReference(siteProjectId);
   const create = async () => {
     const data = await readPublicCartResponse(
       await fetch(`/api/auth/storefront/${siteProjectId}/carts`, {
@@ -48,16 +73,17 @@ export async function addPublicCartItem(
         body: JSON.stringify({ currency }),
       }),
     );
-    const id = data.cart?.id;
-    if (!id) throw new Error("سبد خرید ساخته نشد.");
-    localStorage.setItem(key, id);
-    return id;
+    const id = data.cart?.id, capability = (data as CartResponse & { cartCapability?: string }).cartCapability;
+    if (!id || !capability) throw new Error("سبد خرید ساخته نشد.");
+    const created = { id, capability };
+    writePublicCartReference(siteProjectId, created);
+    return created;
   };
-  const add = async (id: string) => {
+  const add = async ({ id, capability }: PublicCartReference) => {
     const data = await readPublicCartResponse(
       await fetch(`/api/auth/storefront/carts/${id}/items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: cartCapabilityHeaders(capability, true),
         body: JSON.stringify({ variantId, quantity }),
       }),
     );
@@ -67,13 +93,13 @@ export async function addPublicCartItem(
     return data.cart;
   };
 
-  if (!cartId) cartId = await create();
+  if (!reference) reference = await create();
   try {
-    return await add(cartId);
+    return await add(reference);
   } catch (error) {
     if (!isRecoverableStaleCartError(error)) throw error;
     localStorage.removeItem(key);
-    cartId = await create();
-    return add(cartId);
+    reference = await create();
+    return add(reference);
   }
 }

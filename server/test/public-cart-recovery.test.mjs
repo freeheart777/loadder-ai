@@ -63,20 +63,20 @@ test("public cart stale recovery policy", async (t) => {
 
   await t.test("missing and inactive carts recover exactly once and persist the replacement", async () => {
     for (const [status, code] of [[404, "CART_NOT_FOUND"], [409, "CART_NOT_ACTIVE"]]) {
-      const storage = storageWith({ [key]: "cart-stale" });
+      const storage = storageWith({ [key]: JSON.stringify({ id: "cart-stale", capability: "stale-cap" }) });
       const result = await withRuntime({
         storage,
         responses: [
           jsonResponse(status, { success: false, code, message: "stale" }),
-          jsonResponse(201, { success: true, cart: { id: "cart-new", items: [] } }),
+          jsonResponse(201, { success: true, cart: { id: "cart-new", items: [] }, cartCapability: "new-cap" }),
           jsonResponse(201, { success: true, cart: { id: "cart-new", items: [{ variantId: "v1" }] } }),
         ],
       }, () => helper.addPublicCartItem("store-1", "IRT", "v1", 1));
 
       assert.equal(result.calls.length, 3);
       assert.deepEqual(storage.removed, [key]);
-      assert.deepEqual(storage.written, [[key, "cart-new"]]);
-      assert.equal(storage.getItem(key), "cart-new");
+      assert.deepEqual(storage.written, [[key, JSON.stringify({ id: "cart-new", capability: "new-cap" })]]);
+      assert.equal(storage.getItem(key), JSON.stringify({ id: "cart-new", capability: "new-cap" }));
       assert.equal(result.value.items.length, 1);
     }
   });
@@ -95,13 +95,13 @@ test("public cart stale recovery policy", async (t) => {
       [404, "UNKNOWN_CART_ERROR"],
     ];
     for (const [status, code] of cases) {
-      const storage = storageWith({ [key]: "cart-existing" });
+      const storage = storageWith({ [key]: JSON.stringify({ id: "cart-existing", capability: "cart-cap" }) });
       const response = jsonResponse(status, { success: false, code, message: code });
       await assert.rejects(async () => {
         await withRuntime({ storage, responses: [response] }, () =>
           helper.addPublicCartItem("store-1", "IRT", "v1", 1));
       }, (error) => error.code === code && error.status === status && error.testCalls.length === 1);
-      assert.equal(storage.getItem(key), "cart-existing");
+      assert.equal(storage.getItem(key), JSON.stringify({ id: "cart-existing", capability: "cart-cap" }));
       assert.deepEqual(storage.removed, []);
     }
   });
@@ -111,33 +111,33 @@ test("public cart stale recovery policy", async (t) => {
       new TypeError("fetch failed"),
       new Response("not-json", { status: 502 }),
     ]) {
-      const storage = storageWith({ [key]: "cart-existing" });
+      const storage = storageWith({ [key]: JSON.stringify({ id: "cart-existing", capability: "cart-cap" }) });
       await assert.rejects(() => withRuntime({ storage, responses: [failure] }, () =>
         helper.addPublicCartItem("store-1", "IRT", "v1", 1)));
-      assert.equal(storage.getItem(key), "cart-existing");
+      assert.equal(storage.getItem(key), JSON.stringify({ id: "cart-existing", capability: "cart-cap" }));
       assert.deepEqual(storage.removed, []);
     }
   });
 
   await t.test("a retry failure propagates without a second recovery loop", async () => {
-    const storage = storageWith({ [key]: "cart-stale" });
+    const storage = storageWith({ [key]: JSON.stringify({ id: "cart-stale", capability: "stale-cap" }) });
     await assert.rejects(
       () => withRuntime({
           storage,
           responses: [
             jsonResponse(404, { code: "CART_NOT_FOUND", message: "missing" }),
-            jsonResponse(201, { cart: { id: "cart-new", items: [] } }),
+            jsonResponse(201, { cart: { id: "cart-new", items: [] }, cartCapability: "new-cap" }),
             jsonResponse(409, { code: "INSUFFICIENT_INVENTORY", message: "inventory" }),
           ],
         }, () => helper.addPublicCartItem("store-1", "IRT", "v1", 1)),
       (error) => error.code === "INSUFFICIENT_INVENTORY" && error.testCalls.length === 3,
     );
-    assert.equal(storage.getItem(key), "cart-new");
+    assert.equal(storage.getItem(key), JSON.stringify({ id: "cart-new", capability: "new-cap" }));
     assert.equal(storage.written.length, 1);
   });
 
   await t.test("successful add is issued once and response verification cannot trigger recovery", async () => {
-    const storage = storageWith({ [key]: "cart-existing" });
+    const storage = storageWith({ [key]: JSON.stringify({ id: "cart-existing", capability: "cart-cap" }) });
     const success = await withRuntime({
       storage,
       responses: [jsonResponse(201, { cart: { id: "cart-existing", items: [{ variantId: "v1" }] } })],
@@ -149,14 +149,14 @@ test("public cart stale recovery policy", async (t) => {
       storage,
       responses: [jsonResponse(201, { cart: { id: "cart-existing", items: [] } })],
     }, () => helper.addPublicCartItem("store-1", "IRT", "v1", 1)), /محصول در سبد ثبت نشد/);
-    assert.equal(storage.getItem(key), "cart-existing");
+    assert.equal(storage.getItem(key), JSON.stringify({ id: "cart-existing", capability: "cart-cap" }));
   });
 });
 
 test("public cart routes preserve machine-readable stale and variant codes", async () => {
   const source = await readFile(new URL("../app/routes/auth.mjs", import.meta.url), "utf8");
-  assert.match(source, /code:"CART_NOT_FOUND"/);
-  assert.match(source, /code:"VARIANT_NOT_AVAILABLE"/);
+  assert.match(source, /publicNotFound\(res,"CART_NOT_FOUND"\)/);
+  assert.match(source, /VARIANT_NOT_AVAILABLE|variant\.status!=="ACTIVE"/);
 });
 
 test("cart load clears only proven stale references and item updates never recreate carts", async () => {
