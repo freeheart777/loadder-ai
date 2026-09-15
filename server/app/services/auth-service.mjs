@@ -167,6 +167,7 @@ export function createAuthService({
 
     return {
       ...identity,
+      authDisposition: identity.userCreated ? "NEW" : "RETURNING",
       activeWorkspace: identity.memberships[0]?.workspace || null,
       session,
       sessionToken,

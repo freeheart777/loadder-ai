@@ -3,6 +3,18 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DemoModePreserver from "./components/DemoModePreserver";
 import { AuthProvider, RequireAuth } from "./lib/auth";
 
+// Dev-only design prototype. The ternary lets Rollup drop the dynamic import
+// entirely from a production build, so no prototype chunk or copy ever ships.
+const EntryExperiencePrototype = import.meta.env.DEV
+  ? lazy(() => import("./prototype/entry/EntryExperiencePrototype"))
+  : null;
+const GrowthEntryPrototype = import.meta.env.DEV
+  ? lazy(() => import("./prototype/growth/GrowthEntryPrototype"))
+  : null;
+const ExperienceShell = import.meta.env.DEV
+  ? lazy(() => import("./prototype/shell/ExperienceShell"))
+  : null;
+
 const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
 const PublicBusinessAppPage = lazy(() => import("./pages/PublicBusinessAppPage"));
 const StoreFinancialsPage = lazy(() => import("./pages/StoreFinancialsPage"));
@@ -18,6 +30,8 @@ const GrowthLoopPage = lazy(() => import("./pages/GrowthLoopPage"));
 const HomePage = lazy(() => import("./pages/HomePage")),
   OriginalLandingPage = lazy(() => import("./pages/OriginalLandingPage")),
   DashboardPage = lazy(() => import("./pages/DashboardPage")),
+  StartPage = lazy(() => import("./pages/StartPage")),
+  AttentionPage = lazy(() => import("./pages/AttentionPage")),
   AuthPage = lazy(() => import("./pages/AuthPage")),
   BrandBookPage = lazy(() => import("./pages/BrandBookPage")),
   BusinessProposalPage = lazy(() => import("./pages/BusinessProposalPage")),
@@ -57,6 +71,17 @@ export default function App() {
         <DemoModePreserver />
         <Suspense fallback={null}>
           <Routes>
+            {/* Dev-only. Renders no data and calls no API; removable with the
+                whole src/prototype/ directory. */}
+            {EntryExperiencePrototype && (
+              <Route path="/prototype/entry-experience" element={<EntryExperiencePrototype />} />
+            )}
+            {GrowthEntryPrototype && (
+              <Route path="/prototype/growth-entry" element={<GrowthEntryPrototype />} />
+            )}
+            {ExperienceShell && (
+              <Route path="/prototype/experience-shell" element={<ExperienceShell />} />
+            )}
             <Route path="/" element={<OriginalLandingPage />} />
             <Route path="/signup" element={<AuthPage />} />
             <Route path="/app/:projectId" element={<PublicBusinessAppPage />} />
@@ -67,6 +92,8 @@ export default function App() {
             <Route path="/store/:siteProjectId/order-success/:orderId" element={<PublicOrderSuccessPage />} />
             <Route element={<RequireAuth />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/start" element={<StartPage />} />
+              <Route path="/dashboard/attention" element={<AttentionPage />} />
               <Route path="/dashboard/platform-admin" element={<PlatformAdminPage />} />
               <Route path="/legacy-dashboard" element={<HomePage />} />
               <Route path="/dashboard/brand-book" element={<BrandBookPage />} />

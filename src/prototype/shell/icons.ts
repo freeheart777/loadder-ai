@@ -1,0 +1,16 @@
+import {
+  Bag, BookOpenText, ChartLineUp, ChatCircleDots, Compass, Crosshair, FileText,
+  Gauge, Globe, InstagramLogo, Lightning, MagnifyingGlass, Megaphone,
+  PencilSimple, Repeat, SquaresFour, UsersThree,
+} from "@phosphor-icons/react";
+
+/** Kept out of the component files so fast refresh stays intact. */
+export const ICONS: Record<string, typeof Bag> = {
+  grid: SquaresFour, target: Crosshair, compass: Compass,
+  globe: Globe, chat: ChatCircleDots, search: MagnifyingGlass,
+  bag: Bag, users: UsersThree, pen: PencilSimple, megaphone: Megaphone,
+  instagram: InstagramLogo, chart: ChartLineUp, gauge: Gauge, book: BookOpenText,
+  file: FileText, app: Lightning, repeat: Repeat,
+};
+
+export { Bag as FallbackIcon };

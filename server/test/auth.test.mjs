@@ -119,6 +119,7 @@ test("Phase 1 identity, session, workspace, and protection flow", async (t) => {
     const response = await verifyOtp("09120000001", result.developmentOtp);
     assert.equal(response.status, 200);
     const data = await response.json();
+    assert.equal(data.authDisposition, "NEW");
     assert.equal(data.user.mobile, "09120000001");
     assert.equal(data.memberships[0].role, "owner");
     assert.equal(data.activeWorkspace.id, data.memberships[0].workspace.id);
@@ -144,6 +145,28 @@ test("Phase 1 identity, session, workspace, and protection flow", async (t) => {
     assert.ok(latest);
     const response = await verifyOtp("09120000001", consumedOtp);
     assert.equal(response.status, 400);
+  });
+
+  await t.test("existing identity receives a server-derived returning disposition", async () => {
+    const first = authService.requestOtp({ mobile: "09120000001", name: "نام نادیده گرفته می‌شود" });
+    const second = authService.requestOtp({ mobile: "09120000001", name: "نام نادیده گرفته می‌شود" });
+    const expiredByReplacement = await verifyOtp("09120000001", first.code);
+    assert.equal(expiredByReplacement.status, 400);
+    assert.equal(Object.hasOwn(await expiredByReplacement.json(), "authDisposition"), false);
+
+    const response = await request("/api/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mobile: "09120000001",
+        code: second.code,
+        authDisposition: "NEW",
+      }),
+    });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.equal(data.authDisposition, "RETURNING");
+    assert.equal(data.user.id, db.prepare("SELECT id FROM users WHERE mobile=?").get("09120000001").id);
   });
 
   await t.test("auth/me resolves the server session", async () => {
@@ -183,6 +206,7 @@ test("Phase 1 identity, session, workspace, and protection flow", async (t) => {
       secondOtp.developmentOtp
     );
     const secondData = await secondResponse.json();
+    assert.equal(secondData.authDisposition, "NEW");
     const response = await request("/api/crm/stats", {
       headers: {
         Cookie: sessionCookie,
