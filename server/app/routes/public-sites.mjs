@@ -27,7 +27,7 @@ const genericSite = (project, version, assets, content) => {
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><style>body{margin:0;background:#f8f9fc;color:#151821;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.8}.wrap{width:min(1120px,calc(100% - 32px));margin:auto}.nav{display:flex;justify-content:space-between;align-items:center;padding:22px 0}.logo{max-width:160px;max-height:48px}.hero{min-height:58vh;display:grid;align-items:center;background:#eef2ff;background-size:cover;background-position:center;border-radius:28px;overflow:hidden}.hero-content{padding:70px 46px;background:linear-gradient(90deg,#fffefa,#ffffffb8);max-width:720px}.hero h1{font-size:clamp(42px,7vw,72px);line-height:1.1;margin:14px 0}.hero p,.muted{color:#667085}.section{padding:64px 0;border-bottom:1px solid #e9ebf0}.footer{padding:42px 0 70px;color:#71717a}@media(max-width:640px){.wrap{width:calc(100% - 22px)}.hero-content{padding:40px 24px}}</style></head><body><div class="wrap"><nav class="nav">${logo ? `<img class="logo" src="${escapeHtml(logo.url)}" alt="${escapeHtml(logo.altText || project.name)}">` : `<strong>${escapeHtml(project.name)}</strong>`}<span>Loadder</span></nav><section class="hero" ${hero ? `style="background-image:url('${escapeHtml(hero.url)}')"` : ""}><div class="hero-content"><div class="muted">${escapeHtml(project.siteType)}</div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(positioning)}</p></div></section>${sections.slice(1).map((section, i) => `<section class="section"><h2>${escapeHtml(section)}</h2><p class="muted">${escapeHtml(i === 0 ? description : positioning)}</p></section>`).join("")}<footer class="footer">${escapeHtml(project.name)} · نسخه ${escapeHtml(version?.version ?? "draft")} · Loadder</footer></div></body></html>`;
 };
 
-export const renderPublishedSite = (project, version, assets = []) => {
+export const renderPublishedSite = (project, version, assets = [], page = {}) => {
   if (Array.isArray(version) && assets.length === 0) {
     assets = version;
     version = { version: "draft", content: project?.content || {} };
@@ -36,24 +36,27 @@ export const renderPublishedSite = (project, version, assets = []) => {
   // A V16 corporate site renders from the canonical published projection, so
   // /sites/:id, a custom domain and /site/:id cannot diverge. genericSite stays
   // only for BUSINESS projects that have no V16 document yet.
-  if (isCorporateV16(project, content)) return renderCorporateSite(project, version, content);
+  if (isCorporateV16(project, content)) return renderCorporateSite(project, version, content, page);
   return project?.siteType === "STORE" ? storefront(project, version, assets, content) : genericSite(project, version, assets, content);
 };
 
 export function createPublicSitesRouter({ repository }) {
   const router = express.Router();
-  const sendPublished = (req, res, published) => {
+  const sendPublished = (req, res, published, page = {}) => {
     if (!published) return res.status(404).send("Site not found");
-    const etag = `W/\"site-${published.version.id}\"`;
+    const html = renderPublishedSite(published.project, published.version, published.assets, page);
+    // A slug that resolves to no published page is a 404, never a silent Home.
+    if (html === null) return res.status(404).send("Page not found");
+    const etag = `W/\"site-${published.version.id}-${page.slug || ""}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
-    return res.set({ "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(published.project, published.version, published.assets));
+    return res.set({ "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(html);
   };
   const sendPreview = (req, res, preview) => {
     if (!preview) return res.status(404).send("Preview not found");
     const etag = `W/\"preview-${preview.project.id}-${preview.project.updatedAt}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const draftVersion = { version: "draft", content: preview.project.content };
-    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets));
+    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, { slug: typeof req.query.page === "string" ? req.query.page : "", basePath: `/preview/sites/${preview.project.id}` }) || "Page not found");
   };
   router.get("/preview/sites/:id", (req, res) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";
@@ -61,15 +64,21 @@ export function createPublicSitesRouter({ repository }) {
     try { return sendPreview(req, res, repository.getPreviewByToken(hashPreviewToken(token), req.params.id)); }
     catch (error) { console.error("Preview site error:", error); return res.status(500).send("Unable to render preview"); }
   });
-  router.get("/sites/:id", (req, res) => {
-    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id)); }
+  router.get("/sites/:id/:slug", (req, res) => {
+    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: req.params.slug, basePath: `/sites/${req.params.id}` }); }
     catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
   });
-  router.get("/", (req, res, next) => {
+  router.get("/sites/:id", (req, res) => {
+    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: "", basePath: `/sites/${req.params.id}` }); }
+    catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
+  });
+  const domainHandler = (slug) => (req, res, next) => {
     const host = normalizeHost(req.headers.host);
     if (!host || host === "localhost" || host === "127.0.0.1") return next();
-    try { return sendPublished(req, res, repository.getPublishedPublicByDomain(host)); }
+    try { return sendPublished(req, res, repository.getPublishedPublicByDomain(host), { slug: slug(req), basePath: "" }); }
     catch (error) { console.error("Domain site error:", error); return res.status(500).send("Unable to render site"); }
-  });
+  };
+  router.get("/", domainHandler(() => ""));
+  router.get("/:slug", domainHandler((req) => req.params.slug));
   return router;
 }

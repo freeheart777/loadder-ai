@@ -88,6 +88,7 @@ export default function App() {
             <Route path="/signup" element={<AuthPage />} />
             <Route path="/app/:projectId" element={<PublicBusinessAppPage />} />
             <Route path="/site/:siteProjectId" element={<PublicCorporateSitePage />} />
+            <Route path="/site/:siteProjectId/:slug" element={<PublicCorporateSitePage />} />
             <Route path="/store/:siteProjectId" element={<PublicStorefrontPage />} />
             <Route path="/store/:siteProjectId/product/:slug" element={<PublicProductPage />} />
             <Route path="/store/:siteProjectId/cart" element={<PublicCartPage />} />

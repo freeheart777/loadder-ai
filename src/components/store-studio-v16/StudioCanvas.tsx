@@ -2,11 +2,12 @@ import { useMemo, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, Heart, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
 import { defaultProductSettings, formatMoney, productView, productsForSection } from "./config";
 import { isCommerceSite, sectionAnchor, siteTypeDefinition } from "./site-types";
+import { navigationPages } from "./pages";
 import type { DeviceMode, ElementType, PageMode, Product, ProductSettings, SectionConfig, SectionItem, Selection, StudioConfig } from "./types";
 
 export type InlineMediaTarget = { kind: "hero" | "banner" | "logo" | "product"; id?: string };
 export type StorefrontRuntimeAdapter = { openStorefront: () => void; openCollection: () => void; openProduct: (product: Product) => void; openCart: () => void; addProduct: (product: Product) => void | Promise<void>; cartCount?: number };
-type CanvasProps = { config: StudioConfig; products: Product[]; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; onLeadSubmit?: (input: { name: string; phone: string; email: string; company: string; message: string }) => Promise<void>; };
+type CanvasProps = { config: StudioConfig; products: Product[]; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; onLeadSubmit?: (input: { name: string; phone: string; email: string; company: string; message: string }) => Promise<void>; pageBasePath?: string; };
 
 function InlineMediaControl({ target, onUpload, busy, label = "تغییر تصویر", compact = false }: { target: InlineMediaTarget; onUpload?: CanvasProps["onImageUpload"]; busy?: boolean; label?: string; compact?: boolean }) {
   if (!onUpload) return null;
@@ -61,7 +62,16 @@ function insertableSections(siteKind: StudioConfig["siteKind"]): Array<[SectionC
 
 /** Navigation is derived from the enabled sections — a corporate site never
  *  maintains a separate menu structure that can drift out of sync. */
-function navItemsFor(config: StudioConfig) {
+function navItemsFor(config: StudioConfig, basePath = "") {
+  // Navigation references page identity. A single-page site keeps the original
+  // in-page anchor menu so existing corporate sites are unchanged.
+  if (config.pages.length > 1) {
+    return navigationPages(config.pages).map((page) => ({
+      id: page.id,
+      label: page.navLabel || page.title,
+      href: page.slug ? `${basePath}/${page.slug}` : (basePath || "/"),
+    }));
+  }
   return config.sections.filter((section) => section.enabled && section.showInNav !== false && section.type !== "spacer")
     .map((section) => ({ id: section.id, label: section.navLabel || section.title, href: `#${sectionAnchor(section)}` }));
 }
@@ -69,7 +79,7 @@ function navItemsFor(config: StudioConfig) {
 function CorporateHeader(props: CanvasProps) {
   const { config, device, selected, select, interactive = true } = props;
   const mobile = device === "mobile";
-  const items = navItemsFor(config);
+  const items = navItemsFor(config, props.pageBasePath);
   return <EditorElement type="header" id="header" selected={selected} onSelect={select} onEdit={props.onEditElement} interactive={interactive} className={config.header.sticky ? "sticky top-0 z-30" : ""} style={{ background: config.header.backgroundColor, color: config.header.textColor }}>
     <div className="mx-auto flex min-h-16 flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-5" style={{ maxWidth: config.design.containerWidth }}>
       <span className="flex items-center gap-3">
@@ -210,7 +220,7 @@ function CorporateCanvas(props: CanvasProps) {
   const visible = props.config.sections.filter((section) => section.enabled);
   return <div className="min-h-full" style={{ color: props.config.design.textColor, background: props.config.design.backgroundColor }}>
     <CorporateHeader {...props} />
-    <Hero {...props} />
+    {props.config.pages[0]?.id === props.config.activePageId && <Hero {...props} />}
     {visible.map((section, index) => section.type === "spacer"
       ? <SectionShell key={section.id} section={section} index={index} props={props}><div style={{ height: section.spacingTop + section.spacingBottom }} /></SectionShell>
       : <SectionShell key={section.id} section={section} index={index} props={props}>
