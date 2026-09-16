@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Minus, Plus, ShoppingBagOpen, Trash } from "@phosphor-icons/react";
 import { Link, useParams } from "react-router-dom";
-import { isRecoverableStaleCartError, readPublicCartResponse } from "../lib/publicCart";
+import { cartCapabilityHeaders, cartStorageKey, isRecoverableStaleCartError, readPublicCartReference, readPublicCartResponse } from "../lib/publicCart";
 
 type Item = {
   variantId: string;
@@ -33,18 +33,19 @@ export default function PublicCartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-  const key = siteProjectId ? `loadder-public-cart:${siteProjectId}` : "";
+  const key = siteProjectId ? cartStorageKey(siteProjectId) : "";
 
   useEffect(() => {
     void load();
   }, [siteProjectId]);
 
   async function load() {
-    const id = localStorage.getItem(key);
-    if (!id) return;
+    if (!siteProjectId) return;
+    const reference = readPublicCartReference(siteProjectId);
+    if (!reference) return;
     try {
       const data = await readPublicCartResponse<{ cart: Cart }>(
-        await fetch(`/api/auth/storefront/carts/${id}`),
+        await fetch(`/api/auth/storefront/carts/${reference.id}`, { headers: cartCapabilityHeaders(reference.capability) }),
       );
       setCart(data.cart);
     } catch (error) {
@@ -54,13 +55,15 @@ export default function PublicCartPage() {
   }
 
   async function setQuantity(variantId: string, quantity: number) {
-    if (!cart) return;
+    if (!cart || !siteProjectId) return;
+    const reference = readPublicCartReference(siteProjectId);
+    if (!reference || reference.id !== cart.id) return setMessage("دسترسی سبد خرید معتبر نیست.");
     setBusy(variantId);
     try {
       const data = await readPublicCartResponse<{ cart: Cart }>(
         await fetch(`/api/auth/storefront/carts/${cart.id}/items/${variantId}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: cartCapabilityHeaders(reference.capability, true),
           body: JSON.stringify({ quantity }),
         }),
       );

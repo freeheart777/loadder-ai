@@ -23,6 +23,7 @@ type NetworkEntry = { method: string; status: number; url: string };
 
 let adminApi: APIRequestContext;
 let projectId = "";
+let draftProjectId = "";
 let product: Product;
 
 async function expectJsonOk(response: APIResponse) {
@@ -100,8 +101,12 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
     await expectJsonOk(await adminApi.post("/api/auth/verify-otp", {
       data: { mobile, code: otp.developmentOtp },
     }));
+    const draft = await expectJsonOk(await adminApi.post("/api/site-projects", {
+      data: { name: `پیش‌نویس مسیر خرید ${identity}`, siteType: "STORE", content: { storeBuilderV16: { version: 16 } } },
+    }));
+    draftProjectId = draft.project.id;
     const created = await expectJsonOk(await adminApi.post("/api/site-projects", {
-      data: { name: `فروشگاه مسیر خرید ${identity}`, siteType: "STORE", content: {} },
+      data: { name: `فروشگاه مسیر خرید ${identity}`, siteType: "STORE", content: { storeBuilderV16: { version: 16 } } },
     }));
     projectId = created.project.id;
     const catalog = await expectJsonOk(await adminApi.post(`/api/stores/${projectId}/products`, {
@@ -117,6 +122,7 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
     }));
     product = catalog.product;
     expect(product.variants).toHaveLength(1);
+    await expectJsonOk(await adminApi.post(`/api/site-projects/${projectId}/publish`));
   });
 
   test.afterAll(async () => adminApi?.dispose());
@@ -124,8 +130,10 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
   test("persists cart quantity, completes manual checkout, and reloads the real order", async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     const evidence = observe(page);
-    const cartId = await addFixtureProductThroughUi(page);
-    expect(cartId).toMatch(/^cart_/);
+    const cartReference = JSON.parse((await addFixtureProductThroughUi(page)) || "null") as { id: string; capability: string };
+    expect(cartReference.id).toMatch(/^cart_/);
+    expect(cartReference.capability).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+    const cartId = cartReference.id;
 
     await page.getByRole("link", { name: "سبد خرید", exact: true }).click();
     await expect(page).toHaveURL(`/store/${projectId}/cart`);
@@ -163,6 +171,7 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
     await page.getByRole("button", { name: "ثبت سفارش", exact: true }).click();
     const checkoutBody = await (await checkoutCompleted).json();
     const orderId = checkoutBody.order.id as string;
+    expect(checkoutBody.receiptCapability).toMatch(/^[A-Za-z0-9_-]{40,}$/);
     expect(checkoutBody.order.items[0]).toMatchObject({
       productName: product.name,
       quantity: 2,
@@ -184,6 +193,13 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
     expect(persisted.order).toMatchObject({ id: orderId, totalMinor: 90_000_000 });
     await expect(page.getByText(`${product.name} × ۲`, { exact: true })).toBeVisible();
     await assertAndon(evidence, testInfo);
+  });
+
+  test("draft stores and bare public identifiers fail closed", async ({ request: browserRequest }) => {
+    expect((await browserRequest.get(`${apiBaseURL}/api/auth/storefront/${draftProjectId}`)).status()).toBe(404);
+    const cart = await expectJsonOk(await browserRequest.post(`${apiBaseURL}/api/auth/storefront/${projectId}/carts`, { data: { currency: "IRT" } }));
+    expect((await browserRequest.get(`${apiBaseURL}/api/auth/storefront/carts/${cart.cart.id}`)).status()).toBe(404);
+    expect((await browserRequest.get(`${apiBaseURL}/api/auth/storefront/carts/${cart.cart.id}`, { headers: { "x-loadder-cart-capability": "wrong" } })).status()).toBe(404);
   });
 
   test("invalid checkout stays visible, sends no checkout request, and creates no order", async ({ page }, testInfo) => {

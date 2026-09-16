@@ -8,6 +8,7 @@ import {
   Star,
 } from "@phosphor-icons/react";
 import { productMainImage } from "../lib/productMedia";
+import { addPublicCartItem, cartCapabilityHeaders, readPublicCartReference } from "../lib/publicCart";
 type Variant = {
   id: string;
   sku: string;
@@ -74,7 +75,6 @@ export default function PublicStorefrontPage() {
     [cartCount, setCartCount] = useState(0),
     [busy, setBusy] = useState(""),
     [message, setMessage] = useState("");
-  const cartKey = siteProjectId ? `loadder-public-cart:${siteProjectId}` : "";
   useEffect(() => {
     if (!siteProjectId) return;
     void (async () => {
@@ -85,10 +85,10 @@ export default function PublicStorefrontPage() {
         setStore(meta.store);
         setCategories(meta.categories || []);
         setBrands(meta.brands || []);
-        const saved = localStorage.getItem(cartKey);
+        const saved = readPublicCartReference(siteProjectId);
         if (saved) {
           const c = await read(
-            await fetch(`/api/auth/storefront/carts/${saved}`),
+            await fetch(`/api/auth/storefront/carts/${saved.id}`, { headers: cartCapabilityHeaders(saved.capability) }),
           );
           setCartCount(
             (c.cart?.items || []).reduce(
@@ -101,7 +101,7 @@ export default function PublicStorefrontPage() {
         setMessage(e instanceof Error ? e.message : "خطا");
       }
     })();
-  }, [siteProjectId, cartKey]);
+  }, [siteProjectId]);
   useEffect(() => {
     if (!siteProjectId) return;
     const t = setTimeout(
@@ -142,27 +142,9 @@ export default function PublicStorefrontPage() {
     }
     setBusy(p.id);
     try {
-      let cartId = localStorage.getItem(cartKey);
-      if (!cartId) {
-        const c = await read(
-          await fetch(`/api/auth/storefront/${siteProjectId}/carts`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ currency: p.currency }),
-          }),
-        );
-        cartId = c.cart.id;
-        localStorage.setItem(cartKey, cartId || "");
-      }
-      const d = await read(
-        await fetch(`/api/auth/storefront/carts/${cartId}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ variantId: v.id, quantity: 1 }),
-        }),
-      );
+      const cart = await addPublicCartItem(siteProjectId, p.currency, v.id, 1);
       setCartCount(
-        (d.cart?.items || []).reduce(
+        (cart?.items || []).reduce(
           (s: number, i: any) => s + Number(i.quantity || 0),
           0,
         ),

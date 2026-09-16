@@ -84,6 +84,13 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!current.content || Object.keys(current.content).length === 0) throw new SiteProjectError("A site needs content before publishing.", 409, "SITE_CONTENT_REQUIRED");
     return repository.publish(id, now().toISOString());
   }
+  function rollbackPublishVersion(id, targetVersionId) {
+    get(id);
+    if (typeof targetVersionId !== "string" || !targetVersionId.trim()) throw new SiteProjectError("targetVersionId is required.", 400, "SITE_PUBLISH_VERSION_REQUIRED");
+    const result = repository.rollbackPublishVersion(id, targetVersionId.trim(), now().toISOString());
+    if (!result) throw new SiteProjectError("Published version not found.", 404, "SITE_PUBLISH_VERSION_NOT_FOUND");
+    return result;
+  }
   function versions(id) { get(id); return repository.listPublishVersions(id); }
   function list() { return repository.list(); }
   function assets(id) { get(id); return repository.listAssets(id); }
@@ -122,5 +129,5 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
     return true;
   }
-  return Object.freeze({ list, get, create, update, publish, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
+  return Object.freeze({ list, get, create, update, publish, rollbackPublishVersion, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
 }
