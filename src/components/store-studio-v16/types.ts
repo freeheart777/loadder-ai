@@ -1,7 +1,9 @@
 export type DeviceMode = "desktop" | "tablet" | "mobile";
+export type SiteKind = "STORE" | "BUSINESS";
 export type PageMode = "storefront" | "collection" | "product" | "cart" | "checkout" | "success";
 export type ElementType =
   | "header"
+  | "footer"
   | "hero"
   | "section"
   | "product-card"
@@ -40,7 +42,13 @@ export type DesignConfig = { fontFamily: string; primaryColor: string; secondary
 export type HeaderConfig = { logoUrl: string; storeName: string; showSearch: boolean; showAccount: boolean; showCart: boolean; sticky: boolean; height: number; backgroundColor: string; textColor: string };
 export type HeroConfig = { enabled: boolean; layout: "centered" | "split" | "background" | "minimal"; eyebrow: string; title: string; subtitle: string; ctaLabel: string; ctaHref: string; imageUrl: string; backgroundColor: string; textColor: string; overlayOpacity: number; height: number; alignment: "right" | "center" | "left" };
 export type ProductSettings = { source: "featured" | "latest" | "bestselling" | "discounted" | "manual"; productIds: string[]; columnsDesktop: number; columnsTablet: number; columnsMobile: number; imageRatio: "square" | "portrait" | "landscape" | "auto"; cardStyle: "vertical" | "compact" | "horizontal" | "minimal"; showBrand: boolean; showPrice: boolean; showCompareAt: boolean; showStock: boolean; showPromotionBadge: boolean; showCartButton: boolean };
-export type SectionConfig = { id: string; type: "products" | "banner" | "trust" | "text" | "spacer"; enabled: boolean; title: string; subtitle: string; imageUrl?: string; ctaLabel?: string; backgroundColor: string; textColor: string; spacingTop: number; spacingBottom: number; productSettings?: ProductSettings };
-export type StudioConfig = { version: 16; activePage: PageMode; selectedElement: Selection; design: DesignConfig; header: HeaderConfig; hero: HeroConfig; sections: SectionConfig[]; commerce: CommerceConfig };
+/** A repeatable entry inside a services / team / portfolio section. */
+export type SectionItem = { id: string; title: string; subtitle?: string; body?: string; imageUrl?: string; meta?: string; href?: string };
+export type ContactConfig = { formEnabled: boolean; submitLabel: string; successMessage: string; phone?: string; email?: string; address?: string; mapUrl?: string };
+export type SeoConfig = { title: string; description: string };
+export type FooterConfig = { enabled: boolean; text: string; backgroundColor: string; textColor: string };
+export type NavConfig = { enabled: boolean; ctaLabel: string; ctaHref: string };
+export type SectionConfig = { id: string; type: "products" | "banner" | "trust" | "text" | "spacer" | "about" | "services" | "portfolio" | "team" | "text-image" | "cta" | "contact"; enabled: boolean; title: string; subtitle: string; body?: string; imageUrl?: string; ctaLabel?: string; ctaHref?: string; anchor?: string; navLabel?: string; showInNav?: boolean; columns?: number; mediaPosition?: "start" | "end"; items?: SectionItem[]; contact?: ContactConfig; backgroundColor: string; textColor: string; spacingTop: number; spacingBottom: number; productSettings?: ProductSettings };
+export type StudioConfig = { version: 16; siteKind: SiteKind; activePage: PageMode; selectedElement: Selection; design: DesignConfig; header: HeaderConfig; hero: HeroConfig; nav: NavConfig; footer: FooterConfig; seo: SeoConfig; sections: SectionConfig[]; commerce: CommerceConfig };
 export type ProductView = { title: string; imageUrl: string; regularPriceMinor: number; compareAtPriceMinor: number | null; promotionBadge: boolean; promotionBadgeText: string; showDiscountPercentage: boolean; showStock: boolean; ctaLabel: string; ctaStyle: "solid" | "outline" | "soft"; imageRatio: "square" | "portrait" | "landscape" | "auto"; textAlign: "right" | "center"; cardRadius: number; cardShadowStrength: number; borderStrength: number; cardPadding: number };
-export type StudioActions = { select: (selection: Selection) => void; patchDesign: (patch: Partial<DesignConfig>) => void; patchHeader: (patch: Partial<HeaderConfig>) => void; patchHero: (patch: Partial<HeroConfig>) => void; patchSection: (id: string, patch: Partial<SectionConfig>) => void; patchProduct: (id: string, patch: Partial<ProductOverride>) => void; patchCommerce: (patch: Partial<CommerceConfig>) => void };
+export type StudioActions = { select: (selection: Selection) => void; patchDesign: (patch: Partial<DesignConfig>) => void; patchHeader: (patch: Partial<HeaderConfig>) => void; patchHero: (patch: Partial<HeroConfig>) => void; patchSection: (id: string, patch: Partial<SectionConfig>) => void; patchProduct: (id: string, patch: Partial<ProductOverride>) => void; patchCommerce: (patch: Partial<CommerceConfig>) => void; patchSeo: (patch: Partial<SeoConfig>) => void; patchNav: (patch: Partial<NavConfig>) => void; patchFooter: (patch: Partial<FooterConfig>) => void; patchSectionItem: (sectionId: string, itemId: string, patch: Partial<SectionItem>) => void };

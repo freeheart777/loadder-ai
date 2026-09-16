@@ -6,7 +6,8 @@ import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
 import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCanvas";
 import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
-import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, Selection, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
+import { isCommerceSite, siteTypeDefinition } from "../components/store-studio-v16/site-types";
+import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { apiFetch } from "../lib/api";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
@@ -81,19 +82,33 @@ function withProductInSection(current: StudioConfig, sectionId: string, productI
   };
 }
 
+const SECTION_TITLES: Record<SectionConfig["type"], string> = {
+  products: "محصولات جدید", banner: "بنر جدید", trust: "مزیت‌های خرید", text: "متن جدید", spacer: "فاصله",
+  about: "درباره ما", services: "خدمات ما", portfolio: "نمونه‌کارها", team: "تیم ما",
+  "text-image": "متن و تصویر", cta: "فراخوان اقدام", contact: "تماس با ما",
+};
+const newItem = (title: string, subtitle: string): SectionItem => ({ id: `item-${crypto.randomUUID()}`, title, subtitle, body: "", imageUrl: "", meta: "" });
+const STARTER_ITEMS: Partial<Record<SectionConfig["type"], () => SectionItem[]>> = {
+  services: () => [newItem("خدمت جدید", "توضیح کوتاه خدمت")],
+  portfolio: () => [newItem("پروژه جدید", "دسته‌بندی پروژه")],
+  team: () => [newItem("عضو جدید تیم", "سمت سازمانی")],
+};
+
 function newSection(type: SectionConfig["type"]): SectionConfig {
-  const labels = { products: "محصولات جدید", banner: "بنر جدید", trust: "مزیت‌های خرید", text: "متن جدید", spacer: "فاصله" };
   return {
     id: `${type}-${crypto.randomUUID()}`,
     type,
     enabled: true,
-    title: labels[type],
+    showInNav: ["about", "services", "portfolio", "team", "contact"].includes(type),
+    title: SECTION_TITLES[type],
     subtitle: type === "spacer" ? "" : "برای ویرایش این بخش روی آن کلیک کنید.",
     backgroundColor: type === "banner" ? designDefaults.primaryColor : designDefaults.surfaceColor,
     textColor: type === "banner" ? "#fff" : designDefaults.textColor,
     spacingTop: type === "spacer" ? 32 : designDefaults.sectionSpacing,
     spacingBottom: type === "spacer" ? 32 : designDefaults.sectionSpacing,
     ...(type === "products" ? { productSettings: { ...defaultProductSettings } } : {}),
+    ...(STARTER_ITEMS[type] ? { items: STARTER_ITEMS[type]!(), columns: 3 } : {}),
+    ...(type === "contact" ? { contact: { formEnabled: true, submitLabel: "ارسال درخواست", successMessage: "پیام شما ثبت شد.", phone: "", email: "", address: "", mapUrl: "" } } : {}),
   };
 }
 
@@ -119,11 +134,12 @@ function applyMediaToConfig(current: StudioConfig, target: InlineMediaTarget, ur
   return current;
 }
 
-export default function StoreWebsiteStudioPageV16() {
+export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { siteKind?: SiteKind } = {}) {
+  const commerce = isCommerceSite(siteKind);
   const [project, setProject] = useState<Project | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [config, setConfig] = useState<StudioConfig>(() => restoreConfig({}));
+  const [config, setConfig] = useState<StudioConfig>(() => restoreConfig({}, siteKind));
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [tab, setTab] = useState<"context" | "sections" | "design">("context");
   const [busy, setBusy] = useState(true);
@@ -144,15 +160,18 @@ export default function StoreWebsiteStudioPageV16() {
     void (async () => {
       try {
         const listing = await read(await apiFetch("/api/site-projects", { signal: c.signal }));
-        const selected = (listing.projects || []).find((i: any) => String(i.siteType).toUpperCase() === "STORE") || listing.projects?.[0];
-        if (!selected) throw new Error("پروژه فروشگاهی پیدا نشد");
+        const selected = (listing.projects || []).find((i: any) => String(i.siteType).toUpperCase() === siteKind);
+        if (!selected) throw new Error(commerce ? "پروژه فروشگاهی پیدا نشد" : "پروژه سایت شرکتی پیدا نشد");
         const detail = await read(await apiFetch(`/api/site-projects/${selected.id}`, { signal: c.signal }));
         const loaded = detail.project as Project;
         setProject(loaded);
-        setConfig(restoreConfig(loaded.content || {}));
+        setConfig(restoreConfig(loaded.content || {}, siteKind));
         setAssets((detail.assets || []).filter((a: MediaAsset) => typeof a.url === "string"));
-        const catalog = await read(await apiFetch(`/api/stores/${selected.id}/products`, { signal: c.signal }));
-        setProducts(catalog.products || []);
+        // A corporate site never loads Commerce concepts.
+        if (commerce) {
+          const catalog = await read(await apiFetch(`/api/stores/${selected.id}/products`, { signal: c.signal }));
+          setProducts(catalog.products || []);
+        }
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
         setMessage(e instanceof Error ? e.message : "بارگذاری Studio ناموفق بود");
@@ -161,7 +180,7 @@ export default function StoreWebsiteStudioPageV16() {
       }
     })();
     return () => c.abort();
-  }, []);
+  }, [commerce, siteKind]);
 
   const actions = useMemo<StudioActions>(() => ({
     select: (selectedElement) => {
@@ -175,6 +194,10 @@ export default function StoreWebsiteStudioPageV16() {
     patchSection: (id, p) => setConfig((c) => ({ ...c, sections: c.sections.map((s) => s.id === id ? { ...s, ...p } : s) })),
     patchProduct: (id, p) => setConfig((c) => ({ ...c, commerce: { ...c.commerce, productOverrides: { ...c.commerce.productOverrides, [id]: { ...(c.commerce.productOverrides[id] || {}), ...p } } } })),
     patchCommerce: (p) => setConfig((c) => ({ ...c, commerce: { ...c.commerce, ...p } })),
+    patchSeo: (p) => setConfig((c) => ({ ...c, seo: { ...c.seo, ...p } })),
+    patchNav: (p) => setConfig((c) => ({ ...c, nav: { ...c.nav, ...p } })),
+    patchFooter: (p) => setConfig((c) => ({ ...c, footer: { ...c.footer, ...p } })),
+    patchSectionItem: (sectionId, itemId, p) => setConfig((c) => ({ ...c, sections: c.sections.map((s) => s.id === sectionId ? { ...s, items: (s.items || []).map((entry) => entry.id === itemId ? { ...entry, ...p } : entry) } : s) })),
   }), []);
 
   function selectCanvasElement(selectedElement: Selection) {

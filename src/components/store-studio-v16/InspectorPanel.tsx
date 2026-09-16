@@ -7,10 +7,12 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import { defaultProductSettings, formatMoney, productView } from "./config";
+import { siteTypeDefinition } from "./site-types";
 import type {
   MediaAsset,
   Product,
   SectionConfig,
+  SectionItem,
   StudioActions,
   StudioConfig,
 } from "./types";
@@ -85,14 +87,99 @@ function GenericSectionEditor({ section, assets, actions }: { section: SectionCo
 
 function CommerceEditor({ config, actions, kind }: { config: StudioConfig; actions: StudioActions; kind: "cart" | "checkout" | "success" }) { return <div className="space-y-4"><PanelTitle eyebrow={kind.toUpperCase()} title={kind === "cart" ? "تجربه سبد" : kind === "checkout" ? "تجربه تسویه" : "صفحه موفقیت"}/>{kind === "cart" && <Toggle label="بخش کد تخفیف" checked={config.commerce.showCoupon} onChange={(showCoupon) => actions.patchCommerce({ showCoupon })}/>}<Field label="عنوان ارسال" value={config.commerce.shippingLabel} onChange={(shippingLabel) => actions.patchCommerce({ shippingLabel })}/><Field label="آستانه ارسال رایگان" type="number" value={config.commerce.freeShippingThresholdMinor} onChange={(value) => actions.patchCommerce({ freeShippingThresholdMinor: Math.max(0, Number(value)) })}/>{kind !== "success" && <Field label="متن دکمه Checkout" value={config.commerce.checkoutButtonLabel} onChange={(checkoutButtonLabel) => actions.patchCommerce({ checkoutButtonLabel })}/>}<Select label="حالت پرداخت" value={config.commerce.paymentMode} onChange={(paymentMode) => actions.patchCommerce({ paymentMode: paymentMode as "MANUAL" | "ONLINE" })}><option value="MANUAL">هماهنگی دستی</option><option value="ONLINE">آنلاین (فقط preview)</option></Select>{kind === "success" && <Field label="عنوان موفقیت" value={config.commerce.orderSuccessTitle} onChange={(orderSuccessTitle) => actions.patchCommerce({ orderSuccessTitle })}/>}<p className="rounded-xl border border-amber-300/20 bg-amber-300/5 p-3 text-[11px] leading-6 text-amber-100/60">این کنترل‌ها فقط preview/configuration هستند؛ runtime عمومی Cart/Checkout/Order تغییر نمی‌کند.</p></div>; }
 
+const ITEM_SECTIONS = ["services", "team", "portfolio"] as const;
+const isItemSection = (type: SectionConfig["type"]) => (ITEM_SECTIONS as readonly string[]).includes(type);
+
+function ItemsEditor({ section, assets, actions }: { section: SectionConfig; assets: MediaAsset[]; actions: StudioActions }) {
+  const items = section.items || [];
+  const replace = (next: SectionItem[]) => actions.patchSection(section.id, { items: next });
+  const move = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    replace(next);
+  };
+  return <div className="space-y-3">
+    <b className="block text-xs text-white/70">موارد این بخش</b>
+    {items.map((entry, index) => <div key={entry.id} className="space-y-2 rounded-xl border border-white/10 bg-white/[.025] p-3">
+      <Field label="عنوان" value={entry.title} onChange={(title) => actions.patchSectionItem(section.id, entry.id, { title })}/>
+      <Field label="زیرعنوان" value={entry.subtitle || ""} onChange={(subtitle) => actions.patchSectionItem(section.id, entry.id, { subtitle })}/>
+      <TextArea label="توضیح" value={entry.body || ""} onChange={(body) => actions.patchSectionItem(section.id, entry.id, { body })}/>
+      {section.type !== "services" && <MediaSelect label="تصویر" value={entry.imageUrl || ""} assets={assets} onChange={(imageUrl) => actions.patchSectionItem(section.id, entry.id, { imageUrl })}/>}
+      <div className="flex gap-1">
+        <button type="button" aria-label="بالا" onClick={() => move(index, -1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowUp/></button>
+        <button type="button" aria-label="پایین" onClick={() => move(index, 1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowDown/></button>
+        <button type="button" aria-label="حذف مورد" onClick={() => replace(items.filter((candidate) => candidate.id !== entry.id))} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-rose-500/10 text-rose-300"><Trash/></button>
+      </div>
+    </div>)}
+    <button type="button" onClick={() => replace([...items, { id: `item-${crypto.randomUUID()}`, title: "مورد جدید", subtitle: "", body: "", imageUrl: "", meta: "" }])} className="min-h-11 w-full rounded-xl border border-emerald-400/30 bg-emerald-400/10 text-xs font-black text-emerald-300">افزودن مورد</button>
+  </div>;
+}
+
+function CorporateSectionEditor({ section, assets, actions }: { section: SectionConfig; assets: MediaAsset[]; actions: StudioActions }) {
+  return <div className="space-y-4">
+    <PanelTitle eyebrow={section.type.toUpperCase()} title="ویرایش بخش"/>
+    <Field label="عنوان" value={section.title} onChange={(title) => actions.patchSection(section.id, { title })}/>
+    <Field label="زیرعنوان" value={section.subtitle} onChange={(subtitle) => actions.patchSection(section.id, { subtitle })}/>
+    {(section.type === "about" || section.type === "text-image") && <>
+      <TextArea label="متن" value={section.body || ""} onChange={(body) => actions.patchSection(section.id, { body })}/>
+      <MediaSelect label="تصویر" value={section.imageUrl || ""} assets={assets} onChange={(imageUrl) => actions.patchSection(section.id, { imageUrl })}/>
+      <Select label="جای تصویر" value={section.mediaPosition || "end"} onChange={(mediaPosition) => actions.patchSection(section.id, { mediaPosition: mediaPosition as "start" | "end" })}><option value="end">بعد از متن</option><option value="start">قبل از متن</option></Select>
+    </>}
+    {section.type === "cta" && <div className="grid grid-cols-2 gap-3">
+      <Field label="متن دکمه" value={section.ctaLabel || ""} onChange={(ctaLabel) => actions.patchSection(section.id, { ctaLabel })}/>
+      <Field label="مقصد دکمه" value={section.ctaHref || ""} onChange={(ctaHref) => actions.patchSection(section.id, { ctaHref })}/>
+    </div>}
+    {section.type === "contact" && <>
+      <Toggle label="فرم تماس فعال" checked={section.contact?.formEnabled !== false} onChange={(formEnabled) => actions.patchSection(section.id, { contact: { ...(section.contact || { submitLabel: "ارسال", successMessage: "ثبت شد." }), formEnabled } })}/>
+      <Field label="متن دکمه ارسال" value={section.contact?.submitLabel || ""} onChange={(submitLabel) => actions.patchSection(section.id, { contact: { ...(section.contact || { formEnabled: true, successMessage: "ثبت شد." }), submitLabel } })}/>
+      <Field label="پیام موفقیت" value={section.contact?.successMessage || ""} onChange={(successMessage) => actions.patchSection(section.id, { contact: { ...(section.contact || { formEnabled: true, submitLabel: "ارسال" }), successMessage } })}/>
+      <Field label="تلفن" value={section.contact?.phone || ""} onChange={(phone) => actions.patchSection(section.id, { contact: { ...(section.contact || { formEnabled: true, submitLabel: "ارسال", successMessage: "ثبت شد." }), phone } })}/>
+      <Field label="ایمیل" value={section.contact?.email || ""} onChange={(email) => actions.patchSection(section.id, { contact: { ...(section.contact || { formEnabled: true, submitLabel: "ارسال", successMessage: "ثبت شد." }), email } })}/>
+      <Field label="نشانی" value={section.contact?.address || ""} onChange={(address) => actions.patchSection(section.id, { contact: { ...(section.contact || { formEnabled: true, submitLabel: "ارسال", successMessage: "ثبت شد." }), address } })}/>
+    </>}
+    {isItemSection(section.type) && <>
+      <Field label="تعداد ستون" type="number" value={section.columns ?? 3} onChange={(value) => actions.patchSection(section.id, { columns: Math.min(4, Math.max(1, Number(value))) })}/>
+      <ItemsEditor section={section} assets={assets} actions={actions}/>
+    </>}
+    <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[.03] p-3">
+      <b className="text-xs">منو</b>
+      <Toggle label="نمایش در منو" checked={section.showInNav !== false} onChange={(showInNav) => actions.patchSection(section.id, { showInNav })}/>
+      <Field label="عنوان در منو" value={section.navLabel || ""} onChange={(navLabel) => actions.patchSection(section.id, { navLabel })}/>
+    </div>
+    <SectionStyle section={section} actions={actions}/>
+  </div>;
+}
+
+function SiteSettingsEditor({ config, actions }: Props) {
+  return <div className="space-y-4">
+    <PanelTitle eyebrow="SEO & NAVIGATION" title="تنظیمات سایت" text="عنوان و توضیح صفحه در نتایج جستجو، و منوی بالای سایت."/>
+    <Field label="عنوان SEO" value={config.seo.title} onChange={(title) => actions.patchSeo({ title })}/>
+    <TextArea label="توضیح SEO" value={config.seo.description} onChange={(description) => actions.patchSeo({ description })}/>
+    <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[.03] p-3">
+      <b className="text-xs">منوی بالا</b>
+      <Toggle label="نمایش منو" checked={config.nav.enabled} onChange={(enabled) => actions.patchNav({ enabled })}/>
+      <Field label="متن دکمه منو" value={config.nav.ctaLabel} onChange={(ctaLabel) => actions.patchNav({ ctaLabel })}/>
+      <Field label="مقصد دکمه منو" value={config.nav.ctaHref} onChange={(ctaHref) => actions.patchNav({ ctaHref })}/>
+      <p className="text-[10px] leading-5 text-white/35">آیتم‌های منو از بخش‌های فعال ساخته می‌شوند؛ منوی جداگانه‌ای نگهداری نمی‌شود.</p>
+    </div>
+    <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[.03] p-3">
+      <b className="text-xs">فوتر</b>
+      <Toggle label="نمایش فوتر" checked={config.footer.enabled} onChange={(enabled) => actions.patchFooter({ enabled })}/>
+      <Field label="متن فوتر" value={config.footer.text} onChange={(text) => actions.patchFooter({ text })}/>
+    </div>
+  </div>;
+}
+
 function DesignEditor({ config, actions }: Props) { const d = config.design; return <div className="space-y-4"><PanelTitle eyebrow="DESIGN SYSTEM" title="ظاهر کلی فروشگاه"/><Select label="فونت" value={d.fontFamily} onChange={(fontFamily) => actions.patchDesign({ fontFamily })}>{fonts.map((font) => <option key={font}>{font}</option>)}</Select><div className="grid grid-cols-3 gap-2"><Color label="اصلی" value={d.primaryColor} onChange={(primaryColor) => actions.patchDesign({ primaryColor })}/><Color label="ثانویه" value={d.secondaryColor} onChange={(secondaryColor) => actions.patchDesign({ secondaryColor })}/><Color label="پس‌زمینه" value={d.backgroundColor} onChange={(backgroundColor) => actions.patchDesign({ backgroundColor })}/><Color label="سطح" value={d.surfaceColor} onChange={(surfaceColor) => actions.patchDesign({ surfaceColor })}/><Color label="متن" value={d.textColor} onChange={(textColor) => actions.patchDesign({ textColor })}/><Color label="متن کمرنگ" value={d.mutedTextColor} onChange={(mutedTextColor) => actions.patchDesign({ mutedTextColor })}/></div><Range label="عرض محتوا" value={d.containerWidth} min={880} max={1280} onChange={(containerWidth) => actions.patchDesign({ containerWidth })}/><Range label="فاصله بخش‌ها" value={d.sectionSpacing} min={16} max={96} onChange={(sectionSpacing) => actions.patchDesign({ sectionSpacing })}/><Range label="گردی عمومی" value={d.globalRadius} min={0} max={40} onChange={(globalRadius) => actions.patchDesign({ globalRadius })}/><Range label="گردی کارت" value={d.cardRadius} min={0} max={40} onChange={(cardRadius) => actions.patchDesign({ cardRadius })}/><Range label="گردی دکمه" value={d.buttonRadius} min={0} max={32} onChange={(buttonRadius) => actions.patchDesign({ buttonRadius })}/><Range label="مقیاس تیتر" value={d.headingScale} min={75} max={140} onChange={(headingScale) => actions.patchDesign({ headingScale })}/><Range label="مقیاس متن" value={d.bodyScale} min={80} max={125} onChange={(bodyScale) => actions.patchDesign({ bodyScale })}/><Range label="سایه کارت" value={d.cardShadowStrength} min={0} max={40} onChange={(cardShadowStrength) => actions.patchDesign({ cardShadowStrength })}/><Range label="مرز" value={d.borderStrength} min={0} max={30} onChange={(borderStrength) => actions.patchDesign({ borderStrength })}/></div>; }
 
-function SectionTree({ config, moveSection, duplicateSection, deleteSection, addSection, actions }: Props) { return <div className="space-y-4"><PanelTitle eyebrow="SECTION TREE" title="ساختار صفحه" text="بخش‌ها را مرتب، کپی یا غیرفعال کنید."/><div className="space-y-2">{config.sections.map((section) => <div key={section.id} className={`rounded-xl border p-3 ${config.selectedElement.id === section.id ? "border-emerald-400 bg-emerald-400/5" : "border-white/10 bg-white/[.025]"}`}><button type="button" onClick={() => actions.select({ type: section.type === "banner" ? "banner" : section.type === "trust" ? "trust" : "section", id: section.id })} className="w-full text-right"><b className="block text-xs">{section.title || section.type}</b><span className="text-[10px] text-white/35">{section.type}</span></button><div className="mt-2 flex items-center gap-1"><button type="button" aria-label="بالا" onClick={() => moveSection(section.id, -1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowUp/></button><button type="button" aria-label="پایین" onClick={() => moveSection(section.id, 1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowDown/></button><button type="button" aria-label="تکثیر" onClick={() => duplicateSection(section.id)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><Copy/></button><button type="button" aria-label="حذف" onClick={() => deleteSection(section.id)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-rose-500/10 text-rose-300"><Trash/></button><label className="mr-auto flex items-center gap-1 text-[10px] text-white/45"><input type="checkbox" checked={section.enabled} onChange={(event) => actions.patchSection(section.id, { enabled: event.target.checked })}/>فعال</label></div></div>)}</div><Select label="افزودن بخش" value="" onChange={(type) => type && addSection(type as SectionConfig["type"])}><option value="">انتخاب نوع…</option><option value="products">Product Grid</option><option value="banner">Banner</option><option value="trust">Trust Features</option><option value="text">Text</option><option value="spacer">Spacer</option></Select><div className="flex items-center gap-2 text-xs text-white/35"><Plus/> افزودن، بدون CMS پیچیده</div></div>; }
+function SectionTree({ config, moveSection, duplicateSection, deleteSection, addSection, actions }: Props) { return <div className="space-y-4"><PanelTitle eyebrow="SECTION TREE" title="ساختار صفحه" text="بخش‌ها را مرتب، کپی یا غیرفعال کنید."/><div className="space-y-2">{config.sections.map((section) => <div key={section.id} className={`rounded-xl border p-3 ${config.selectedElement.id === section.id ? "border-emerald-400 bg-emerald-400/5" : "border-white/10 bg-white/[.025]"}`}><button type="button" onClick={() => actions.select({ type: section.type === "banner" ? "banner" : section.type === "trust" ? "trust" : "section", id: section.id })} className="w-full text-right"><b className="block text-xs">{section.title || section.type}</b><span className="text-[10px] text-white/35">{section.type}</span></button><div className="mt-2 flex items-center gap-1"><button type="button" aria-label="بالا" onClick={() => moveSection(section.id, -1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowUp/></button><button type="button" aria-label="پایین" onClick={() => moveSection(section.id, 1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowDown/></button><button type="button" aria-label="تکثیر" onClick={() => duplicateSection(section.id)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><Copy/></button><button type="button" aria-label="حذف" onClick={() => deleteSection(section.id)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-rose-500/10 text-rose-300"><Trash/></button><label className="mr-auto flex items-center gap-1 text-[10px] text-white/45"><input type="checkbox" checked={section.enabled} onChange={(event) => actions.patchSection(section.id, { enabled: event.target.checked })}/>فعال</label></div></div>)}</div><Select label="افزودن بخش" value="" onChange={(type) => type && addSection(type as SectionConfig["type"])}><option value="">انتخاب نوع…</option>{siteTypeDefinition(config.siteKind).sectionTypes.map((type) => <option key={type} value={type}>{type}</option>)}</Select><div className="flex items-center gap-2 text-xs text-white/35"><Plus/> افزودن، بدون CMS پیچیده</div></div>; }
 
 export default function InspectorPanel(props: Props & { tab: "context" | "sections" | "design"; onTab: (tab: "context" | "sections" | "design") => void }) {
   const { config, products, assets, actions, tab, onTab } = props;
   const selection = config.selectedElement;
   const section = config.sections.find((item) => item.id === selection.id);
   const product = products.find((item) => item.id === selection.id);
-  return <aside className="flex h-full min-h-0 flex-col border-r border-white/10 bg-[#0d1520] text-white"><div className="grid grid-cols-3 gap-1 border-b border-white/10 p-3">{(["context", "sections", "design"] as const).map((value) => <button key={value} type="button" onClick={() => onTab(value)} className={`min-h-11 rounded-xl text-xs font-black ${tab === value ? "bg-emerald-400 text-slate-950" : "bg-white/5 text-white/50"}`}>{value === "context" ? "ویرایش" : value === "sections" ? "بخش‌ها" : "طراحی"}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto p-5">{tab === "sections" ? <SectionTree {...props}/> : tab === "design" ? <DesignEditor {...props}/> : selection.type === "header" ? <HeaderEditor {...props}/> : selection.type === "hero" ? <HeroEditor {...props}/> : selection.type === "product-card" && product ? <ProductCardEditor product={product} config={config} assets={assets} actions={actions}/> : section?.type === "products" ? <ProductSectionEditor section={section} products={products} actions={actions}/> : section ? <GenericSectionEditor section={section} assets={assets} actions={actions}/> : selection.type === "cart" ? <CommerceEditor config={config} actions={actions} kind="cart"/> : selection.type === "checkout" ? <CommerceEditor config={config} actions={actions} kind="checkout"/> : selection.type === "success" ? <CommerceEditor config={config} actions={actions} kind="success"/> : <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm leading-7 text-white/35">یک عنصر را روی بوم انتخاب کنید تا کنترل‌های مرتبط همین‌جا نمایش داده شوند.</div>}</div></aside>;
+  return <aside className="flex h-full min-h-0 flex-col border-r border-white/10 bg-[#0d1520] text-white"><div className="grid grid-cols-3 gap-1 border-b border-white/10 p-3">{(["context", "sections", "design"] as const).map((value) => <button key={value} type="button" onClick={() => onTab(value)} className={`min-h-11 rounded-xl text-xs font-black ${tab === value ? "bg-emerald-400 text-slate-950" : "bg-white/5 text-white/50"}`}>{value === "context" ? "ویرایش" : value === "sections" ? "بخش‌ها" : "طراحی"}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto p-5">{tab === "sections" ? <SectionTree {...props}/> : tab === "design" ? <><DesignEditor {...props}/><div className="mt-6 border-t border-white/10 pt-6"><SiteSettingsEditor {...props}/></div></> : selection.type === "header" ? <HeaderEditor {...props}/> : selection.type === "hero" ? <HeroEditor {...props}/> : selection.type === "product-card" && product ? <ProductCardEditor product={product} config={config} assets={assets} actions={actions}/> : section?.type === "products" ? <ProductSectionEditor section={section} products={products} actions={actions}/> : section && siteTypeDefinition(config.siteKind).capabilities.includes("lead") ? <CorporateSectionEditor section={section} assets={assets} actions={actions}/> : section ? <GenericSectionEditor section={section} assets={assets} actions={actions}/> : selection.type === "cart" ? <CommerceEditor config={config} actions={actions} kind="cart"/> : selection.type === "checkout" ? <CommerceEditor config={config} actions={actions} kind="checkout"/> : selection.type === "success" ? <CommerceEditor config={config} actions={actions} kind="success"/> : <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm leading-7 text-white/35">یک عنصر را روی بوم انتخاب کنید تا کنترل‌های مرتبط همین‌جا نمایش داده شوند.</div>}</div></aside>;
 }
