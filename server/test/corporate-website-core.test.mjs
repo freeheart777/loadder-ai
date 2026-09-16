@@ -10,6 +10,7 @@ import { createSiteProjectService } from "../app/services/site-project-service.m
 import { createSiteLeadService } from "../app/services/site-lead-service.mjs";
 import { projectPublicStorePresentation } from "../app/services/store-public-presentation.mjs";
 import { isCorporateV16, navigationFor, renderCorporateSite } from "../app/services/corporate-site-html.mjs";
+import { renderPublishedSite } from "../app/routes/public-sites.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 import { migration089LeadEnquiryMessage } from "../db/migrations/089_lead_enquiry_message.mjs";
 
@@ -314,4 +315,119 @@ test("the corporate public payload carries no Commerce vocabulary, while STORE k
 
   const storeContent = { storeBuilderV16: { version: 16, commerce: { cartButtonLabel: "افزودن" }, sections: [] } };
   assert.equal(projectPublicStorePresentation(storeContent).storeBuilderV16.commerce.cartButtonLabel, "افزودن", "STORE still publishes its commerce config");
+});
+
+test("one live truth across the whole publish lifecycle: every live surface agrees at every step", () => {
+  const { db, repository, service } = fixture();
+
+  // The two live emitters for a published BUSINESS project:
+  //   /api/auth/site/:id  -> the projection the V16 runtime renders
+  //   /sites/:id and a custom domain -> renderPublishedSite (same snapshot)
+  const runtimeTruth = (content) => {
+    const v16 = projectPublicStorePresentation(content, { preserveSectionIds: true, includeCommerce: false }).storeBuilderV16;
+    return { hero: v16.hero.title, sections: v16.sections.map((s) => `${s.type}#${s.id}`), seo: v16.seo.title };
+  };
+  const htmlTruth = (published) => {
+    const html = renderPublishedSite({ ...published.project, siteType: "BUSINESS" }, published.version, []);
+    return {
+      hero: (html.match(/<h1>([^<]*)<\/h1>/) || [])[1],
+      sections: [...html.matchAll(/<section id="([^"]+)" data-section-type="([a-z-]+)"/g)].map((m) => `${m[2]}#${m[1]}`),
+      seo: (html.match(/<title>([^<]*)<\/title>/) || [])[1],
+      html,
+    };
+  };
+  const contentWith = (heroTitle) => {
+    const next = corporateContent();
+    next.storeBuilderV16.hero.title = heroTitle;
+    return next;
+  };
+
+  runWithWorkspace("ws-1", () => {
+    const created = service.create({ name: "شرکت چرخه", siteType: "BUSINESS", content: contentWith("A") });
+
+    // draft -> not live
+    assert.equal(repository.getPublishedPublic(created.id), null, "a draft corporate site is on no live surface");
+
+    // publish A -> every live surface shows A
+    service.publish(created.id);
+    const liveA = repository.getPublishedPublic(created.id);
+    const runtimeA = runtimeTruth(liveA.version.content);
+    const htmlA = htmlTruth(liveA);
+    assert.equal(runtimeA.hero, "A");
+    assert.equal(htmlA.hero, "A");
+    assert.deepEqual(htmlA.sections, runtimeA.sections, "publish A: html and runtime agree on section order and anchors");
+    assert.equal(htmlA.seo, runtimeA.seo);
+    assert.doesNotMatch(htmlA.html, /ساخته‌شده با Loadder Site Builder/, "genericSite is never used for a V16 corporate site");
+
+    // draft B -> live stays A on every surface
+    service.update(created.id, { content: contentWith("B") });
+    const stillA = repository.getPublishedPublic(created.id);
+    assert.equal(runtimeTruth(stillA.version.content).hero, "A", "unpublished draft must not reach the runtime payload");
+    assert.equal(htmlTruth(stillA).hero, "A", "unpublished draft must not reach the html surfaces");
+
+    // publish B -> every live surface shows B
+    service.publish(created.id);
+    const liveB = repository.getPublishedPublic(created.id);
+    assert.equal(runtimeTruth(liveB.version.content).hero, "B");
+    assert.equal(htmlTruth(liveB).hero, "B");
+
+    // rollback to A -> every live surface shows A-equivalent
+    service.rollbackPublishVersion(created.id, liveA.version.id);
+    const rolledBack = repository.getPublishedPublic(created.id);
+    const runtimeR = runtimeTruth(rolledBack.version.content);
+    const htmlR = htmlTruth(rolledBack);
+    assert.equal(runtimeR.hero, "A");
+    assert.equal(htmlR.hero, "A");
+    assert.deepEqual(runtimeR, runtimeA, "rollback restores the A projection exactly");
+    assert.deepEqual(htmlR.sections, htmlA.sections);
+  });
+  db.close();
+});
+
+test("STORE: an intentionally empty section array survives save, publish and live", () => {
+  const { db, repository, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    // The store owner deleted every section.
+    const emptied = { storeBuilderV16: { version: 16, hero: { title: "بدون بخش" }, sections: [] } };
+    const project = service.create({ name: "فروشگاه خالی", siteType: "STORE", content: emptied });
+
+    // save -> reload
+    assert.deepEqual(repository.get(project.id).content.storeBuilderV16.sections, [], "the saved draft keeps zero sections");
+
+    // publish -> live
+    service.publish(project.id);
+    const live = repository.getPublishedPublic(project.id);
+    assert.deepEqual(live.version.content.storeBuilderV16.sections, [], "the published snapshot keeps zero sections");
+    assert.deepEqual(
+      projectPublicStorePresentation(live.version.content).storeBuilderV16.sections,
+      [],
+      "the public projection must not resurrect default sections"
+    );
+  });
+  db.close();
+});
+
+test("the enquiry message is private: it reaches no public payload and no foreign workspace", () => {
+  const { db, service } = fixture();
+  const secret = "متن محرمانه درخواست";
+  let projectId;
+  runWithWorkspace("ws-1", () => {
+    const project = service.create({ name: "شرکت خصوصی", siteType: "BUSINESS", content: corporateContent() });
+    projectId = project.id;
+    service.publish(project.id);
+    createSiteLeadService({ db }).submit(project.id, { name: "سارا", phone: "09120000000", message: secret });
+  });
+
+  // A foreign workspace can neither read nor be credited with the lead.
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM leads WHERE workspace_id='ws-2'").get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM leads WHERE message=? AND workspace_id='ws-1'").get(secret).n, 1);
+
+  // The message is never part of anything the public can read.
+  const content = db.prepare("SELECT content_json FROM site_publish_versions WHERE site_project_id=?").get(projectId).content_json;
+  assert.ok(!content.includes(secret), "a lead message is never written into the published snapshot");
+  const presentation = JSON.stringify(projectPublicStorePresentation(JSON.parse(content), { preserveSectionIds: true, includeCommerce: false }));
+  assert.ok(!presentation.includes(secret), "a lead message is never in the public projection");
+  const html = renderCorporateSite({ id: projectId, name: "x", siteType: "BUSINESS" }, { version: 1 }, JSON.parse(content));
+  assert.ok(!html.includes(secret), "a lead message is never rendered on the live site");
+  db.close();
 });
