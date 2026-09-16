@@ -71,7 +71,7 @@ async function assertAndon(evidence: ReturnType<typeof observe>, testInfo: TestI
 
 async function addFixtureProductThroughUi(page: Page) {
   await page.goto(`/store/${projectId}`);
-  const card = page.locator("article").filter({ hasText: product.name }).last();
+  const card = page.getByRole("button").filter({ hasText: product.name }).first().locator("..");
   await expect(card).toBeVisible();
   const cartCreated = page.waitForResponse((response) =>
     response.request().method() === "POST"
@@ -83,7 +83,7 @@ async function addFixtureProductThroughUi(page: Page) {
     && /\/api\/auth\/storefront\/carts\/[^/]+\/items$/.test(new URL(response.url()).pathname)
     && response.status() === 201,
   );
-  await card.getByRole("button", { name: "افزودن", exact: true }).click();
+  await card.getByRole("button", { name: "افزودن به سبد خرید", exact: true }).click();
   await Promise.all([cartCreated, itemAdded]);
   await expect(page.getByText("به سبد خرید اضافه شد.")).toBeVisible();
   return page.evaluate((id) => localStorage.getItem(`loadder-public-cart:${id}`), projectId);
@@ -135,7 +135,7 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
     expect(cartReference.capability).toMatch(/^[A-Za-z0-9_-]{40,}$/);
     const cartId = cartReference.id;
 
-    await page.getByRole("link", { name: "سبد خرید", exact: true }).click();
+    await page.getByRole("button", { name: "سبد خرید", exact: true }).click();
     await expect(page).toHaveURL(`/store/${projectId}/cart`);
     const cartItem = page.locator("article").filter({ hasText: product.name });
     await expect(cartItem).toContainText("۱");
@@ -205,7 +205,7 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
   test("invalid checkout stays visible, sends no checkout request, and creates no order", async ({ page }, testInfo) => {
     const evidence = observe(page);
     await addFixtureProductThroughUi(page);
-    await page.getByRole("link", { name: "سبد خرید", exact: true }).click();
+    await page.getByRole("button", { name: "سبد خرید", exact: true }).click();
     await page.getByRole("link", { name: "ادامه و ثبت سفارش", exact: true }).click();
     const beforeOrders = await expectJsonOk(await adminApi.get(`/api/stores/${projectId}/orders`));
     const checkoutPostsBefore = evidence.network.filter(({ method, url }) =>
@@ -229,7 +229,7 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
     await page.setViewportSize({ width: 390, height: 844 });
     const evidence = observe(page);
     await addFixtureProductThroughUi(page);
-    await page.getByRole("link", { name: "سبد خرید", exact: true }).click();
+    await page.getByRole("button", { name: "سبد خرید", exact: true }).click();
     await expect(page.getByRole("link", { name: "ادامه", exact: true })).toBeVisible();
     await page.getByRole("link", { name: "ادامه", exact: true }).click();
     await expect(page.getByRole("button", { name: "ثبت سفارش", exact: true })).toBeVisible();

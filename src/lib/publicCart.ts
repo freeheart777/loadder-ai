@@ -1,4 +1,4 @@
-type Cart = { id?: string; items?: Array<{ variantId: string }> };
+type Cart = { id?: string; items?: Array<{ variantId: string; quantity?: number }> };
 type CartResponse = { cart?: Cart; code?: string; message?: string };
 export type PublicCartReference = { id: string; capability: string };
 

@@ -30,7 +30,7 @@ export type Product = {
   basePriceMinor: number;
   compareAtPriceMinor?: number | null;
   metadata?: { gallery?: string[]; geoDescription?: string; contentMode?: "SEO" | "GEO" | "HYBRID"; [key: string]: unknown };
-  variants?: Array<{ id?: string; title?: string; inventoryQuantity: number; imageUrl?: string | null }>;
+  variants?: Array<{ id?: string; sku?: string; title?: string; priceMinor?: number | null; inventoryQuantity: number; inventoryPolicy?: string; imageUrl?: string | null; purchasable?: boolean }>;
 };
 
 export type MediaAsset = { id: string; name: string; url: string; kind?: string };

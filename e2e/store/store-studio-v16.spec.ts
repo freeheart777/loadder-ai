@@ -64,7 +64,7 @@ async function openStudio(page: Page) {
 }
 
 test("canonical authenticated Store Studio V16 customer journey", async ({ browser }, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const journey = await createJourney(browser, testInfo);
   try {
     await test.step("authenticated Studio load and Hero persistence", async () => {
@@ -108,6 +108,49 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       await journey.page.reload();
       await expect(journey.page.locator('[data-editor-element="product-card"]')).toContainText("کرم زعفران ویژه");
       await expect(journey.page.locator('[data-editor-element="product-card"]')).toContainText("۴۵۰٬۰۰۰");
+    });
+
+    await test.step("draft preview, immutable live publication and rollback stay in parity", async () => {
+      const publishedA = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}/publish` && response.request().method() === "POST" && response.status() === 200);
+      await journey.page.getByRole("button", { name: "انتشار نسخه", exact: true }).click();
+      await publishedA;
+      await expect(journey.page.getByText("نسخه منتشرشده با موفقیت ایجاد شد.")).toBeVisible();
+
+      await journey.page.goto(`/store/${journey.projectId}`);
+      await expect(journey.page.locator('[data-storefront-renderer="store-studio-v16"]')).toBeVisible();
+      await expect(journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true })).toBeVisible();
+      const versionA = await journey.page.locator("main[data-published-version-id]").getAttribute("data-published-version-id");
+      expect(versionA).toBeTruthy();
+
+      await openStudio(journey.page);
+      await journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true }).click();
+      await journey.page.getByLabel("عنوان", { exact: true }).fill("پیش‌نویس منتشرنشده ب");
+      const savedB = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}` && response.request().method() === "PATCH" && response.status() === 200);
+      await journey.page.getByRole("button", { name: "ذخیره", exact: true }).click();
+      await savedB;
+      await journey.page.getByRole("button", { name: "پیش‌نمایش پیش‌نویس", exact: true }).click();
+      await expect(journey.page.locator('[data-canvas-interactive="false"]').getByRole("heading", { name: "پیش‌نویس منتشرنشده ب", exact: true })).toBeVisible();
+      await journey.page.getByText("پیش‌نمایش پیش‌نویس", { exact: true }).locator("..").getByRole("button").click();
+
+      await journey.page.goto(`/store/${journey.projectId}`);
+      await expect(journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true })).toBeVisible();
+      await expect(journey.page.getByText("پیش‌نویس منتشرنشده ب")).toHaveCount(0);
+
+      await openStudio(journey.page);
+      const publishedB = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}/publish` && response.status() === 200);
+      await journey.page.getByRole("button", { name: "انتشار نسخه", exact: true }).click();
+      await publishedB;
+      await journey.page.goto(`/store/${journey.projectId}`);
+      await expect(journey.page.getByRole("heading", { name: "پیش‌نویس منتشرنشده ب", exact: true })).toBeVisible();
+
+      await expectJsonOk(await journey.api.post(`/api/site-projects/${journey.projectId}/publish-rollback`, { data: { targetVersionId: versionA } }));
+      await journey.page.reload();
+      await expect(journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true })).toBeVisible();
+      await journey.page.setViewportSize({ width: 390, height: 844 });
+      const overflow = await journey.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+      await journey.page.setViewportSize({ width: 1280, height: 900 });
+      await openStudio(journey.page);
     });
 
     await test.step("inline product validation sends no request", async () => {

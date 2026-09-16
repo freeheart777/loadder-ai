@@ -250,10 +250,14 @@ export function restoreConfig(content: Record<string, any>): StudioConfig {
 export function productView(product: Product, config: StudioConfig): ProductView {
   const override = config.commerce.productOverrides[product.id] || {};
   return {
-    title: override.title || product.name,
-    imageUrl: override.imageUrl || productMainImage(product),
-    regularPriceMinor: override.regularPriceMinor ?? product.basePriceMinor,
-    compareAtPriceMinor: override.compareAtPriceMinor ?? product.compareAtPriceMinor ?? null,
+    // Product identity and media remain canonical Commerce truth. Persisted
+    // legacy overrides are intentionally ignored rather than promoted.
+    title: product.name,
+    imageUrl: productMainImage(product),
+    // Money remains Commerce-owned. Legacy visual price overrides stay readable
+    // in persisted V16 documents but never replace authoritative catalog prices.
+    regularPriceMinor: product.basePriceMinor,
+    compareAtPriceMinor: product.compareAtPriceMinor ?? null,
     promotionBadge: override.promotionBadge ?? false,
     promotionBadgeText: override.promotionBadgeText || "فروش ویژه",
     showDiscountPercentage: override.showDiscountPercentage ?? true,
