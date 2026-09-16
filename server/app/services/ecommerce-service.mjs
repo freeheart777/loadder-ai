@@ -297,8 +297,12 @@ export function createEcommerceService({ db, env = process.env }) {
     },
     listOrders(siteProjectId){ requireSite(siteProjectId); return db.prepare("SELECT id FROM ecommerce_orders WHERE workspace_id=? AND site_project_id=? ORDER BY created_at DESC").all(workspaceId(),siteProjectId).map(r=>this.getOrder(r.id)); },
     setOrderStatus(orderId,input={}){
-      const order=this.getOrder(orderId); const status=input.status||order.status,paymentStatus=input.paymentStatus||order.paymentStatus,fulfillmentStatus=input.fulfillmentStatus||order.fulfillmentStatus;
-      db.prepare("UPDATE ecommerce_orders SET status=?,payment_status=?,fulfillment_status=?,payment_reference=COALESCE(?,payment_reference),updated_at=? WHERE id=? AND workspace_id=?").run(status,paymentStatus,fulfillmentStatus,input.paymentReference||null,now(),orderId,workspaceId()); return this.getOrder(orderId);
+      const order=this.getOrder(orderId);
+      if (input.paymentStatus !== undefined || input.paymentReference !== undefined || input.paymentProvider !== undefined || input.status === "REFUNDED") {
+        throw new EcommerceError("Payment and refund state require their canonical financial authority.", "FINANCIAL_STATE_AUTHORITY_REQUIRED", 409);
+      }
+      const status=input.status||order.status,fulfillmentStatus=input.fulfillmentStatus||order.fulfillmentStatus;
+      db.prepare("UPDATE ecommerce_orders SET status=?,fulfillment_status=?,updated_at=? WHERE id=? AND workspace_id=?").run(status,fulfillmentStatus,now(),orderId,workspaceId()); return this.getOrder(orderId);
     },
   });
 }

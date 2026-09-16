@@ -49,7 +49,7 @@ test("canonical runtime mounts Commerce through the authenticated API chain", ()
   assert.match(source, /router\.use\(canonicalCommerceRouter\)/);
 });
 
-test("beta HTTP journey reaches checkout, capture, partial refund, full refund and financial zero", async () => {
+test("beta HTTP journey reaches manual checkout but cannot manufacture payment or refund truth", async () => {
   const { db, store, app } = fixture();
   const server = await new Promise((resolve) => {
     const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
@@ -92,64 +92,32 @@ test("beta HTTP journey reaches checkout, capture, partial refund, full refund a
     }));
     const orderId = checkout.order.id;
 
-    await json(await fetch(`${base}/commerce/orders/${orderId}/status`, {
+    const fabricatedCapture = await fetch(`${base}/commerce/orders/${orderId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentStatus: "PAID", paymentReference: "capture-beta-001" }),
-    }));
+    });
+    assert.equal(fabricatedCapture.status, 409);
+    assert.equal((await fabricatedCapture.json()).code, "FINANCIAL_STATE_AUTHORITY_REQUIRED");
 
-    const firstRefund = await json(await fetch(`${base}/commerce/orders/${orderId}/refunds`, {
+    const fabricatedRefund = await fetch(`${base}/commerce/orders/${orderId}/refunds`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amountMinor: 2000, provider: "TEST", reason: "partial beta refund" }),
-    }));
-    for (const status of ["APPROVED", "PROCESSING"]) {
-      await json(await fetch(`${base}/commerce/refunds/${firstRefund.refund.id}/transitions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      }));
-    }
-    await json(await fetch(`${base}/commerce/refunds/${firstRefund.refund.id}/transitions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "SUCCEEDED", providerReference: "refund-beta-partial-001" }),
-    }));
+    });
+    assert.equal(fabricatedRefund.status, 409);
+    assert.equal((await fabricatedRefund.json()).code, "REFUND_ORDER_NOT_PAID");
 
-    let order = (await json(await fetch(`${base}/commerce/orders/${orderId}`))).order;
-    assert.equal(order.paymentStatus, "PARTIALLY_REFUNDED");
-    let financials = (await json(await fetch(`${base}/commerce/orders/${orderId}/financials`))).financials;
-    assert.equal(financials.summary.paidMinor, 5000);
-    assert.equal(financials.summary.refundedMinor, 2000);
-    assert.equal(financials.summary.netMinor, 3000);
-
-    const secondRefund = await json(await fetch(`${base}/commerce/orders/${orderId}/refunds`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amountMinor: 3000, provider: "TEST", reason: "complete beta refund" }),
-    }));
-    for (const status of ["APPROVED", "PROCESSING"]) {
-      await json(await fetch(`${base}/commerce/refunds/${secondRefund.refund.id}/transitions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      }));
-    }
-    await json(await fetch(`${base}/commerce/refunds/${secondRefund.refund.id}/transitions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "SUCCEEDED", providerReference: "refund-beta-full-002" }),
-    }));
-
-    order = (await json(await fetch(`${base}/commerce/orders/${orderId}`))).order;
-    assert.equal(order.paymentStatus, "REFUNDED");
-    financials = (await json(await fetch(`${base}/commerce/orders/${orderId}/financials`))).financials;
-    assert.equal(financials.summary.refundedMinor, 5000);
+    const order = (await json(await fetch(`${base}/commerce/orders/${orderId}`))).order;
+    assert.equal(order.paymentStatus, "UNPAID");
+    const financials = (await json(await fetch(`${base}/commerce/orders/${orderId}/financials`))).financials;
+    assert.equal(financials.summary.paidMinor, 0);
+    assert.equal(financials.summary.refundedMinor, 0);
     assert.equal(financials.summary.netMinor, 0);
 
     const variant = db.prepare("SELECT inventory_quantity FROM ecommerce_variants WHERE id=?").get(variantId);
     assert.equal(variant.inventory_quantity, 2);
-    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM ecommerce_financial_ledger WHERE order_id=?").get(orderId).n, 3);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM ecommerce_financial_ledger WHERE order_id=?").get(orderId).n, 0);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     db.close();
