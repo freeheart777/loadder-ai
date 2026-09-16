@@ -6,6 +6,7 @@ import { createSiteTestDb } from "../test-helpers/site-test-db.mjs";
 import { createSiteProjectRepository } from "../app/repositories/site-project-repository.mjs";
 import { createSiteProjectService } from "../app/services/site-project-service.mjs";
 import { createEcommerceService } from "../app/services/ecommerce-service.mjs";
+import { createPaymentAttemptService } from "../app/commerce/payment-attempt-service.mjs";
 import {
   createFinancialLedgerService,
   getOrderFinancialTimeline,
@@ -25,6 +26,8 @@ function fixture() {
     projectService.create({ name: "Finance Store", siteType: "STORE", content: {} })
   );
   const ecommerceService = createEcommerceService({ db });
+  runWithWorkspace("ws-1", () => ecommerceService.configurePaymentProvider(store.id, { providerKey: "TEST", status: "PENDING" }));
+  const paymentAttemptService = createPaymentAttemptService({ db, clock: () => "2026-09-05T00:00:00.000Z" });
   const audits = [];
   const auditRepository = {
     createAuditLog(entry) {
@@ -42,9 +45,18 @@ function fixture() {
     db,
     store,
     ecommerceService,
+    paymentAttemptService,
     financialLedgerService,
     audits,
   };
+}
+
+function settle({ db, paymentAttemptService, order, reference }) {
+  return runWithWorkspace("ws-1", () => {
+    const providerConfigId = db.prepare("SELECT id FROM ecommerce_payment_providers WHERE workspace_id='ws-1' AND site_project_id=? AND provider_key='TEST'").get(order.siteProjectId).id;
+    const attempt = paymentAttemptService.create({ orderId:order.id, provider:"TEST", providerConfigId, idempotencyKey:`settle:${order.id}` });
+    return paymentAttemptService.settleVerified(attempt.id, { provider:"TEST", providerConfigId, providerTransactionId:reference, amountMinor:order.totalMinor, currency:order.currency });
+  });
 }
 
 function createOrder({ store, ecommerceService, sku = "FIN-1", amount = 1250 }) {
@@ -67,15 +79,10 @@ function createOrder({ store, ecommerceService, sku = "FIN-1", amount = 1250 }) 
 }
 
 test("financial timeline exposes immutable capture summary inside workspace scope", () => {
-  const { db, store, ecommerceService } = fixture();
+  const { db, store, ecommerceService, paymentAttemptService } = fixture();
   const order = createOrder({ store, ecommerceService });
 
-  runWithWorkspace("ws-1", () => {
-    ecommerceService.setOrderStatus(order.id, {
-      paymentStatus: "PAID",
-      paymentReference: "capture-001",
-    });
-  });
+  settle({ db, paymentAttemptService, order, reference:"capture-001" });
 
   const financials = getOrderFinancialTimeline(db, {
     workspaceId: "ws-1",
@@ -96,16 +103,11 @@ test("financial timeline exposes immutable capture summary inside workspace scop
 });
 
 test("financial reconciliation repairs a missing capture once and records operator audit", () => {
-  const { db, store, ecommerceService, financialLedgerService, audits } = fixture();
+  const { db, store, ecommerceService, paymentAttemptService, financialLedgerService, audits } = fixture();
   const order = createOrder({ store, ecommerceService, sku: "FIN-REPAIR" });
 
   db.exec("DROP TRIGGER trg_ecommerce_payment_captured_ledger");
-  runWithWorkspace("ws-1", () => {
-    ecommerceService.setOrderStatus(order.id, {
-      paymentStatus: "PAID",
-      paymentReference: "repair-001",
-    });
-  });
+  settle({ db, paymentAttemptService, order, reference:"repair-001" });
 
   assert.equal(
     db.prepare("SELECT COUNT(*) AS count FROM ecommerce_financial_ledger WHERE order_id=?").get(order.id).count,
@@ -152,14 +154,9 @@ test("financial reconciliation repairs a missing capture once and records operat
 });
 
 test("financial HTTP surface rejects members and serves owner/admin scoped data", async () => {
-  const { db, store, ecommerceService, financialLedgerService, audits } = fixture();
+  const { db, store, ecommerceService, paymentAttemptService, financialLedgerService, audits } = fixture();
   const order = createOrder({ store, ecommerceService, sku: "FIN-HTTP" });
-  runWithWorkspace("ws-1", () => {
-    ecommerceService.setOrderStatus(order.id, {
-      paymentStatus: "PAID",
-      paymentReference: "http-001",
-    });
-  });
+  settle({ db, paymentAttemptService, order, reference:"http-001" });
 
   const app = express();
   app.use(express.json());

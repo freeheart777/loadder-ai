@@ -5,6 +5,7 @@ import { createSiteTestDb } from "../test-helpers/site-test-db.mjs";
 import { createSiteProjectRepository } from "../app/repositories/site-project-repository.mjs";
 import { createSiteProjectService } from "../app/services/site-project-service.mjs";
 import { createEcommerceService } from "../app/services/ecommerce-service.mjs";
+import { createPaymentAttemptService } from "../app/commerce/payment-attempt-service.mjs";
 import { createFinancialLedgerService } from "../app/commerce/v2/financial-ledger.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
 
@@ -20,6 +21,8 @@ test("reconciliation repair rolls back when the required audit write fails", () 
     projectService.create({ name: "Audit Atomicity Store", siteType: "STORE", content: {} })
   );
   const ecommerceService = createEcommerceService({ db });
+  runWithWorkspace("ws-1", () => ecommerceService.configurePaymentProvider(store.id, { providerKey: "TEST", status: "PENDING" }));
+  const paymentAttemptService = createPaymentAttemptService({ db, clock: () => "2026-09-05T00:00:00.000Z" });
 
   const order = runWithWorkspace("ws-1", () => {
     const product = ecommerceService.createProduct(store.id, {
@@ -40,10 +43,9 @@ test("reconciliation repair rolls back when the required audit write fails", () 
 
   db.exec("DROP TRIGGER trg_ecommerce_payment_captured_ledger");
   runWithWorkspace("ws-1", () => {
-    ecommerceService.setOrderStatus(order.id, {
-      paymentStatus: "PAID",
-      paymentReference: "audit-fail-capture",
-    });
+    const providerConfigId = db.prepare("SELECT id FROM ecommerce_payment_providers WHERE workspace_id='ws-1' AND site_project_id=? AND provider_key='TEST'").get(store.id).id;
+    const attempt = paymentAttemptService.create({ orderId:order.id, provider:"TEST", providerConfigId, idempotencyKey:"audit-settle" });
+    paymentAttemptService.settleVerified(attempt.id, { provider:"TEST", providerConfigId, providerTransactionId:"audit-fail-capture", amountMinor:order.totalMinor, currency:order.currency });
   });
 
   const financialLedgerService = createFinancialLedgerService({

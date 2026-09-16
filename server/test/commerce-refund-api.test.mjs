@@ -39,7 +39,7 @@ test("refund service enforces lifecycle and derives partial/full order payment s
   });db.close();
 });
 
-test("refund HTTP surface rejects members and lets admin drive a refund to success",async()=>{
+test("refund HTTP surface rejects members and cannot let admin fabricate provider success",async()=>{
   const{db,refundService}=fixture();const service={listProducts(){return[];}};const financialLedgerService={list(){return[];},getOrderFinancials(){return null;},reconcile(){return{status:"missing_order"};}};
   const app=express();app.use(express.json());app.use((req,res,next)=>{req.workspace={id:"w1"};req.membership={role:String(req.headers["x-test-role"]||"member")};req.user={id:"u1"};return runWithWorkspace("w1",next);});app.use(createEcommerceRouter({service,financialLedgerService,refundService}));
   const server=await new Promise(resolve=>{const listener=app.listen(0,"127.0.0.1",()=>resolve(listener));});
@@ -48,7 +48,8 @@ test("refund HTTP surface rejects members and lets admin drive a refund to succe
     const denied=await fetch(`${base}/commerce/orders/o1/refunds`,{method:"POST",headers:{"content-type":"application/json","x-test-role":"member"},body:JSON.stringify({amountMinor:2500})});assert.equal(denied.status,403);
     const createdResponse=await fetch(`${base}/commerce/orders/o1/refunds`,{method:"POST",headers:{"content-type":"application/json","x-test-role":"admin"},body:JSON.stringify({amountMinor:2500,provider:"TEST"})});assert.equal(createdResponse.status,201);const created=(await createdResponse.json()).refund;
     for(const status of ["APPROVED","PROCESSING"]){const response=await fetch(`${base}/commerce/refunds/${created.id}/transitions`,{method:"POST",headers:{"content-type":"application/json","x-test-role":"admin"},body:JSON.stringify({status})});assert.equal(response.status,200);}
-    const succeeded=await fetch(`${base}/commerce/refunds/${created.id}/transitions`,{method:"POST",headers:{"content-type":"application/json","x-test-role":"admin"},body:JSON.stringify({status:"SUCCEEDED",providerReference:"api-refund-1"})});assert.equal(succeeded.status,200);
-    assert.equal(db.prepare("SELECT COUNT(*) c FROM ecommerce_financial_ledger WHERE source_id=? AND entry_type='REFUND'").get(created.id).c,1);
+    const succeeded=await fetch(`${base}/commerce/refunds/${created.id}/transitions`,{method:"POST",headers:{"content-type":"application/json","x-test-role":"admin"},body:JSON.stringify({status:"SUCCEEDED",providerReference:"api-refund-1"})});assert.equal(succeeded.status,409);assert.equal((await succeeded.json()).code,"REFUND_PROVIDER_VERIFICATION_REQUIRED");
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM ecommerce_financial_ledger WHERE source_id=? AND entry_type='REFUND'").get(created.id).c,0);
+    assert.equal(db.prepare("SELECT payment_status FROM ecommerce_orders WHERE id='o1'").get().payment_status,"PAID");
   }finally{await new Promise(resolve=>server.close(resolve));db.close();}
 });

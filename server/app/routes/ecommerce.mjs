@@ -62,7 +62,12 @@ export function createEcommerceRouter({ service, financialLedgerService = null, 
   router.get("/commerce/orders/:orderId/refunds", requireFinancialAdmin, (req, res) => run(res, () => ({ refunds: refunds().list(req.params.orderId) })));
   router.post("/commerce/orders/:orderId/refunds", requireFinancialAdmin, (req, res) => run(res, () => ({ refund: refunds().create(req.params.orderId, req.body || {}) }), 201));
   router.get("/commerce/refunds/:refundId", requireFinancialAdmin, (req, res) => run(res, () => ({ refund: refunds().get(req.params.refundId) })));
-  router.post("/commerce/refunds/:refundId/transitions", requireFinancialAdmin, (req, res) => run(res, () => ({ refund: refunds().transition(req.params.refundId, req.body?.status, req.body || {}) })));
+  router.post("/commerce/refunds/:refundId/transitions", requireFinancialAdmin, (req, res) => {
+    if (String(req.body?.status || "").toUpperCase() === "SUCCEEDED") {
+      return res.status(409).json({ success: false, code: "REFUND_PROVIDER_VERIFICATION_REQUIRED", message: "Provider-verified refund settlement is not available." });
+    }
+    return run(res, () => ({ refund: refunds().transition(req.params.refundId, req.body?.status, req.body || {}) }));
+  });
 
   router.get("/stores/:siteProjectId/financial-ledger", requireFinancialAdmin, (req, res) => run(res, () => ({ entries: finance().list({ workspaceId: workspaceId(req), siteProjectId: req.params.siteProjectId, entryType: req.query.entryType || null, limit: req.query.limit || 100 }) })));
 
