@@ -12,6 +12,7 @@ import { apiFetch } from "../../lib/api";
 
 type SiteMeta = {
   site: { id: string; name: string; siteType: string };
+  canonicalDomain?: string | null;
   presentation: Record<string, unknown>;
   publishedVersion: { id: string; version: number; publishedAt: string };
 };
@@ -68,6 +69,19 @@ export default function PublicSiteRuntime() {
     document.title = title;
     const tag = document.querySelector('meta[name="description"]') || document.head.appendChild(Object.assign(document.createElement("meta"), { name: "description" }));
     tag.setAttribute("content", page?.seo.description || config.seo.description || (page?.isHome ? config.hero.subtitle : "") || "");
+
+    // This internal address is never the indexable one: the customer domain is
+    // the SEO authority, and no canonical is invented when none exists.
+    const robots = document.querySelector('meta[name="robots"]') || document.head.appendChild(Object.assign(document.createElement("meta"), { name: "robots" }));
+    robots.setAttribute("content", "noindex, follow");
+
+    const existing = document.querySelector('link[rel="canonical"]');
+    if (meta.canonicalDomain && page) {
+      const link = existing || document.head.appendChild(Object.assign(document.createElement("link"), { rel: "canonical" }));
+      link.setAttribute("href", `https://${meta.canonicalDomain}${page.slug ? `/${encodeURIComponent(page.slug)}` : "/"}`);
+    } else if (existing) {
+      existing.remove();
+    }
   }, [config, meta, page]);
 
   const submitLead = async (input: { name: string; phone: string; email: string; company: string; message: string }) => {

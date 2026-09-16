@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import express from "express";
 import { isCorporateV16, renderCorporateSite } from "../services/corporate-site-html.mjs";
+import { previewSiteHeaders, publishedSiteHeaders } from "../services/public-site-headers.mjs";
+import { isDiscoverableSite, renderRobots, renderSitemap } from "../services/public-site-discovery.mjs";
 
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const normalizeHost = (value) => String(value ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
@@ -47,16 +49,16 @@ export function createPublicSitesRouter({ repository }) {
     const html = renderPublishedSite(published.project, published.version, published.assets, page);
     // A slug that resolves to no published page is a 404, never a silent Home.
     if (html === null) return res.status(404).send("Page not found");
-    const etag = `W/\"site-${published.version.id}-${page.slug || ""}\"`;
+    const etag = `W/\"site-${published.version.id}-${page.slug || ""}${page.noindex ? "-ni" : ""}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
-    return res.set({ "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(html);
+    return res.set(publishedSiteHeaders({ ETag: etag, ...(page.noindex ? { "X-Robots-Tag": "noindex, follow" } : {}) })).type("html").send(html);
   };
   const sendPreview = (req, res, preview) => {
     if (!preview) return res.status(404).send("Preview not found");
     const etag = `W/\"preview-${preview.project.id}-${preview.project.updatedAt}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const draftVersion = { version: "draft", content: preview.project.content };
-    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, { slug: typeof req.query.page === "string" ? req.query.page : "", basePath: `/preview/sites/${preview.project.id}` }) || "Page not found");
+    return res.set(previewSiteHeaders({ ETag: etag })).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, { slug: typeof req.query.page === "string" ? req.query.page : "", basePath: `/preview/sites/${preview.project.id}` }) || "Page not found");
   };
   router.get("/preview/sites/:id", (req, res) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";
@@ -65,19 +67,41 @@ export function createPublicSitesRouter({ repository }) {
     catch (error) { console.error("Preview site error:", error); return res.status(500).send("Unable to render preview"); }
   });
   router.get("/sites/:id/:slug", (req, res) => {
-    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: req.params.slug, basePath: `/sites/${req.params.id}` }); }
+    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: req.params.slug, basePath: `/sites/${req.params.id}`, canonicalDomain: repository.getActiveDomainForProject(req.params.id), noindex: true }); }
     catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
   });
   router.get("/sites/:id", (req, res) => {
-    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: "", basePath: `/sites/${req.params.id}` }); }
+    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: "", basePath: `/sites/${req.params.id}`, canonicalDomain: repository.getActiveDomainForProject(req.params.id), noindex: true }); }
     catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
   });
   const domainHandler = (slug) => (req, res, next) => {
     const host = normalizeHost(req.headers.host);
     if (!host || host === "localhost" || host === "127.0.0.1") return next();
-    try { return sendPublished(req, res, repository.getPublishedPublicByDomain(host), { slug: slug(req), basePath: "" }); }
+    try { return sendPublished(req, res, repository.getPublishedPublicByDomain(host), { slug: slug(req), basePath: "", canonicalDomain: host }); }
     catch (error) { console.error("Domain site error:", error); return res.status(500).send("Unable to render site"); }
   };
+  // Discovery files are served only for a published corporate site on its own
+  // domain, so nothing about another tenant is ever reachable here.
+  const domainSite = (req) => {
+    const host = normalizeHost(req.headers.host);
+    if (!host || host === "localhost" || host === "127.0.0.1") return null;
+    const published = repository.getPublishedPublicByDomain(host);
+    return published && isDiscoverableSite(published) ? { published, origin: `https://${host}` } : null;
+  };
+  router.get("/sitemap.xml", (req, res, next) => {
+    try {
+      const site = domainSite(req);
+      if (!site) return next();
+      return res.set(publishedSiteHeaders()).type("application/xml").send(renderSitemap(site.published, site.origin));
+    } catch (error) { console.error("Sitemap error:", error); return res.status(500).send("Unable to build sitemap"); }
+  });
+  router.get("/robots.txt", (req, res, next) => {
+    try {
+      const site = domainSite(req);
+      if (!site) return next();
+      return res.set(publishedSiteHeaders()).type("text/plain").send(renderRobots(site.origin));
+    } catch (error) { console.error("Robots error:", error); return res.status(500).send("Unable to build robots"); }
+  });
   router.get("/", domainHandler(() => ""));
   router.get("/:slug", domainHandler((req) => req.params.slug));
   return router;
