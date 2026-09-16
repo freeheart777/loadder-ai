@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { requireWorkspaceId } from "../tenant-context.mjs";
+import { createInventoryReservationService } from "../commerce/inventory-reservation-service.mjs";
 
 export class EcommerceError extends Error {
   constructor(message, code = "ECOMMERCE_ERROR", status = 400) {
@@ -48,7 +49,12 @@ const productMetadata = (value, fallback = "{}", { allowLocal = false } = {}) =>
   return { ...next, gallery: [...new Set(next.gallery.map((url) => productImageUrl(url, { allowLocal })))].slice(0, 12) };
 };
 
-export function createEcommerceService({ db, env = process.env }) {
+export function createEcommerceService({ db, env = process.env, inventoryReservations = null }) {
+  const reservations = inventoryReservations || createInventoryReservationService({ db });
+  // Admission is server-authoritative: it subtracts live holds from physical
+  // stock. The exported isVariantPurchasable stays a pure catalog-display
+  // predicate for storefront listing and is intentionally not reservation-aware.
+  const admissible = (variant, quantity) => reservations.isPurchasable(variant.id, quantity);
   const workspaceId = () => requireWorkspaceId();
   const ownedSite = (siteProjectId) => db.prepare("SELECT id,site_type AS siteType,name FROM site_projects WHERE id=? AND workspace_id=?").get(siteProjectId, workspaceId());
   const requireSite = (siteProjectId) => {
@@ -217,12 +223,12 @@ export function createEcommerceService({ db, env = process.env }) {
       const variant = requireVariant(input.variantId);
       if (variant.site_project_id !== cart.site_project_id) throw new EcommerceError("Variant belongs to another store.", "CROSS_STORE_VARIANT", 409);
       const quantity = Number(input.quantity || 1); if (!Number.isInteger(quantity) || quantity <= 0) throw new EcommerceError("Quantity must be a positive integer.", "INVALID_QUANTITY");
-      if (!isVariantPurchasable(variant, quantity)) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
+      if (!admissible(variant, quantity)) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
       const price = variant.price_minor == null ? variant.base_price_minor : variant.price_minor;
       const existing = db.prepare("SELECT * FROM ecommerce_cart_items WHERE workspace_id=? AND cart_id=? AND variant_id=?").get(workspaceId(),cartId,variant.id);
       if (existing) {
         const nextQty = existing.quantity + quantity;
-        if (!isVariantPurchasable(variant, nextQty)) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
+        if (!admissible(variant, nextQty)) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
         db.prepare("UPDATE ecommerce_cart_items SET quantity=?,unit_price_minor=?,updated_at=? WHERE id=? AND workspace_id=?").run(nextQty,price,now(),existing.id,workspaceId());
       } else {
         const stamp=now(); db.prepare(`INSERT INTO ecommerce_cart_items(id,workspace_id,cart_id,product_id,variant_id,quantity,unit_price_minor,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(id("item"),workspaceId(),cartId,variant.product_id,variant.id,quantity,price,stamp,stamp);
@@ -234,7 +240,7 @@ export function createEcommerceService({ db, env = process.env }) {
       if (!Number.isInteger(q) || q < 0) throw new EcommerceError("Quantity must be zero or a positive integer.", "INVALID_QUANTITY");
       if (q===0) db.prepare("DELETE FROM ecommerce_cart_items WHERE workspace_id=? AND cart_id=? AND variant_id=?").run(workspaceId(),cartId,variantId);
       else {
-        const v=requireVariant(variantId); if(!isVariantPurchasable(v,q)) throw new EcommerceError("Not enough inventory.","INSUFFICIENT_INVENTORY",409);
+        const v=requireVariant(variantId); if(!admissible(v,q)) throw new EcommerceError("Not enough inventory.","INSUFFICIENT_INVENTORY",409);
         db.prepare("UPDATE ecommerce_cart_items SET quantity=?,updated_at=? WHERE workspace_id=? AND cart_id=? AND variant_id=?").run(q,now(),workspaceId(),cartId,variantId);
       }
       return cartMap(recalcCart(cartId));
@@ -279,17 +285,22 @@ export function createEcommerceService({ db, env = process.env }) {
         const cart=recalcCart(cartId); requireSite(cart.site_project_id);
         if(cart.status!=="ACTIVE") throw new EcommerceError("Cart is not active.","CART_NOT_ACTIVE",409);
         if(!cart.items.length) throw new EcommerceError("Cart is empty.","EMPTY_CART",409);
-        for(const item of cart.items){ const v=requireVariant(item.variantId); if(!isVariantPurchasable(v,item.quantity)) throw new EcommerceError(`Insufficient inventory for ${item.sku}.`,"INSUFFICIENT_INVENTORY",409); }
+        for(const item of cart.items){ const v=requireVariant(item.variantId); if(!admissible(v,item.quantity)) throw new EcommerceError(`Insufficient inventory for ${item.sku}.`,"INSUFFICIENT_INVENTORY",409); }
         const orderId=id("order"),stamp=now();
         db.prepare(`INSERT INTO ecommerce_orders(id,workspace_id,site_project_id,cart_id,customer_id,email,currency,status,payment_status,fulfillment_status,payment_provider,payment_reference,shipping_method,shipping_address_json,subtotal_minor,discount_minor,shipping_minor,total_minor,receipt_capability_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(orderId,workspaceId(),cart.site_project_id,cart.id,input.customerId||cart.customer_id||null,input.email||cart.email||null,cart.currency,"PENDING","UNPAID","UNFULFILLED",input.paymentProvider||null,null,input.shippingMethod||null,JSON.stringify(input.shippingAddress||{}),cart.subtotal_minor,cart.discount_minor,cart.shipping_minor,cart.total_minor,input.receiptCapabilityHash||null,stamp,stamp);
-        for(const item of cart.items){ const v=requireVariant(item.variantId); db.prepare(`INSERT INTO ecommerce_order_items(id,workspace_id,order_id,product_id,variant_id,product_name,sku,quantity,unit_price_minor,line_total_minor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(id("oi"),workspaceId(),orderId,item.productId,item.variantId,item.productName,item.sku,item.quantity,item.unitPriceMinor,item.lineTotalMinor,stamp); if(v.inventory_policy==="DENY") db.prepare("UPDATE ecommerce_variants SET inventory_quantity=inventory_quantity-?,updated_at=? WHERE id=? AND workspace_id=?").run(item.quantity,stamp,item.variantId,workspaceId()); }
+        for(const item of cart.items){ db.prepare(`INSERT INTO ecommerce_order_items(id,workspace_id,order_id,product_id,variant_id,product_name,sku,quantity,unit_price_minor,line_total_minor,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(id("oi"),workspaceId(),orderId,item.productId,item.variantId,item.productName,item.sku,item.quantity,item.unitPriceMinor,item.lineTotalMinor,stamp); }
+        // Unpaid checkout holds stock; physical inventory is decremented only
+        // at verified-payment commit, and released on failure/cancel/expiry.
+        reservations.reserveForOrder({ orderId, siteProjectId: cart.site_project_id, items: cart.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity })) });
         if(cart.coupon_code) db.prepare("UPDATE ecommerce_coupons SET usage_count=usage_count+1,updated_at=? WHERE workspace_id=? AND site_project_id=? AND upper(code)=upper(?)").run(stamp,workspaceId(),cart.site_project_id,cart.coupon_code);
         db.prepare("UPDATE ecommerce_carts SET status='CONVERTED',updated_at=? WHERE id=? AND workspace_id=?").run(stamp,cartId,workspaceId());
         return this.getOrder(orderId);
       });
       return execute();
     },
+    availableQuantity(variantId){ return reservations.availableQuantity(variantId); },
+    inventoryReservationsForOrder(orderId){ return reservations.listForOrder(orderId); },
     getOrder(orderId){
       const order=db.prepare("SELECT * FROM ecommerce_orders WHERE id=? AND workspace_id=?").get(orderId,workspaceId()); if(!order) throw new EcommerceError("Order not found.","ORDER_NOT_FOUND",404); requireSite(order.site_project_id);
       const items=db.prepare("SELECT * FROM ecommerce_order_items WHERE workspace_id=? AND order_id=? ORDER BY created_at").all(workspaceId(),orderId).map(r=>({id:r.id,productId:r.product_id,variantId:r.variant_id,productName:r.product_name,sku:r.sku,quantity:r.quantity,unitPriceMinor:r.unit_price_minor,lineTotalMinor:r.line_total_minor}));

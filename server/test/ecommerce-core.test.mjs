@@ -19,7 +19,7 @@ function fixture() {
   return { db, store, other, service:createEcommerceService({ db }) };
 }
 
-test("commerce core creates product, cart, discount, shipping and checkout while decrementing inventory", () => {
+test("commerce core creates product, cart, discount, shipping and checkout while holding inventory", () => {
   const { db, store, service } = fixture();
   runWithWorkspace("ws-1", () => {
     const product = service.createProduct(store.id, {
@@ -43,7 +43,12 @@ test("commerce core creates product, cart, discount, shipping and checkout while
     assert.equal(order.totalMinor, 18500);
     assert.equal(order.items[0].quantity, 2);
     assert.equal(service.getCart(cart.id).status, "CONVERTED");
-    assert.equal(service.getProduct(product.id).variants[0].inventoryQuantity, 3);
+    // Unpaid checkout holds stock; physical inventory is decremented only at
+    // verified payment. Availability is derived from the hold.
+    const variantId = service.getProduct(product.id).variants[0].id;
+    assert.equal(service.getProduct(product.id).variants[0].inventoryQuantity, 5);
+    assert.equal(service.availableQuantity(variantId), 3);
+    assert.deepEqual(service.inventoryReservationsForOrder(order.id).map((r) => r.state), ["HELD"]);
   });
   db.close();
 });
