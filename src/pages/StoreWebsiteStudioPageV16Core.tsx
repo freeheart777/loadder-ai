@@ -7,7 +7,8 @@ import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCan
 import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
 import { isCommerceSite, siteTypeDefinition } from "../components/store-studio-v16/site-types";
-import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
+import { activePageOf, navigationPages, newPage, normalizeSlug, slugProblem, withActivePageSections, withPages } from "../components/store-studio-v16/pages";
+import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { apiFetch } from "../lib/api";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
@@ -120,7 +121,7 @@ function normalizeManual(settings: ProductSettings, products: Product[]) {
 function applyMediaToConfig(current: StudioConfig, target: InlineMediaTarget, url: string): StudioConfig {
   if (target.kind === "hero") return { ...current, hero: { ...current.hero, imageUrl: url } };
   if (target.kind === "logo") return { ...current, header: { ...current.header, logoUrl: url } };
-  if (target.kind === "banner" && target.id) return { ...current, sections: current.sections.map((section) => section.id === target.id ? { ...section, imageUrl: url } : section) };
+  if (target.kind === "banner" && target.id) return withActivePageSections(current, activePageOf(current).sections.map((section) => section.id === target.id ? { ...section, imageUrl: url } : section));
   if (target.kind === "product" && target.id) return {
     ...current,
     commerce: {
@@ -141,7 +142,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [config, setConfig] = useState<StudioConfig>(() => restoreConfig({}, siteKind));
   const [device, setDevice] = useState<DeviceMode>("desktop");
-  const [tab, setTab] = useState<"context" | "sections" | "design">("context");
+  const [tab, setTab] = useState<"context" | "sections" | "design" | "pages">("context");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -191,13 +192,32 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     patchDesign: (p) => setConfig((c) => ({ ...c, design: { ...c.design, ...p } })),
     patchHeader: (p) => setConfig((c) => ({ ...c, header: { ...c.header, ...p } })),
     patchHero: (p) => setConfig((c) => ({ ...c, hero: { ...c.hero, ...p } })),
-    patchSection: (id, p) => setConfig((c) => ({ ...c, sections: c.sections.map((s) => s.id === id ? { ...s, ...p } : s) })),
+    patchSection: (id, p) => setConfig((c) => withActivePageSections(c, activePageOf(c).sections.map((s) => s.id === id ? { ...s, ...p } : s))),
     patchProduct: (id, p) => setConfig((c) => ({ ...c, commerce: { ...c.commerce, productOverrides: { ...c.commerce.productOverrides, [id]: { ...(c.commerce.productOverrides[id] || {}), ...p } } } })),
     patchCommerce: (p) => setConfig((c) => ({ ...c, commerce: { ...c.commerce, ...p } })),
     patchSeo: (p) => setConfig((c) => ({ ...c, seo: { ...c.seo, ...p } })),
     patchNav: (p) => setConfig((c) => ({ ...c, nav: { ...c.nav, ...p } })),
     patchFooter: (p) => setConfig((c) => ({ ...c, footer: { ...c.footer, ...p } })),
-    patchSectionItem: (sectionId, itemId, p) => setConfig((c) => ({ ...c, sections: c.sections.map((s) => s.id === sectionId ? { ...s, items: (s.items || []).map((entry) => entry.id === itemId ? { ...entry, ...p } : entry) } : s) })),
+    selectPage: (pageId) => setConfig((c) => ({ ...c, activePageId: pageId, selectedElement: { type: "hero", id: "hero" } })),
+    addPage: () => setConfig((c) => {
+      const index = c.pages.length + 1;
+      const page = newPage(`صفحه ${index}`, `page-${index}`, []);
+      return { ...withPages(c, [...c.pages, page]), activePageId: page.id };
+    }),
+    patchPage: (pageId, patch) => setConfig((c) => withPages(c, c.pages.map((page) => (page.id === pageId ? { ...page, ...patch } : page)))),
+    // Home is the site root and cannot be removed.
+    deletePage: (pageId) => setConfig((c) => (c.pages[0]?.id === pageId || c.pages.length < 2
+      ? c
+      : { ...withPages(c, c.pages.filter((page) => page.id !== pageId)), activePageId: c.activePageId === pageId ? c.pages[0].id : c.activePageId })),
+    movePage: (pageId, delta) => setConfig((c) => {
+      const i = c.pages.findIndex((page) => page.id === pageId), t = i + delta;
+      // Home stays first: neither it nor another page may take position 0.
+      if (i < 1 || t < 1 || t >= c.pages.length) return c;
+      const pages = [...c.pages];
+      [pages[i], pages[t]] = [pages[t], pages[i]];
+      return withPages(c, pages);
+    }),
+    patchSectionItem: (sectionId, itemId, p) => setConfig((c) => withActivePageSections(c, activePageOf(c).sections.map((s) => s.id === sectionId ? { ...s, items: (s.items || []).map((entry) => entry.id === itemId ? { ...entry, ...p } : entry) } : s))),
   }), []);
 
   function selectCanvasElement(selectedElement: Selection) {
@@ -205,7 +225,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   }
 
   function patchProductSection(sectionId: string, updater: (s: ProductSettings) => ProductSettings) {
-    setConfig((c) => ({ ...c, sections: c.sections.map((s) => s.id === sectionId && s.type === "products" && s.productSettings ? { ...s, productSettings: updater(s.productSettings) } : s) }));
+    setConfig((c) => withActivePageSections(c, activePageOf(c).sections.map((s) => s.id === sectionId && s.type === "products" && s.productSettings ? { ...s, productSettings: updater(s.productSettings) } : s)));
   }
 
   function addProduct(sectionId: string, productId: string) {
@@ -340,55 +360,57 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
 
   function moveSection(id: string, delta: number) {
     setConfig((c) => {
-      const i = c.sections.findIndex((s) => s.id === id), t = i + delta;
-      if (i < 0 || t < 0 || t >= c.sections.length) return c;
-      const sections = [...c.sections];
+      const current = activePageOf(c).sections;
+      const i = current.findIndex((s) => s.id === id), t = i + delta;
+      if (i < 0 || t < 0 || t >= current.length) return c;
+      const sections = [...current];
       [sections[i], sections[t]] = [sections[t], sections[i]];
-      return { ...c, sections };
+      return withActivePageSections(c, sections);
     });
   }
 
   function reorderSection(fromId: string, toId: string) {
     if (fromId === toId) return;
     setConfig((c) => {
-      const sections = [...c.sections], from = sections.findIndex((s) => s.id === fromId), to = sections.findIndex((s) => s.id === toId);
+      const sections = [...activePageOf(c).sections], from = sections.findIndex((s) => s.id === fromId), to = sections.findIndex((s) => s.id === toId);
       if (from < 0 || to < 0) return c;
       const [moved] = sections.splice(from, 1);
       sections.splice(to, 0, moved);
-      return { ...c, sections, selectedElement: { type: moved.type === "banner" ? "banner" : moved.type === "trust" ? "trust" : "section", id: moved.id } };
+      return { ...withActivePageSections(c, sections), selectedElement: { type: moved.type === "banner" ? "banner" : moved.type === "trust" ? "trust" : "section", id: moved.id } };
     });
   }
 
   function insertSection(index: number, type: SectionConfig["type"]) {
     const section = newSection(type);
     setConfig((c) => {
-      const sections = [...c.sections];
+      const sections = [...activePageOf(c).sections];
       sections.splice(Math.min(index, sections.length), 0, section);
-      return { ...c, sections, selectedElement: { type: type === "banner" ? "banner" : type === "trust" ? "trust" : "section", id: section.id } };
+      return { ...withActivePageSections(c, sections), selectedElement: { type: type === "banner" ? "banner" : type === "trust" ? "trust" : "section", id: section.id } };
     });
     setTab("context");
     if (type === "products") setMessage("بخش محصولات اضافه شد؛ از + داخل آن محصول انتخاب کنید.");
     if (type === "banner") setMessage("بنر اضافه شد؛ روی خود تصویر بنر کلیک کنید و عکس را انتخاب کنید.");
   }
 
-  function addSection(type: SectionConfig["type"]) { insertSection(config.sections.length, type); }
+  function addSection(type: SectionConfig["type"]) { insertSection(activePageOf(config).sections.length, type); }
 
   function duplicateSection(id: string) {
     setConfig((c) => {
-      const i = c.sections.findIndex((s) => s.id === id);
+      const current = activePageOf(c).sections;
+      const i = current.findIndex((s) => s.id === id);
       if (i < 0) return c;
-      const src = c.sections[i];
+      const src = current[i];
       const copy = { ...src, id: `${src.type}-${crypto.randomUUID()}`, title: `${src.title} (کپی)`, productSettings: src.productSettings ? { ...src.productSettings, productIds: [...src.productSettings.productIds] } : undefined };
-      const sections = [...c.sections];
+      const sections = [...current];
       sections.splice(i + 1, 0, copy);
       const type = copy.type === "banner" ? "banner" : copy.type === "trust" ? "trust" : "section";
-      return { ...c, sections, selectedElement: { type, id: copy.id } };
+      return { ...withActivePageSections(c, sections), selectedElement: { type, id: copy.id } };
     });
     setMessage("بخش کپی شد.");
   }
 
   function deleteSection(id: string) {
-    setConfig((c) => ({ ...c, sections: c.sections.filter((s) => s.id !== id), selectedElement: { type: "hero", id: "hero" } }));
+    setConfig((c) => ({ ...withActivePageSections(c, activePageOf(c).sections.filter((s) => s.id !== id)), selectedElement: { type: "hero", id: "hero" } }));
     setInspectorOpen(false);
     setMessage("بخش حذف شد.");
   }
@@ -397,7 +419,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     const section = newSection("products");
     section.title = "تخفیف‌های ویژه";
     section.productSettings = { ...defaultProductSettings, source: "discounted", showPromotionBadge: true, showCompareAt: true };
-    setConfig((c) => ({ ...c, sections: [...c.sections, section], selectedElement: { type: "section", id: section.id } }));
+    setConfig((c) => ({ ...withActivePageSections(c, [...activePageOf(c).sections, section]), selectedElement: { type: "section", id: section.id } }));
   }
 
   async function persistConfig(nextConfig: StudioConfig) {
@@ -467,7 +489,10 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     } finally { setBusy(false); }
   }
 
-  const inspectorProps = { config, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection };
+  // The canvas and inspector always operate on the SELECTED page's sections.
+  // For a single-page site (every STORE) this is exactly config.sections.
+  const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
+  const inspectorProps = { config: canvasConfig, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection };
   const pickerSection = pickerSectionId ? config.sections.find((s) => s.id === pickerSectionId) : null;
   const pickerSettings = pickerSection?.type === "products" && pickerSection.productSettings ? normalizeManual(pickerSection.productSettings, products) : null;
 
@@ -485,7 +510,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> بنر</button>
           <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
         </div>
-        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={config} products={products} device={device} selected={config.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
+        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
       <aside className={`order-1 min-h-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
@@ -498,7 +523,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       </button>
     </div>
 
-    {previewOpen && <div className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] items-center justify-between"><b>پیش‌نمایش پیش‌نویس</b><button onClick={() => setPreviewOpen(false)} className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={config.selectedElement} select={() => undefined} interactive={false} /></div>}
+    {previewOpen && <div className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] items-center justify-between"><b>پیش‌نمایش پیش‌نویس</b><button onClick={() => setPreviewOpen(false)} className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
 
     {pickerSectionId && <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-4">
       <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622] shadow-2xl">

@@ -1,5 +1,6 @@
 import { productMainImage } from "../../lib/productMedia";
 import { siteTypeDefinition } from "./site-types";
+import { readPages } from "./pages";
 import type {
   CommerceConfig,
   FooterConfig,
@@ -302,9 +303,18 @@ export function restoreConfig(content: Record<string, any>, siteKind: SiteKind =
     : (corporate ? corporateSectionDefaults : legacySections(content));
   const storedHero = v16.hero || {};
 
+  const sections = corporate
+    ? (restoredSections.length ? restoredSections : corporateSectionDefaults)
+    : modernizeSections(restoredSections);
+  // A document with no `pages` is READ as a single Home page; nothing is
+  // rewritten until the editor saves.
+  const pages = readPages(v16, sections);
+
   return {
     version: 16,
     siteKind,
+    pages,
+    activePageId: pages.some((page) => page.id === v16.activePageId) ? v16.activePageId : pages[0].id,
     activePage: ["storefront", "cart", "checkout", "success"].includes(v16.activePage) ? v16.activePage : (v15.previewMode || "storefront"),
     selectedElement: v16.selectedElement || { type: "hero", id: "hero" },
     design: {
@@ -333,9 +343,9 @@ export function restoreConfig(content: Record<string, any>, siteKind: SiteKind =
       imageUrl: storedHero.imageUrl || heroDefaults.imageUrl,
       height: Math.min(Number(storedHero.height || heroDefaults.height), 360),
     },
-    sections: corporate
-      ? (restoredSections.length ? restoredSections : corporateSectionDefaults)
-      : modernizeSections(restoredSections),
+    // The legacy mirror always tracks Home, so older readers and the STORE
+    // path (which never uses pages) keep working unchanged.
+    sections: pages[0].sections,
     nav: { ...navDefaults, ...v16.nav },
     footer: { ...footerDefaults, ...v16.footer },
     seo: { ...seoDefaults, ...v16.seo },

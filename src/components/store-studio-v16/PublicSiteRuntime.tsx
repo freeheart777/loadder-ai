@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { restoreConfig } from "./config";
+import { normalizeSlug } from "./pages";
 import StudioCanvas from "./StudioCanvas";
 import type { DeviceMode, Selection } from "./types";
 import { apiFetch } from "../../lib/api";
@@ -23,7 +24,7 @@ const read = async (response: Response) => {
 const deviceForWidth = (width: number): DeviceMode => (width < 640 ? "mobile" : width < 1024 ? "tablet" : "desktop");
 
 export default function PublicSiteRuntime() {
-  const { siteProjectId } = useParams();
+  const { siteProjectId, slug } = useParams();
   const [meta, setMeta] = useState<SiteMeta | null>(null);
   const [selected, setSelected] = useState<Selection>({ type: "hero", id: "hero" });
   const [device, setDevice] = useState<DeviceMode>(() => deviceForWidth(window.innerWidth));
@@ -50,15 +51,24 @@ export default function PublicSiteRuntime() {
     return () => controller.abort();
   }, [siteProjectId]);
 
-  const config = useMemo(() => restoreConfig(meta?.presentation || {}, "BUSINESS"), [meta]);
+  const site = useMemo(() => restoreConfig(meta?.presentation || {}, "BUSINESS"), [meta]);
+  // Public routing resolves only published pages; an unknown slug is a 404.
+  const page = useMemo(() => {
+    const wanted = normalizeSlug(slug || "");
+    return wanted === null ? undefined : site.pages.find((candidate) => candidate.slug === wanted);
+  }, [site, slug]);
+  const config = useMemo(
+    () => (page ? { ...site, activePageId: page.id, sections: page.sections } : site),
+    [site, page]
+  );
 
   useEffect(() => {
     if (!meta) return;
-    const title = config.seo.title || meta.site.name;
+    const title = page?.seo.title || page?.title || config.seo.title || meta.site.name;
     document.title = title;
     const tag = document.querySelector('meta[name="description"]') || document.head.appendChild(Object.assign(document.createElement("meta"), { name: "description" }));
-    tag.setAttribute("content", config.seo.description || config.hero.subtitle || "");
-  }, [config, meta]);
+    tag.setAttribute("content", page?.seo.description || config.seo.description || (page?.isHome ? config.hero.subtitle : "") || "");
+  }, [config, meta, page]);
 
   const submitLead = async (input: { name: string; phone: string; email: string; company: string; message: string }) => {
     const response = await apiFetch(`/api/auth/site/${siteProjectId}/leads`, {
@@ -71,8 +81,9 @@ export default function PublicSiteRuntime() {
 
   if (message) return <main dir="rtl" className="grid min-h-screen place-items-center bg-slate-50 p-6"><div className="rounded-3xl border bg-white p-8 text-center"><p>{message}</p><Link to="/" className="mt-5 inline-block rounded-xl bg-slate-900 px-5 py-3 text-white">بازگشت</Link></div></main>;
   if (!meta) return <main className="min-h-screen bg-slate-50" aria-label="در حال بارگذاری سایت" />;
+  if (!page) return <main dir="rtl" data-page-missing="true" className="grid min-h-screen place-items-center bg-slate-50 p-6"><div className="rounded-3xl border bg-white p-8 text-center"><h1 className="text-lg font-black">صفحه پیدا نشد</h1><Link to={`/site/${siteProjectId}`} className="mt-5 inline-block rounded-xl bg-slate-900 px-5 py-3 text-white">بازگشت به خانه</Link></div></main>;
 
-  return <main data-published-version-id={meta.publishedVersion.id} data-published-version={meta.publishedVersion.version}>
-    <StudioCanvas config={config} products={[]} device={device} selected={selected} select={setSelected} interactive={false} onLeadSubmit={submitLead} />
+  return <main data-published-version-id={meta.publishedVersion.id} data-published-version={meta.publishedVersion.version} data-page-slug={page.slug}>
+    <StudioCanvas config={config} products={[]} device={device} selected={selected} select={setSelected} interactive={false} onLeadSubmit={submitLead} pageBasePath={`/site/${siteProjectId}`} />
   </main>;
 }

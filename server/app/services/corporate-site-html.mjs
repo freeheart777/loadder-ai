@@ -1,4 +1,5 @@
 import { projectPublicStorePresentation } from "./store-public-presentation.mjs";
+import { findPageBySlug, navigationPages, readPages } from "./site-page-model.mjs";
 
 // A published corporate site has exactly one truth: the V16 document, read
 // through the same public projection that /api/auth/site/:id serves. This
@@ -19,13 +20,22 @@ export const navigationFor = (sections) => sections
   .filter((section) => section.enabled !== false && section.showInNav !== false && section.type !== "spacer")
   .map((section) => ({ anchor: anchorOf(section), label: section.navLabel || section.title || "" }));
 
+/** Site navigation references page identity; a page is never duplicated into it. */
+export const pageNavigationFor = (pages, basePath) => navigationPages(pages)
+  .map((page) => ({ href: page.slug ? `${basePath}/${page.slug}` : (basePath || "/"), label: page.navLabel || page.title }));
+
 const CORPORATE_TYPES = new Set(["about", "services", "portfolio", "team", "text-image", "cta", "contact"]);
 
 /** True when this published project is a V16 corporate site. */
 export function isCorporateV16(project, content) {
   if (String(project?.siteType || "").toUpperCase() !== "BUSINESS") return false;
-  const sections = content?.storeBuilderV16?.sections;
-  return Array.isArray(sections) && sections.some((section) => CORPORATE_TYPES.has(section?.type));
+  const v16 = content?.storeBuilderV16;
+  if (!v16 || typeof v16 !== "object") return false;
+  const everySection = [
+    ...(Array.isArray(v16.sections) ? v16.sections : []),
+    ...(Array.isArray(v16.pages) ? v16.pages.flatMap((page) => (Array.isArray(page?.sections) ? page.sections : [])) : []),
+  ];
+  return everySection.some((section) => CORPORATE_TYPES.has(section?.type));
 }
 
 const itemsHtml = (section, withMedia) => (section.items || []).map((item) => `<article class="card">${
@@ -62,24 +72,37 @@ function sectionHtml(section) {
   return `${open}${head}${section.body ? `<p class="body">${escape(section.body)}</p>` : ""}${close}`;
 }
 
-export function renderCorporateSite(project, version, content) {
+/**
+ * Render one page of a published corporate site.
+ * Returns null when the requested slug does not resolve to a page, so the
+ * caller answers 404 rather than silently serving Home.
+ */
+export function renderCorporateSite(project, version, content, { slug = "", basePath = "" } = {}) {
   // The canonical projection — the same function and options the public
   // /api/auth/site/:id payload is built from.
   const presentation = projectPublicStorePresentation(content, { preserveSectionIds: true, includeCommerce: false }).storeBuilderV16 || {};
   const design = presentation.design || {};
   const header = presentation.header || {};
   const hero = presentation.hero || {};
-  const sections = (presentation.sections || []).filter((section) => section.enabled !== false);
-  const seo = presentation.seo || {};
+  const siteSeo = presentation.seo || {};
+
+  // A legacy single-page document reads as one Home page; it is not rewritten.
+  const pages = readPages(presentation);
+  const page = findPageBySlug(pages, slug);
+  if (!page) return null;
+
+  const sections = (page.sections || []).filter((section) => section.enabled !== false);
+  const seo = page.seo || {};
 
   const siteName = header.storeName || project?.name || "";
-  const title = seo.title || siteName;
-  const description = seo.description || hero.subtitle || "";
+  // Per-page canonical SEO, falling back only to values the site already has.
+  const title = seo.title || page.title || siteSeo.title || siteName;
+  const description = seo.description || siteSeo.description || (page.isHome ? hero.subtitle : "") || "";
   const primary = color(design.primaryColor, "#6d5dfc");
   const width = Math.min(1280, Math.max(880, num(design.containerWidth, 1240)));
   const nav = presentation.nav || {};
   const footer = presentation.footer || {};
-  const navItems = nav.enabled === false ? [] : navigationFor(sections);
+  const navItems = nav.enabled === false ? [] : pageNavigationFor(pages, basePath);
 
   const css = `*{box-sizing:border-box}body{margin:0;background:${color(design.backgroundColor, "#f8fafc")};color:${color(design.textColor, "#0f172a")};font-family:${escape(design.fontFamily || "Vazirmatn")},system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.8}`
     + `.wrap{width:min(${width}px,100%);margin:auto;padding:0 16px}`
@@ -105,7 +128,7 @@ export function renderCorporateSite(project, version, content) {
     + `@media(min-width:760px){.split{grid-template-columns:1fr 1fr}.hero-inner{grid-template-columns:1.05fr .95fr}}`
     + `@media(max-width:640px){.grid{grid-template-columns:1fr}}`;
 
-  const heroHtml = hero.enabled === false ? "" : `<section class="hero"><div class="wrap hero-inner"><div>${
+  const heroHtml = (hero.enabled === false || !page.isHome) ? "" : `<section class="hero"><div class="wrap hero-inner"><div>${
     hero.eyebrow ? `<span class="eyebrow" style="color:inherit;opacity:.75">${escape(hero.eyebrow)}</span>` : ""
   }<h1>${escape(hero.title || siteName)}</h1>${hero.subtitle ? `<p>${escape(hero.subtitle)}</p>` : ""}${
     hero.ctaLabel ? `<a class="hero-cta" href="${escape(String(hero.ctaHref || "#"))}">${escape(hero.ctaLabel)}</a>` : ""
@@ -113,9 +136,9 @@ export function renderCorporateSite(project, version, content) {
 
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<title>${escape(title)}</title>${description ? `<meta name="description" content="${escape(description)}">` : ""}`
-    + `<meta name="generator" content="Loadder Site Builder"><style>${css}</style></head><body data-site-kind="BUSINESS" data-published-version="${escape(version?.version ?? "draft")}">`
+    + `<meta name="generator" content="Loadder Site Builder"><style>${css}</style></head><body data-site-kind="BUSINESS" data-published-version="${escape(version?.version ?? "draft")}" data-page-slug="${escape(page.slug)}" data-page-id="${escape(page.id)}">`
     + `<header class="site"><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>`
-    + `${navItems.length ? `<nav class="menu">${navItems.map((item) => `<a href="#${escape(item.anchor)}">${escape(item.label)}</a>`).join("")}</nav>` : ""}`
+    + `${navItems.length ? `<nav class="menu">${navItems.map((item) => `<a href="${escape(item.href)}">${escape(item.label)}</a>`).join("")}</nav>` : ""}`
     + `${nav.enabled === false ? "" : `<a class="nav-cta" href="${escape(String(nav.ctaHref || "#"))}">${escape(nav.ctaLabel || "تماس با ما")}</a>`}`
     + `</div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section)).join("")}</main>`
     + `${footer.enabled === false ? "" : `<footer class="site"><div class="wrap foot"><b>${escape(siteName)}</b><span>${escape(footer.text || "")}</span></div></footer>`}`

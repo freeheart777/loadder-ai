@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { requireWorkspaceId } from "../tenant-context.mjs";
 import { ensureWebsitePlatformContent } from "./website-platform-definition.mjs";
+import { validateSiteDocument } from "./site-page-model.mjs";
 
 const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
 const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
@@ -55,7 +56,7 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (typeof name !== "string" || !name.trim()) throw new SiteProjectError("name is required.");
     requireType(siteType);
     const cleanName = name.trim();
-    const normalizedContent = ensureWebsitePlatformContent(content, { siteType, name: cleanName });
+    const normalizedContent = ensureWebsitePlatformContent(validateSiteDocument(content), { siteType, name: cleanName });
     return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context?.id ?? null, content: normalizedContent, now: now().toISOString() });
   }
   function get(id) {
@@ -71,7 +72,7 @@ export function createSiteProjectService({ repository, businessContextService, d
     const nextName = typeof input.name === "string" && input.name.trim() ? input.name.trim() : current.name;
     const nextContent = input.content === undefined
       ? undefined
-      : ensureWebsitePlatformContent(input.content, { siteType: nextSiteType, name: nextName });
+      : ensureWebsitePlatformContent(validateSiteDocument(input.content), { siteType: nextSiteType, name: nextName });
     return repository.update(id, {
       ...input,
       ...(nextContent === undefined ? {} : { content: nextContent }),
