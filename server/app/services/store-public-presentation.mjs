@@ -34,13 +34,13 @@ const projectProductOverrides = (value) => Object.fromEntries(Object.entries(obj
 const projectCommerce = (value) => { const source=object(value); return compact({cartButtonLabel:string(source.cartButtonLabel),productOverrides:projectProductOverrides(source.productOverrides)}); };
 const projectLegacyDesign = (value) => { const source=object(value); return compact({font:string(source.font),primary:string(source.primary),text:string(source.text),surface:string(source.surface),radius:number(source.radius),sectionGap:number(source.sectionGap),textScale:number(source.textScale)}); };
 
-export function projectPublicStorePresentation(content, { preserveSectionIds = false } = {}) {
+export function projectPublicStorePresentation(content, { preserveSectionIds = false, includeCommerce = true } = {}) {
   const result={};
   const v11=object(content?.storeBuilderV11),v13=object(content?.storeBuilderV13),v14=object(content?.storeBuilderV14),v15=object(content?.storeBuilderV15),v16=object(content?.storeBuilderV16);
   if(Object.keys(v11).length)result.storeBuilderV11=compact({design:projectLegacyDesign(v11.design),sections:projectSections(v11.sections)});
   if(Object.keys(v13).length)result.storeBuilderV13=compact({design:projectDesign(v13.design)});
   if(Object.keys(v14).length)result.storeBuilderV14=compact({commerce:projectCommerce(v14.commerce)});
   if(Object.keys(v15).length)result.storeBuilderV15=compact({design:projectDesign(v15.design),sections:projectSections(v15.sections),commerce:projectCommerce(v15.commerce)});
-  if(Object.keys(v16).length)result.storeBuilderV16=compact({version:16,design:projectDesign(v16.design),header:projectHeader(v16.header),hero:projectHero(v16.hero),nav:projectNav(v16.nav),footer:projectFooter(v16.footer),seo:projectSeo(v16.seo),sections:projectSections(v16.sections,preserveSectionIds),commerce:projectCommerce(v16.commerce)});
+  if(Object.keys(v16).length)result.storeBuilderV16=compact({version:16,design:projectDesign(v16.design),header:projectHeader(v16.header),hero:projectHero(v16.hero),nav:projectNav(v16.nav),footer:projectFooter(v16.footer),seo:projectSeo(v16.seo),sections:projectSections(v16.sections,preserveSectionIds),commerce:includeCommerce?projectCommerce(v16.commerce):undefined});
   return result;
 }

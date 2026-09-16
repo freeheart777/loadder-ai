@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import express from "express";
+import { isCorporateV16, renderCorporateSite } from "../services/corporate-site-html.mjs";
 
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const normalizeHost = (value) => String(value ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
@@ -32,6 +33,10 @@ export const renderPublishedSite = (project, version, assets = []) => {
     version = { version: "draft", content: project?.content || {} };
   }
   const content = version?.content && typeof version.content === "object" ? version.content : {};
+  // A V16 corporate site renders from the canonical published projection, so
+  // /sites/:id, a custom domain and /site/:id cannot diverge. genericSite stays
+  // only for BUSINESS projects that have no V16 document yet.
+  if (isCorporateV16(project, content)) return renderCorporateSite(project, version, content);
   return project?.siteType === "STORE" ? storefront(project, version, assets, content) : genericSite(project, version, assets, content);
 };
 

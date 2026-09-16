@@ -294,7 +294,10 @@ export function restoreConfig(content: Record<string, any>, siteKind: SiteKind =
   const oldCommerce = v15.commerce || v14.commerce || {};
   const oldV11Design = v11.design || {};
   const corporate = siteKind === "BUSINESS";
-  const restoredSections = Array.isArray(v16.sections) && v16.sections.length
+  // STORE keeps its original semantics exactly: a persisted array is honoured
+  // as-is, including an empty one, so deleting every section stays deleted.
+  // Only a corporate document falls back to defaults when it has no sections.
+  const restoredSections = Array.isArray(v16.sections)
     ? (corporate ? allowedSections(v16.sections, siteKind) : v16.sections)
     : (corporate ? corporateSectionDefaults : legacySections(content));
   const storedHero = v16.hero || {};
@@ -330,7 +333,9 @@ export function restoreConfig(content: Record<string, any>, siteKind: SiteKind =
       imageUrl: storedHero.imageUrl || heroDefaults.imageUrl,
       height: Math.min(Number(storedHero.height || heroDefaults.height), 360),
     },
-    sections: corporate ? restoredSections : modernizeSections(restoredSections),
+    sections: corporate
+      ? (restoredSections.length ? restoredSections : corporateSectionDefaults)
+      : modernizeSections(restoredSections),
     nav: { ...navDefaults, ...v16.nav },
     footer: { ...footerDefaults, ...v16.footer },
     seo: { ...seoDefaults, ...v16.seo },

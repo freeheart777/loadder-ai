@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -8,20 +9,27 @@ import { createSiteProjectRepository } from "../app/repositories/site-project-re
 import { createSiteProjectService } from "../app/services/site-project-service.mjs";
 import { createSiteLeadService } from "../app/services/site-lead-service.mjs";
 import { projectPublicStorePresentation } from "../app/services/store-public-presentation.mjs";
+import { isCorporateV16, navigationFor, renderCorporateSite } from "../app/services/corporate-site-html.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
+import { migration089LeadEnquiryMessage } from "../db/migrations/089_lead_enquiry_message.mjs";
 
 const source = (path) => readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)), "utf8");
+
+/** The `leads` shape as it exists before migration 089. */
+const LEGACY_LEADS_DDL = `CREATE TABLE IF NOT EXISTS leads(
+  id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, name TEXT NOT NULL, phone TEXT, email TEXT,
+  company TEXT, source TEXT, score REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'new',
+  opportunity_value INTEGER NOT NULL DEFAULT 0, customer_id TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);`;
 
 function fixture() {
   const db = createSiteTestDb();
   // `leads` predates the migration chain (it lives in database.mjs's raw
-  // bootstrap), so the test DB declares it exactly as production shapes it.
-  db.exec(`CREATE TABLE IF NOT EXISTS leads(
-    id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, name TEXT NOT NULL, phone TEXT, email TEXT,
-    company TEXT, source TEXT, score REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'new',
-    opportunity_value INTEGER NOT NULL DEFAULT 0, customer_id TEXT,
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-  );`);
+  // bootstrap), so the test DB declares the pre-089 shape and then upgrades it
+  // exactly as a real deployment does.
+  db.exec(LEGACY_LEADS_DDL);
+  migration089LeadEnquiryMessage.up(db);
   const repository = createSiteProjectRepository(db);
   const service = createSiteProjectService({
     repository,
@@ -189,4 +197,121 @@ test("direct entry needs no Growth, Goal, Plan or Brain prerequisite", () => {
   assert.match(bootstrap, /siteType/, "the bootstrap creates the project by site type");
   // Corporate bootstrap must not touch Commerce's canonical active-store truth.
   assert.doesNotMatch(bootstrap, /setCanonicalStoreProject/, "corporate entry must not mutate the canonical store project");
+});
+
+test("STORE keeps empty-section semantics: deleting every section must stay deleted", () => {
+  const config = source("src/components/store-studio-v16/config.ts");
+  // A persisted array is honoured as-is for STORE; only a missing array falls
+  // back. Guarding on `.length` here would resurrect the defaults on reload.
+  assert.match(
+    config,
+    /const restoredSections = Array\.isArray\(v16\.sections\)\s*\n\s*\?\s*\(corporate \?/,
+    "STORE must not treat an empty sections array as 'no sections'"
+  );
+  assert.doesNotMatch(config, /Array\.isArray\(v16\.sections\) && v16\.sections\.length/, "the empty-array fallback must not return");
+});
+
+test("one live truth: the legacy public route and a custom domain render the same published V16 projection", () => {
+  const project = { id: "p-1", name: "شرکت نمونه", siteType: "BUSINESS" };
+  const content = corporateContent();
+  const version = { version: 3, content };
+
+  assert.equal(isCorporateV16(project, content), true, "a V16 corporate document is recognised");
+  assert.equal(isCorporateV16({ ...project, siteType: "STORE" }, content), false, "STORE never takes the corporate path");
+  assert.equal(isCorporateV16(project, {}), false, "a BUSINESS project with no V16 document keeps legacy rendering");
+
+  const html = renderCorporateSite(project, version, content);
+  const payload = projectPublicStorePresentation(content, { preserveSectionIds: true }).storeBuilderV16;
+
+  // Same hero, same SEO, same sections in the same order as /api/auth/site/:id.
+  assert.match(html, /<title>شرکت نمونه<\/title>/);
+  assert.match(html, /<meta name="description" content="خدمات حرفه‌ای">/);
+  assert.match(html, new RegExp(`<h1>${payload.hero.title}</h1>`));
+  const rendered = [...html.matchAll(/data-section-type="([a-z-]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(rendered, payload.sections.filter((s) => s.enabled !== false).map((s) => s.type), "every projected section is rendered, in order");
+  for (const section of payload.sections) assert.ok(html.includes(`id="${section.id}"`), `${section.id} anchor is present`);
+
+  // Navigation is derived from the same rule the canvas uses.
+  assert.deepEqual(
+    navigationFor(payload.sections).map((item) => item.label),
+    ["درباره ما", "خدمات", "تیم", "نمونه‌کار", "تماس"]
+  );
+  // Real content, not genericSite's invented headings.
+  assert.ok(html.includes("مشاوره"), "service items reach the rendered page");
+  assert.doesNotMatch(html, /ساخته‌شده با Loadder Site Builder/, "the generic placeholder must not be used");
+});
+
+test("the corporate renderer escapes published content and rejects unsafe media URLs", () => {
+  const content = corporateContent();
+  content.storeBuilderV16.hero.title = '<script>alert(1)</script>';
+  content.storeBuilderV16.hero.imageUrl = "javascript:alert(1)";
+  const html = renderCorporateSite({ id: "p-1", name: "x", siteType: "BUSINESS" }, { version: 1 }, content);
+  assert.doesNotMatch(html, /<script>alert/, "published text is escaped");
+  assert.ok(html.includes("&lt;script&gt;"), "the title survives as escaped text");
+  assert.doesNotMatch(html, /javascript:/, "only https/data image URLs are emitted");
+});
+
+test("a contact submission persists the visitor's enquiry text", () => {
+  const { db, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const project = service.create({ name: "شرکت نمونه", siteType: "BUSINESS", content: corporateContent() });
+    const leads = createSiteLeadService({ db });
+    const lead = leads.submit(project.id, { name: "سارا", phone: "09120000000", message: "درخواست مشاوره برای پروژه جدید" });
+    const row = db.prepare("SELECT message FROM leads WHERE id=?").get(lead.id);
+    assert.equal(row.message, "درخواست مشاوره برای پروژه جدید", "the enquiry text the visitor typed is stored");
+
+    // Optional, clamped, and never client-controlled beyond the message itself.
+    const blank = leads.submit(project.id, { name: "علی", phone: "09121111111" });
+    assert.equal(db.prepare("SELECT message FROM leads WHERE id=?").get(blank.id).message, null);
+    const long = leads.submit(project.id, { name: "رضا", phone: "09122222222", message: "x".repeat(5000) });
+    assert.equal(db.prepare("SELECT message FROM leads WHERE id=?").get(long.id).message.length, 1000, "message is clamped");
+  });
+  db.close();
+});
+
+test("migration 089 is additive: it upgrades an existing leads table and preserves every row", () => {
+  const upgrade = new Database(":memory:");
+  upgrade.exec(LEGACY_LEADS_DDL);
+  upgrade.prepare("INSERT INTO leads(id,workspace_id,name,phone,source,created_at,updated_at) VALUES('legacy-1','ws-1','مشتری قدیمی','0912','google_ads',?,?)").run("2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
+
+  migration089LeadEnquiryMessage.up(upgrade);
+
+  const columns = upgrade.prepare("PRAGMA table_info(leads)").all().map((row) => row.name);
+  assert.ok(columns.includes("message"), "the column is added");
+  assert.deepEqual(
+    upgrade.prepare("SELECT id,name,source,message FROM leads WHERE id='legacy-1'").get(),
+    { id: "legacy-1", name: "مشتری قدیمی", source: "google_ads", message: null },
+    "a pre-089 lead is preserved and simply has no enquiry message"
+  );
+
+  // Re-running must not fail or duplicate the column.
+  migration089LeadEnquiryMessage.up(upgrade);
+  assert.equal(upgrade.prepare("PRAGMA table_info(leads)").all().filter((row) => row.name === "message").length, 1);
+  assert.equal(upgrade.pragma("integrity_check", { simple: true }), "ok");
+  upgrade.close();
+});
+
+test("migration 089 is a no-op on a schema that does not carry leads", () => {
+  const fresh = new Database(":memory:");
+  assert.doesNotThrow(() => migration089LeadEnquiryMessage.up(fresh), "a leads-free schema subset must still migrate");
+  assert.equal(fresh.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='leads'").get().n, 0, "no table is invented");
+  fresh.close();
+});
+
+test("a freshly migrated database accepts and returns the enquiry message", () => {
+  const { db, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const project = service.create({ name: "شرکت نو", siteType: "BUSINESS", content: corporateContent() });
+    const lead = createSiteLeadService({ db }).submit(project.id, { name: "نازنین", phone: "09123333333", message: "سلام" });
+    assert.equal(db.prepare("SELECT message FROM leads WHERE id=?").get(lead.id).message, "سلام");
+  });
+  db.close();
+});
+
+test("the corporate public payload carries no Commerce vocabulary, while STORE keeps it", () => {
+  const corporate = projectPublicStorePresentation(corporateContent(), { preserveSectionIds: true, includeCommerce: false }).storeBuilderV16;
+  assert.equal("commerce" in corporate, false, "a corporate site must not publish Commerce config");
+
+  const storeContent = { storeBuilderV16: { version: 16, commerce: { cartButtonLabel: "افزودن" }, sections: [] } };
+  assert.equal(projectPublicStorePresentation(storeContent).storeBuilderV16.commerce.cartButtonLabel, "افزودن", "STORE still publishes its commerce config");
 });

@@ -33,9 +33,9 @@ export function createSiteLeadService({ db, clock = () => new Date().toISOString
     const source = `website:${clamp(siteProjectId, 60)}`;
 
     db.prepare(`
-      INSERT INTO leads(id,workspace_id,name,phone,email,company,source,score,status,opportunity_value,customer_id,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,0,'new',0,NULL,?,?)
-    `).run(id, workspaceId, name, phone, email, company, source, at, at);
+      INSERT INTO leads(id,workspace_id,name,phone,email,company,source,message,score,status,opportunity_value,customer_id,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,0,'new',0,NULL,?,?)
+    `).run(id, workspaceId, name, phone, email, company, source, message || null, at, at);
 
     return { id, name, source, message, createdAt: at };
   }
