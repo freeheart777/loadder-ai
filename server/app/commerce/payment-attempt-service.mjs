@@ -37,7 +37,7 @@ export function defineCommercePaymentProviderAdapter(adapter = {}) {
   });
 }
 
-export function createPaymentAttemptService({ db, clock = () => new Date().toISOString(), beforeOrderSettlement = null } = {}) {
+export function createPaymentAttemptService({ db, clock = () => new Date().toISOString(), beforeOrderSettlement = null, onTerminal = null } = {}) {
   if (!db) throw new PaymentAttemptError("Database is required.", "PAYMENT_DATABASE_REQUIRED", 500);
   const workspaceId = () => requireWorkspaceId();
   const getRow = (attemptId) => db.prepare("SELECT * FROM ecommerce_payment_attempts WHERE id=? AND workspace_id=?").get(attemptId, workspaceId()) || null;
@@ -84,6 +84,25 @@ export function createPaymentAttemptService({ db, clock = () => new Date().toISO
     return map(requireAttempt(attempt.id));
   });
 
+  // FAILED/CANCELLED is the only path that may hand reserved stock back.
+  // RECONCILIATION_REQUIRED is deliberately NOT terminal: an unknown provider
+  // outcome must keep holding inventory until it resolves.
+  const terminalTransaction = db.transaction((attemptId, status, reason) => {
+    const normalized = required(status, "status", 40).toUpperCase();
+    if (!["FAILED", "CANCELLED"].includes(normalized)) {
+      throw new PaymentAttemptError("Only FAILED or CANCELLED are terminal here.", "PAYMENT_TERMINAL_STATUS_INVALID", 400);
+    }
+    const attempt = requireAttempt(attemptId);
+    if (attempt.status === normalized) return map(attempt);
+    if (attempt.status === "SUCCEEDED") throw new PaymentAttemptError("Settled payment cannot fail.", "PAYMENT_ATTEMPT_TERMINAL", 409);
+    if (["FAILED", "CANCELLED"].includes(attempt.status)) throw new PaymentAttemptError("Terminal payment attempt is immutable.", "PAYMENT_ATTEMPT_TERMINAL", 409);
+    const at = clock();
+    db.prepare("UPDATE ecommerce_payment_attempts SET status=?,verification_code=?,terminal_at=?,updated_at=? WHERE id=? AND workspace_id=?")
+      .run(normalized, String(reason || normalized).slice(0, 100), at, at, attempt.id, workspaceId());
+    onTerminal?.({ db, attemptId: attempt.id, orderId: attempt.order_id, status: normalized });
+    return map(requireAttempt(attempt.id));
+  });
+
   return Object.freeze({
     create({ orderId, provider, providerConfigId, idempotencyKey, ...untrusted } = {}) {
       if (Object.hasOwn(untrusted, "amountMinor") || Object.hasOwn(untrusted, "currency")) {
@@ -112,5 +131,6 @@ export function createPaymentAttemptService({ db, clock = () => new Date().toISO
     },
     get(attemptId) { return map(requireAttempt(attemptId)); },
     settleVerified(attemptId, verification = {}) { return settleTransaction(attemptId, verification); },
+    markTerminal(attemptId, { status, reason } = {}) { return terminalTransaction(attemptId, status, reason); },
   });
 }

@@ -5,6 +5,7 @@ import { migration084GrowthCopilotRuns } from './084_growth_copilot_runs.mjs';
 import { migration085GrowthSemanticEvidence } from './085_growth_semantic_evidence.mjs';
 import { migration086CommercePublicCapabilities } from "./086_commerce_public_capabilities.mjs";
 import { migration087CommercePaymentAttempts } from "./087_commerce_payment_attempts.mjs";
+import { migration088CommerceInventoryReservations } from "./088_commerce_inventory_reservations.mjs";
 import { migration002TenantDomainData } from "./002_tenant_domain_data.mjs";
 import { migration003TenantRelationshipGuards } from "./003_tenant_relationship_guards.mjs";
 import { migration004WorkspaceManagementAudit } from "./004_workspace_management_audit.mjs";
@@ -174,4 +175,5 @@ export const migrations = [
   migration085GrowthSemanticEvidence,
   migration086CommercePublicCapabilities,
   migration087CommercePaymentAttempts,
+  migration088CommerceInventoryReservations,
 ];

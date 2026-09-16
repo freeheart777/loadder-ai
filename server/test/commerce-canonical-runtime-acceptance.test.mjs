@@ -115,8 +115,14 @@ test("beta HTTP journey reaches manual checkout but cannot manufacture payment o
     assert.equal(financials.summary.refundedMinor, 0);
     assert.equal(financials.summary.netMinor, 0);
 
+    // An UNPAID order must not have consumed stock: it holds it. Physical
+    // inventory moves only when payment is verified.
     const variant = db.prepare("SELECT inventory_quantity FROM ecommerce_variants WHERE id=?").get(variantId);
-    assert.equal(variant.inventory_quantity, 2);
+    assert.equal(variant.inventory_quantity, 3);
+    assert.deepEqual(
+      db.prepare("SELECT state FROM ecommerce_inventory_reservations WHERE order_id=?").all(orderId).map((r) => r.state),
+      ["HELD"]
+    );
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM ecommerce_financial_ledger WHERE order_id=?").get(orderId).n, 0);
   } finally {
     await new Promise((resolve) => server.close(resolve));

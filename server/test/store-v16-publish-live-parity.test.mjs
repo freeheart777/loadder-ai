@@ -40,7 +40,10 @@ test("publication and public availability share authoritative transactional poli
   const auth=source("server/app/routes/auth.mjs");
   assert.match(repository,/function publish\(id, now\).*db\.transaction/s);
   assert.match(ecommerce,/export const isVariantPurchasable/);
-  assert.match(ecommerce,/if \(!isVariantPurchasable\(variant, quantity\)\)/);
+  // Admission is still server-authoritative, now via the reservation service
+  // so that held-but-unpaid stock cannot be sold twice.
+  assert.match(ecommerce,/if \(!admissible\(variant, quantity\)\)/);
+  assert.match(ecommerce,/reservations\.isPurchasable\(variant\.id, quantity\)/);
   assert.match(auth,/purchasable:isVariantPurchasable\(v\)/);
 });
 
