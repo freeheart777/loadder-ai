@@ -23,6 +23,9 @@ const nonNegativeInt = (value, field) => {
   if (!Number.isInteger(n) || n < 0) throw new EcommerceError(`${field} must be a non-negative integer.`, "INVALID_AMOUNT");
   return n;
 };
+export const isVariantPurchasable = (variant, quantity = 1) => Boolean(variant?.active ?? true)
+  && ((variant?.inventoryPolicy ?? variant?.inventory_policy) !== "DENY"
+    || Number(variant?.inventoryQuantity ?? variant?.inventory_quantity ?? 0) >= quantity);
 const productImageUrl = (value, { nullable = false, allowLocal = false } = {}) => {
   if (value == null || value === "") {
     if (nullable) return null;
@@ -214,12 +217,12 @@ export function createEcommerceService({ db, env = process.env }) {
       const variant = requireVariant(input.variantId);
       if (variant.site_project_id !== cart.site_project_id) throw new EcommerceError("Variant belongs to another store.", "CROSS_STORE_VARIANT", 409);
       const quantity = Number(input.quantity || 1); if (!Number.isInteger(quantity) || quantity <= 0) throw new EcommerceError("Quantity must be a positive integer.", "INVALID_QUANTITY");
-      if (variant.inventory_policy === "DENY" && variant.inventory_quantity < quantity) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
+      if (!isVariantPurchasable(variant, quantity)) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
       const price = variant.price_minor == null ? variant.base_price_minor : variant.price_minor;
       const existing = db.prepare("SELECT * FROM ecommerce_cart_items WHERE workspace_id=? AND cart_id=? AND variant_id=?").get(workspaceId(),cartId,variant.id);
       if (existing) {
         const nextQty = existing.quantity + quantity;
-        if (variant.inventory_policy === "DENY" && variant.inventory_quantity < nextQty) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
+        if (!isVariantPurchasable(variant, nextQty)) throw new EcommerceError("Not enough inventory.", "INSUFFICIENT_INVENTORY", 409);
         db.prepare("UPDATE ecommerce_cart_items SET quantity=?,unit_price_minor=?,updated_at=? WHERE id=? AND workspace_id=?").run(nextQty,price,now(),existing.id,workspaceId());
       } else {
         const stamp=now(); db.prepare(`INSERT INTO ecommerce_cart_items(id,workspace_id,cart_id,product_id,variant_id,quantity,unit_price_minor,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(id("item"),workspaceId(),cartId,variant.product_id,variant.id,quantity,price,stamp,stamp);
@@ -231,7 +234,7 @@ export function createEcommerceService({ db, env = process.env }) {
       if (!Number.isInteger(q) || q < 0) throw new EcommerceError("Quantity must be zero or a positive integer.", "INVALID_QUANTITY");
       if (q===0) db.prepare("DELETE FROM ecommerce_cart_items WHERE workspace_id=? AND cart_id=? AND variant_id=?").run(workspaceId(),cartId,variantId);
       else {
-        const v=requireVariant(variantId); if(v.inventory_policy==="DENY"&&v.inventory_quantity<q) throw new EcommerceError("Not enough inventory.","INSUFFICIENT_INVENTORY",409);
+        const v=requireVariant(variantId); if(!isVariantPurchasable(v,q)) throw new EcommerceError("Not enough inventory.","INSUFFICIENT_INVENTORY",409);
         db.prepare("UPDATE ecommerce_cart_items SET quantity=?,updated_at=? WHERE workspace_id=? AND cart_id=? AND variant_id=?").run(q,now(),workspaceId(),cartId,variantId);
       }
       return cartMap(recalcCart(cartId));
@@ -276,7 +279,7 @@ export function createEcommerceService({ db, env = process.env }) {
         const cart=recalcCart(cartId); requireSite(cart.site_project_id);
         if(cart.status!=="ACTIVE") throw new EcommerceError("Cart is not active.","CART_NOT_ACTIVE",409);
         if(!cart.items.length) throw new EcommerceError("Cart is empty.","EMPTY_CART",409);
-        for(const item of cart.items){ const v=requireVariant(item.variantId); if(v.inventory_policy==="DENY"&&v.inventory_quantity<item.quantity) throw new EcommerceError(`Insufficient inventory for ${item.sku}.`,"INSUFFICIENT_INVENTORY",409); }
+        for(const item of cart.items){ const v=requireVariant(item.variantId); if(!isVariantPurchasable(v,item.quantity)) throw new EcommerceError(`Insufficient inventory for ${item.sku}.`,"INSUFFICIENT_INVENTORY",409); }
         const orderId=id("order"),stamp=now();
         db.prepare(`INSERT INTO ecommerce_orders(id,workspace_id,site_project_id,cart_id,customer_id,email,currency,status,payment_status,fulfillment_status,payment_provider,payment_reference,shipping_method,shipping_address_json,subtotal_minor,discount_minor,shipping_minor,total_minor,receipt_capability_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(orderId,workspaceId(),cart.site_project_id,cart.id,input.customerId||cart.customer_id||null,input.email||cart.email||null,cart.currency,"PENDING","UNPAID","UNFULFILLED",input.paymentProvider||null,null,input.shippingMethod||null,JSON.stringify(input.shippingAddress||{}),cart.subtotal_minor,cart.discount_minor,cart.shipping_minor,cart.total_minor,input.receiptCapabilityHash||null,stamp,stamp);

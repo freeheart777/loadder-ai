@@ -36,14 +36,20 @@ project("store-published", "workspace-a", "PUBLISHED");
 project("store-draft", "workspace-a", "DRAFT");
 project("store-foreign", "workspace-b", "PUBLISHED");
 for (const [id, workspaceId] of [["store-published", "workspace-a"], ["store-foreign", "workspace-b"]]) {
+  const content = id === "store-published" ? { storeBuilderV16: {
+    version:16,selectedElement:{type:"product-card",id:"private-selection"},providerConfig:{secret:"must-not-leak"},unexpected:{merchantNote:"private"},
+    design:{primaryColor:"#123456",privateToken:"hidden"},hero:{title:"عنوان عمومی",subtitle:"متن عمومی",internalDraft:true},
+    sections:[{id:"private-section-id",type:"products",enabled:true,title:"محصولات",subtitle:"",backgroundColor:"#fff",textColor:"#111",spacingTop:20,spacingBottom:20,privateNote:"hidden",productSettings:{source:"featured",columnsDesktop:4,columnsTablet:3,columnsMobile:2,showStock:true,showCartButton:true}}],
+    commerce:{cartButtonLabel:"خرید",paymentMode:"ONLINE",providerSecret:"hidden",productOverrides:{"product-a":{title:"عنوان جعلی",imageUrl:"https://evil.example/fake.png",regularPriceMinor:1,inventoryQuantity:999,promotionBadge:true,promotionBadgeText:"ویژه"}}},
+  }} : { storeBuilderV16: { version:16 } };
   db.prepare("INSERT INTO site_publish_versions(id,workspace_id,site_project_id,version,content_json,manifest_json,published_at,created_at) VALUES(?,?,?,?,?,?,?,?)")
-    .run(`version-${id}`, workspaceId, id, 1, JSON.stringify({ storeBuilderV16: { version: 16 } }), "{}", now, now);
+    .run(`version-${id}`, workspaceId, id, 1, JSON.stringify(content), "{}", now, now);
 }
 function catalog(workspaceId, storeId, suffix) {
-  db.prepare("INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,status,currency,base_price_minor,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,'ACTIVE','IRT',10000,'{}',?,?)")
-    .run(`product-${suffix}`, workspaceId, storeId, `Product ${suffix}`, `product-${suffix}`, now, now);
-  db.prepare("INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,active,created_at,updated_at) VALUES(?,?,?,?,?,10000,10,'DENY','{}',1,?,?)")
-    .run(`variant-${suffix}`, workspaceId, `product-${suffix}`, `SKU-${suffix}`, "Default", now, now);
+  db.prepare("INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,status,currency,base_price_minor,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,'ACTIVE','IRT',10000,?,?,?)")
+    .run(`product-${suffix}`, workspaceId, storeId, `Product ${suffix}`, `product-${suffix}`, JSON.stringify({gallery:[`https://cdn.example.test/${suffix}.png`]}), now, now);
+  db.prepare("INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,image_url,active,created_at,updated_at) VALUES(?,?,?,?,?,10000,10,'DENY','{}',?,1,?,?)")
+    .run(`variant-${suffix}`, workspaceId, `product-${suffix}`, `SKU-${suffix}`, "Default", `https://cdn.example.test/${suffix}-main.png`, now, now);
 }
 catalog("workspace-a", "store-published", "a");
 catalog("workspace-b", "store-foreign", "b");
@@ -69,6 +75,53 @@ test("draft and missing stores share the same unavailable public posture", async
     assert.equal(cart.response.status, 404);
     assert.equal(cart.body.code, "PUBLIC_RESOURCE_NOT_FOUND");
   }
+});
+
+test("public presentation is a recursive allowlist and catalog truth defeats malicious snapshot overrides", async () => {
+  const store = await json("/storefront/store-published");
+  assert.equal(store.response.status, 200);
+  assert.equal(store.body.presentation.storeBuilderV16.design.primaryColor, "#123456");
+  assert.equal(store.body.presentation.storeBuilderV16.hero.title, "عنوان عمومی");
+  assert.equal(store.body.presentation.storeBuilderV16.commerce.productOverrides["product-a"].promotionBadge, true);
+  const serialized = JSON.stringify(store.body.presentation);
+  for (const secret of ["selectedElement","private-selection","providerConfig","must-not-leak","unexpected","merchantNote","privateToken","internalDraft","private-section-id","privateNote","paymentMode","providerSecret","عنوان جعلی","evil.example","regularPriceMinor","inventoryQuantity"]) assert.equal(serialized.includes(secret), false, secret);
+
+  const products = await json("/storefront/store-published/products");
+  const product = products.body.products[0];
+  assert.equal(product.name, "Product a");
+  assert.equal(product.basePriceMinor, 10000);
+  assert.deepEqual(product.gallery, ["https://cdn.example.test/a.png"]);
+  assert.equal(product.variants[0].imageUrl, "https://cdn.example.test/a-main.png");
+  assert.equal(product.variants[0].purchasable, true);
+});
+
+test("public availability uses the same canonical policy as cart authority", async () => {
+  db.prepare("UPDATE ecommerce_variants SET inventory_quantity=0,inventory_policy='DENY' WHERE id='variant-a'").run();
+  let products = await json("/storefront/store-published/products");
+  assert.equal(products.body.products[0].variants[0].purchasable, false);
+  const deniedCart = await post("/storefront/store-published/carts", { currency:"IRT" });
+  const denied = await post(`/storefront/carts/${deniedCart.body.cart.id}/items`, { variantId:"variant-a",quantity:1 }, deniedCart.body.cartCapability);
+  assert.equal(denied.body.code, "INSUFFICIENT_INVENTORY");
+
+  db.prepare("UPDATE ecommerce_variants SET inventory_policy='CONTINUE' WHERE id='variant-a'").run();
+  products = await json("/storefront/store-published/products");
+  assert.equal(products.body.products[0].variants[0].purchasable, true);
+  const allowedCart = await post("/storefront/store-published/carts", { currency:"IRT" });
+  const allowed = await post(`/storefront/carts/${allowedCart.body.cart.id}/items`, { variantId:"variant-a",quantity:1 }, allowedCart.body.cartCapability);
+  assert.equal(allowed.response.status, 201);
+  const checkout = await post(`/storefront/carts/${allowedCart.body.cart.id}/checkout`, { fullName:"خریدار نمونه",phone:"09120000009",shippingAddress:{address:"تهران"} }, allowedCart.body.cartCapability);
+  assert.equal(checkout.response.status, 201);
+
+  db.prepare("UPDATE ecommerce_variants SET inventory_policy='DENY' WHERE id='variant-a'").run();
+  db.prepare("INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,active,created_at,updated_at) VALUES('variant-mixed','workspace-a','product-a','SKU-MIXED','Backorder',10000,0,'CONTINUE','{}',1,?,?)").run(now,now);
+  products = await json("/storefront/store-published/products");
+  assert.deepEqual(products.body.products[0].variants.map((variant)=>variant.purchasable),[false,true]);
+
+  db.prepare("UPDATE ecommerce_variants SET active=0 WHERE product_id='product-a'").run();
+  products = await json("/storefront/store-published/products");
+  assert.equal(products.body.products[0].variants.length, 0);
+  db.prepare("DELETE FROM ecommerce_variants WHERE id='variant-mixed'").run();
+  db.prepare("UPDATE ecommerce_variants SET active=1,inventory_quantity=10,inventory_policy='DENY' WHERE id='variant-a'").run();
 });
 
 test("published cart capability is opaque, mandatory, store-bound and persisted only as a hash", async () => {

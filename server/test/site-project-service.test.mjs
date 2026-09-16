@@ -126,3 +126,36 @@ test("published Store V16 snapshots remain immutable until publish and rollback 
   });
   db.close();
 });
+
+test("publication is atomic across version creation and canonical live state", () => {
+  const db=createSiteTestDb(),repository=createSiteProjectRepository(db);
+  const service=createSiteProjectService({repository,businessContextService:{getCurrent:()=>({activeContext:{id:"ctx-1"},isStale:false})},now:(()=>{let tick=0;return()=>new Date(Date.UTC(2026,8,11,0,0,tick++));})()});
+  runWithWorkspace("ws-1",()=>{
+    const project=service.create({name:"Atomic Store",siteType:"STORE",content:{storeBuilderV16:{version:16,hero:{title:"A"}}}});
+    service.publish(project.id);
+    service.update(project.id,{content:{storeBuilderV16:{version:16,hero:{title:"B"}}}});
+    db.exec("CREATE TRIGGER fail_publish_update BEFORE UPDATE OF status ON site_projects BEGIN SELECT RAISE(ABORT,'forced publish failure'); END;");
+    assert.throws(()=>service.publish(project.id),/forced publish failure/);
+    assert.equal(repository.listPublishVersions(project.id).length,1);
+    assert.equal(repository.getPublishedPublic(project.id).version.content.storeBuilderV16.hero.title,"A");
+    db.exec("DROP TRIGGER fail_publish_update");
+    service.publish(project.id);
+    assert.equal(repository.listPublishVersions(project.id).length,2);
+    assert.equal(repository.getPublishedPublic(project.id).version.content.storeBuilderV16.hero.title,"B");
+  });
+  db.close();
+});
+
+test("failed first publication leaves no public storefront or version", () => {
+  const db=createSiteTestDb(),repository=createSiteProjectRepository(db);
+  const service=createSiteProjectService({repository,businessContextService:{getCurrent:()=>({activeContext:{id:"ctx-1"},isStale:false})}});
+  runWithWorkspace("ws-1",()=>{
+    const project=service.create({name:"Never Published",siteType:"STORE",content:{storeBuilderV16:{version:16}}});
+    db.exec("CREATE TRIGGER fail_first_publish BEFORE UPDATE OF status ON site_projects BEGIN SELECT RAISE(ABORT,'forced first publish failure'); END;");
+    assert.throws(()=>service.publish(project.id),/forced first publish failure/);
+    assert.equal(repository.listPublishVersions(project.id).length,0);
+    assert.equal(repository.get(project.id).status,"DRAFT");
+    assert.equal(repository.getPublishedPublic(project.id),null);
+  });
+  db.close();
+});

@@ -14,9 +14,12 @@ test("public Store and product routes delegate to the canonical V16 renderer", (
 
 test("public Store presentation is sourced from the latest immutable publish version only", () => {
   const auth = source("server/app/routes/auth.mjs");
+  const projection = source("server/app/services/store-public-presentation.mjs");
   assert.match(auth, /ORDER BY latest\.version DESC LIMIT 1/);
   assert.match(auth, /publishedVersion:\{id:store\.publishedVersionId/);
-  assert.match(auth, /\["storeBuilderV11","storeBuilderV13","storeBuilderV14","storeBuilderV15","storeBuilderV16"\]/);
+  assert.match(auth, /projectPublicStorePresentation\(content\)/);
+  assert.match(projection, /projectProductOverrides/);
+  assert.doesNotMatch(projection, /title:string\(source\.title\).*productOverrides/);
   assert.doesNotMatch(auth, /presentation:content/);
 });
 
@@ -24,7 +27,21 @@ test("V16 product presentation cannot override authoritative catalog money", () 
   const config = source("src/components/store-studio-v16/config.ts");
   assert.match(config, /regularPriceMinor: product\.basePriceMinor/);
   assert.match(config, /compareAtPriceMinor: product\.compareAtPriceMinor \?\? null/);
+  assert.match(config, /title: product\.name/);
+  assert.match(config, /imageUrl: productMainImage\(product\)/);
   assert.doesNotMatch(config, /regularPriceMinor: override\.regularPriceMinor/);
+  assert.doesNotMatch(config, /title: override\.title/);
+  assert.doesNotMatch(config, /imageUrl: override\.imageUrl/);
+});
+
+test("publication and public availability share authoritative transactional policies", () => {
+  const repository=source("server/app/repositories/site-project-repository.mjs");
+  const ecommerce=source("server/app/services/ecommerce-service.mjs");
+  const auth=source("server/app/routes/auth.mjs");
+  assert.match(repository,/function publish\(id, now\).*db\.transaction/s);
+  assert.match(ecommerce,/export const isVariantPurchasable/);
+  assert.match(ecommerce,/if \(!isVariantPurchasable\(variant, quantity\)\)/);
+  assert.match(auth,/purchasable:isVariantPurchasable\(v\)/);
 });
 
 test("Studio distinguishes draft preview, save, and explicit publication", () => {
