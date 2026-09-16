@@ -102,3 +102,27 @@ test("site project service rejects a repository record owned by another workspac
   assert.equal(updated, false);
   assert.equal(published, false);
 });
+
+test("published Store V16 snapshots remain immutable until publish and rollback creates a new live version", () => {
+  const db = createSiteTestDb();
+  const repository = createSiteProjectRepository(db);
+  const service = createSiteProjectService({ repository, businessContextService: { getCurrent: () => ({ activeContext: { id: "ctx-1" }, isStale: false }) }, now: (() => { let tick = 0; return () => new Date(Date.UTC(2026, 8, 10, 0, 0, tick++)); })() });
+  const contentA = { storeBuilderV16: { version: 16, hero: { title: "نسخه الف" } } };
+  const contentB = { storeBuilderV16: { version: 16, hero: { title: "نسخه ب" } } };
+  const project = runWithWorkspace("ws-1", () => service.create({ name: "Store", siteType: "STORE", content: contentA }));
+
+  runWithWorkspace("ws-1", () => {
+    service.publish(project.id);
+    const first = repository.getPublishedPublic(project.id);
+    service.update(project.id, { content: contentB });
+    assert.equal(repository.get(project.id).content.storeBuilderV16.hero.title, "نسخه ب");
+    assert.equal(repository.getPublishedPublic(project.id).version.content.storeBuilderV16.hero.title, "نسخه الف");
+    service.publish(project.id);
+    assert.equal(repository.getPublishedPublic(project.id).version.content.storeBuilderV16.hero.title, "نسخه ب");
+    const rollback = service.rollbackPublishVersion(project.id, first.version.id);
+    assert.equal(rollback.version.version, 3);
+    assert.equal(repository.getPublishedPublic(project.id).version.content.storeBuilderV16.hero.title, "نسخه الف");
+    assert.equal(repository.listPublishVersions(project.id).length, 3);
+  });
+  db.close();
+});

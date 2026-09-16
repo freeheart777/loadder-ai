@@ -252,8 +252,10 @@ export function productView(product: Product, config: StudioConfig): ProductView
   return {
     title: override.title || product.name,
     imageUrl: override.imageUrl || productMainImage(product),
-    regularPriceMinor: override.regularPriceMinor ?? product.basePriceMinor,
-    compareAtPriceMinor: override.compareAtPriceMinor ?? product.compareAtPriceMinor ?? null,
+    // Money remains Commerce-owned. Legacy visual price overrides stay readable
+    // in persisted V16 documents but never replace authoritative catalog prices.
+    regularPriceMinor: product.basePriceMinor,
+    compareAtPriceMinor: product.compareAtPriceMinor ?? null,
     promotionBadge: override.promotionBadge ?? false,
     promotionBadgeText: override.promotionBadgeText || "فروش ویژه",
     showDiscountPercentage: override.showDiscountPercentage ?? true,

@@ -10,7 +10,7 @@ import type { DeviceMode, MediaAsset, Product, ProductSettings, SectionConfig, S
 import { apiFetch } from "../lib/api";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
-type Project = { id: string; name?: string; content: Record<string, any> };
+type Project = { id: string; name?: string; status?: string; content: Record<string, any> };
 type ProductDraft = {
   name: string;
   basePriceMinor: string;
@@ -430,6 +430,20 @@ export default function StoreWebsiteStudioPageV16() {
     }
   }
 
+  async function publish() {
+    if (!project) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await persistConfig(config);
+      const out = await read(await apiFetch(`/api/site-projects/${project.id}/publish`, { method: "POST" }));
+      setProject(out.project);
+      setMessage("نسخه منتشرشده با موفقیت ایجاد شد.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "انتشار ناموفق بود؛ نسخه زنده قبلی بدون تغییر باقی ماند.");
+    } finally { setBusy(false); }
+  }
+
   const inspectorProps = { config, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection };
   const pickerSection = pickerSectionId ? config.sections.find((s) => s.id === pickerSectionId) : null;
   const pickerSettings = pickerSection?.type === "products" && pickerSection.productSettings ? normalizeManual(pickerSection.productSettings, products) : null;
@@ -438,7 +452,7 @@ export default function StoreWebsiteStudioPageV16() {
     <header className="flex min-h-20 items-center gap-3 border-b border-white/10 bg-[#0a111b] px-4 py-3">
       <Link to="/dashboard" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10"><ArrowRight /></Link>
       <div className="min-w-56"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</div><h1 className="font-black">فروشگاه شما</h1><p className="mt-1 flex items-center gap-1 text-[10px] text-white/35"><CursorClick /> روی خود تصویر کلیک کنید تا همان‌جا تعویض شود</p></div>
-      <StudioToolbar device={device} page={config.activePage} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} />
+      <StudioToolbar device={device} page={config.activePage} status={project?.status} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} onPublish={() => void publish()} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
@@ -461,7 +475,7 @@ export default function StoreWebsiteStudioPageV16() {
       </button>
     </div>
 
-    {previewOpen && <div className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] items-center justify-between"><b>پیش‌نمایش Draft</b><button onClick={() => setPreviewOpen(false)} className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={config.selectedElement} select={() => undefined} interactive={false} /></div>}
+    {previewOpen && <div className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] items-center justify-between"><b>پیش‌نمایش پیش‌نویس</b><button onClick={() => setPreviewOpen(false)} className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={config.selectedElement} select={() => undefined} interactive={false} /></div>}
 
     {pickerSectionId && <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-4">
       <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622] shadow-2xl">

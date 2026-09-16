@@ -62,8 +62,8 @@ test("V16 supports responsive commerce pages and configurable product sections",
 test("V16 reads real catalog and media while keeping visual overrides separate", () => {
   assert.match(v16, /\/api\/stores\/\$\{selected\.id\}\/products/);
   assert.match(v16, /setAssets\(\(detail\.assets/);
-  assert.match(v16Inspector, /ویرایش اطلاعات اصلی محصول/);
-  assert.match(v16Inspector, /override بصری/);
+  assert.match(v16Inspector, /ویرایش قیمت و اطلاعات اصلی محصول/);
+  assert.match(v16Inspector, /قیمت و موجودی همیشه از کاتالوگ معتبر می‌آید/);
   assert.match(v16, /import \{ uploadSiteMedia \} from "\.\.\/lib\/siteMediaUpload"/);
   assert.match(v16, /await uploadSiteMedia\(\{/);
   assert.doesNotMatch(v16, /\/media\/upload-url/);

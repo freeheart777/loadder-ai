@@ -9,6 +9,8 @@ const quickStart = read("../../src/pages/StoreQuickStartPage.tsx");
 const studio = read("../../src/pages/StoreWebsiteStudioPageV13.tsx");
 const storefront = read("../../src/pages/PublicStorefrontPage.tsx");
 const publicProduct = read("../../src/pages/PublicProductPage.tsx");
+const publicRuntime = read("../../src/components/store-studio-v16/PublicStorefrontRuntime.tsx");
+const studioConfig = read("../../src/components/store-studio-v16/config.ts");
 const media = read("../../src/lib/productMedia.ts");
 
 test("active product editor retains URL, Media Library, and variant editing compatibility", () => {
@@ -59,6 +61,8 @@ test("Quick Start, Studio, and public storefront share canonical image selection
   assert.match(media, /export function productGallery/);
   assert.match(quickStart, /productMainImage\(x\)/);
   assert.match(studio, /productMainImage\(product\)/);
-  assert.match(storefront, /productMainImage\(p\)/);
-  assert.match(publicProduct, /productGallery\(product\)/);
+  assert.match(storefront, /PublicStorefrontRuntime page="storefront"/);
+  assert.match(publicProduct, /PublicStorefrontRuntime page="product"/);
+  assert.match(publicRuntime, /StudioCanvas/);
+  assert.match(studioConfig, /productMainImage\(product\)/);
 });
