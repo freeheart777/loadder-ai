@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, Heart, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
 import { defaultProductSettings, formatMoney, productView, productsForSection } from "./config";
-import type { DeviceMode, ElementType, PageMode, Product, ProductSettings, SectionConfig, Selection, StudioConfig } from "./types";
+import { isCommerceSite, sectionAnchor, siteTypeDefinition } from "./site-types";
+import type { DeviceMode, ElementType, PageMode, Product, ProductSettings, SectionConfig, SectionItem, Selection, StudioConfig } from "./types";
 
 export type InlineMediaTarget = { kind: "hero" | "banner" | "logo" | "product"; id?: string };
 export type StorefrontRuntimeAdapter = { openStorefront: () => void; openCollection: () => void; openProduct: (product: Product) => void; openCart: () => void; addProduct: (product: Product) => void | Promise<void>; cartCount?: number };
-type CanvasProps = { config: StudioConfig; products: Product[]; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; };
+type CanvasProps = { config: StudioConfig; products: Product[]; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; onLeadSubmit?: (input: { name: string; phone: string; email: string; company: string; message: string }) => Promise<void>; };
 
 function InlineMediaControl({ target, onUpload, busy, label = "تغییر تصویر", compact = false }: { target: InlineMediaTarget; onUpload?: CanvasProps["onImageUpload"]; busy?: boolean; label?: string; compact?: boolean }) {
   if (!onUpload) return null;
@@ -33,11 +34,11 @@ function TrustStrip({ config }: { config: StudioConfig }) { const items = [[Truc
 
 function ProductCard({ product, settings, config, selected, select, sectionId, interactive, onReorderProduct, onRuntimePage, onEditElement, onImageUpload, imageBusy, runtimeAdapter }: { product: Product; settings: ProductSettings; config: StudioConfig; selected: Selection; select: CanvasProps["select"]; sectionId: string; interactive: boolean; onReorderProduct?: CanvasProps["onReorderProduct"]; onRuntimePage?: CanvasProps["onRuntimePage"]; onEditElement?: CanvasProps["onEditElement"]; onImageUpload?: CanvasProps["onImageUpload"]; imageBusy?: boolean; runtimeAdapter?: StorefrontRuntimeAdapter }) { const view = productView(product, config); const inventory = (product.variants || []).reduce((s,v)=>s+Number(v.inventoryQuantity||0),0); const purchasable=(product.variants||[]).some(v=>v.purchasable ?? (v.inventoryPolicy!=="DENY"||v.inventoryQuantity>0)); const open=()=>runtimeAdapter?.openProduct(product) ?? (select({ type: "product-card", id: product.id }), onRuntimePage?.("product")); const add=()=>runtimeAdapter?.addProduct(product) ?? onRuntimePage?.("cart"); return <EditorElement type="product-card" id={product.id} selected={selected} onSelect={select} onEdit={onEditElement} interactive={interactive} draggable={interactive} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl" onDragStart={(e)=>{e.dataTransfer.setData("text/loadder-product-id",product.id);}} onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>{e.preventDefault();e.stopPropagation();const from=e.dataTransfer.getData("text/loadder-product-id");if(from)onReorderProduct?.(sectionId,from,product.id);}}><button type="button" onClick={!interactive ? open : undefined} className="block w-full text-right"><div className="relative aspect-square bg-slate-50">{view.imageUrl ? <img src={view.imageUrl} alt={view.title} className="h-full w-full object-contain p-4 transition group-hover:scale-[1.03]"/> : <div className="grid h-full place-items-center text-slate-300"><Package size={52}/></div>}{view.promotionBadge && <span className="absolute right-3 top-3 rounded-full bg-rose-500 px-2.5 py-1 text-[10px] font-black text-white">{view.promotionBadgeText || "تخفیف"}</span>}<span className="absolute left-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white shadow"><Heart size={16}/></span>{interactive && <InlineMediaControl target={{kind:"product",id:product.id}} onUpload={onImageUpload} busy={imageBusy} label={view.imageUrl ? "تعویض عکس" : "افزودن عکس"} compact/>}</div><div className="p-4"><span className="text-[10px] text-slate-400">{product.brand || product.category || "محصول"}</span><b className="mt-1 block text-sm text-slate-900">{view.title}</b><div className="mt-2 flex gap-0.5 text-amber-400"><Star weight="fill"/><Star weight="fill"/><Star weight="fill"/><Star weight="fill"/><Star/></div>{settings.showStock && <span className={`mt-2 block text-[10px] ${purchasable?"text-emerald-600":"text-rose-500"}`}>{inventory>0?`${inventory} عدد موجود`:purchasable?"قابل سفارش":"ناموجود"}</span>}<div className="mt-4 flex items-center gap-2"><strong className="text-sm" style={{color:config.design.primaryColor}}>{formatMoney(view.regularPriceMinor,product.currency)}</strong>{settings.showCompareAt && view.compareAtPriceMinor && <del className="text-[10px] text-slate-400">{formatMoney(view.compareAtPriceMinor, product.currency)}</del>}</div></div></button>{settings.showCartButton && <button type="button" disabled={!purchasable} onClick={(e)=>{e.stopPropagation(); if(!interactive) void add();}} className="mx-4 mb-4 min-h-11 w-[calc(100%-32px)] text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-45" style={{background:config.design.primaryColor,borderRadius:config.design.buttonRadius}}>{purchasable?(view.ctaLabel || config.commerce.cartButtonLabel):"ناموجود"}</button>}</EditorElement>; }
 
-function InsertBetween({ index, onInsert }: { index: number; onInsert?: CanvasProps["onInsertSection"] }) { const [open, setOpen] = useState(false); const items: Array<[SectionConfig["type"], string, React.ReactNode]> = [["products", "محصولات", <Package />], ["banner", "بنر", <ImageSquare />], ["text", "متن", <TextT />], ["trust", "مزیت‌ها", <ShieldCheck />], ["spacer", "فاصله", <Plus />]]; return <div className="group relative z-20 flex h-7 items-center justify-center" onClick={(e) => e.stopPropagation()}><div className="absolute inset-x-8 top-1/2 border-t border-dashed border-violet-300/0 transition group-hover:border-violet-300/70"/><button type="button" onClick={()=>setOpen(v=>!v)} className="relative grid h-7 w-7 place-items-center rounded-full border border-violet-300 bg-white text-violet-600 opacity-0 shadow-lg transition group-hover:opacity-100"><Plus size={16}/></button>{open && <div className="absolute top-8 flex gap-1 rounded-2xl border bg-white p-2 shadow-2xl">{items.map(([type,label,icon])=><button key={type} type="button" onClick={()=>{onInsert?.(index,type);setOpen(false);}} className="flex min-w-20 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600 hover:bg-violet-50">{icon}<span>{label}</span></button>)}</div>}</div>; }
+function InsertBetween({ index, onInsert, siteKind }: { index: number; onInsert?: CanvasProps["onInsertSection"]; siteKind: StudioConfig["siteKind"] }) { const [open, setOpen] = useState(false); const items = insertableSections(siteKind); return <div className="group relative z-20 flex h-7 items-center justify-center" onClick={(e) => e.stopPropagation()}><div className="absolute inset-x-8 top-1/2 border-t border-dashed border-violet-300/0 transition group-hover:border-violet-300/70"/><button type="button" onClick={()=>setOpen(v=>!v)} className="relative grid h-7 w-7 place-items-center rounded-full border border-violet-300 bg-white text-violet-600 opacity-0 shadow-lg transition group-hover:opacity-100"><Plus size={16}/></button>{open && <div className="absolute top-8 flex gap-1 rounded-2xl border bg-white p-2 shadow-2xl">{items.map(([type,label,icon])=><button key={type} type="button" onClick={()=>{onInsert?.(index,type);setOpen(false);}} className="flex min-w-20 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600 hover:bg-violet-50">{icon}<span>{label}</span></button>)}</div>}</div>; }
 
-function SectionShell({ section, index, props, children }: { section: SectionConfig; index: number; props: CanvasProps; children: React.ReactNode }) { const type: ElementType = section.type === "banner" ? "banner" : section.type === "trust" ? "trust" : "section"; return <><InsertBetween index={index} onInsert={props.interactive === false ? undefined : props.onInsertSection}/><EditorElement type={type} id={section.id} selected={props.selected} onSelect={props.select} onEdit={props.onEditElement} interactive={props.interactive !== false} draggable className="group/section" onMoveUp={()=>props.onMoveSection?.(section.id,-1)} onMoveDown={()=>props.onMoveSection?.(section.id,1)} onDuplicate={()=>props.onDuplicateSection?.(section.id)} onDelete={()=>props.onDeleteSection?.(section.id)} onDragStart={(e)=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/loadder-section-id",section.id);}} onDragOver={(e)=>{if(e.dataTransfer.types.includes("text/loadder-section-id")){e.preventDefault();e.dataTransfer.dropEffect="move";}}} onDrop={(e)=>{const from=e.dataTransfer.getData("text/loadder-section-id");if(from){e.preventDefault();e.stopPropagation();props.onReorderSection?.(from,section.id);}}}>{children}</EditorElement></>; }
+function SectionShell({ section, index, props, children }: { section: SectionConfig; index: number; props: CanvasProps; children: React.ReactNode }) { const type: ElementType = section.type === "banner" ? "banner" : section.type === "trust" ? "trust" : "section"; return <><InsertBetween index={index} onInsert={props.interactive === false ? undefined : props.onInsertSection} siteKind={props.config.siteKind}/><EditorElement type={type} id={section.id} selected={props.selected} onSelect={props.select} onEdit={props.onEditElement} interactive={props.interactive !== false} draggable className="group/section" onMoveUp={()=>props.onMoveSection?.(section.id,-1)} onMoveDown={()=>props.onMoveSection?.(section.id,1)} onDuplicate={()=>props.onDuplicateSection?.(section.id)} onDelete={()=>props.onDeleteSection?.(section.id)} onDragStart={(e)=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/loadder-section-id",section.id);}} onDragOver={(e)=>{if(e.dataTransfer.types.includes("text/loadder-section-id")){e.preventDefault();e.dataTransfer.dropEffect="move";}}} onDrop={(e)=>{const from=e.dataTransfer.getData("text/loadder-section-id");if(from){e.preventDefault();e.stopPropagation();props.onReorderSection?.(from,section.id);}}}>{children}</EditorElement></>; }
 
-function StorefrontCanvas(props: CanvasProps) { const visible = props.config.sections.filter(s=>s.enabled); const openCollection=()=>props.runtimeAdapter?.openCollection() ?? props.onRuntimePage?.("collection"); return <div className="min-h-full" style={{color:props.config.design.textColor,background:props.config.design.backgroundColor}}><Header {...props}/><Hero {...props}/><TrustStrip config={props.config}/>{visible.map((section,index)=>{ if(section.type==="spacer") return <SectionShell key={section.id} section={section} index={index} props={props}><div style={{height:section.spacingTop+section.spacingBottom}}/></SectionShell>; if(section.type==="products") { const settings=section.productSettings || defaultProductSettings; const source=productsForSection(props.products,settings); const shown=(source.length?source:settings.source==="manual"?[]:props.products).slice(0,12); const columns=props.device==="mobile"?settings.columnsMobile:props.device==="tablet"?settings.columnsTablet:settings.columnsDesktop; return <SectionShell key={section.id} section={section} index={index} props={props}><section id="products" className="mx-auto px-5 py-10" style={{maxWidth:props.config.design.containerWidth}}><div className="mb-6 flex items-end justify-between gap-4"><div><span className="text-[10px] font-black" style={{color:props.config.design.primaryColor}}>منتخب فروشگاه</span><h3 className="mt-2 text-2xl font-black text-slate-900">{section.title}</h3><p className="mt-2 text-xs text-slate-400">{section.subtitle}</p></div>{props.interactive===false && <button type="button" onClick={openCollection} className="text-xs font-black" style={{color:props.config.design.primaryColor}}>مشاهده همه ←</button>}</div><div className="grid gap-4" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}}>{shown.map(p=><ProductCard key={p.id} product={p} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId={section.id} interactive={props.interactive!==false} onReorderProduct={props.onReorderProduct} onRuntimePage={props.onRuntimePage} onEditElement={props.onEditElement} onImageUpload={props.onImageUpload} imageBusy={props.imageBusy} runtimeAdapter={props.runtimeAdapter}/>)}{props.interactive!==false && <button type="button" onClick={(e)=>{e.stopPropagation();props.onAddProduct?.(section.id);}} className="grid min-h-64 place-items-center rounded-3xl border-2 border-dashed border-violet-300 bg-violet-50 text-violet-700"><span><Plus size={32} className="mx-auto"/><b className="mt-2 block">افزودن محصول</b><small>از کاتالوگ واقعی</small></span></button>}</div></section></SectionShell>; } if(section.type==="banner") return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="grid overflow-hidden rounded-[28px] md:grid-cols-2" style={{background:section.backgroundColor,color:section.textColor}}><div className="p-8"><span className="text-[10px] font-black opacity-60">پیشنهاد فروشگاه</span><h3 className="mt-2 text-2xl font-black">{section.title}</h3><p className="mt-3 text-sm opacity-70">{section.subtitle}</p></div><div className="relative min-h-48 bg-white/10">{section.imageUrl?<img src={section.imageUrl} alt="" className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-sm opacity-50">از + همین‌جا تصویر را اضافه کنید</div>}{props.interactive!==false && <InlineMediaControl target={{kind:"banner",id:section.id}} onUpload={props.onImageUpload} busy={props.imageBusy} label={section.imageUrl ? "تعویض بنر" : "افزودن بنر"}/>}</div></div></section></SectionShell>; return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="rounded-[28px] border bg-white p-7"><h3 className="text-xl font-black text-slate-900">{section.title}</h3><p className="mt-3 text-sm text-slate-500">{section.subtitle}</p></div></section></SectionShell>; })}<InsertBetween index={visible.length} onInsert={props.interactive===false?undefined:props.onInsertSection}/><Footer config={props.config}/></div>; }
+function StorefrontCanvas(props: CanvasProps) { const visible = props.config.sections.filter(s=>s.enabled); const openCollection=()=>props.runtimeAdapter?.openCollection() ?? props.onRuntimePage?.("collection"); return <div className="min-h-full" style={{color:props.config.design.textColor,background:props.config.design.backgroundColor}}><Header {...props}/><Hero {...props}/><TrustStrip config={props.config}/>{visible.map((section,index)=>{ if(section.type==="spacer") return <SectionShell key={section.id} section={section} index={index} props={props}><div style={{height:section.spacingTop+section.spacingBottom}}/></SectionShell>; if(section.type==="products") { const settings=section.productSettings || defaultProductSettings; const source=productsForSection(props.products,settings); const shown=(source.length?source:settings.source==="manual"?[]:props.products).slice(0,12); const columns=props.device==="mobile"?settings.columnsMobile:props.device==="tablet"?settings.columnsTablet:settings.columnsDesktop; return <SectionShell key={section.id} section={section} index={index} props={props}><section id="products" className="mx-auto px-5 py-10" style={{maxWidth:props.config.design.containerWidth}}><div className="mb-6 flex items-end justify-between gap-4"><div><span className="text-[10px] font-black" style={{color:props.config.design.primaryColor}}>منتخب فروشگاه</span><h3 className="mt-2 text-2xl font-black text-slate-900">{section.title}</h3><p className="mt-2 text-xs text-slate-400">{section.subtitle}</p></div>{props.interactive===false && <button type="button" onClick={openCollection} className="text-xs font-black" style={{color:props.config.design.primaryColor}}>مشاهده همه ←</button>}</div><div className="grid gap-4" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}}>{shown.map(p=><ProductCard key={p.id} product={p} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId={section.id} interactive={props.interactive!==false} onReorderProduct={props.onReorderProduct} onRuntimePage={props.onRuntimePage} onEditElement={props.onEditElement} onImageUpload={props.onImageUpload} imageBusy={props.imageBusy} runtimeAdapter={props.runtimeAdapter}/>)}{props.interactive!==false && <button type="button" onClick={(e)=>{e.stopPropagation();props.onAddProduct?.(section.id);}} className="grid min-h-64 place-items-center rounded-3xl border-2 border-dashed border-violet-300 bg-violet-50 text-violet-700"><span><Plus size={32} className="mx-auto"/><b className="mt-2 block">افزودن محصول</b><small>از کاتالوگ واقعی</small></span></button>}</div></section></SectionShell>; } if(section.type==="banner") return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="grid overflow-hidden rounded-[28px] md:grid-cols-2" style={{background:section.backgroundColor,color:section.textColor}}><div className="p-8"><span className="text-[10px] font-black opacity-60">پیشنهاد فروشگاه</span><h3 className="mt-2 text-2xl font-black">{section.title}</h3><p className="mt-3 text-sm opacity-70">{section.subtitle}</p></div><div className="relative min-h-48 bg-white/10">{section.imageUrl?<img src={section.imageUrl} alt="" className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-sm opacity-50">از + همین‌جا تصویر را اضافه کنید</div>}{props.interactive!==false && <InlineMediaControl target={{kind:"banner",id:section.id}} onUpload={props.onImageUpload} busy={props.imageBusy} label={section.imageUrl ? "تعویض بنر" : "افزودن بنر"}/>}</div></div></section></SectionShell>; return <SectionShell key={section.id} section={section} index={index} props={props}><section className="mx-auto px-5 py-8" style={{maxWidth:props.config.design.containerWidth}}><div className="rounded-[28px] border bg-white p-7"><h3 className="text-xl font-black text-slate-900">{section.title}</h3><p className="mt-3 text-sm text-slate-500">{section.subtitle}</p></div></section></SectionShell>; })}<InsertBetween index={visible.length} onInsert={props.interactive===false?undefined:props.onInsertSection} siteKind={props.config.siteKind}/><Footer config={props.config}/></div>; }
 
 function CollectionCanvas(props: CanvasProps) { const settings: ProductSettings = { ...defaultProductSettings, columnsDesktop: 4, columnsTablet: 3, columnsMobile: 2, showCompareAt: true, showCartButton: true, showPromotionBadge: true }; return <div className="min-h-full bg-slate-50 text-slate-900"><Header {...props}/><section className="mx-auto px-5 py-10" style={{maxWidth:props.config.design.containerWidth}}><div className="rounded-[32px] bg-slate-950 p-7 text-white md:p-10"><span className="text-[10px] font-black text-emerald-300">COLLECTION</span><h2 className="mt-2 text-3xl font-black md:text-4xl">همه محصولات فروشگاه</h2><p className="mt-3 max-w-xl text-sm leading-7 text-white/55">محصولات واقعی کاتالوگ Loadder؛ آماده فیلتر، دسته‌بندی و اتصال به کمپین‌ها.</p></div><div className="mt-7 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-2"><button className="rounded-full bg-slate-950 px-4 py-2 text-xs font-black text-white">همه</button><button className="rounded-full border bg-white px-4 py-2 text-xs font-bold">جدیدترین</button><button className="rounded-full border bg-white px-4 py-2 text-xs font-bold">تخفیف‌دار</button></div><button className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-bold"><SlidersHorizontal/>فیلتر و مرتب‌سازی</button></div><div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">{props.products.map(p=><ProductCard key={p.id} product={p} settings={settings} config={props.config} selected={props.selected} select={props.select} sectionId="collection" interactive={false} onRuntimePage={props.onRuntimePage} runtimeAdapter={props.runtimeAdapter}/>)}</div></section><Footer config={props.config}/></div>; }
 
@@ -48,4 +49,176 @@ function CartCanvas(props: CanvasProps) { const item=props.products.find(p=>p.id
 function CheckoutCanvas(props: CanvasProps) { return <div className="min-h-[650px] bg-slate-50 p-8 text-slate-900"><div className="mx-auto max-w-xl rounded-3xl border bg-white p-7 shadow-sm"><h2 className="text-2xl font-black">تسویه حساب</h2><p className="mt-2 text-xs text-slate-400">اطلاعات ارسال و پرداخت</p><input className="mt-6 min-h-12 w-full rounded-xl border px-4" placeholder="نام و نام خانوادگی"/><input className="mt-3 min-h-12 w-full rounded-xl border px-4" placeholder="شماره تماس"/><input className="mt-3 min-h-12 w-full rounded-xl border px-4" placeholder="آدرس ارسال"/><button onClick={()=>props.onRuntimePage?.("success")} className="mt-5 w-full rounded-xl bg-violet-600 py-3 font-black text-white">ثبت سفارش آزمایشی</button></div></div>; }
 function SuccessCanvas(props: CanvasProps) { return <div className="grid min-h-[650px] place-items-center bg-slate-50 p-8 text-center text-slate-900"><div><CheckCircle size={64} className="mx-auto text-emerald-500"/><h2 className="mt-4 text-2xl font-black">{props.config.commerce.orderSuccessTitle}</h2><p className="mt-2 text-sm text-slate-400">سفارش شما با موفقیت ثبت شد.</p><button onClick={()=>props.onRuntimePage?.("storefront")} className="mt-6 rounded-xl border bg-white px-5 py-3 font-bold">بازگشت به فروشگاه</button></div></div>; }
 
-export default function StudioCanvas(props: CanvasProps) { const [runtimePage,setRuntimePage]=useState<PageMode>(props.runtimePage || props.config.activePage); const page=props.interactive===false?runtimePage:props.config.activePage; const navigate=(next:PageMode)=>{setRuntimePage(next);props.onRuntimePage?.(next);}; const effective=useMemo(()=>({...props,onRuntimePage:navigate}),[props]); return <div dir="rtl" data-canvas-interactive={props.interactive === false ? "false" : "true"} data-preview-device={props.device} data-storefront-renderer="store-studio-v16" className="mx-auto overflow-hidden bg-white shadow-2xl" style={{width:props.device==="desktop"?"100%":props.device==="tablet"?"768px":"390px",maxWidth:"100%",fontFamily:props.config.design.fontFamily,fontSize:`${props.config.design.bodyScale}%`}}>{page==="storefront"?<StorefrontCanvas {...effective}/>:page==="collection"?<CollectionCanvas {...effective}/>:page==="product"?<ProductCanvas {...effective}/>:page==="cart"?<CartCanvas {...effective}/>:page==="checkout"?<CheckoutCanvas {...effective}/>:<SuccessCanvas {...effective}/>}</div>; }
+const SECTION_LABELS: Record<SectionConfig["type"], [string, React.ReactNode]> = {
+  products: ["محصولات", <Package />], banner: ["بنر", <ImageSquare />], trust: ["مزیت‌ها", <ShieldCheck />],
+  text: ["متن", <TextT />], spacer: ["فاصله", <Plus />], about: ["درباره ما", <TextT />],
+  services: ["خدمات", <Star />], portfolio: ["نمونه‌کار", <ImageSquare />], team: ["تیم", <UserCircle />],
+  "text-image": ["متن و تصویر", <ImageSquare />], cta: ["فراخوان", <ArrowLeft />], contact: ["تماس", <Headset />],
+};
+function insertableSections(siteKind: StudioConfig["siteKind"]): Array<[SectionConfig["type"], string, React.ReactNode]> {
+  return siteTypeDefinition(siteKind).sectionTypes.map((type) => [type, SECTION_LABELS[type][0], SECTION_LABELS[type][1]]);
+}
+
+/** Navigation is derived from the enabled sections — a corporate site never
+ *  maintains a separate menu structure that can drift out of sync. */
+function navItemsFor(config: StudioConfig) {
+  return config.sections.filter((section) => section.enabled && section.showInNav !== false && section.type !== "spacer")
+    .map((section) => ({ id: section.id, label: section.navLabel || section.title, href: `#${sectionAnchor(section)}` }));
+}
+
+function CorporateHeader(props: CanvasProps) {
+  const { config, device, selected, select, interactive = true } = props;
+  const mobile = device === "mobile";
+  const items = navItemsFor(config);
+  return <EditorElement type="header" id="header" selected={selected} onSelect={select} onEdit={props.onEditElement} interactive={interactive} className={config.header.sticky ? "sticky top-0 z-30" : ""} style={{ background: config.header.backgroundColor, color: config.header.textColor }}>
+    <div className="mx-auto flex min-h-16 flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-5" style={{ maxWidth: config.design.containerWidth }}>
+      <span className="flex items-center gap-3">
+        <span className="relative block">
+          {config.header.logoUrl ? <img src={config.header.logoUrl} alt="لوگو" className="h-10 w-10 rounded-xl object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-xl font-black text-white" style={{ background: config.design.primaryColor }}>L</span>}
+          {interactive && <InlineMediaControl target={{ kind: "logo" }} onUpload={props.onImageUpload} busy={props.imageBusy} label="لوگو" compact />}
+        </span>
+        <b className="text-sm sm:text-base">{config.header.storeName}</b>
+      </span>
+      {config.nav.enabled && !mobile && <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-bold opacity-80">
+        {items.map((entry) => <a key={entry.id} href={entry.href} onClick={interactive ? (event) => event.preventDefault() : undefined}>{entry.label}</a>)}
+      </nav>}
+      {config.nav.enabled && <a href={config.nav.ctaHref} onClick={interactive ? (event) => event.preventDefault() : undefined} className="mr-auto inline-flex min-h-10 items-center px-4 text-xs font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{config.nav.ctaLabel}</a>}
+    </div>
+    {config.nav.enabled && mobile && <nav className="flex gap-4 overflow-x-auto border-t border-black/5 px-4 py-2 text-[11px] font-bold opacity-80">
+      {items.map((entry) => <a key={entry.id} href={entry.href} className="whitespace-nowrap" onClick={interactive ? (event) => event.preventDefault() : undefined}>{entry.label}</a>)}
+    </nav>}
+  </EditorElement>;
+}
+
+function CorporateFooter({ config }: { config: StudioConfig }) {
+  if (!config.footer.enabled) return null;
+  return <footer className="mt-4" style={{ background: config.footer.backgroundColor, color: config.footer.textColor }}>
+    <div className="mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-8 sm:px-5" style={{ maxWidth: config.design.containerWidth }}>
+      <b className="text-sm">{config.header.storeName}</b>
+      <span className="text-xs opacity-70">{config.footer.text}</span>
+    </div>
+  </footer>;
+}
+
+function ItemCard({ item, section, config, variant }: { item: SectionItem; section: SectionConfig; config: StudioConfig; variant: "service" | "team" | "portfolio" }) {
+  const rounded = { borderRadius: config.design.cardRadius };
+  return <article className="overflow-hidden border border-black/5 bg-white" style={rounded}>
+    {variant !== "service" && <div className="aspect-[4/3] w-full bg-slate-100">
+      {item.imageUrl ? <img src={item.imageUrl} alt={item.title} loading="lazy" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-slate-300">{variant === "team" ? <UserCircle size={44} /> : <ImageSquare size={44} />}</div>}
+    </div>}
+    <div className="p-5">
+      {variant === "service" && <span className="mb-3 inline-grid h-10 w-10 place-items-center rounded-xl text-white" style={{ background: config.design.primaryColor }}><Star size={20} /></span>}
+      <b className="block text-sm" style={{ color: section.textColor }}>{item.title}</b>
+      {item.subtitle && <span className="mt-1 block text-xs opacity-60">{item.subtitle}</span>}
+      {item.body && <p className="mt-3 text-xs leading-6 opacity-70">{item.body}</p>}
+    </div>
+  </article>;
+}
+
+function ContactForm({ section, config, onSubmit }: { section: SectionConfig; config: StudioConfig; onSubmit?: CanvasProps["onLeadSubmit"] }) {
+  const [form, setForm] = useState({ name: "", phone: "", email: "", company: "", message: "" });
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [error, setError] = useState("");
+  const field = (key: keyof typeof form) => ({ value: form[key], onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((current) => ({ ...current, [key]: event.target.value })) });
+  const input = "min-h-12 w-full rounded-xl border border-black/10 bg-white px-4 text-sm outline-none focus:border-violet-400";
+  if (state === "done") return <p role="status" data-lead-state="submitted" className="rounded-2xl bg-emerald-50 p-5 text-sm font-bold text-emerald-700">{section.contact?.successMessage}</p>;
+  return <form data-lead-form="corporate" className="grid gap-3" onSubmit={async (event) => {
+    event.preventDefault();
+    if (!onSubmit) return;
+    setState("busy"); setError("");
+    try { await onSubmit(form); setState("done"); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "ارسال ناموفق بود."); setState("error"); }
+  }}>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <input className={input} name="name" required placeholder="نام و نام خانوادگی" aria-label="نام و نام خانوادگی" {...field("name")} />
+      <input className={input} name="phone" required placeholder="شماره تماس" aria-label="شماره تماس" {...field("phone")} />
+      <input className={input} name="email" type="email" placeholder="ایمیل (اختیاری)" aria-label="ایمیل" {...field("email")} />
+      <input className={input} name="company" placeholder="نام سازمان (اختیاری)" aria-label="نام سازمان" {...field("company")} />
+    </div>
+    <textarea className={`${input} min-h-28 py-3`} name="message" placeholder="شرح درخواست شما" aria-label="شرح درخواست" {...field("message")} />
+    {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{error}</p>}
+    <button type="submit" disabled={state === "busy" || !onSubmit} className="min-h-12 px-6 text-sm font-black text-white disabled:opacity-60" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>
+      {state === "busy" ? "در حال ارسال…" : section.contact?.submitLabel || "ارسال"}
+    </button>
+  </form>;
+}
+
+function CorporateSection({ section, props }: { section: SectionConfig; props: CanvasProps }) {
+  const { config } = props;
+  const shell = { maxWidth: config.design.containerWidth };
+  const pad = { paddingTop: section.spacingTop, paddingBottom: section.spacingBottom };
+  const head = <div className="mb-7">
+    {section.subtitle && <span className="text-[11px] font-black" style={{ color: config.design.primaryColor }}>{section.subtitle}</span>}
+    <h2 className="mt-2 font-black" style={{ fontSize: props.device === "mobile" ? 24 : 30 * config.design.headingScale / 100 }}>{section.title}</h2>
+  </div>;
+  const columns = props.device === "mobile" ? 1 : props.device === "tablet" ? Math.min(2, section.columns || 3) : (section.columns || 3);
+  const grid = { display: "grid", gap: 16, gridTemplateColumns: `repeat(${columns},minmax(0,1fr))` } as React.CSSProperties;
+
+  if (section.type === "about" || section.type === "text-image") {
+    const media = <div className="relative min-h-56 overflow-hidden bg-slate-100" style={{ borderRadius: config.design.cardRadius }}>
+      {section.imageUrl ? <img src={section.imageUrl} alt={section.title} loading="lazy" className="h-full w-full object-cover" /> : <div className="grid h-full min-h-56 place-items-center text-slate-300"><ImageSquare size={48} /></div>}
+      {props.interactive !== false && <InlineMediaControl target={{ kind: "banner", id: section.id }} onUpload={props.onImageUpload} busy={props.imageBusy} label={section.imageUrl ? "تعویض تصویر" : "افزودن تصویر"} />}
+    </div>;
+    const copy = <div>{head}<p className="text-sm leading-8 opacity-75">{section.body}</p></div>;
+    return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
+      <div className={props.device === "mobile" ? "grid gap-6" : "grid gap-8 md:grid-cols-2"}>
+        {section.mediaPosition === "start" ? <>{media}{copy}</> : <>{copy}{media}</>}
+      </div>
+    </section>;
+  }
+
+  if (section.type === "services" || section.type === "team" || section.type === "portfolio") {
+    const variant = section.type === "services" ? "service" : section.type === "team" ? "team" : "portfolio";
+    return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
+      {head}
+      <div style={grid}>{(section.items || []).map((entry) => <ItemCard key={entry.id} item={entry} section={section} config={config} variant={variant} />)}</div>
+    </section>;
+  }
+
+  if (section.type === "cta") {
+    return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
+      <div className="flex flex-wrap items-center justify-between gap-5 p-8" style={{ background: section.backgroundColor, color: section.textColor, borderRadius: config.design.cardRadius }}>
+        <div><h2 className="text-xl font-black sm:text-2xl">{section.title}</h2><p className="mt-2 text-sm opacity-80">{section.subtitle}</p></div>
+        <a href={section.ctaHref || "#contact-main"} onClick={props.interactive !== false ? (event) => event.preventDefault() : undefined} className="inline-flex min-h-12 items-center bg-white px-6 text-sm font-black" style={{ color: section.backgroundColor, borderRadius: config.design.buttonRadius }}>{section.ctaLabel}</a>
+      </div>
+    </section>;
+  }
+
+  if (section.type === "contact") {
+    const details = [["تلفن", section.contact?.phone], ["ایمیل", section.contact?.email], ["نشانی", section.contact?.address]].filter(([, value]) => Boolean(value));
+    return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
+      {head}
+      <div className={props.device === "mobile" ? "grid gap-6" : "grid gap-8 md:grid-cols-[1.1fr_.9fr]"}>
+        {section.contact?.formEnabled !== false
+          ? <ContactForm section={section} config={config} onSubmit={props.interactive === false ? props.onLeadSubmit : undefined} />
+          : <p className="text-sm leading-8 opacity-70">{section.body}</p>}
+        <div className="grid content-start gap-3">
+          {details.map(([label, value]) => <div key={label as string} className="border border-black/5 bg-white p-4 text-sm" style={{ borderRadius: config.design.cardRadius }}>
+            <b className="block text-xs opacity-60">{label}</b><span className="mt-1 block">{value}</span>
+          </div>)}
+        </div>
+      </div>
+    </section>;
+  }
+
+  return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
+    {head}{section.body && <p className="text-sm leading-8 opacity-75">{section.body}</p>}
+  </section>;
+}
+
+function CorporateCanvas(props: CanvasProps) {
+  const visible = props.config.sections.filter((section) => section.enabled);
+  return <div className="min-h-full" style={{ color: props.config.design.textColor, background: props.config.design.backgroundColor }}>
+    <CorporateHeader {...props} />
+    <Hero {...props} />
+    {visible.map((section, index) => section.type === "spacer"
+      ? <SectionShell key={section.id} section={section} index={index} props={props}><div style={{ height: section.spacingTop + section.spacingBottom }} /></SectionShell>
+      : <SectionShell key={section.id} section={section} index={index} props={props}>
+          <div style={{ background: section.backgroundColor, color: section.textColor }}><CorporateSection section={section} props={props} /></div>
+        </SectionShell>)}
+    <InsertBetween index={visible.length} onInsert={props.interactive === false ? undefined : props.onInsertSection} siteKind={props.config.siteKind} />
+    <CorporateFooter config={props.config} />
+  </div>;
+}
+
+export default function StudioCanvas(props: CanvasProps) { const [runtimePage,setRuntimePage]=useState<PageMode>(props.runtimePage || props.config.activePage); const page=props.interactive===false?runtimePage:props.config.activePage; const navigate=(next:PageMode)=>{setRuntimePage(next);props.onRuntimePage?.(next);}; const effective=useMemo(()=>({...props,onRuntimePage:navigate}),[props]); return <div dir="rtl" data-canvas-interactive={props.interactive === false ? "false" : "true"} data-preview-device={props.device} data-storefront-renderer="store-studio-v16" data-site-kind={props.config.siteKind} className="mx-auto overflow-hidden bg-white shadow-2xl" style={{width:props.device==="desktop"?"100%":props.device==="tablet"?"768px":"390px",maxWidth:"100%",fontFamily:props.config.design.fontFamily,fontSize:`${props.config.design.bodyScale}%`}}>{!isCommerceSite(props.config.siteKind)?<CorporateCanvas {...effective}/>:page==="storefront"?<StorefrontCanvas {...effective}/>:page==="collection"?<CollectionCanvas {...effective}/>:page==="product"?<ProductCanvas {...effective}/>:page==="cart"?<CartCanvas {...effective}/>:page==="checkout"?<CheckoutCanvas {...effective}/>:<SuccessCanvas {...effective}/>}</div>; }

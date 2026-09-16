@@ -1,6 +1,11 @@
 import { productMainImage } from "../../lib/productMedia";
+import { siteTypeDefinition } from "./site-types";
 import type {
   CommerceConfig,
+  FooterConfig,
+  NavConfig,
+  SeoConfig,
+  SiteKind,
   DesignConfig,
   HeaderConfig,
   HeroConfig,
@@ -114,6 +119,83 @@ export const commerceDefaults: CommerceConfig = {
   productOverrides: {},
 };
 
+export const navDefaults: NavConfig = { enabled: true, ctaLabel: "تماس با ما", ctaHref: "#contact-main" };
+export const footerDefaults: FooterConfig = { enabled: true, text: "© تمامی حقوق محفوظ است.", backgroundColor: "#0f172a", textColor: "#e2e8f0" };
+export const seoDefaults: SeoConfig = { title: "", description: "" };
+
+export const corporateHeroDefaults: HeroConfig = {
+  ...heroDefaults,
+  layout: "split",
+  eyebrow: "راهکارهای حرفه‌ای کسب‌وکار",
+  title: "شریک مطمئن رشد کسب‌وکار شما",
+  subtitle: "با تیمی باتجربه، خدماتی شفاف و نتیجه‌محور برای سازمان شما طراحی می‌کنیم.",
+  ctaLabel: "درخواست مشاوره",
+  ctaHref: "#contact-main",
+};
+
+export const corporateHeaderDefaults: HeaderConfig = {
+  ...headerDefaults,
+  storeName: "شرکت شما",
+  showSearch: false,
+  showAccount: false,
+  showCart: false,
+  sticky: true,
+};
+
+const item = (id: string, title: string, subtitle: string, body = "") => ({ id, title, subtitle, body, imageUrl: "", meta: "" });
+
+export const corporateSectionDefaults: SectionConfig[] = [
+  {
+    id: "about-main", type: "about", enabled: true, showInNav: true, navLabel: "درباره ما",
+    title: "درباره ما", subtitle: "ما که هستیم",
+    body: "ما یک تیم چندتخصصی هستیم که با تکیه بر تجربه و داده، راهکارهایی پایدار برای کسب‌وکارها می‌سازیم.",
+    imageUrl: "", mediaPosition: "end",
+    backgroundColor: "#ffffff", textColor: "#0f172a", spacingTop: 32, spacingBottom: 32,
+  },
+  {
+    id: "services-main", type: "services", enabled: true, showInNav: true, navLabel: "خدمات",
+    title: "خدمات ما", subtitle: "آنچه برای شما انجام می‌دهیم", columns: 3,
+    items: [
+      item("service-1", "مشاوره تخصصی", "بررسی وضعیت و طراحی نقشه راه"),
+      item("service-2", "اجرا و پیاده‌سازی", "تبدیل برنامه به نتیجه قابل اندازه‌گیری"),
+      item("service-3", "پشتیبانی مستمر", "همراهی پس از اجرا و بهبود پیوسته"),
+    ],
+    backgroundColor: "#f8fafc", textColor: "#0f172a", spacingTop: 32, spacingBottom: 32,
+  },
+  {
+    id: "portfolio-main", type: "portfolio", enabled: true, showInNav: true, navLabel: "نمونه‌کارها",
+    title: "نمونه‌کارها", subtitle: "پروژه‌هایی که به سرانجام رسانده‌ایم", columns: 3,
+    items: [
+      item("project-1", "پروژه نمونه یک", "صنعت تولیدی"),
+      item("project-2", "پروژه نمونه دو", "خدمات مالی"),
+      item("project-3", "پروژه نمونه سه", "خرده‌فروشی"),
+    ],
+    backgroundColor: "#ffffff", textColor: "#0f172a", spacingTop: 32, spacingBottom: 32,
+  },
+  {
+    id: "team-main", type: "team", enabled: true, showInNav: true, navLabel: "تیم ما",
+    title: "تیم ما", subtitle: "افرادی که پروژه شما را پیش می‌برند", columns: 3,
+    items: [
+      item("member-1", "عضو تیم", "مدیر پروژه"),
+      item("member-2", "عضو تیم", "کارشناس ارشد"),
+      item("member-3", "عضو تیم", "مشاور فنی"),
+    ],
+    backgroundColor: "#f8fafc", textColor: "#0f172a", spacingTop: 32, spacingBottom: 32,
+  },
+  {
+    id: "cta-main", type: "cta", enabled: true, showInNav: false,
+    title: "آماده شروع همکاری هستید؟", subtitle: "همین امروز با ما گفت‌وگو کنید.",
+    ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main",
+    backgroundColor: "#6d5dfc", textColor: "#ffffff", spacingTop: 28, spacingBottom: 28,
+  },
+  {
+    id: "contact-main", type: "contact", enabled: true, showInNav: true, navLabel: "تماس",
+    title: "تماس با ما", subtitle: "فرم زیر را کامل کنید تا همکاران ما تماس بگیرند.",
+    contact: { formEnabled: true, submitLabel: "ارسال درخواست", successMessage: "پیام شما ثبت شد. به‌زودی با شما تماس می‌گیریم.", phone: "", email: "", address: "", mapUrl: "" },
+    backgroundColor: "#ffffff", textColor: "#0f172a", spacingTop: 32, spacingBottom: 36,
+  },
+];
+
 export const sectionDefaults: SectionConfig[] = [
   {
     id: "products-main",
@@ -192,7 +274,17 @@ function modernizeSections(sections: SectionConfig[]) {
   }));
 }
 
-export function restoreConfig(content: Record<string, any>): StudioConfig {
+/** Sections a site type starts with when nothing has been persisted yet. */
+export const defaultSectionsFor = (siteKind: SiteKind): SectionConfig[] =>
+  siteKind === "BUSINESS" ? corporateSectionDefaults : sectionDefaults;
+
+/** Only sections this site type is allowed to compose survive a restore. */
+const allowedSections = (sections: SectionConfig[], siteKind: SiteKind) => {
+  const allowed = siteTypeDefinition(siteKind).sectionTypes;
+  return sections.filter((section) => allowed.includes(section.type));
+};
+
+export function restoreConfig(content: Record<string, any>, siteKind: SiteKind = "STORE"): StudioConfig {
   const v11 = content.storeBuilderV11 || {};
   const v13 = content.storeBuilderV13 || {};
   const v14 = content.storeBuilderV14 || {};
@@ -201,11 +293,15 @@ export function restoreConfig(content: Record<string, any>): StudioConfig {
   const oldDesign = v13.design || v15.design || {};
   const oldCommerce = v15.commerce || v14.commerce || {};
   const oldV11Design = v11.design || {};
-  const restoredSections = Array.isArray(v16.sections) ? v16.sections : legacySections(content);
+  const corporate = siteKind === "BUSINESS";
+  const restoredSections = Array.isArray(v16.sections) && v16.sections.length
+    ? (corporate ? allowedSections(v16.sections, siteKind) : v16.sections)
+    : (corporate ? corporateSectionDefaults : legacySections(content));
   const storedHero = v16.hero || {};
 
   return {
     version: 16,
+    siteKind,
     activePage: ["storefront", "cart", "checkout", "success"].includes(v16.activePage) ? v16.activePage : (v15.previewMode || "storefront"),
     selectedElement: v16.selectedElement || { type: "hero", id: "hero" },
     design: {
@@ -224,17 +320,20 @@ export function restoreConfig(content: Record<string, any>): StudioConfig {
       containerWidth: Math.max(1120, Number(v16.design?.containerWidth || designDefaults.containerWidth)),
     },
     header: {
-      ...headerDefaults,
+      ...(corporate ? corporateHeaderDefaults : headerDefaults),
       ...v16.header,
       height: Math.min(Number(v16.header?.height || headerDefaults.height), 72),
     },
     hero: {
-      ...heroDefaults,
+      ...(corporate ? corporateHeroDefaults : heroDefaults),
       ...storedHero,
       imageUrl: storedHero.imageUrl || heroDefaults.imageUrl,
       height: Math.min(Number(storedHero.height || heroDefaults.height), 360),
     },
-    sections: modernizeSections(restoredSections),
+    sections: corporate ? restoredSections : modernizeSections(restoredSections),
+    nav: { ...navDefaults, ...v16.nav },
+    footer: { ...footerDefaults, ...v16.footer },
+    seo: { ...seoDefaults, ...v16.seo },
     commerce: {
       ...commerceDefaults,
       ...oldCommerce,
