@@ -57,7 +57,7 @@ test("canonical corporate website journey: compose, publish, live, draft isolati
   expect(project.siteType).toBe("BUSINESS");
 
   // 2-4. Compose hero, corporate sections and navigation, then save the draft.
-  await expectJsonOk(await api.patch(`/api/site-projects/${projectId}`, { data: { content: { storeBuilderV16: corporateConfig("عنوان نسخه یک") } } }));
+  await expectJsonOk(await api.patch(`/api/site-projects/${projectId}`, { data: { content: { storeBuilderV16: corporateConfig("عنوان نسخه یک") }, idempotencyKey: `e2e-${Date.now()}-${Math.random().toString(16).slice(2)}` } }));
 
   // Unpublished: there is no live site yet.
   expect((await api.get(`/api/auth/site/${projectId}`)).status()).toBe(404);
@@ -91,9 +91,41 @@ test("canonical corporate website journey: compose, publish, live, draft isolati
   await expect(canvas).toHaveAttribute("dir", "rtl");
 
   // 8. A draft edit must not alter what is live.
-  await expectJsonOk(await api.patch(`/api/site-projects/${projectId}`, { data: { content: { storeBuilderV16: corporateConfig("عنوان نسخه دو") } } }));
+  await expectJsonOk(await api.patch(`/api/site-projects/${projectId}`, { data: { content: { storeBuilderV16: corporateConfig("عنوان نسخه دو") }, idempotencyKey: `e2e-${Date.now()}-${Math.random().toString(16).slice(2)}` } }));
   await page.reload();
   expect(await liveHeroTitle(page), "an unpublished draft edit must not reach the live site").toBe("عنوان نسخه یک");
+
+  // Every draft save is tracked: the document never moves without a revision.
+  const history = await expectJsonOk(await api.get(`/api/site-projects/${projectId}/document-revisions`));
+  expect(history.revisions.length, "both saves are in history, on top of the baseline").toBeGreaterThanOrEqual(2);
+  expect(history.current).toBe(history.revisions[history.revisions.length - 1].revision);
+
+  // A structured patch previews without touching the draft, then applies once.
+  const patchKey = `e2e-patch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const proposed = await expectJsonOk(await api.post(`/api/site-projects/${projectId}/document-patches`, {
+    data: {
+      idempotencyKey: patchKey,
+      operations: [
+        { type: "SET", target: "hero", path: "subtitle", value: "زیرعنوان پچ‌شده" },
+        { type: "SET", target: "hero", path: "priceMinor", value: 1 },
+      ],
+    },
+  }));
+  const preview = await expectJsonOk(await api.post(`/api/site-projects/${projectId}/document-patches/${proposed.patch.id}/preview`));
+  expect(preview.results.map((result: { outcome: string }) => result.outcome)).toEqual(["ACCEPTED", "REJECTED_PROTECTED_PROPERTY"]);
+  const draftBeforeApply = await expectJsonOk(await api.get(`/api/site-projects/${projectId}`));
+  expect(draftBeforeApply.project.content.storeBuilderV16.hero.subtitle, "preview changes nothing").not.toBe("زیرعنوان پچ‌شده");
+
+  const applied = await expectJsonOk(await api.post(`/api/site-projects/${projectId}/document-patches/${proposed.patch.id}/apply`));
+  expect(applied.applied).toBe(true);
+  expect(applied.patch.status).toBe("PARTIALLY_APPLIED");
+  const draftAfterApply = await expectJsonOk(await api.get(`/api/site-projects/${projectId}`));
+  expect(draftAfterApply.project.content.storeBuilderV16.hero.subtitle).toBe("زیرعنوان پچ‌شده");
+  expect("priceMinor" in draftAfterApply.project.content.storeBuilderV16.hero, "Commerce truth is never written by a patch").toBe(false);
+
+  // An applied patch mutates the draft only; live is still version 1.
+  await page.reload();
+  expect(await liveHeroTitle(page)).toBe("عنوان نسخه یک");
 
   // Publishing the edit promotes it.
   await expectJsonOk(await api.post(`/api/site-projects/${projectId}/publish`));
@@ -113,7 +145,7 @@ test("canonical corporate website journey: compose, publish, live, draft isolati
 test("the live contact form creates a real lead, and 390px has no horizontal overflow", async ({ browser }) => {
   const project = await createCorporateProject(`شرکت فرم ${Date.now()}`);
   const projectId = project.id as string;
-  await expectJsonOk(await api.patch(`/api/site-projects/${projectId}`, { data: { content: { storeBuilderV16: corporateConfig("عنوان فرم") } } }));
+  await expectJsonOk(await api.patch(`/api/site-projects/${projectId}`, { data: { content: { storeBuilderV16: corporateConfig("عنوان فرم") }, idempotencyKey: `e2e-${Date.now()}-${Math.random().toString(16).slice(2)}` } }));
   await expectJsonOk(await api.post(`/api/site-projects/${projectId}/publish`));
 
   // 11. 390px mobile: the critical content fits with no horizontal page scroll.

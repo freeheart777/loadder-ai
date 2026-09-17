@@ -60,7 +60,7 @@ async function publishedSite(homeTitle = "عنوان خانه") {
     data: { name: `شرکت چندصفحه ${Date.now()}`, siteType: "BUSINESS", content: {} },
   }));
   const id = created.project.id as string;
-  await expectJsonOk(await api.patch(`/api/site-projects/${id}`, { data: { content: { storeBuilderV16: multiPageConfig(homeTitle) } } }));
+  await expectJsonOk(await api.patch(`/api/site-projects/${id}`, { data: { content: { storeBuilderV16: multiPageConfig(homeTitle) }, idempotencyKey: `e2e-${Date.now()}-${Math.random().toString(16).slice(2)}` } }));
   await expectJsonOk(await api.post(`/api/site-projects/${id}/publish`));
   return id;
 }
@@ -122,7 +122,7 @@ test("a draft page never reaches the live site until it is published, and rollba
   // Draft: add a page and retitle Home. Neither may appear live.
   const draft = multiPageConfig("نسخه دو");
   draft.pages.push(page_("page-news", "اخبار", "news"));
-  await expectJsonOk(await api.patch(`/api/site-projects/${siteId}`, { data: { content: { storeBuilderV16: draft } } }));
+  await expectJsonOk(await api.patch(`/api/site-projects/${siteId}`, { data: { content: { storeBuilderV16: draft }, idempotencyKey: `e2e-${Date.now()}-${Math.random().toString(16).slice(2)}` } }));
   await page.goto(`/site/${siteId}/news`);
   await expect(page.locator('[data-page-missing="true"]')).toBeVisible();
   await page.goto(`/site/${siteId}`);

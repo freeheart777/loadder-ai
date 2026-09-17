@@ -153,6 +153,10 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [productError, setProductError] = useState("");
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
   const productSubmitLock = useRef(false);
+  // The draft revision this editor is composed on, and the save that is in
+  // flight: its idempotency key together with the exact document it carried.
+  const draftRevision = useRef<number | null>(null);
+  const pendingSave = useRef<{ key: string; document: string } | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
 
@@ -166,6 +170,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         const detail = await read(await apiFetch(`/api/site-projects/${selected.id}`, { signal: c.signal }));
         const loaded = detail.project as Project;
         setProject(loaded);
+        draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
         setConfig(restoreConfig(loaded.content || {}, siteKind));
         setAssets((detail.assets || []).filter((a: MediaAsset) => typeof a.url === "string"));
         // A corporate site never loads Commerce concepts.
@@ -426,8 +431,24 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     if (!project) throw new Error("پروژه فروشگاه آماده نیست.");
     const storeBuilderV16: StudioConfig = { ...nextConfig, version: 16 };
     const content = { ...project.content, storeBuilderV16 };
-    const out = await read(await apiFetch(`/api/site-projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) }));
+    // One key per logical save, generated with the browser's own CSPRNG.
+    // Retrying the SAME document reuses the key so the duplicate request
+    // converges instead of appending a second revision; a document that has
+    // changed since the failed attempt is a new save and gets a new key.
+    const document = JSON.stringify(content);
+    const idempotencyKey = pendingSave.current?.document === document ? pendingSave.current.key : crypto.randomUUID();
+    pendingSave.current = { key: idempotencyKey, document };
+    const out = await read(await apiFetch(`/api/site-projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      // expectedRevision is the draft this edit was composed on, so a stale
+      // save cannot silently overwrite newer work.
+      body: JSON.stringify({ content, idempotencyKey, expectedRevision: draftRevision.current }),
+    }));
+    // Cleared only on success, so a save that threw keeps its key for a retry.
     setProject(out.project);
+    if (typeof out.revision === "number") draftRevision.current = out.revision;
+    pendingSave.current = null;
   }
 
   async function uploadMedia(target: InlineMediaTarget, file: File) {
