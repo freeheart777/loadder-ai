@@ -80,6 +80,30 @@ export function createSiteProjectService({ repository, businessContextService, d
       now: now().toISOString(),
     });
   }
+  // A tracked draft save: the same validation and normalisation the ordinary
+  // update path applies, plus an immutable revision recorded in the same
+  // transaction.
+  function saveDraft(id, { content, idempotencyKey, actorUserId = null } = {}) {
+    const current = get(id);
+    const normalized = ensureWebsitePlatformContent(validateSiteDocument(content), { siteType: current.siteType, name: current.name });
+    const result = repository.saveDraftWithRevision(id, { content: normalized, idempotencyKey, actorUserId, now: now().toISOString() });
+    if (!result) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND");
+    return result;
+  }
+
+  // Exact forward restore. Revision N is replayed as a new revision; nothing
+  // in history is mutated or removed.
+  function restoreDraftRevision(id, { revision, idempotencyKey, actorUserId = null } = {}) {
+    get(id);
+    const result = repository.restoreDocumentRevision(id, { revision, idempotencyKey, actorUserId, now: now().toISOString() });
+    if (!result) throw new SiteProjectError("Site document revision not found.", 404, "SITE_REVISION_NOT_FOUND");
+    return result;
+  }
+
+  function documentRevisions(id) { get(id); return repository.listDocumentRevisions(id); }
+  function documentRevision(id, revision) { get(id); return repository.getDocumentRevision(id, revision); }
+  function currentDocumentRevision(id) { get(id); return repository.currentDocumentRevision(id); }
+
   function publish(id) {
     const current = get(id);
     if (!current.content || Object.keys(current.content).length === 0) throw new SiteProjectError("A site needs content before publishing.", 409, "SITE_CONTENT_REQUIRED");
@@ -130,5 +154,5 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
     return true;
   }
-  return Object.freeze({ list, get, create, update, publish, rollbackPublishVersion, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
+  return Object.freeze({ list, get, create, update, saveDraft, restoreDraftRevision, documentRevisions, documentRevision, currentDocumentRevision, publish, rollbackPublishVersion, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
 }
