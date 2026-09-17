@@ -33,6 +33,42 @@ function containers(builder) {
   return list;
 }
 
+/** A section is addressable only by a non-empty string id. */
+const sectionId = (section) => (typeof section?.id === "string" && section.id.trim() ? section.id : null);
+
+/** Every section carrying this id, across every container. */
+function sectionMatches(builder, id) {
+  const hits = [];
+  if (typeof id !== "string" || !id.trim()) return hits;
+  for (const entry of containers(builder)) {
+    (entry.node.sections || []).forEach((section, index) => {
+      if (sectionId(section) === id) hits.push({ entry, index });
+    });
+  }
+  return hits;
+}
+
+/**
+ * The container holding a section, for REMOVE/MOVE/SET/UNSET.
+ *
+ * This fails CLOSED: a target resolves only when exactly one section carries
+ * that id. A legacy document may hold duplicate or id-less sections — those
+ * targets are unresolved rather than silently first-match, so a patch can never
+ * mutate a different section than the one it named. Nothing is rewritten to
+ * make such a document addressable.
+ */
+function sectionHome(builder, id) {
+  const hits = sectionMatches(builder, id);
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/** Section ids for a REORDER: null when any is missing or duplicated. */
+function orderableIds(list) {
+  const ids = list.map(sectionId);
+  if (ids.some((id) => id === null)) return null;
+  return new Set(ids).size === ids.length ? ids : null;
+}
+
 /** Resolve a semantic target to the object a path applies to. */
 export function resolveTarget(builder, target) {
   const kind = targetKind(target);
@@ -42,23 +78,10 @@ export function resolveTarget(builder, target) {
     return containers(builder).find((entry) => entry.slug === slug)?.node || null;
   }
   if (kind === "section") {
-    const id = targetSelector(target);
-    for (const entry of containers(builder)) {
-      const found = (entry.node.sections || []).find((section) => String(section?.id) === id);
-      if (found) return found;
-    }
-    return null;
+    const home = sectionHome(builder, targetSelector(target));
+    return home ? home.entry.node.sections[home.index] : null;
   }
   return builder[kind] && typeof builder[kind] === "object" ? builder[kind] : null;
-}
-
-/** The container holding a section, for INSERT/REMOVE/MOVE/REORDER. */
-function sectionHome(builder, sectionId) {
-  for (const entry of containers(builder)) {
-    const index = (entry.node.sections || []).findIndex((section) => String(section?.id) === sectionId);
-    if (index >= 0) return { entry, index };
-  }
-  return null;
 }
 
 const readPath = (node, segments) => segments.slice(0, -1).reduce((acc, key) => (acc && typeof acc === "object" ? acc[key] : undefined), node);
@@ -109,7 +132,9 @@ function applyOne(builder, operation) {
     const node = resolveTarget(builder, target);
     const list = node && Array.isArray(node.sections) ? node.sections : null;
     if (!list) return false;
-    const byId = new Map(list.map((section) => [String(section?.id), section]));
+    const ids = orderableIds(list);
+    if (!ids) return false;
+    const byId = new Map(list.map((section, index) => [ids[index], section]));
     // A reorder is a permutation of exactly the ids already present.
     if (order.length !== list.length || !order.every((id) => byId.has(String(id)))) return false;
     node.sections = order.map((id) => byId.get(String(id)));
@@ -137,11 +162,13 @@ function validateOne(builder, operation) {
     const verdict = classify(target, "sections");
     if (verdict.reason) return { outcome: OUTCOME[verdict.reason] };
     if (!resolveTarget(builder, target)) return { outcome: OUTCOME.REJECTED_INVALID_TARGET };
-    if (!value || typeof value !== "object" || Array.isArray(value) || !value.id || !value.type) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || !sectionId(value) || typeof value.type !== "string" || !value.type.trim()) {
       return { outcome: OUTCOME.REJECTED_SCHEMA };
     }
     if (!validateValue(value)) return { outcome: OUTCOME.REJECTED_INVALID_VALUE };
-    if (sectionHome(builder, String(value.id))) return { outcome: OUTCOME.REJECTED_SCHEMA };
+    // Collision is checked against EVERY match, not the resolvable one, so a
+    // document that already holds duplicates cannot gain another.
+    if (sectionMatches(builder, value.id).length) return { outcome: OUTCOME.REJECTED_SCHEMA };
     return { outcome: OUTCOME.ACCEPTED, klass: verdict.klass };
   }
 
@@ -163,7 +190,9 @@ function validateOne(builder, operation) {
     const node = resolveTarget(builder, target);
     if (!node || !Array.isArray(node.sections)) return { outcome: OUTCOME.REJECTED_INVALID_TARGET };
     if (!Array.isArray(order) || order.length > LIMITS.maxCollection) return { outcome: OUTCOME.REJECTED_SCHEMA };
-    const ids = new Set(node.sections.map((section) => String(section?.id)));
+    const ordered = orderableIds(node.sections);
+    if (!ordered) return { outcome: OUTCOME.REJECTED_INVALID_TARGET };
+    const ids = new Set(ordered);
     if (order.length !== ids.size || !order.every((id) => ids.has(String(id)))) return { outcome: OUTCOME.REJECTED_SCHEMA };
     return { outcome: OUTCOME.ACCEPTED, klass: verdict.klass };
   }

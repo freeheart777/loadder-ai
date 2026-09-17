@@ -51,11 +51,13 @@ BEGIN
   ) THEN RAISE(ABORT,'site document patch revision workspace mismatch') END;
 END;
 
--- Identity is immutable for the life of a patch.
+-- Identity is immutable for the life of a patch. The operations are part of
+-- that identity: what was validated is what applies, and patch_hash stays true.
 CREATE TRIGGER IF NOT EXISTS trg_site_document_patch_identity_immutable
 BEFORE UPDATE ON site_document_patches
 WHEN OLD.workspace_id<>NEW.workspace_id OR OLD.site_project_id<>NEW.site_project_id
   OR OLD.idempotency_key<>NEW.idempotency_key OR OLD.patch_hash<>NEW.patch_hash
+  OR OLD.operations_json<>NEW.operations_json
   OR OLD.base_revision<>NEW.base_revision OR OLD.created_at<>NEW.created_at
 BEGIN
   SELECT RAISE(ABORT,'site document patch identity is immutable');

@@ -591,3 +591,122 @@ test("the HTTP patch surface previews without mutating and applies exactly once"
     assert.equal(conflicted.body.patch.status, "CONFLICTED");
   } finally { await close(); }
 });
+
+// ---------------------------------------------- hardening: name normalisation
+
+test("a protected Commerce name is refused in every equivalent spelling", () => {
+  const doc = multiPage();
+  const spellings = [
+    ["priceMinor", "price_minor", "price-minor", "PRICE_MINOR", "Price_Minor"],
+    ["sellingPrice", "selling_price", "SELLING-PRICE"],
+    ["inventoryQuantity", "inventory_quantity", "INVENTORY_QUANTITY"],
+    ["productId", "product_id", "PRODUCT-ID"],
+    ["orderStatus", "order_status", "ORDER_STATUS"],
+    ["sku", "SKU", "S_K_U"],
+  ];
+  for (const forms of spellings) {
+    for (const name of forms) {
+      // As a path: refused as protected, never merely "unknown property".
+      assert.equal(
+        evaluatePatch(doc, [op("SET", { target: "section:s1", path: name.replace(/-/g, "_"), value: 1 })]).results[0].outcome,
+        OUTCOME.REJECTED_PROTECTED_PROPERTY, `path ${name}`);
+      // As a key inside a submitted value, including nested and in arrays.
+      for (const value of [{ [name]: 1 }, [{ [name]: 1 }], [{ a: { [name]: 1 } }]]) {
+        const result = evaluatePatch(doc, [op("SET", { target: "section:s1", path: "items", value })]);
+        assert.equal(result.results[0].outcome, OUTCOME.REJECTED_INVALID_VALUE, `value ${name}`);
+        assert.deepEqual(result.proposed, doc, `value ${name} changed nothing`);
+      }
+    }
+  }
+  // Normalisation must not swallow ordinary presentation names.
+  assert.equal(evaluatePatch(doc, [op("SET", { target: "section:s1", path: "title", value: { label: "ok", cta_href: "/x" } })]).results[0].outcome, OUTCOME.ACCEPTED);
+  // A prototype vector is still matched exactly, so a harmless "proto" is fine.
+  assert.equal(evaluatePatch(doc, [op("SET", { target: "section:s1", path: "items", value: [{ proto: 1 }] })]).results[0].outcome, OUTCOME.ACCEPTED);
+});
+
+// ------------------------------------------- hardening: section target safety
+
+test("a section target resolves only when exactly one non-empty string id matches", () => {
+  const ambiguous = () => ({
+    storeBuilderV16: {
+      version: 16,
+      hero: { title: "H" },
+      pages: [
+        { id: "h", slug: "", sections: [section("dup", "about", "A"), section("dup", "about", "B"), { type: "about", title: "NOID" }, section("only", "team", "C")] },
+        { id: "t", slug: "team", sections: [section("dup", "about", "D")] },
+      ],
+    },
+  });
+  const doc = ambiguous();
+  const outcome = (operation) => evaluatePatch(doc, [operation]).results[0].outcome;
+
+  // Duplicate id: unresolved, and NEITHER section is touched.
+  for (const operation of [
+    op("SET", { target: "section:dup", path: "title", value: "X" }),
+    op("UNSET", { target: "section:dup", path: "title" }),
+    op("REMOVE", { target: "section:dup" }),
+    op("MOVE", { target: "section:dup", toTarget: "page:team" }),
+  ]) {
+    const result = evaluatePatch(doc, [operation]);
+    assert.equal(result.results[0].outcome, OUTCOME.REJECTED_INVALID_TARGET, JSON.stringify(operation));
+    assert.deepEqual(result.proposed, doc, "an ambiguous target mutates nothing");
+  }
+
+  // Missing, empty and non-string ids are not addressable at all.
+  for (const target of ["section:undefined", "section:null", "section:", "section:   ", "section:[object Object]"]) {
+    assert.equal(outcome(op("SET", { target, path: "title", value: "PWNED" })), OUTCOME.REJECTED_INVALID_TARGET, target);
+  }
+  assert.equal(evaluatePatch(doc, [op("SET", { target: "section:undefined", path: "title", value: "PWNED" })]).proposed.storeBuilderV16.pages[0].sections[2].title, "NOID");
+
+  // A unique id still resolves, in whichever page it lives.
+  const applied = evaluatePatch(doc, [op("SET", { target: "section:only", path: "title", value: "OK" })]);
+  assert.equal(applied.results[0].outcome, OUTCOME.ACCEPTED);
+  assert.equal(applied.proposed.storeBuilderV16.pages[0].sections[3].title, "OK");
+
+  // INSERT cannot mint an unaddressable or colliding section.
+  for (const value of [{ type: "about" }, { id: "", type: "about" }, { id: "   ", type: "about" }, { id: 7, type: "about" }, { id: "x" }, section("dup", "about", "E"), section("only", "about", "F")]) {
+    assert.equal(outcome(op("INSERT", { target: "page:team", value })), OUTCOME.REJECTED_SCHEMA, JSON.stringify(value));
+  }
+
+  // REORDER refuses a collection it cannot address unambiguously.
+  assert.equal(outcome(op("REORDER", { target: "page:", order: ["dup", "only"] })), OUTCOME.REJECTED_INVALID_TARGET);
+  assert.equal(outcome(op("REORDER", { target: "page:team", order: ["dup"] })), OUTCOME.ACCEPTED, "a clean single-section page still reorders");
+
+  // The document itself is never rewritten to make these targets resolvable.
+  assert.deepEqual(doc, ambiguous());
+});
+
+// --------------------------------------- hardening: patch operations immutable
+
+test("a patch's operations cannot be rewritten after validation", () => {
+  const { db, service } = fixture();
+  const proposed = runWithWorkspace("ws-1", () => {
+    const project = seeded(service);
+    return service.proposePatch(project.id, {
+      operations: [op("SET", { target: "hero", path: "title", value: "اصل" })],
+      idempotencyKey: "immutable",
+    }).patch;
+  });
+
+  // What was validated is what applies: raw SQL cannot swap the operations out
+  // from under the recorded patch_hash.
+  assert.throws(
+    () => db.prepare("UPDATE site_document_patches SET operations_json=? WHERE id=?")
+      .run(JSON.stringify([op("SET", { target: "hero", path: "title", value: "جعلی" })]), proposed.id),
+    /identity is immutable/
+  );
+  assert.deepEqual(JSON.parse(db.prepare("SELECT operations_json FROM site_document_patches WHERE id=?").get(proposed.id).operations_json), proposed.operations);
+
+  // The rest of identity stays sealed too.
+  for (const [column, value] of [["patch_hash", "b".repeat(64)], ["base_revision", 99], ["idempotency_key", "other"], ["created_at", "2030-01-01"]]) {
+    assert.throws(() => db.prepare(`UPDATE site_document_patches SET ${column}=? WHERE id=?`).run(value, proposed.id), /identity is immutable/, column);
+  }
+
+  // Outcome fields still move, so apply can settle the patch.
+  runWithWorkspace("ws-1", () => {
+    const applied = service.applyPatch(proposed.siteProjectId, { patchId: proposed.id });
+    assert.equal(applied.applied, true);
+    assert.equal(applied.patch.status, "APPLIED");
+  });
+  db.close();
+});

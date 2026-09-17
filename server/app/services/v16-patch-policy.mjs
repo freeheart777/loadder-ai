@@ -28,7 +28,19 @@ const PROTECTED_PROPERTIES = new Set([
   "providertransactionid", "variantid", "productid", "productoverrides", "productsettings",
 ]);
 
-// Prototype-pollution vectors, rejected at any depth.
+/**
+ * Canonical form of a property name: lower case with separators removed, so
+ * priceMinor, price_minor, price-minor and PRICE_MINOR are one name. Bounded,
+ * because the input is an arbitrary submitted key.
+ */
+export const canonicalProperty = (value) => String(value ?? "").slice(0, 64).toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** True when a property name is canonical Commerce truth in any spelling. */
+export const isProtectedProperty = (value) => PROTECTED_PROPERTIES.has(canonicalProperty(value));
+
+// Prototype-pollution vectors, rejected at any depth. These are matched on the
+// exact lower-cased name: only `__proto__` itself reaches Object.prototype, so
+// separator stripping here would reject harmless names like "proto".
 const FORBIDDEN_SEGMENTS = new Set(["__proto__", "prototype", "constructor"]);
 
 /** Properties a patch may set, by the target kind that owns them. */
@@ -92,7 +104,7 @@ export function parsePath(path) {
 }
 
 /** True when any path segment names canonical Commerce truth. */
-export const touchesProtected = (segments) => segments.some((segment) => PROTECTED_PROPERTIES.has(segment.toLowerCase()));
+export const touchesProtected = (segments) => segments.some(isProtectedProperty);
 
 /**
  * Classify a target+path. Returns { klass } or { reason } naming why it is not
@@ -125,7 +137,7 @@ export function validateValue(value, depth = 0) {
     const keys = Object.keys(value);
     if (keys.length > LIMITS.maxCollection) return false;
     return keys.every((key) => !FORBIDDEN_SEGMENTS.has(key.toLowerCase())
-      && !PROTECTED_PROPERTIES.has(key.toLowerCase())
+      && !isProtectedProperty(key)
       && validateValue(value[key], depth + 1));
   }
   return false; // functions, symbols, undefined
