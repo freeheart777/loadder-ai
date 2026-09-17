@@ -83,10 +83,10 @@ export function createSiteProjectService({ repository, businessContextService, d
   // A tracked draft save: the same validation and normalisation the ordinary
   // update path applies, plus an immutable revision recorded in the same
   // transaction.
-  function saveDraft(id, { content, idempotencyKey, actorUserId = null } = {}) {
+  function saveDraft(id, { content, idempotencyKey, actorUserId = null, expectedRevision = null } = {}) {
     const current = get(id);
     const normalized = ensureWebsitePlatformContent(validateSiteDocument(content), { siteType: current.siteType, name: current.name });
-    const result = repository.saveDraftWithRevision(id, { content: normalized, idempotencyKey, actorUserId, now: now().toISOString() });
+    const result = repository.saveDraftWithRevision(id, { content: normalized, idempotencyKey, actorUserId, expectedRevision, now: now().toISOString() });
     if (!result) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND");
     return result;
   }
@@ -99,6 +99,30 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!result) throw new SiteProjectError("Site document revision not found.", 404, "SITE_REVISION_NOT_FOUND");
     return result;
   }
+
+  function proposePatch(id, { operations, idempotencyKey, actorUserId = null } = {}) {
+    get(id);
+    const result = repository.proposePatch(id, { operations, idempotencyKey, actorUserId });
+    if (!result) throw new SiteProjectError("Site project not found.", 404, "SITE_PROJECT_NOT_FOUND");
+    return result;
+  }
+
+  function previewPatch(id, patchId) {
+    get(id);
+    const result = repository.previewPatch(id, patchId);
+    if (!result) throw new SiteProjectError("Site document patch not found.", 404, "SITE_PATCH_NOT_FOUND");
+    return result;
+  }
+
+  function applyPatch(id, { patchId } = {}) {
+    get(id);
+    const result = repository.applyPatch(id, { patchId, now: now().toISOString() });
+    if (!result) throw new SiteProjectError("Site document patch not found.", 404, "SITE_PATCH_NOT_FOUND");
+    return result;
+  }
+
+  function documentPatches(id) { get(id); return repository.listDocumentPatches(id); }
+  function documentPatch(id, patchId) { get(id); return repository.getDocumentPatch(id, patchId); }
 
   function documentRevisions(id) { get(id); return repository.listDocumentRevisions(id); }
   function documentRevision(id, revision) { get(id); return repository.getDocumentRevision(id, revision); }
@@ -154,5 +178,5 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
     return true;
   }
-  return Object.freeze({ list, get, create, update, saveDraft, restoreDraftRevision, documentRevisions, documentRevision, currentDocumentRevision, publish, rollbackPublishVersion, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
+  return Object.freeze({ list, get, create, update, saveDraft, restoreDraftRevision, proposePatch, previewPatch, applyPatch, documentPatches, documentPatch, documentRevisions, documentRevision, currentDocumentRevision, publish, rollbackPublishVersion, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
 }

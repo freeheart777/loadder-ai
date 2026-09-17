@@ -90,6 +90,18 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       await expect(journey.page.getByLabel("چیدمان", { exact: true })).toHaveValue("background");
     });
 
+    await test.step("the Studio save is recorded in draft revision history", async () => {
+      const history = await expectJsonOk(await journey.api.get(`/api/site-projects/${journey.projectId}/document-revisions`));
+      expect(history.current, "the save produced a revision").toBeGreaterThanOrEqual(1);
+      expect(history.revisions.length).toBeGreaterThanOrEqual(1);
+      for (const revision of history.revisions as Array<{ documentHash: string; document?: unknown }>) {
+        expect(revision.documentHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(revision.document, "the summary carries no document payload").toBeUndefined();
+      }
+      const detail = await expectJsonOk(await journey.api.get(`/api/site-projects/${journey.projectId}`));
+      expect(detail.draftRevision, "the editor reloads on the current revision").toBe(history.current);
+    });
+
     await test.step("Persian product creation and reload persistence", async () => {
       await journey.page.getByRole("button", { name: "+ افزودن محصول از کاتالوگ واقعی", exact: true }).click();
       await journey.page.getByRole("button", { name: "ساخت محصول جدید", exact: true }).click();
