@@ -39,8 +39,17 @@ export function createSiteProjectRepository(db) {
     const source = revisions.get(id, target);
     if (!source) return null;
     const { revision, created } = revisions.append({ siteProjectId: id, document: source.document, idempotencyKey, actorUserId });
-    if (!created) return { project, revision, created, restoredFrom: source.revision };
-    return { project: update(id, { content: source.document, now }), revision, created, restoredFrom: source.revision };
+    if (!created) {
+      // Idempotency means "this request was already processed" — never "repeat
+      // its old side effect against newer state". A replayed key reports the
+      // truth about the CURRENT draft: still the restored state, or superseded
+      // by later work. Either way nothing is written and no revision is added.
+      const superseded = revisions.documentHash(project.content) !== revision.documentHash;
+      return superseded
+        ? { project, revision, created: false, applied: false, superseded: true, restoredFrom: null }
+        : { project, revision, created: false, applied: false, superseded: false, restoredFrom: source.revision };
+    }
+    return { project: update(id, { content: source.document, now }), revision, created, applied: true, superseded: false, restoredFrom: source.revision };
   });
 
   function listDocumentRevisions(siteProjectId) { get(siteProjectId); return revisions.list(siteProjectId); }

@@ -354,3 +354,69 @@ test("a tracked save preserves the multi-page document exactly", () => {
   });
   db.close();
 });
+
+test("restore replay is truthful: converged while current, superseded once the draft moves on", () => {
+  const { db, repository, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const created = project(service);
+    service.saveDraft(created.id, { content: doc("A"), idempotencyKey: "k1" }); // rev 1 = A
+    service.saveDraft(created.id, { content: doc("B"), idempotencyKey: "k2" }); // rev 2 = B
+
+    // 1. A real restore applies and appends.
+    const first = service.restoreDraftRevision(created.id, { revision: 1, idempotencyKey: "R" });
+    assert.deepEqual([first.created, first.applied, first.superseded, first.restoredFrom, first.revision.revision], [true, true, false, 1, 3]);
+    assert.equal(repository.get(created.id).content.storeBuilderV16.hero.title, "A");
+
+    // 2. Immediate replay while the restored state is still current: converged,
+    //    not superseded, nothing appended.
+    const immediate = service.restoreDraftRevision(created.id, { revision: 1, idempotencyKey: "R" });
+    assert.deepEqual([immediate.created, immediate.applied, immediate.superseded, immediate.restoredFrom], [false, false, false, 1]);
+    assert.equal(immediate.revision.revision, 3);
+    assert.deepEqual(service.documentRevisions(created.id).map((r) => r.revision), [1, 2, 3], "no revision 4");
+    assert.equal(repository.get(created.id).content.storeBuilderV16.hero.title, "A", "current is unchanged");
+
+    // 3. The draft moves on.
+    service.saveDraft(created.id, { content: doc("C"), idempotencyKey: "k4" }); // rev 4 = C
+
+    // 4. Replaying the OLD restore key must not claim revision 1 was restored now.
+    const stale = service.restoreDraftRevision(created.id, { revision: 1, idempotencyKey: "R" });
+    assert.deepEqual([stale.created, stale.applied, stale.superseded], [false, false, true]);
+    assert.equal(stale.restoredFrom, null, "a stale replay never claims a restore happened now");
+    assert.equal(stale.revision.revision, 3, "it points at the historical revision it converged on");
+    assert.equal(stale.project.content.storeBuilderV16.hero.title, "C", "the returned project is the true current draft");
+    assert.equal(repository.get(created.id).content.storeBuilderV16.hero.title, "C", "content_json is not rewritten");
+    assert.deepEqual(service.documentRevisions(created.id).map((r) => r.revision), [1, 2, 3, 4], "no revision 5");
+
+    // 5. A genuinely new restore request still applies forward.
+    const fresh = service.restoreDraftRevision(created.id, { revision: 1, idempotencyKey: "R2" });
+    assert.deepEqual([fresh.created, fresh.applied, fresh.superseded, fresh.restoredFrom, fresh.revision.revision], [true, true, false, 1, 5]);
+    assert.equal(repository.get(created.id).content.storeBuilderV16.hero.title, "A");
+    assert.deepEqual(service.documentRevisions(created.id).map((r) => r.revision), [1, 2, 3, 4, 5], "history is intact");
+
+    // 6. Same key, different target stays a deterministic conflict.
+    assert.throws(
+      () => service.restoreDraftRevision(created.id, { revision: 2, idempotencyKey: "R2" }),
+      (error) => error.code === "SITE_REVISION_IDEMPOTENCY_CONFLICT"
+    );
+    assert.deepEqual(service.documentRevisions(created.id).map((r) => r.revision), [1, 2, 3, 4, 5]);
+  });
+  db.close();
+});
+
+test("a replayed save converges without appending and hands back the true current draft", () => {
+  const { db, repository, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const created = project(service);
+    const k1 = service.saveDraft(created.id, { content: doc("A"), idempotencyKey: "K1" });
+    service.saveDraft(created.id, { content: doc("B"), idempotencyKey: "K2" });
+
+    const replay = service.saveDraft(created.id, { content: doc("A"), idempotencyKey: "K1" });
+    assert.equal(replay.created, false, "no new revision");
+    assert.equal(replay.revision.id, k1.revision.id, "it converges on the revision the key already made");
+    assert.deepEqual(service.documentRevisions(created.id).map((r) => r.revision), [1, 2]);
+    // The caller is handed the CURRENT draft, not the document it replayed.
+    assert.equal(replay.project.content.storeBuilderV16.hero.title, "B");
+    assert.equal(repository.get(created.id).content.storeBuilderV16.hero.title, "B", "content_json is not rewound");
+  });
+  db.close();
+});
