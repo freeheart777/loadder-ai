@@ -1267,6 +1267,18 @@ Watch for:
 
 Do not micro-optimize without evidence.
 
+#### Lean performance and deployment standard
+
+**Large capability, small infrastructure footprint.** Default to a **Modular Monolith** on a normal, inexpensive VPS, not an enterprise cluster. Scale by measured evidence; microservices, queues, caches, workers, containers and distributed infrastructure are not prerequisites. Existing workload-bounding guidance does not mandate new infrastructure.
+
+- For every meaningful implementation, review CPU, RAM, DB query cost, network payload/request count, startup/runtime overhead, background process count and third-party/API cost. Reason explicitly about **50 / 500 / 5,000 users**, stating concurrency, workload and data-volume assumptions; estimates are not load-test proof.
+- Prefer bounded queries, explicit projections, page-scoped aggregation, server pagination, small JSON payloads and lazy/on-demand loading. Cancel obsolete requests and prevent stale-response races. Avoid N+1, unnecessary polling/refetches, hidden-data loading, duplicate processing/services and oversized initial UI bundles; preserve responsive mobile navigation.
+- Aim for ordinary operational reads **<300ms** and dashboard aggregates **<500ms** where practical. Report measurement conditions; never weaken correctness, authorization or integrity to meet these goals.
+- Keep heavy AI/media/OCR/transcription/rendering work from unnecessarily occupying the main web process. Prefer provider execution or bounded asynchronous execution with appropriate isolation when measured need warrants it; normal hosting must not require GPUs.
+- Scale in evidence-justified stages: **single application server + database where practical → separate DB → separate background workers → horizontal application scaling → specialized services**. Stages are options, not automatic milestones; preserve persistence, backup and recovery requirements.
+
+For significant future infrastructure cost, make a tested, low-risk in-scope improvement now or report **PERFORMANCE_INFRASTRUCTURE_PROPOSAL** with: **problem / current cost pattern / 50–500–5,000-user impact / recommended design / expected resource reduction (assumptions or measurements) / risk / NOW–NEXT–LATER**. Do not implement broader proposals without authorization.
+
 ### 50. SCALABILITY TRUTH
 
 Do not claim large-scale readiness without evidence.
