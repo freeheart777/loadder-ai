@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { requireWorkspaceId } from "../tenant-context.mjs";
 import { ensureWebsitePlatformContent } from "./website-platform-definition.mjs";
 import { validateSiteDocument } from "./site-page-model.mjs";
+import { translateInstruction } from "./v16-instruction-translator.mjs";
 
 const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
 const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
@@ -100,6 +101,16 @@ export function createSiteProjectService({ repository, businessContextService, d
     return result;
   }
 
+  // Ask Loadder's translation step. Side-effect free: it only reads the
+  // current draft to resolve the selected section, and never touches the
+  // database. The caller still proposes/previews/applies the resulting
+  // operations through the ordinary patch pipeline, so the same policy and
+  // revision guarantees apply to an AI-authored patch as to any other.
+  function translateAskLoadderInstruction(id, { target, instruction } = {}) {
+    const current = get(id);
+    return translateInstruction({ document: current.content, target, instruction });
+  }
+
   function proposePatch(id, { operations, idempotencyKey, actorUserId = null } = {}) {
     get(id);
     const result = repository.proposePatch(id, { operations, idempotencyKey, actorUserId });
@@ -178,5 +189,5 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (!repository.removeAsset(projectId, assetId)) throw new SiteProjectError("Asset not found.", 404, "SITE_ASSET_NOT_FOUND");
     return true;
   }
-  return Object.freeze({ list, get, create, update, saveDraft, restoreDraftRevision, proposePatch, previewPatch, applyPatch, documentPatches, documentPatch, documentRevisions, documentRevision, currentDocumentRevision, publish, rollbackPublishVersion, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
+  return Object.freeze({ list, get, create, update, saveDraft, restoreDraftRevision, translateAskLoadderInstruction, proposePatch, previewPatch, applyPatch, documentPatches, documentPatch, documentRevisions, documentRevision, currentDocumentRevision, publish, rollbackPublishVersion, versions, assets, addAsset, domains, addDomain, removeDomain, createPreviewToken, revokePreviewToken, remove, removeAsset });
 }

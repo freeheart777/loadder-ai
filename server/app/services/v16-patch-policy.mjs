@@ -76,6 +76,12 @@ const ALLOWED = {
     mediaPosition: "PRESENTATION", imageUrl: "PRESENTATION", showInNav: "PRESENTATION",
     title: "CONTENT", subtitle: "CONTENT", body: "CONTENT", ctaLabel: "CONTENT", ctaHref: "CONTENT", navLabel: "CONTENT",
     items: "CONTENT",
+    // Sibling levers for a products section, deliberately kept OUTSIDE
+    // productSettings: that whole container is protected Commerce-adjacent
+    // truth (see PROTECTED_PROPERTIES) and stays unreachable by any patch, on
+    // purpose. These two top-level fields are the only patch-reachable
+    // presentation control over a products section's display.
+    visibleProductCount: "PRESENTATION", productImageSize: "PRESENTATION",
   },
 };
 

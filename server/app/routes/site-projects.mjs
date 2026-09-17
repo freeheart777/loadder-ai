@@ -1,11 +1,12 @@
 import express from "express";
 import { SiteProjectError } from "../services/site-project-service.mjs";
 import { SitePatchError } from "../services/site-document-patch-service.mjs";
+import { InstructionTranslatorError } from "../services/v16-instruction-translator.mjs";
 
 export function createSiteProjectsRouter({ service }) {
   const router = express.Router();
   const handle = (error, res) => {
-    if (error instanceof SiteProjectError || error instanceof SitePatchError) {
+    if (error instanceof SiteProjectError || error instanceof SitePatchError || error instanceof InstructionTranslatorError) {
       return res.status(error.status).json({ success: false, message: error.message, code: error.code });
     }
     console.error("Site project error:", error);
@@ -84,6 +85,41 @@ export function createSiteProjectsRouter({ service }) {
       const revision = service.documentRevision(req.params.id, Number(req.params.revision));
       if (!revision) return res.status(404).json({ success: false, code: "SITE_REVISION_NOT_FOUND", message: "Site document revision not found." });
       return res.json({ success: true, revision });
+    } catch (e) { return handle(e, res); }
+  });
+  // Undo: an exact forward restore. Revision N is replayed as a NEW revision;
+  // nothing in history is deleted or mutated, and the pointer never moves
+  // backward. Idempotent like every other tracked write.
+  router.post("/site-projects/:id/document-revisions/:revision/restore", (req, res) => {
+    try {
+      const result = service.restoreDraftRevision(req.params.id, {
+        revision: Number(req.params.revision),
+        idempotencyKey: req.body?.idempotencyKey,
+        actorUserId: req.user?.id || null,
+      });
+      return res.json({
+        success: true,
+        project: result.project,
+        revision: result.revision.revision,
+        applied: result.applied,
+        superseded: Boolean(result.superseded),
+        restoredFrom: result.restoredFrom ?? null,
+      });
+    } catch (e) { return handle(e, res); }
+  });
+
+  // Ask Loadder: translate one natural-language instruction, scoped to a
+  // single already-selected section, into structured patch operations. Pure
+  // and side-effect free — the caller still proposes/previews/applies through
+  // the ordinary patch pipeline below, so an AI-authored patch gets exactly
+  // the same policy and revision guarantees as any other.
+  router.post("/site-projects/:id/ask-loadder/translate", (req, res) => {
+    try {
+      const result = service.translateAskLoadderInstruction(req.params.id, {
+        target: req.body?.target,
+        instruction: req.body?.instruction,
+      });
+      return res.json({ success: true, operations: result.operations, matches: result.matches, warnings: result.warnings });
     } catch (e) { return handle(e, res); }
   });
 
