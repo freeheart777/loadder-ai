@@ -483,6 +483,16 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     }
   }
 
+  // Ask Loadder applies and undoes through the structured patch / revision
+  // system, never by overwriting content directly. This just syncs the
+  // Studio's own view onto whatever that system just made authoritative.
+  function onAskLoadderApplied(content: Record<string, any>, revision: number) {
+    setConfig(restoreConfig(content, siteKind));
+    setProject((current) => (current ? { ...current, content } : current));
+    draftRevision.current = revision;
+    setMessage("Ask Loadder بخش انتخاب‌شده را به‌روزرسانی کرد.");
+  }
+
   async function save() {
     if (!project) return;
     setBusy(true);
@@ -513,7 +523,10 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // The canvas and inspector always operate on the SELECTED page's sections.
   // For a single-page site (every STORE) this is exactly config.sections.
   const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
-  const inspectorProps = { config: canvasConfig, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection };
+  const inspectorProps = {
+    config: canvasConfig, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection,
+    askLoadder: project ? { projectId: project.id, onApplied: onAskLoadderApplied } : undefined,
+  };
   const pickerSection = pickerSectionId ? config.sections.find((s) => s.id === pickerSectionId) : null;
   const pickerSettings = pickerSection?.type === "products" && pickerSection.productSettings ? normalizeManual(pickerSection.productSettings, products) : null;
 
