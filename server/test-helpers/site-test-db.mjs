@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { runMigrations } from "../db/migrate.mjs";
 import { migrations } from "../db/migrations/index.mjs";
 
-export function createSiteTestDb() {
+export function createSiteTestDb({ maxVersion = Infinity } = {}) {
   const db = new Database(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
@@ -25,6 +25,6 @@ export function createSiteTestDb() {
     db.exec(`CREATE TABLE ${table}(id TEXT PRIMARY KEY,workspace_id TEXT)`);
   }
   // Later evidence migrations require the real event, semantic and experiment owners.
-  runMigrations(db, migrations.filter((migration) => [14, 35, 38].includes(migration.version) || migration.version >= 42));
+  runMigrations(db, migrations.filter((migration) => ([14, 35, 38].includes(migration.version) || migration.version >= 42) && migration.version <= maxVersion));
   return db;
 }
