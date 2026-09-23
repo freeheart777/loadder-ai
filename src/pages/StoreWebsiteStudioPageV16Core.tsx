@@ -87,12 +87,15 @@ const SECTION_TITLES: Record<SectionConfig["type"], string> = {
   products: "محصولات جدید", banner: "بنر جدید", trust: "مزیت‌های خرید", text: "متن جدید", spacer: "فاصله",
   about: "درباره ما", services: "خدمات ما", portfolio: "نمونه‌کارها", team: "تیم ما",
   "text-image": "متن و تصویر", cta: "فراخوان اقدام", contact: "تماس با ما",
+  "category-grid": "دسته‌بندی‌های فروشگاه", brand: "برندهای فروشگاه",
 };
 const newItem = (title: string, subtitle: string): SectionItem => ({ id: `item-${crypto.randomUUID()}`, title, subtitle, body: "", imageUrl: "", meta: "" });
 const STARTER_ITEMS: Partial<Record<SectionConfig["type"], () => SectionItem[]>> = {
   services: () => [newItem("خدمت جدید", "توضیح کوتاه خدمت")],
   portfolio: () => [newItem("پروژه جدید", "دسته‌بندی پروژه")],
   team: () => [newItem("عضو جدید تیم", "سمت سازمانی")],
+  "category-grid": () => [newItem("دسته‌بندی جدید", "")],
+  brand: () => [newItem("برند جدید", "")],
 };
 
 function newSection(type: SectionConfig["type"]): SectionConfig {

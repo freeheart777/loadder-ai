@@ -21,7 +21,7 @@ export const SITE_TYPES: Record<SiteKind, SiteTypeDefinition> = {
     kind: "STORE",
     label: "فروشگاه اینترنتی",
     capabilities: ["commerce", "catalog"],
-    sectionTypes: ["products", "banner", "trust", "text", "spacer"],
+    sectionTypes: ["products", "banner", "trust", "text", "spacer", "category-grid", "brand"],
     defaultSectionIds: ["products-main", "banner-main", "trust-main"],
   },
   BUSINESS: {

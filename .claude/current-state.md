@@ -40,9 +40,9 @@ This directly supersedes the "V16 was never implemented" finding from earlier in
 
 ## P0-1 + P0-2 implementation (2026-09-24)
 
-Both commercial-release blockers from the audit are now implemented and verified. Checkpoint commit `6bd0755` ("checkpoint before storefront checkout P0 fixes") was created before any code edit, per instruction.
+Both commercial-release blockers from the audit are now implemented and verified. Checkpoint commit `6bd0755` ("checkpoint before storefront checkout P0 fixes") was created before any code edit, per instruction. Committed as `d845f6f` ("P0 complete - real storefront SSR and checkout integration") after review confirmed only the intended 8 files were staged (no db/log/temp artifacts).
 
-**Files changed (uncommitted, ready for review):**
+**Files changed:**
 - `server/app/services/store-site-html.mjs` (new) — `renderStoreSite()`/`isStoreV16()`, mirrors `corporate-site-html.mjs`'s contract for the STORE site kind: real design/hero/sections from `projectPublicStorePresentation()` plus real products.
 - `server/app/routes/public-sites.mjs` — `renderPublishedSite()` now branches to `renderStoreSite()` for a STORE project with a real V16 document; `createPublicSitesRouter` takes an `ecommerceService` and fetches the live catalog (workspace-scoped via `runWithWorkspace`) before rendering. Legacy `storefront()`/`genericSite()` untouched, still used as fallback for pre-V16 projects.
 - `server/public-site-server.mjs` — instantiates `ecommerceService` and passes it into `createPublicSitesRouter`.
@@ -61,3 +61,13 @@ Both commercial-release blockers from the audit are now implemented and verified
 - One of the test-file runs above wrote to the **real** `server/db/loadder.sqlite` (not an isolated DB) — caught via `git status` and reverted with `git checkout -- server/db/loadder.sqlite` before finishing. Some test files in this suite isolate their DB via `DATABASE_PATH`/temp files or `test-helpers/site-test-db.mjs` (in-memory); others don't and fall through to `server/db/database.mjs`'s default path. This is a pre-existing property of the test suite, not something this change introduced — but it's worth knowing before running `node --test` against files outside this list.
 - Checkout in `CheckoutCanvas` sends no `shippingMethod` (the picker UI for shipping methods wasn't part of this task's approved scope) — checkout still succeeds since it's optional server-side, but shipping cost will be 0 until that's added as a follow-up.
 - Nothing here touches CRM/Marketing/Business Brain, and AI independence is preserved — none of the 7 changed/added files call an AI/model service.
+
+## Template system audit (2026-09-24) — see `docs/TEMPLATE_SYSTEM_AUDIT.md` for full detail
+
+**Status: audit only, no code changed.** Read-only pass over `src/components/store-studio-v16/*`, `StoreWebsiteStudioPageV16Core.tsx`, and the V16 persistence/schema files. Confirmed (targeted grep, not a repo scan) that no theme/template table or file exists anywhere in that scope.
+
+**Finding:** the system does **not** currently support reusable templates. Sections are a closed hardcoded TS union with duplicated switch-statements across `StudioCanvas.tsx` and `InspectorPanel.tsx` (no registry); themes are just one project's inline `design` values with a single hardcoded per-site-kind default (`config.ts`); there is no template catalog, no "create project from template" flow, and no template-vs-instance separation. The underlying `StudioConfig` document model itself is plain, versioned JSON with no embedded logic, so this is addable without a rewrite — it just isn't built yet.
+
+**Plan on file for "Loadder Commerce Modern V1"** (design only, not implemented): of the 8 Stitch reference sections, 4 already exist and are reusable as-is (hero, trust badges, product grid, footer), 1 exists partially (flash sale — needs a countdown field added to the existing discounted-products preset), and 2 are genuinely missing new section types (`category-grid`, `brand`). The template itself would be one more static `SectionConfig[]` + `DesignConfig` literal, identical in shape to today's `sectionDefaults` — deterministic, AI-independent, and schema-driven by construction. Where that literal should live so it's reusable across projects (the actual template-catalog storage question) is explicitly deferred to a future decision, not part of this audit.
+
+**Next step:** awaiting go-ahead on (a) adding the two missing section types + flash-sale fields, and (b) deciding the template-catalog storage mechanism, before any implementation begins.
