@@ -3,12 +3,14 @@ import { environment } from "./app/config/environment.mjs";
 import { createSiteProjectRepository } from "./app/repositories/site-project-repository.mjs";
 import { db } from "./db/workspace-database.mjs";
 import { createPublicSitesRouter } from "./app/routes/public-sites.mjs";
+import { createEcommerceService } from "./app/services/ecommerce-service.mjs";
 
 const app = express();
 const repository = createSiteProjectRepository(db);
+const ecommerceService = createEcommerceService({ db });
 
 app.disable("x-powered-by");
-app.use(createPublicSitesRouter({ repository }));
+app.use(createPublicSitesRouter({ repository, ecommerceService }));
 
 const port = Number(process.env.PUBLIC_SITE_PORT || Number(environment.apiPort) + 1);
 const host = process.env.PUBLIC_SITE_HOST || environment.apiHost;

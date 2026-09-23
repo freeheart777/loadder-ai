@@ -38,6 +38,26 @@ This directly supersedes the "V16 was never implemented" finding from earlier in
 
 **Next implementation gate (recommended, pending user decision):** Fix the STORE SSR path in `public-sites.mjs` so `renderPublishedSite()` projects the real `storeBuilderV16` document + live `ecommerce_products` catalog for STORE sites the same way `renderCorporateSite()` already does for BUSINESS — this is the single highest-leverage fix, since it's blocking both SEO/crawlability and correct custom-domain delivery for every commerce site. Wire `CheckoutCanvas` to the real `POST /commerce/carts/:cartId/checkout` endpoint should follow immediately after, since a store cannot take real orders without it. Do not start either without explicit go-ahead — these are product-facing changes, not docs/investigation.
 
-## Not yet done
+## P0-1 + P0-2 implementation (2026-09-24)
 
-No Website Builder implementation code has been modified this session (audit was read-only, per instructions). The next task is implementation-shaped (see gate above) and needs explicit user sign-off before any code changes.
+Both commercial-release blockers from the audit are now implemented and verified. Checkpoint commit `6bd0755` ("checkpoint before storefront checkout P0 fixes") was created before any code edit, per instruction.
+
+**Files changed (uncommitted, ready for review):**
+- `server/app/services/store-site-html.mjs` (new) — `renderStoreSite()`/`isStoreV16()`, mirrors `corporate-site-html.mjs`'s contract for the STORE site kind: real design/hero/sections from `projectPublicStorePresentation()` plus real products.
+- `server/app/routes/public-sites.mjs` — `renderPublishedSite()` now branches to `renderStoreSite()` for a STORE project with a real V16 document; `createPublicSitesRouter` takes an `ecommerceService` and fetches the live catalog (workspace-scoped via `runWithWorkspace`) before rendering. Legacy `storefront()`/`genericSite()` untouched, still used as fallback for pre-V16 projects.
+- `server/public-site-server.mjs` — instantiates `ecommerceService` and passes it into `createPublicSitesRouter`.
+- `server/app/routes/auth.mjs` — `sendLegacySite` (the `/api/auth/sites/:id` path, sharing the same `renderPublishedSite`) now fetches products for STORE projects too, for parity.
+- `src/lib/publicCart.ts` — added `getPublicCart()` and `checkoutPublicCart()` against the already-complete `/api/auth/storefront/carts/:id/checkout` API; existing exports/behavior unchanged.
+- `src/components/store-studio-v16/PublicStorefrontRuntime.tsx` — loads the real cart (not just a count) and exposes `cart`/`checkout` on the runtime adapter.
+- `src/components/store-studio-v16/StudioCanvas.tsx` — `StorefrontRuntimeAdapter` type extended (optional `cart`/`checkout`, backward compatible); `CartCanvas` renders real line items and `CheckoutCanvas` submits through `adapter.checkout()` **only when a real adapter is present** — the editor's own no-adapter preview path is untouched.
+
+**Tests run:**
+- `npx tsc -b` — clean, exit 0.
+- Targeted server test files (not the full 201-file suite, per token/scope rules): `public-sites.test.mjs`, `public-storefront-render.test.mjs`, `corporate-website-core.test.mjs`, `commerce-public-trust-boundary.test.mjs`, `commerce-v2-checkout-order.test.mjs`, `ecommerce-core.test.mjs`, `auth.test.mjs`, `public-cart-recovery.test.mjs`, `commerce-v2-pricing-cart.test.mjs`, `store-v16-publish-live-parity.test.mjs`, `v16-ask-loadder.test.mjs`, `v16-document-revisions.test.mjs`, `v16-multi-page-core.test.mjs`, `v16-patch-engine.test.mjs`, `site-project-service.test.mjs`, `site-project-manual-creation.test.mjs` — **145/145 pass, 0 failures.**
+- Two ad-hoc verification scripts (scratchpad, real migrated schema, `runWithWorkspace`) confirmed all 4 requested checks end-to-end: (1) SSR renders the real V16 hero/title, (2) real catalog product name+price appear (not the legacy placeholder), (3) a real cart returns real line items from `ecommerce_cart_items`, (4) checkout writes a real row to `ecommerce_orders`. One check was run at the HTTP layer (`GET /api/auth/sites/:id` through a live Express app) for full confidence, not just at the function level.
+
+**Remaining risks:**
+- `server/public-site-server.mjs` is a separate process from the main API server — confirm it's actually deployed/running wherever `/sites/:id` and custom domains are served in production; this fix is inert otherwise.
+- One of the test-file runs above wrote to the **real** `server/db/loadder.sqlite` (not an isolated DB) — caught via `git status` and reverted with `git checkout -- server/db/loadder.sqlite` before finishing. Some test files in this suite isolate their DB via `DATABASE_PATH`/temp files or `test-helpers/site-test-db.mjs` (in-memory); others don't and fall through to `server/db/database.mjs`'s default path. This is a pre-existing property of the test suite, not something this change introduced — but it's worth knowing before running `node --test` against files outside this list.
+- Checkout in `CheckoutCanvas` sends no `shippingMethod` (the picker UI for shipping methods wasn't part of this task's approved scope) — checkout still succeeds since it's optional server-side, but shipping cost will be 0 until that's added as a follow-up.
+- Nothing here touches CRM/Marketing/Business Brain, and AI independence is preserved — none of the 7 changed/added files call an AI/model service.

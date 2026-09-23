@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import express from "express";
 import { isCorporateV16, renderCorporateSite } from "../services/corporate-site-html.mjs";
+import { isStoreV16, renderStoreSite } from "../services/store-site-html.mjs";
+import { runWithWorkspace } from "../tenant-context.mjs";
 
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const normalizeHost = (value) => String(value ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
@@ -27,24 +29,33 @@ const genericSite = (project, version, assets, content) => {
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><style>body{margin:0;background:#f8f9fc;color:#151821;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.8}.wrap{width:min(1120px,calc(100% - 32px));margin:auto}.nav{display:flex;justify-content:space-between;align-items:center;padding:22px 0}.logo{max-width:160px;max-height:48px}.hero{min-height:58vh;display:grid;align-items:center;background:#eef2ff;background-size:cover;background-position:center;border-radius:28px;overflow:hidden}.hero-content{padding:70px 46px;background:linear-gradient(90deg,#fffefa,#ffffffb8);max-width:720px}.hero h1{font-size:clamp(42px,7vw,72px);line-height:1.1;margin:14px 0}.hero p,.muted{color:#667085}.section{padding:64px 0;border-bottom:1px solid #e9ebf0}.footer{padding:42px 0 70px;color:#71717a}@media(max-width:640px){.wrap{width:calc(100% - 22px)}.hero-content{padding:40px 24px}}</style></head><body><div class="wrap"><nav class="nav">${logo ? `<img class="logo" src="${escapeHtml(logo.url)}" alt="${escapeHtml(logo.altText || project.name)}">` : `<strong>${escapeHtml(project.name)}</strong>`}<span>Loadder</span></nav><section class="hero" ${hero ? `style="background-image:url('${escapeHtml(hero.url)}')"` : ""}><div class="hero-content"><div class="muted">${escapeHtml(project.siteType)}</div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(positioning)}</p></div></section>${sections.slice(1).map((section, i) => `<section class="section"><h2>${escapeHtml(section)}</h2><p class="muted">${escapeHtml(i === 0 ? description : positioning)}</p></section>`).join("")}<footer class="footer">${escapeHtml(project.name)} · نسخه ${escapeHtml(version?.version ?? "draft")} · Loadder</footer></div></body></html>`;
 };
 
-export const renderPublishedSite = (project, version, assets = [], page = {}) => {
+export const renderPublishedSite = (project, version, assets = [], page = {}, products = []) => {
   if (Array.isArray(version) && assets.length === 0) {
     assets = version;
     version = { version: "draft", content: project?.content || {} };
   }
   const content = version?.content && typeof version.content === "object" ? version.content : {};
-  // A V16 corporate site renders from the canonical published projection, so
-  // /sites/:id, a custom domain and /site/:id cannot diverge. genericSite stays
-  // only for BUSINESS projects that have no V16 document yet.
+  // A V16 site (corporate or store) renders from the canonical published
+  // projection, so /sites/:id, a custom domain and /site(/storefront)/:id
+  // cannot diverge. genericSite/storefront stay only for projects that have
+  // no V16 document yet.
   if (isCorporateV16(project, content)) return renderCorporateSite(project, version, content, page);
+  if (isStoreV16(project, content)) return renderStoreSite(project, version, content, products, page);
   return project?.siteType === "STORE" ? storefront(project, version, assets, content) : genericSite(project, version, assets, content);
 };
 
-export function createPublicSitesRouter({ repository }) {
+export function createPublicSitesRouter({ repository, ecommerceService = null }) {
   const router = express.Router();
+  // The live catalog for a STORE project, fetched only when needed — a
+  // BUSINESS project never touches ecommerce data.
+  const productsFor = (project) => {
+    if (!ecommerceService || project?.siteType !== "STORE") return [];
+    try { return runWithWorkspace(project.workspaceId, () => ecommerceService.listProducts(project.id)); }
+    catch (error) { console.error("Public storefront catalog error:", error); return []; }
+  };
   const sendPublished = (req, res, published, page = {}) => {
     if (!published) return res.status(404).send("Site not found");
-    const html = renderPublishedSite(published.project, published.version, published.assets, page);
+    const html = renderPublishedSite(published.project, published.version, published.assets, page, productsFor(published.project));
     // A slug that resolves to no published page is a 404, never a silent Home.
     if (html === null) return res.status(404).send("Page not found");
     const etag = `W/\"site-${published.version.id}-${page.slug || ""}\"`;
@@ -56,7 +67,8 @@ export function createPublicSitesRouter({ repository }) {
     const etag = `W/\"preview-${preview.project.id}-${preview.project.updatedAt}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const draftVersion = { version: "draft", content: preview.project.content };
-    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, { slug: typeof req.query.page === "string" ? req.query.page : "", basePath: `/preview/sites/${preview.project.id}` }) || "Page not found");
+    const page = { slug: typeof req.query.page === "string" ? req.query.page : "", basePath: `/preview/sites/${preview.project.id}` };
+    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, page, productsFor(preview.project)) || "Page not found");
   };
   router.get("/preview/sites/:id", (req, res) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";
