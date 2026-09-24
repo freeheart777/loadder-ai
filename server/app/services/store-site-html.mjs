@@ -45,6 +45,27 @@ function productCardHtml(product, settings, overrides) {
   return `<article class="product-card">${image ? `<div class="product-media"><img src="${escape(image)}" alt="${escape(product.name)}" loading="lazy">${badge}</div>` : `<div class="product-media product-media-empty">${badge}</div>`}<div class="product-body">${settings.showBrand !== false && (product.brand || product.category) ? `<span class="product-eyebrow">${escape(product.brand || product.category)}</span>` : ""}<b class="product-name">${escape(product.name)}</b><div class="product-price">${settings.showPrice !== false ? `<strong>${formatMoney(product.basePriceMinor, product.currency)}</strong>` : ""}${compareAt ? `<del>${formatMoney(compareAt, product.currency)}</del>` : ""}</div>${settings.showCartButton !== false ? `<span class="product-cta">${purchasable ? escape(override.ctaLabel || "افزودن به سبد خرید") : "ناموجود"}</span>` : ""}</div></article>`;
 }
 
+/** A snapshot at render time — the SSR page has no client-side clock, so this is the sale state as of publish/request, not a live countdown. saleLabel renders on its own; saleEndsAt only adds the countdown/expiry state next to it. */
+function saleLineHtml(section) {
+  const label = escape(section.saleLabel || "");
+  let stateText = "";
+  if (section.saleEndsAt) {
+    const endsAt = new Date(section.saleEndsAt);
+    if (!Number.isNaN(endsAt.getTime())) {
+      const ended = endsAt.getTime() <= Date.now();
+      stateText = ended ? "فروش ویژه به پایان رسید" : `تا پایان: ${escape(new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(endsAt))}`;
+    }
+  }
+  if (!label && !stateText) return "";
+  return `<div class="sale-line">${label ? `<b class="sale-badge">${label}</b>` : ""}${stateText ? `<span class="sale-state">${stateText}</span>` : ""}</div>`;
+}
+
+function itemGridHtml(section) {
+  const items = (section.items || []).slice(0, 60);
+  if (!items.length) return `<div class="empty-products">هنوز موردی در این بخش نیست.</div>`;
+  return `<div class="item-grid">${items.map((item) => `<a class="item-tile" href="${escape(item.href || "#products")}">${url(item.imageUrl) ? `<div class="item-media"><img src="${escape(url(item.imageUrl))}" alt="${escape(item.title || "")}" loading="lazy"></div>` : `<div class="item-media item-media-empty"></div>`}<b class="item-title">${escape(item.title || "")}</b></a>`).join("")}</div>`;
+}
+
 function sectionHtml(section, products, commerce) {
   const style = `background:${color(section.backgroundColor, "#ffffff")};color:${color(section.textColor, "#0f172a")};padding-top:${num(section.spacingTop, 28)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
   const open = `<section data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
@@ -56,7 +77,7 @@ function sectionHtml(section, products, commerce) {
     const settings = section.productSettings || {};
     const cap = Math.max(1, Math.min(12, num(section.visibleProductCount, 12)));
     const shown = productsForSection(products, settings).slice(0, cap);
-    return `${open}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
+    return `${open}${saleLineHtml(section)}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
       shown.length ? `<div class="product-grid">${shown.map((product) => productCardHtml(product, settings, commerce.productOverrides || {})).join("")}</div>` : `<div class="empty-products">هنوز محصولی در این بخش نیست.</div>`
     }${close}`;
   }
@@ -67,6 +88,10 @@ function sectionHtml(section, products, commerce) {
 
   if (section.type === "trust") {
     return `${open}<div class="section-head"><h2>${escape(section.title || "")}</h2><p class="muted">${escape(section.subtitle || "")}</p></div>${close}`;
+  }
+
+  if (section.type === "category-grid" || section.type === "brand") {
+    return `${open}<div class="section-head"><h2>${escape(section.title || "")}</h2>${section.subtitle ? `<p class="muted">${escape(section.subtitle)}</p>` : ""}</div>${itemGridHtml(section)}${close}`;
   }
 
   return `${open}<h2>${escape(section.title || "")}</h2>${section.subtitle ? `<p class="muted">${escape(section.subtitle)}</p>` : ""}${close}`;
@@ -113,6 +138,10 @@ export function renderStoreSite(project, version, content, products, { slug = ""
     + `.product-cta{display:block;margin-top:12px;background:${primary};color:#fff;text-align:center;border-radius:${num(design.buttonRadius, 12)}px;padding:10px;font-size:13px;font-weight:800}`
     + `.empty-products{border:1px dashed rgba(0,0,0,.15);border-radius:${num(design.cardRadius, 18)}px;padding:32px;text-align:center;opacity:.55}`
     + `.banner{display:grid;border-radius:${num(design.cardRadius, 18)}px;overflow:hidden}.banner img{width:100%;height:100%;object-fit:cover}.banner-copy{padding:24px}`
+    + `.sale-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}.sale-badge{background:#e11d48;color:#fff;border-radius:999px;padding:4px 12px;font-size:11px}.sale-state{font-size:12px;opacity:.7}`
+    + `.item-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}`
+    + `.item-tile{display:block;text-align:center;text-decoration:none;color:inherit;border:1px solid rgba(0,0,0,.06);background:#fff;border-radius:${num(design.cardRadius, 18)}px;overflow:hidden}`
+    + `.item-media{aspect-ratio:1;background:#f1f5f9}.item-media img{width:100%;height:100%;object-fit:cover;display:block}.item-title{display:block;padding:10px;font-size:13px}`
     + `footer.site{background:${color(header.backgroundColor, "#0f172a")};color:#e2e8f0;margin-top:8px}`
     + `.foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:28px 0;font-size:13px}`
     + `@media(min-width:760px){.hero-inner{grid-template-columns:1.05fr .95fr}.banner{grid-template-columns:1fr 1fr;align-items:center}}`;

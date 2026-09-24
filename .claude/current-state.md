@@ -71,3 +71,47 @@ Both commercial-release blockers from the audit are now implemented and verified
 **Plan on file for "Loadder Commerce Modern V1"** (design only, not implemented): of the 8 Stitch reference sections, 4 already exist and are reusable as-is (hero, trust badges, product grid, footer), 1 exists partially (flash sale — needs a countdown field added to the existing discounted-products preset), and 2 are genuinely missing new section types (`category-grid`, `brand`). The template itself would be one more static `SectionConfig[]` + `DesignConfig` literal, identical in shape to today's `sectionDefaults` — deterministic, AI-independent, and schema-driven by construction. Where that literal should live so it's reusable across projects (the actual template-catalog storage question) is explicitly deferred to a future decision, not part of this audit.
 
 **Next step:** awaiting go-ahead on (a) adding the two missing section types + flash-sale fields, and (b) deciding the template-catalog storage mechanism, before any implementation begins.
+
+## Template System V1 implementation (2026-09-24)
+
+**Status: implemented and verified.** Checkpoint commit `511d812` ("checkpoint template system v1 foundation") was created before continuing; final work described here builds on top of it and is **not yet committed** (no commit was explicitly requested for this stage).
+
+**Files changed/created (this stage, on top of the checkpoint):**
+- `src/components/store-studio-v16/StudioCanvas.tsx` — added a `category-grid`/`brand` render branch in `StorefrontCanvas` (uses the existing `StoreItemGrid` component from the checkpoint), and added `SECTION_LABELS` entries for both new types so they appear in the insert-section picker.
+- `src/components/store-studio-v16/InspectorPanel.tsx` — `ProductSectionEditor` gained a "فروش ویژه با شمارش معکوس" field group (`saleLabel` text + `saleEndsAt` datetime-local); `GenericSectionEditor` now renders the existing `ItemsEditor` for `category-grid`/`brand` sections (STORE sections fall through to `GenericSectionEditor`, not `CorporateSectionEditor`, since STORE lacks the `lead` capability).
+- `src/components/store-studio-v16/templates/commerce-modern-v1.ts` (new) — the actual "Loadder Commerce Modern V1" `WebsiteTemplate` data: hero + trust + flash-sale (`products` with `saleLabel`, no `saleEndsAt` — a template never carries a moving deadline) + `category-grid` + `products` (featured) + `brand`, all plain data, no logic.
+- `src/components/store-studio-v16/templates/registry.ts` (new) — `TEMPLATES` catalog array and `createConfigFromTemplate(template)`, which builds a `{ storeBuilderV16: {...} }` content shape from the template's fields and feeds it through the existing `restoreConfig()` — the exact same normalization path a saved draft already goes through, so a templated site is indistinguishable from a hand-built one from first render. No parallel builder, no new persistence path.
+- `server/app/services/store-public-presentation.mjs` — `projectSections()`'s whitelist extended with `visibleProductCount`, `productImageSize`, `saleEndsAt`, `saleLabel` (previously silently stripped from public/SSR output).
+- `server/app/services/store-site-html.mjs` — added `saleLineHtml()` (a static snapshot of the sale label/end-time at request time, not a live client-side countdown — SSR has no clock) wired into the `products` branch, and `itemGridHtml()` wired into a new `category-grid`/`brand` branch of `sectionHtml()`, plus matching CSS.
+
+**Not done (deliberately out of scope per explicit instruction "Do not expand scope"):** no page was wired to call `createConfigFromTemplate()` yet (e.g. a "create from template" UI in `StoreSetupWizardPage.tsx` or similar) — the capability exists and is ready to be called, but hooking it into an actual site-creation flow was not one of the listed remaining-scope items and was left untouched to avoid touching an unreviewed file.
+
+**Tests run:**
+- `npx tsc -b` — clean, exit 0 (type-checks `templates/registry.ts` and `templates/commerce-modern-v1.ts` along with everything else).
+- `npm run build` (`tsc -b && vite build`) — full production build succeeded, confirming the new template files bundle without runtime import errors.
+- Targeted server tests covering the two backend files touched: `store-v16-publish-live-parity.test.mjs`, `v16-patch-engine.test.mjs`, `v16-document-revisions.test.mjs`, `v16-multi-page-core.test.mjs` — **58/58 pass, 0 failures.**
+- Confirmed via `git status` that `server/db/loadder.sqlite` was not touched by the test run.
+
+**Remaining risk:** the two new section types (`category-grid`, `brand`) and the flash-sale fields are only reachable through direct edits (`persistConfig()`'s full-document save) — they are not yet in the Ask Loadder structured-patch allow-list (`v16-patch-policy.mjs`), so "Ask Loadder" cannot add/edit them via natural language yet. This was explicitly out of scope ("keep existing persistence and patch engine unchanged").
+
+## Commercial acceptance test (2026-09-24) — first pass found 2 defects, both now fixed
+
+Ran a real end-to-end acceptance test against the Template System V1 work above (not just code reading): bundled the actual `templates/registry.ts` + `config.ts` via Vite's library-mode build to execute the real TypeScript logic under Node, and ran a full backend pass (in-memory test DB → create a STORE project from `commerce-modern-v1` → add two real catalog products → publish via the real repository → render through the actual `renderPublishedSite()` dispatcher). All scratch scripts lived in the session scratchpad; nothing in the repo was touched by the test itself.
+
+**Found and fixed:**
+1. **Template mutation leak (FAIL → fixed).** `createConfigFromTemplate()` returned independent top-level objects per call, but nested arrays — e.g. a `category-grid` section's `items` — were shared by reference with the template seed, because `restoreConfig()`'s `modernizeSections()` only shallow-copies each section (`{...section}`). Reproduced deterministically: pushing an item into a created config's `items` array grew the *template's* array too. **Fix (registry.ts only):** wrapped the content object in `structuredClone()` before it reaches `restoreConfig()`, so every nested field is deep-copied upfront and nothing downstream can share a reference back to the template, regardless of how shallow `restoreConfig()`'s own copying is.
+2. **Flash-sale label invisible without an end date (FAIL → fixed).** Both `StudioCanvas.tsx`'s products-section render and `store-site-html.mjs`'s `saleLineHtml()` gated the *entire* sale-info block (label + countdown) on `section.saleEndsAt` being set. Since the template intentionally seeds `saleLabel` without `saleEndsAt` ("a template never carries a moving deadline"), the flash-sale section looked like a plain product grid until a merchant manually set an end date. **Fix:** the wrapper now shows whenever `saleLabel` OR `saleEndsAt` is present; the `Countdown` component (client) / countdown-or-expired state text (SSR) render only when `saleEndsAt` is actually set. No dates were added to the template; persistence, the patch engine, and the AI layer were not touched.
+
+**Files touched by the fix:**
+- `src/components/store-studio-v16/templates/registry.ts` — `createConfigFromTemplate()` now deep-clones via `structuredClone()`.
+- `src/components/store-studio-v16/StudioCanvas.tsx` — sale-info wrapper condition changed from `section.saleEndsAt &&` to `(section.saleLabel || section.saleEndsAt) &&`; `<Countdown>` now conditional on `section.saleEndsAt` independently.
+- `server/app/services/store-site-html.mjs` — `saleLineHtml()` rewritten to compute `label` and `stateText` independently and return early only when *both* are empty.
+
+**Verification after the fix:**
+- Template isolation re-test (bundled real code): **18/18 checks pass** — includes byte-identical template JSON before/after mutating a created config, and independent copies across two separate `createConfigFromTemplate()` calls.
+- SSR end-to-end re-test (real DB, real publish, real `renderPublishedSite()`): **22/22 checks pass** — including the previously-failing "SSR contains flash-sale saleLabel badge" check, now passing with no `saleEndsAt` set.
+- `npx tsc -b` — clean, exit 0.
+- Targeted server regression check: `store-v16-publish-live-parity.test.mjs`, `v16-patch-engine.test.mjs`, `v16-document-revisions.test.mjs`, `v16-multi-page-core.test.mjs` — 58/58 pass, no regressions.
+- `server/db/loadder.sqlite` confirmed untouched by any of the above.
+
+**Status: fixed and verified, not yet committed** (no commit was requested for this stage).
