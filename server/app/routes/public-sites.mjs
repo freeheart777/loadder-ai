@@ -81,7 +81,11 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
   router.get("/preview/sites/:id", (req, res) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";
     if (token.length < 32 || token.length > 128) return res.status(401).send("Preview token required");
-    try { return sendPreview(req, res, repository.getPreviewByToken(hashPreviewToken(token), req.params.id)); }
+    try {
+      // The token lookup is workspace-scoped; enter the project's tenant context first (a valid token for this project is still required).
+      const workspaceId = repository.getProjectWorkspaceId(req.params.id);
+      return sendPreview(req, res, workspaceId ? runWithWorkspace(workspaceId, () => repository.getPreviewByToken(hashPreviewToken(token), req.params.id)) : null);
+    }
     catch (error) { console.error("Preview site error:", error); return res.status(500).send("Unable to render preview"); }
   });
   router.get("/sites/:id/:slug", (req, res) => {
