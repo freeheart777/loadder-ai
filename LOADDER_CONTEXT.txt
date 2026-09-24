@@ -1,0 +1,29 @@
+Project: Loadder
+
+Stack:
+Frontend: React + TypeScript + Vite + Tailwind
+Backend: Node.js services
+
+Important paths:
+
+Frontend:
+src/
+src/components/
+src/pages/
+src/lib/
+src/App.tsx
+
+Backend:
+server/
+server/app/
+server/ai/
+server/services/
+server/db/
+server/agent-gateway.js
+server/cloudflare-ai.js
+
+Documentation:
+docs/
+
+Analyze only existing files.
+Do not assume architecture.

@@ -29,3 +29,11 @@ server/.env*
 # Playwright run artifacts
 test-results/
 playwright-report/
+
+# AI tooling local files
+.agents/
+.claude/
+.continue/
+
+# Graphify generated graph
+graphify-out/
