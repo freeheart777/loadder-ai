@@ -1,6 +1,7 @@
 type Cart = { id?: string; items?: Array<{ variantId: string; quantity?: number }> };
 type CartResponse = { cart?: Cart; code?: string; message?: string };
 export type PublicCartReference = { id: string; capability: string };
+export type PublicOrderReference = { id: string; capability: string };
 
 export type PublicCartItem = { id: string; productId: string; variantId: string; productName: string; sku: string; variantTitle: string; quantity: number; unitPriceMinor: number; lineTotalMinor: number };
 export type PublicCart = { id: string; siteProjectId: string; currency: string; status: string; couponCode: string | null; subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number; items: PublicCartItem[]; createdAt: string; updatedAt: string };
@@ -22,6 +23,21 @@ export function readPublicCartReference(siteProjectId: string): PublicCartRefere
 
 export function writePublicCartReference(siteProjectId: string, reference: PublicCartReference) {
   localStorage.setItem(cartStorageKey(siteProjectId), JSON.stringify(reference));
+}
+
+/** P0-2: the receipt capability a completed checkout returns, kept so the customer can
+ *  look their own order up again later -- previously this token was read once and discarded. */
+export function readPublicOrderReference(orderId: string): PublicOrderReference | null {
+  const raw = localStorage.getItem(orderStorageKey(orderId));
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as PublicOrderReference;
+    return typeof value.id === "string" && typeof value.capability === "string" && value.id && value.capability ? value : null;
+  } catch { return null; }
+}
+
+export function writePublicOrderReference(reference: PublicOrderReference) {
+  localStorage.setItem(orderStorageKey(reference.id), JSON.stringify(reference));
 }
 
 export function cartCapabilityHeaders(capability: string, json = false): HeadersInit {
@@ -150,5 +166,25 @@ export async function checkoutPublicCart(
   if (!data.order || !data.receiptCapability) throw new Error("سفارش ثبت نشد.");
   // A completed checkout closes the cart server-side; the local reference to it is stale from here on.
   localStorage.removeItem(cartStorageKey(siteProjectId));
+  // P0-2: preserve the receipt capability so this order can be looked up again later,
+  // instead of it being read once from the response and discarded.
+  writePublicOrderReference({ id: data.order.id, capability: data.receiptCapability });
   return { order: data.order, receiptCapability: data.receiptCapability };
+}
+
+/** The real order for this receipt reference, or null if it can no longer be found. */
+export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
+  const reference = readPublicOrderReference(orderId);
+  if (!reference) return null;
+  try {
+    const data = await readPublicCartResponse<{ order?: PublicOrder }>(
+      await fetch(`/api/auth/storefront/orders/${reference.id}`, {
+        headers: orderCapabilityHeaders(reference.capability),
+      }),
+    );
+    return data.order ?? null;
+  } catch (error) {
+    if (error instanceof PublicCartApiError && error.status === 404) return null;
+    throw error;
+  }
 }

@@ -11,12 +11,15 @@ import { createSiteLeadService } from "../services/site-lead-service.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
 import { createPublicBusinessAppRouter } from "../business-builder/public-app-router.mjs";
 import { CART_CAPABILITY_HEADER, ORDER_CAPABILITY_HEADER, createPublicCapability, matchesPublicCapability } from "../services/public-commerce-capability.mjs";
+import { createPaymentAttemptService } from "../commerce/payment-attempt-service.mjs";
+import { sendMessage } from "../../services/messaging.mjs";
 
 export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false }) {
   const router = express.Router();
   const publicSiteRepository = createSiteProjectRepository(db);
   const ecommerceService = createEcommerceService({ db });
   const siteLeadService = createSiteLeadService({ db });
+  const paymentAttemptService = createPaymentAttemptService({ db });
   const sendOtpLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message: { success:false, message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const leadLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const checkoutLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"درخواست‌های خرید زیاد است. کمی بعد دوباره تلاش کنید." } });
@@ -32,6 +35,15 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   function orderRow(req){const row=db.prepare("SELECT id,workspace_id AS workspaceId,site_project_id AS siteProjectId,receipt_capability_hash AS capabilityHash FROM ecommerce_orders WHERE id=?").get(req.params.orderId);if(!row||!matchesPublicCapability(req.get(ORDER_CAPABILITY_HEADER),row.capabilityHash)||!publicStore(row.siteProjectId))return null;return row}
   function publicProduct(product){if(!product||product.status!=="ACTIVE")return null;const gallery=Array.isArray(product.metadata?.gallery)?product.metadata.gallery.filter(x=>typeof x==="string").slice(0,12):[];return{id:product.id,siteProjectId:product.siteProjectId,name:product.name,slug:product.slug,description:product.description||"",category:product.category||null,brand:product.brand||null,currency:product.currency,basePriceMinor:product.basePriceMinor,compareAtPriceMinor:product.compareAtPriceMinor??null,featured:Boolean(product.featured),seoTitle:product.seoTitle||null,seoDescription:product.seoDescription||null,metadata:{gallery},gallery,variants:(product.variants||[]).filter(v=>v.active).map(v=>({id:v.id,sku:v.sku,title:v.title,priceMinor:v.priceMinor,inventoryQuantity:v.inventoryQuantity,inventoryPolicy:v.inventoryPolicy,purchasable:isVariantPurchasable(v),options:v.options||{},imageUrl:v.imageUrl||null}))}}
   function storefrontError(error,res){console.error("Public storefront error:",error);const status=Number(error?.status)||500;return res.status(status>=400&&status<600?status:500).json({success:false,code:error?.code||"STOREFRONT_ERROR",message:status===500?"Unable to process storefront request.":error.message})}
+  // P0-1: merchant order notification. No merchant contact (email/phone) field exists
+  // anywhere in the current data model -- site_projects, ecommerce_* tables, or workspace
+  // tables all lack one. Inventing an address here would mean sending to a fabricated
+  // recipient, which is explicitly disallowed. This resolver is the single connection
+  // point for a real merchant notification setting once one exists; until then it always
+  // returns null and the caller skips sending, it never fabricates a recipient.
+  // TODO(merchant-notifications): once a real "order notification contact" field exists
+  // (e.g. on the site project or workspace), resolve it here and return { channel, address }.
+  function resolveMerchantNotificationRecipient(_store) { return null; }
 
   if(process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true") router.use(createPublicBusinessAppRouter({db}));
   router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"}));
@@ -53,7 +65,31 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   router.get("/storefront/:siteProjectId/checkout-options",(req,res)=>{try{const store=publicStore(req.params.siteProjectId);if(!store)return res.status(404).json({success:false,message:"Store not found."});const shipping=db.prepare("SELECT id,name,price_minor AS priceMinor,active FROM ecommerce_shipping_methods WHERE workspace_id=? AND site_project_id=? AND active=1 ORDER BY price_minor,name").all(store.workspaceId,store.id);return res.json({success:true,shippingMethods:shipping,paymentMethods:[{key:"manual",title:"پرداخت آزمایشی / هماهنگی با فروشگاه",enabled:true}]})}catch(e){return storefrontError(e,res)}});
   router.post("/storefront/carts/:cartId/coupon",checkoutLimiter,(req,res)=>{try{const row=cartRow(req);if(!row)return cartNotFound(res);const code=String(req.body?.code||"").trim().slice(0,64);const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.applyCoupon(row.id,code));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
   router.post("/storefront/carts/:cartId/shipping",checkoutLimiter,(req,res)=>{try{const row=cartRow(req);if(!row)return cartNotFound(res);const methodId=String(req.body?.shippingMethodId||"");const method=db.prepare("SELECT id FROM ecommerce_shipping_methods WHERE id=? AND workspace_id=? AND site_project_id=? AND active=1").get(methodId,row.workspaceId,row.siteProjectId);if(!method)return res.status(404).json({success:false,code:"SHIPPING_NOT_FOUND",message:"Shipping method not available."});const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.setCartShipping(row.id,method.id));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
-  router.post("/storefront/carts/:cartId/checkout",checkoutLimiter,(req,res)=>{try{const row=cartRow(req);if(!row)return cartNotFound(res);const email=String(req.body?.email||"").trim().slice(0,180),phone=String(req.body?.phone||"").trim().slice(0,32),fullName=String(req.body?.fullName||"").trim().slice(0,120);if(!fullName||!phone)return res.status(400).json({success:false,message:"نام و شماره موبایل الزامی است."});const address=req.body?.shippingAddress||{};const shippingAddress={fullName,phone,province:String(address.province||"").slice(0,80),city:String(address.city||"").slice(0,80),address:String(address.address||"").slice(0,500),postalCode:String(address.postalCode||"").slice(0,32),notes:String(address.notes||"").slice(0,500)},receipt=createPublicCapability();const order=runWithWorkspace(row.workspaceId,()=>ecommerceService.checkout(row.id,{email:email||null,paymentProvider:"manual",shippingMethod:String(req.body?.shippingMethod||"").slice(0,120)||null,shippingAddress,receiptCapabilityHash:receipt.hash}));return res.status(201).json({success:true,receiptCapability:receipt.value,order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
+  router.post("/storefront/carts/:cartId/checkout",checkoutLimiter,async(req,res)=>{try{const row=cartRow(req);if(!row)return cartNotFound(res);const email=String(req.body?.email||"").trim().slice(0,180),phone=String(req.body?.phone||"").trim().slice(0,32),fullName=String(req.body?.fullName||"").trim().slice(0,120);if(!fullName||!phone)return res.status(400).json({success:false,message:"نام و شماره موبایل الزامی است."});const address=req.body?.shippingAddress||{};const shippingAddress={fullName,phone,province:String(address.province||"").slice(0,80),city:String(address.city||"").slice(0,80),address:String(address.address||"").slice(0,500),postalCode:String(address.postalCode||"").slice(0,32),notes:String(address.notes||"").slice(0,500)},receipt=createPublicCapability();
+    const { order, store } = runWithWorkspace(row.workspaceId,()=>{
+      const createdOrder=ecommerceService.checkout(row.id,{email:email||null,paymentProvider:"manual",shippingMethod:String(req.body?.shippingMethod||"").slice(0,120)||null,shippingAddress,receiptCapabilityHash:receipt.hash});
+      // P0-3: connect the existing payment-attempt contract, without integrating any
+      // external gateway. Only activates if a merchant has already configured a CONNECTED
+      // payment provider (today, none are -- configurePaymentProvider() has no caller in
+      // the audited frontend); the order's own paymentProvider stays "manual" either way.
+      const providerConfig=db.prepare("SELECT id,provider_key FROM ecommerce_payment_providers WHERE workspace_id=? AND site_project_id=? AND status='CONNECTED' ORDER BY created_at LIMIT 1").get(row.workspaceId,row.siteProjectId);
+      if(providerConfig){
+        try{ paymentAttemptService.create({orderId:createdOrder.id,provider:providerConfig.provider_key,providerConfigId:providerConfig.id,idempotencyKey:`checkout:${createdOrder.id}`}); }
+        catch(attemptError){ console.error("Payment attempt creation failed:",attemptError); }
+      }
+      return { order:createdOrder, store:publicStore(row.siteProjectId) };
+    });
+    // P0-1: best-effort merchant notification via the existing messaging service. Never
+    // fabricates a recipient, and a failure here must never fail the checkout response
+    // the customer already has a successful order.
+    const recipient=resolveMerchantNotificationRecipient(store);
+    if(recipient){
+      try{ await sendMessage({channel:recipient.channel,recipient:recipient.address,subject:"سفارش جدید در فروشگاه شما",message:`سفارش جدید به شماره ${order.id} ثبت شد.`}); }
+      catch(notifyError){ console.error("Merchant order notification failed:",notifyError); }
+    } else {
+      console.info(`Merchant order notification skipped for site ${row.siteProjectId}: no notification recipient configured (order ${order.id}).`);
+    }
+    return res.status(201).json({success:true,receiptCapability:receipt.value,order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
   router.get("/storefront/orders/:orderId",(req,res)=>{try{const row=orderRow(req);if(!row)return publicNotFound(res);const order=runWithWorkspace(row.workspaceId,()=>ecommerceService.getOrder(row.id));return res.json({success:true,order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
 
   router.post("/send-otp",sendOtpLimiter,(req,res)=>{try{const result=authService.requestOtp(req.body||{}),response={success:true,message:"کد تأیید ایجاد شد.",expiresAt:result.challenge.expiresAt};if(nodeEnv!=="production"&&exposeDevelopmentOtp)response.developmentOtp=result.code;return res.json(response)}catch(e){return handleAuthError(e,res)}});
