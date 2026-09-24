@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { createRegistry, defineCapability, defineSection } from "../app/site-platform/registry.mjs";
 import { INITIAL_CAPABILITIES, siteRegistry } from "../app/site-platform/capabilities.mjs";
 import { resolveCapabilities } from "../app/site-platform/capability-resolver.mjs";
+import { CORPORATE_SECTION_TYPES } from "../app/services/corporate-site-html.mjs";
+import { STORE_SECTION_TYPES } from "../app/services/store-site-html.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const source = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
@@ -117,7 +119,8 @@ const siteTypes = source("src/components/store-studio-v16/site-types.ts");
 const frontendSectionTypes = (kind) => quotedList(siteTypes.match(new RegExp(`${kind}:\\s*\\{[\\s\\S]*?sectionTypes:\\s*\\[([^\\]]*)\\]`))[1]);
 const sectionConfigUnion = quotedList(source("src/components/store-studio-v16/types.ts").match(/export type SectionConfig = \{[^}]*?type:\s*([^;]+);/)[1]);
 const corporateTypes = quotedList(source("server/app/services/corporate-site-html.mjs").match(/CORPORATE_TYPES = new Set\(\[([^\]]*)\]\)/)[1]);
-const storeRendererTypes = quotedList([...source("server/app/services/store-site-html.mjs").matchAll(/section\.type === "[^"]+"/g)].join(" "));
+// Since PR4B the renderers dispatch through exported tables instead of if-chains.
+const storeRendererTypes = [...STORE_SECTION_TYPES, ...CORPORATE_SECTION_TYPES];
 
 test("agreement: every existing section type has registry metadata", () => {
   assert.ok(sectionConfigUnion.length >= 14, "SectionConfig union was parsed");

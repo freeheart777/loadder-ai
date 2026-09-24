@@ -66,35 +66,49 @@ function itemGridHtml(section) {
   return `<div class="item-grid">${items.map((item) => `<a class="item-tile" href="${escape(item.href || "#products")}">${url(item.imageUrl) ? `<div class="item-media"><img src="${escape(url(item.imageUrl))}" alt="${escape(item.title || "")}" loading="lazy"></div>` : `<div class="item-media item-media-empty"></div>`}<b class="item-title">${escape(item.title || "")}</b></a>`).join("")}</div>`;
 }
 
+// Section render functions, dispatched by the stored legacy section type
+// (docs/decisions/PR4B-render-boundary.md). Bodies are unchanged from the
+// former if-chain; `parts` carries the shared wrapper values computed once.
+// Store sections carry no id attribute: the projection's public-section-N ids
+// are never emitted.
+const spacerHtml = (section) => `<div style="height:${num(section.spacingTop, 0) + num(section.spacingBottom, 0)}px"></div>`;
+
+const productsHtml = (section, { open, close, products, commerce }) => {
+  const settings = section.productSettings || {};
+  const cap = Math.max(1, Math.min(12, num(section.visibleProductCount, 12)));
+  const shown = productsForSection(products, settings).slice(0, cap);
+  return `${open}${saleLineHtml(section)}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
+    shown.length ? `<div class="product-grid">${shown.map((product) => productCardHtml(product, settings, commerce.productOverrides || {})).join("")}</div>` : `<div class="empty-products">هنوز محصولی در این بخش نیست.</div>`
+  }${close}`;
+};
+
+const bannerHtml = (section, { open, close }) => `${open}<div class="banner">${url(section.imageUrl) ? `<img src="${escape(url(section.imageUrl))}" alt="${escape(section.title || "")}" loading="lazy">` : ""}<div class="banner-copy"><h2>${escape(section.title || "")}</h2><p>${escape(section.subtitle || "")}</p></div></div>${close}`;
+
+const trustHtml = (section, { open, close }) => `${open}<div class="section-head"><h2>${escape(section.title || "")}</h2><p class="muted">${escape(section.subtitle || "")}</p></div>${close}`;
+
+const itemTilesHtml = (section, { open, close }) => `${open}<div class="section-head"><h2>${escape(section.title || "")}</h2>${section.subtitle ? `<p class="muted">${escape(section.subtitle)}</p>` : ""}</div>${itemGridHtml(section)}${close}`;
+
+/** Unknown types (including prototype names such as "toString") render this fallback. */
+const unknownSectionHtml = (section, { open, close }) => `${open}<h2>${escape(section.title || "")}</h2>${section.subtitle ? `<p class="muted">${escape(section.subtitle)}</p>` : ""}${close}`;
+
+// A Map, never a plain object: lookup is by exact own key only.
+const SECTION_RENDERERS = new Map([
+  ["spacer", spacerHtml],
+  ["products", productsHtml],
+  ["banner", bannerHtml],
+  ["trust", trustHtml],
+  ["category-grid", itemTilesHtml],
+  ["brand", itemTilesHtml],
+]);
+
+/** Section types with a dedicated store renderer (read-only; for agreement tests). */
+export const STORE_SECTION_TYPES = Object.freeze([...SECTION_RENDERERS.keys()]);
+
 function sectionHtml(section, products, commerce) {
   const style = `background:${color(section.backgroundColor, "#ffffff")};color:${color(section.textColor, "#0f172a")};padding-top:${num(section.spacingTop, 28)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
   const open = `<section data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
   const close = `</div></section>`;
-
-  if (section.type === "spacer") return `<div style="height:${num(section.spacingTop, 0) + num(section.spacingBottom, 0)}px"></div>`;
-
-  if (section.type === "products") {
-    const settings = section.productSettings || {};
-    const cap = Math.max(1, Math.min(12, num(section.visibleProductCount, 12)));
-    const shown = productsForSection(products, settings).slice(0, cap);
-    return `${open}${saleLineHtml(section)}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
-      shown.length ? `<div class="product-grid">${shown.map((product) => productCardHtml(product, settings, commerce.productOverrides || {})).join("")}</div>` : `<div class="empty-products">هنوز محصولی در این بخش نیست.</div>`
-    }${close}`;
-  }
-
-  if (section.type === "banner") {
-    return `${open}<div class="banner">${url(section.imageUrl) ? `<img src="${escape(url(section.imageUrl))}" alt="${escape(section.title || "")}" loading="lazy">` : ""}<div class="banner-copy"><h2>${escape(section.title || "")}</h2><p>${escape(section.subtitle || "")}</p></div></div>${close}`;
-  }
-
-  if (section.type === "trust") {
-    return `${open}<div class="section-head"><h2>${escape(section.title || "")}</h2><p class="muted">${escape(section.subtitle || "")}</p></div>${close}`;
-  }
-
-  if (section.type === "category-grid" || section.type === "brand") {
-    return `${open}<div class="section-head"><h2>${escape(section.title || "")}</h2>${section.subtitle ? `<p class="muted">${escape(section.subtitle)}</p>` : ""}</div>${itemGridHtml(section)}${close}`;
-  }
-
-  return `${open}<h2>${escape(section.title || "")}</h2>${section.subtitle ? `<p class="muted">${escape(section.subtitle)}</p>` : ""}${close}`;
+  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, products, commerce });
 }
 
 /**
