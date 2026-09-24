@@ -114,4 +114,43 @@ Ran a real end-to-end acceptance test against the Template System V1 work above 
 - Targeted server regression check: `store-v16-publish-live-parity.test.mjs`, `v16-patch-engine.test.mjs`, `v16-document-revisions.test.mjs`, `v16-multi-page-core.test.mjs` — 58/58 pass, no regressions.
 - `server/db/loadder.sqlite` confirmed untouched by any of the above.
 
-**Status: fixed and verified, not yet committed** (no commit was requested for this stage).
+**Status: fixed, verified, and committed** as `d2864b5` ("Template System V1 - Commerce Modern template foundation") after a second, final acceptance pass (24/24 SSR checks + 18/18 isolation checks) confirmed both fixes held.
+
+## Commercial Readiness Audit V1 (2026-09-24) — see `docs/COMMERCIAL_READINESS_AUDIT_V1.md` for full detail
+
+**Status: audit only, no code changed.** Read-only pass over the Website Builder V16 frontend (`store-studio-v16/`, `StoreWebsiteStudioPageV16Core.tsx`, `templates/`) and backend (`site-projects.mjs`, `public-sites.mjs`, `auth.mjs`, `server/app/commerce/` incl. `v2/`, and the site services those files call). Goal: determine what remains before Loadder Website Builder can be sold to real customers.
+
+**Customer journey result:** of the 8 steps audited (account/workspace creation was out of file scope and not assessed), only **Edit design, Add products, and Publish are a clean PASS**. **Create website** and **Select template** are **MISSING** — both have complete, tested backend/logic (`POST /site-projects`, `createConfigFromTemplate()`) but zero UI path anywhere in the audited Studio to reach them (`StoreWebsiteStudioPageV16Core.tsx` assumes a project already exists; nothing references `"template"` outside the `templates/` folder itself). **Connect domain** and **Receive orders** are **PARTIAL**: domain-connect has a working backend endpoint but no UI at all, and (even if UI existed) no DNS ownership verification or TLS provisioning; order creation is solid end-to-end but checkout is hardcoded to `"manual"` payment (no gateway wired despite a complete, tested adapter contract in `payment-attempt-service.mjs`) and there is no order/lead notification of any kind (no email/SMS/webhook).
+
+**Biggest structural finding:** `server/app/commerce/v2/*` — 10 files covering cart, checkout, pricing, promotions, inventory reservation, fulfillment, returns/refunds, customer accounts, orders, and catalog — is imported **exclusively by test files** (confirmed via `grep -rl` for each engine across `server/`). The live storefront (`auth.mjs` + `ecommerce-service.mjs`) uses a separate, simpler, hand-rolled implementation instead. Only `financial-ledger.mjs` is genuinely wired into production routes. This means substantial, well-tested commerce functionality (promotions, inventory reservation, real fulfillment, returns, customer accounts) exists in the codebase but is unreachable by any real merchant today — a product decision (wire it in vs. archive it) is needed before adding more commerce surface area.
+
+**P0 blockers (6):** no create-site UI, no template-selection UI, no real payment gateway wired, no order/lead notifications, domain-connect has no ownership/TLS verification, OTP delivery self-reported as `"not-connected"` (`/api/auth/status`).
+
+**P1 (6):** `commerce/v2` unwired (above); no SEO essentials beyond title/description (no OG tags, JSON-LD, sitemap.xml, robots.txt); new section types not yet in the Ask Loadder patch allow-list; Ask Loadder is a regex matcher despite AI branding; Design Copilot reads the wrong content path; no rate limiting on public site GET routes.
+
+**Next step:** none taken — this was audit-only per explicit instruction. The 30-day roadmap in the audit doc prioritizes unblocking create-site + template-selection UI in week 1 (highest leverage: existing tested backend, UI-only work), order notifications and a first real payment-gateway integration in weeks 1-2, domain verification in weeks 2-3, a `commerce/v2` wire-in-or-archive decision in week 3, SEO essentials in weeks 3-4, and minimum monitoring in week 4.
+
+## Website Creation and Template Selection Flow V1 (2026-09-24) — closes the audit's #1 P0
+
+**Status: implemented and verified, not yet committed** (review requested before commit, per instruction).
+
+Implements exactly the week-1 audit recommendation: a new user can now create a STORE or BUSINESS site from the Studio UI itself, instead of the Studio requiring a project to already exist.
+
+**File changed (one file only):** `src/pages/StoreWebsiteStudioPageV16Core.tsx`. No backend changes — `POST /api/site-projects` (`site-project-service.mjs`'s `create()`) already accepted exactly the content shape needed; confirmed by reading `validateSiteDocument()`/`ensureWebsitePlatformContent()` before writing any code.
+
+**What changed:**
+- The load effect's previous behavior (throw "پروژه ... پیدا نشد" when no project of this `siteKind` exists) now sets a new `needsCreate` flag instead of failing.
+- A new `CreateWebsiteScreen` component (defined in the same file) renders instead of the empty Studio shell when `needsCreate` is true: for STORE it lists `TEMPLATES` from `templates/registry` (currently just "Loadder Commerce Modern V1") plus a "start blank" option; for BUSINESS it offers "start blank" only, since the template registry has no BUSINESS templates today (not invented here).
+- A new `createProject(template)` function builds the seed `StudioConfig` via `createConfigFromTemplate(template)` or `restoreConfig({}, siteKind)` for blank, wraps it as `{ storeBuilderV16: { ...config, version: 16 } }` — the exact same shape `persistConfig()` already writes on every later save — and `POST`s it to `/api/site-projects`. On success it sets `project`/`config`/`assets` from the response, exactly like the existing load effect does, landing the user directly in the already-working Studio with no page reload.
+- "Select site type" (the flow's step 2) is resolved one level above this file: `siteKind` arrives as a prop already fixed by which route mounted this component (`App.tsx` for STORE, `CorporateWebsiteStudioPage.tsx` for BUSINESS) — not a new screen, and not touched.
+
+**Tests run:**
+- `npx tsc -b` — clean, exit 0.
+- `npm run build` (`tsc -b && vite build`) — full production build succeeded; `StoreWebsiteStudioPageV16Core` chunk grew from 95.89 kB to 101.79 kB, consistent with the added code, no bundling errors.
+- `site-project-manual-creation.test.mjs` + `site-project-service.test.mjs` — 10/10 pass, no regressions.
+- A real functional end-to-end check (bundled the actual `registry.ts`/`config.ts` via Vite, ran against a real in-memory test DB and the real `site-project-service`): **12/12 checks pass**, covering all three paths — STORE+template (5 sections in the exact template order, hero title matches, `siteKind` correct), STORE blank (falls back to the ordinary `products`/`banner`/`trust` defaults), BUSINESS blank (`siteKind` correct, only corporate section types present) — plus confirmed two separately-created template projects don't share `items` array references (the isolation fix from the previous task holds for freshly created projects too, not just in-memory config copies).
+- `server/db/loadder.sqlite` confirmed untouched throughout.
+
+**Not done (deliberately, per explicit constraints):** no backend/database change, no change to `commerce/v2` or any commerce engine, no AI dependency added, no refactor of the existing Studio/canvas/patch-engine architecture — this is additive UI plus one new client-side function that calls two already-existing, already-tested backend capabilities.
+
+**Remaining gap (unchanged from the audit, not in this task's scope):** domain connection still has no UI and no DNS/TLS verification; no payment gateway; no order/lead notifications. This task closes only the "create website" + "select template" P0 items.

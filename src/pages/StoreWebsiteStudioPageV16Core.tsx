@@ -8,6 +8,8 @@ import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
 import { isCommerceSite, siteTypeDefinition } from "../components/store-studio-v16/site-types";
 import { activePageOf, navigationPages, newPage, normalizeSlug, slugProblem, withActivePageSections, withPages } from "../components/store-studio-v16/pages";
+import { createConfigFromTemplate, TEMPLATES } from "../components/store-studio-v16/templates/registry";
+import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { apiFetch } from "../lib/api";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
@@ -138,6 +140,27 @@ function applyMediaToConfig(current: StudioConfig, target: InlineMediaTarget, ur
   return current;
 }
 
+function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelectTemplate, creating, message, onCreate, onCreateBlank }: { commerce: boolean; templates: readonly WebsiteTemplate[]; selectedTemplateId: string | null; onSelectTemplate: (id: string) => void; creating: boolean; message: string; onCreate: () => void; onCreateBlank: () => void }) {
+  return <main dir="rtl" className="grid min-h-screen place-items-center bg-[#070b12] px-4 text-white">
+    <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#0d1622] p-7 shadow-2xl">
+      <p className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</p>
+      <h1 className="mt-2 text-xl font-black">{commerce ? "ساخت فروشگاه اینترنتی" : "ساخت سایت شرکتی"}</h1>
+      <p className="mt-2 text-xs leading-6 text-white/45">{commerce ? "یک قالب آماده را انتخاب کنید یا از یک فروشگاه خالی شروع کنید." : "برای شروع، یک سایت خالی می‌سازیم؛ همه‌چیز را در همین Studio ویرایش می‌کنید."}</p>
+      {commerce && templates.length > 0 && <div className="mt-5 grid gap-2">
+        {templates.map((template) => <button key={template.id} type="button" onClick={() => onSelectTemplate(template.id)} className={`rounded-2xl border p-4 text-right transition ${selectedTemplateId === template.id ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/[.03]"}`}>
+          <b className="block text-sm">{template.label}</b>
+          <span className="mt-1 block text-[11px] text-white/40">{template.description}</span>
+        </button>)}
+      </div>}
+      {message && <p role="alert" className="mt-4 rounded-xl bg-rose-500/10 p-3 text-xs font-bold text-rose-300">{message}</p>}
+      <div className="mt-6 flex flex-col gap-2">
+        {commerce && templates.length > 0 && <button type="button" disabled={creating || !selectedTemplateId} onClick={onCreate} className="min-h-12 rounded-xl bg-emerald-400 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{creating ? "در حال ساخت…" : "ساخت از روی قالب انتخاب‌شده"}</button>}
+        <button type="button" disabled={creating} onClick={onCreateBlank} className="min-h-12 rounded-xl border border-white/15 text-sm font-bold text-white/80 disabled:cursor-not-allowed disabled:opacity-50">{creating ? "در حال ساخت…" : commerce ? "شروع از فروشگاه خالی" : "ساخت سایت خالی"}</button>
+      </div>
+    </div>
+  </main>;
+}
+
 export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { siteKind?: SiteKind } = {}) {
   const commerce = isCommerceSite(siteKind);
   const [project, setProject] = useState<Project | null>(null);
@@ -148,6 +171,12 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [tab, setTab] = useState<"context" | "sections" | "design" | "pages">("context");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
+  // No project of this siteKind exists yet — the user is offered a create-website
+  // screen instead of the empty Studio shell. Set by the load effect, cleared by
+  // createProject() once a real project exists.
+  const [needsCreate, setNeedsCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(commerce ? TEMPLATES[0]?.id ?? null : null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pickerSectionId, setPickerSectionId] = useState<string | null>(null);
   const [createProductOpen, setCreateProductOpen] = useState(false);
@@ -169,7 +198,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       try {
         const listing = await read(await apiFetch("/api/site-projects", { signal: c.signal }));
         const selected = (listing.projects || []).find((i: any) => String(i.siteType).toUpperCase() === siteKind);
-        if (!selected) throw new Error(commerce ? "پروژه فروشگاهی پیدا نشد" : "پروژه سایت شرکتی پیدا نشد");
+        if (!selected) { setNeedsCreate(true); return; }
         const detail = await read(await apiFetch(`/api/site-projects/${selected.id}`, { signal: c.signal }));
         const loaded = detail.project as Project;
         setProject(loaded);
@@ -430,6 +459,38 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     setConfig((c) => ({ ...withActivePageSections(c, [...activePageOf(c).sections, section]), selectedElement: { type: "section", id: section.id } }));
   }
 
+  // Builds the first document exactly the shape persistConfig() already writes
+  // on every later save, so a templated/blank project behaves identically to a
+  // hand-edited one from its very first load — no separate creation format.
+  async function createProject(template: WebsiteTemplate | null) {
+    setCreating(true);
+    setMessage("");
+    try {
+      const seedConfig = template ? createConfigFromTemplate(template) : restoreConfig({}, siteKind);
+      const content = { storeBuilderV16: { ...seedConfig, version: 16 } };
+      const name = template ? template.label : (commerce ? "فروشگاه من" : "سایت من");
+      const out = await read(await apiFetch("/api/site-projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, siteType: siteKind, content }),
+      }));
+      const createdProject = out.project as Project;
+      setProject(createdProject);
+      draftRevision.current = null;
+      setConfig(restoreConfig(createdProject.content || {}, siteKind));
+      setAssets([]);
+      setNeedsCreate(false);
+      if (commerce) {
+        const catalog = await read(await apiFetch(`/api/stores/${createdProject.id}/products`));
+        setProducts(catalog.products || []);
+      }
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "ساخت سایت ناموفق بود");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   async function persistConfig(nextConfig: StudioConfig) {
     if (!project) throw new Error("پروژه فروشگاه آماده نیست.");
     const storeBuilderV16: StudioConfig = { ...nextConfig, version: 16 };
@@ -532,6 +593,19 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   };
   const pickerSection = pickerSectionId ? config.sections.find((s) => s.id === pickerSectionId) : null;
   const pickerSettings = pickerSection?.type === "products" && pickerSection.productSettings ? normalizeManual(pickerSection.productSettings, products) : null;
+
+  if (!busy && needsCreate) {
+    return <CreateWebsiteScreen
+      commerce={commerce}
+      templates={commerce ? TEMPLATES : []}
+      selectedTemplateId={selectedTemplateId}
+      onSelectTemplate={setSelectedTemplateId}
+      creating={creating}
+      message={message}
+      onCreate={() => { const template = TEMPLATES.find((t) => t.id === selectedTemplateId) || null; void createProject(template); }}
+      onCreateBlank={() => void createProject(null)}
+    />;
+  }
 
   return <main dir="rtl" className="h-screen overflow-hidden bg-[#070b12] text-white" data-studio-version="16">
     <header className="flex min-h-20 items-center gap-3 border-b border-white/10 bg-[#0a111b] px-4 py-3">
