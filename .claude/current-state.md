@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-09-25, after Website Platform Phase 1 (PR 1.0–1.3).
+Last updated: 2026-09-25, after Website Platform PR 2 (capability manifest).
 
 ## Git
 
@@ -415,14 +415,15 @@ Branch `feature/site-platform-baseline`. Architecture: `docs/architecture/ADR-00
 - **PR 1.0** `2800fa0` — `server/test/site-render-baseline.test.mjs` + 7 HTML baselines in `server/test/__snapshots__/site-render-baseline/` (V16 store, V16 corporate single/multi-page, legacy STORE, legacy generic BUSINESS/MEDICAL) and 4 dispatch-edge tests. Regenerate only on intended change: `UPDATE_SNAPSHOTS=1`.
 - **PR 1.1** `9c7b45d` — `server/app/site-platform/capability-resolver.mjs`: `resolveCapabilities(project, content)` → `{ capabilities, unregistered, ignored, source }`. Legacy names mapped (`catalog→commerce`, `lead→forms`, `team→people`, `content→blog`; `landing/location/portfolio→core`; `analytics/ads` ignored).
 - **PR 1.2** `af1eec2` — `server/app/site-platform/registry.mjs` (`defineCapability`, `defineSection`, `createRegistry`) and `capabilities.mjs` (`core`, `people`, `payments` internal, `commerce` → requires `payments`). All 14 existing section types registered via legacy aliases; metadata only.
-- **PR 1.3** — this documentation update.
+- **PR 1.3** `b6c3500` — architecture decisions recorded in `current-state.md` / `decisions.md`.
+- **PR 2** `a9f19f57d05761be82a173c294cc59043d970c7d` — Capability metadata in published snapshots. `site_publish_versions.manifest_json` is now the version-2 metadata carrier (`manifestVersion: 2`). New publish versions store `capabilities`, `unregisteredCapabilities`, `sectionTypes` (namespaced, enabled sections across all pages) and `unknownSectionTypes`, built by `server/app/site-platform/publish-manifest.mjs` (`buildCapabilityManifest`) inside the existing publish transaction. Existing manifest fields (`projectId`, `slug`, `siteType`, `contextVersionId`, `publishedAt`, `assetIds`, `rollbackOfVersionId`) are unchanged; stored website content is never rewritten. Old manifests keep working through fallback resolution (`readCapabilityManifest` derives metadata from snapshot content; the stored row is never migrated). Rollback creates v2 metadata from the restored snapshot content, using the project's current `siteType`. No renderer, frontend, migration or runtime-loading changes.
 
 **Capabilities:** `core`, `commerce`, `payments` (internal), `people`, `forms`, `blog`; pending: `booking`, `courses`. `forms` and `blog` are resolved but not yet in the registry (no sections).
 
-**Commerce rule:** commerce/payments resolve for `STORE` only. Renderers still dispatch by `siteType` (`isCorporateV16` / `isStoreV16`); nothing in the runtime imports `site-platform/` yet (enforced by an agreement test).
+**Commerce rule:** commerce/payments resolve for `STORE` only. Renderers still dispatch by `siteType` (`isCorporateV16` / `isStoreV16`); no renderer or the public server imports `site-platform/` yet (enforced by an agreement test); since PR 2 only the publish path (`site-project-repository.mjs`) does, to write manifest metadata.
 
-**Tests:** `node --test test/site-platform*` 30/30; server suite 1101/1101.
+**Tests:** `node --test test/site-platform*` 40/40; server suite 1111/1111.
 
 **Known rendering inconsistencies recorded (not fixed):** BUSINESS V16 docs with only `text`/`spacer` fall back to `genericSite`; empty STORE V16 falls back to the legacy storefront; `genericSite` prints raw `siteType` (e.g. "MEDICAL") to visitors; MEDICAL/LEGAL/NEWS have no V16 renderer; STORE is single-page; sale countdown depends on request time; spacers carry no `data-section-type`. Open issue from ADR-004 verification: `/preview/sites/:id` on the standalone public server likely lacks workspace context (unconfirmed).
 
-**Next:** PR 2 — publish manifest capability metadata (`manifestVersion: 2`, `capabilities`, `sectionTypes` in existing `site_publish_versions.manifest_json`; additive, no migration).
+**Next:** PR 3 — Runtime Capability Resolution. Goal: move the public runtime from `siteType`-based decisions toward capability-manifest decisions. Expected scope: capability-aware public rendering; lazy capability loading; remove eager `createEcommerceService()` initialization in `public-site-server.mjs`; preserve current behavior with fallback (`readCapabilityManifest` for pre-v2 versions; commerce stays STORE-only per the recorded decision). Rendering baselines must stay byte-identical.
