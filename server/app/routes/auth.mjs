@@ -12,7 +12,7 @@ import { runWithWorkspace } from "../tenant-context.mjs";
 import { createPublicBusinessAppRouter } from "../business-builder/public-app-router.mjs";
 import { CART_CAPABILITY_HEADER, ORDER_CAPABILITY_HEADER, createPublicCapability, matchesPublicCapability } from "../services/public-commerce-capability.mjs";
 import { createPaymentAttemptService } from "../commerce/payment-attempt-service.mjs";
-import { zarinpalPaymentProvider } from "../commerce/zarinpal-payment-provider.mjs";
+import { paymentAdapters } from "../commerce/payment-adapters.mjs";
 import { sendMessage } from "../../services/messaging.mjs";
 
 export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false }) {
@@ -21,7 +21,6 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   const ecommerceService = createEcommerceService({ db });
   const siteLeadService = createSiteLeadService({ db });
   const paymentAttemptService = createPaymentAttemptService({ db });
-  const paymentAdapters = { ZARINPAL: zarinpalPaymentProvider };
   const sendOtpLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message: { success:false, message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const leadLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const checkoutLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"درخواست‌های خرید زیاد است. کمی بعد دوباره تلاش کنید." } });

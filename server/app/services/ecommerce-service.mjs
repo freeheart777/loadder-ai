@@ -269,10 +269,18 @@ export function createEcommerceService({ db, env = process.env }) {
     },
     configurePaymentProvider(siteProjectId,input={}) {
       requireSite(siteProjectId); const key=String(input.providerKey||"").trim().toUpperCase(); if(!key) throw new EcommerceError("providerKey is required.","PROVIDER_KEY_REQUIRED");
+      const credential=String(input.credentialReference||"").trim()||null;
+      if(key==="ZARINPAL"&&credential&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credential)) throw new EcommerceError("ZarinPal merchant ID must be a 36-character UUID.","PAYMENT_PROVIDER_CREDENTIAL_INVALID");
+      // Every save lands PENDING, whatever the caller sends: CONNECTED is reachable only through
+      // payment-provider-activation-service, and changed credentials must be activated again.
       const existing=db.prepare("SELECT id FROM ecommerce_payment_providers WHERE workspace_id=? AND site_project_id=? AND provider_key=?").get(workspaceId(),siteProjectId,key); const stamp=now();
-      if(existing) db.prepare("UPDATE ecommerce_payment_providers SET status=?,config_json=?,credential_reference=?,updated_at=? WHERE id=? AND workspace_id=?").run(input.status||"PENDING",JSON.stringify(input.config||{}),input.credentialReference||null,stamp,existing.id,workspaceId());
-      else db.prepare(`INSERT INTO ecommerce_payment_providers(id,workspace_id,site_project_id,provider_key,status,config_json,credential_reference,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(id("pay"),workspaceId(),siteProjectId,key,input.status||"PENDING",JSON.stringify(input.config||{}),input.credentialReference||null,stamp,stamp);
-      return {providerKey:key,status:input.status||"PENDING"};
+      if(existing) db.prepare("UPDATE ecommerce_payment_providers SET status='PENDING',config_json=?,credential_reference=?,updated_at=? WHERE id=? AND workspace_id=?").run(JSON.stringify(input.config||{}),credential,stamp,existing.id,workspaceId());
+      else db.prepare(`INSERT INTO ecommerce_payment_providers(id,workspace_id,site_project_id,provider_key,status,config_json,credential_reference,created_at,updated_at) VALUES(?,?,?,?,'PENDING',?,?,?,?)`).run(id("pay"),workspaceId(),siteProjectId,key,JSON.stringify(input.config||{}),credential,stamp,stamp);
+      return {providerKey:key,status:"PENDING"};
+    },
+    listPaymentProviders(siteProjectId) {
+      requireSite(siteProjectId);
+      return db.prepare("SELECT provider_key,status,config_json,credential_reference,updated_at FROM ecommerce_payment_providers WHERE workspace_id=? AND site_project_id=? ORDER BY created_at").all(workspaceId(),siteProjectId).map(r=>{let config={};try{config=JSON.parse(r.config_json||"{}")}catch{}return{providerKey:r.provider_key,status:r.status,sandbox:config.sandbox===true,credentialHint:r.credential_reference?`…${r.credential_reference.slice(-4)}`:null,updatedAt:r.updated_at}});
     },
     checkout(cartId,input={}) {
       const execute=db.transaction(() => {

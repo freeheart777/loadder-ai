@@ -3,7 +3,7 @@ import { EcommerceError } from "../services/ecommerce-service.mjs";
 import { FinancialLedgerError } from "../commerce/v2/financial-ledger.mjs";
 import { RefundPersistenceError } from "../commerce/v2/refund-service.mjs";
 
-export function createEcommerceRouter({ service, financialLedgerService = null, refundService = null }) {
+export function createEcommerceRouter({ service, financialLedgerService = null, refundService = null, paymentProviderActivationService = null }) {
   const router = express.Router();
   const handle = (error, res) => {
     if (error instanceof EcommerceError || error instanceof FinancialLedgerError || error instanceof RefundPersistenceError) {
@@ -53,7 +53,14 @@ export function createEcommerceRouter({ service, financialLedgerService = null, 
 
   router.post("/stores/:siteProjectId/coupons", (req, res) => run(res, () => ({ coupon: service.createCoupon(req.params.siteProjectId, req.body || {}) }), 201));
   router.post("/stores/:siteProjectId/shipping-methods", (req, res) => run(res, () => ({ shippingMethod: service.createShippingMethod(req.params.siteProjectId, req.body || {}) }), 201));
-  router.put("/stores/:siteProjectId/payment-providers/:providerKey", (req, res) => run(res, () => ({ provider: service.configurePaymentProvider(req.params.siteProjectId, { ...(req.body || {}), providerKey: req.params.providerKey }) })));
+  router.get("/stores/:siteProjectId/payment-providers", (req, res) => run(res, () => ({ providers: service.listPaymentProviders(req.params.siteProjectId) })));
+  // Client status is never forwarded; see payment-provider-activation-service for CONNECTED.
+  router.put("/stores/:siteProjectId/payment-providers/:providerKey", (req, res) => run(res, () => ({ provider: service.configurePaymentProvider(req.params.siteProjectId, { config: req.body?.config, credentialReference: req.body?.credentialReference, providerKey: req.params.providerKey }) })));
+  router.post("/stores/:siteProjectId/payment-providers/:providerKey/activate", async (req, res) => {
+    if (!paymentProviderActivationService) return res.status(503).json({ success: false, code: "PAYMENT_ACTIVATION_UNAVAILABLE", message: "Payment activation is unavailable." });
+    try { return res.json({ success: true, provider: await paymentProviderActivationService.activate(req.params.siteProjectId, req.params.providerKey, { origin: `${req.protocol}://${req.get("host")}` }) }); }
+    catch (error) { return handle(error, res); }
+  });
 
   router.get("/stores/:siteProjectId/orders", (req, res) => run(res, () => ({ orders: service.listOrders(req.params.siteProjectId) })));
   router.get("/commerce/orders/:orderId", (req, res) => run(res, () => ({ order: service.getOrder(req.params.orderId) })));

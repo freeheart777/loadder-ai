@@ -10,7 +10,7 @@ type Product={id:string;name:string;slug:string;description?:string;status:strin
 type OrderItem={id:string;productId:string;variantId:string;productName:string;sku:string;quantity:number;unitPriceMinor:number;lineTotalMinor:number};
 type ShippingAddress={fullName?:string;phone?:string;province?:string;city?:string;address?:string;postalCode?:string;notes?:string};
 type Order={id:string;email?:string|null;currency:string;status:string;paymentStatus:string;fulfillmentStatus:string;paymentProvider?:string|null;shippingMethod?:string|null;shippingAddress?:ShippingAddress|null;subtotalMinor:number;discountMinor:number;shippingMinor:number;totalMinor:number;items:OrderItem[];createdAt:string};
-type PaymentProviderConfig={providerKey:string;status:string};
+type PaymentProviderConfig={providerKey:string;status:string;sandbox?:boolean;credentialHint?:string|null;updatedAt?:string};
 type FormErrors={name?:string;price?:string;inventory?:string;submit?:string};
 
 const empty={name:"",sku:"",price:"",compareAt:"",inventory:"0",category:"",brand:"",currency:"IRT",description:"",slug:"",seoTitle:"",seoDescription:"",featured:false,variantTitle:"پیش‌فرض"};
@@ -35,13 +35,13 @@ export default function StoreCommerceManagerPage(){
  const[selectedOrderId,setSelectedOrderId]=useState<string|null>(null);
  const[orderBusy,setOrderBusy]=useState(false);
  const[orderMessage,setOrderMessage]=useState("");
- const[providerKeyInput,setProviderKeyInput]=useState("");
- const[credentialReferenceInput,setCredentialReferenceInput]=useState("");
+ const[merchantIdInput,setMerchantIdInput]=useState("");
+ const[sandboxInput,setSandboxInput]=useState(false);
  const[paymentBusy,setPaymentBusy]=useState(false);
  const[paymentMessage,setPaymentMessage]=useState("");
- const[lastConfiguredProvider,setLastConfiguredProvider]=useState<PaymentProviderConfig|null>(null);
+ const[zarinpal,setZarinpal]=useState<PaymentProviderConfig|null>(null);
  useEffect(()=>{void boot()},[]);
- async function boot(){try{const d=await read(await apiFetch("/api/site-projects"));const s=(d.projects||[]).find((x:Project)=>String(x.siteType).toUpperCase()==="STORE");if(!s)throw new Error("ابتدا یک فروشگاه بساز");setProject(s);await refresh(s.id)}catch(e){setMessage(e instanceof Error?e.message:"خطا")}}
+ async function boot(){try{const d=await read(await apiFetch("/api/site-projects"));const s=(d.projects||[]).find((x:Project)=>String(x.siteType).toUpperCase()==="STORE");if(!s)throw new Error("ابتدا یک فروشگاه بساز");setProject(s);await refresh(s.id);await loadProviders(s.id)}catch(e){setMessage(e instanceof Error?e.message:"خطا")}}
  async function refresh(id=project?.id){if(!id)return;const[p,o]=await Promise.all([read(await apiFetch(`/api/stores/${id}/products`)),read(await apiFetch(`/api/stores/${id}/orders`))]);setProducts(p.products||[]);setOrders(o.orders||[])}
  async function uploadAsset(f:File,placement:string,productId?:string){if(!project)throw new Error("پروژه پیدا نشد");setMessage(`در حال آپلود ${f.name}…`);const assetType=placement.includes("gallery")?"gallery":"product";const media=await uploadSiteMedia({siteProjectId:project.id,file:f,assetType,metadata:{placement,altText:form.name||"تصویر محصول",...(productId?{productId}:{})}});return media.url}
 
@@ -92,23 +92,30 @@ export default function StoreCommerceManagerPage(){
   finally{setOrderBusy(false)}
  }
 
- // Payment settings (Gate 2 P1) -- connects the existing, already-live
- // configurePaymentProvider endpoint. There is no GET endpoint to read back a
- // previously configured provider (none exists in the audited API surface, and
- // adding one is out of this task's scope), so only the just-saved result can be
- // shown; a page reload will not show prior configuration.
- async function configureProvider(){
+ // Payment settings (Gate 3.5): save always lands PENDING server-side; only
+ // "test and activate" (a real ZarinPal request) can make the gateway CONNECTED.
+ async function loadProviders(id=project?.id){if(!id)return;try{const d=await read(await apiFetch(`/api/stores/${id}/payment-providers`));const zp=(d.providers||[]).find((p:PaymentProviderConfig)=>p.providerKey==="ZARINPAL")||null;setZarinpal(zp);if(zp)setSandboxInput(Boolean(zp.sandbox))}catch{/* settings stay empty */}}
+ async function saveZarinpal(){
   if(!project)return;
-  const key=providerKeyInput.trim();
-  if(!key){setPaymentMessage("کلید درگاه پرداخت را وارد کن.");return}
+  const merchantId=merchantIdInput.trim();
+  if(!merchantId&&!zarinpal?.credentialHint){setPaymentMessage("مرچنت کد زرین‌پال را وارد کن.");return}
+  if(!merchantId){setPaymentMessage("برای تغییر تنظیمات، مرچنت کد را دوباره وارد کن.");return}
   setPaymentBusy(true);setPaymentMessage("");
   try{
-   const d=await read(await apiFetch(`/api/stores/${project.id}/payment-providers/${encodeURIComponent(key)}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({credentialReference:credentialReferenceInput.trim()||null})}));
-   const provider=d.provider as PaymentProviderConfig;
-   setLastConfiguredProvider(provider);
-   setPaymentMessage(`درگاه «${provider.providerKey}» ذخیره شد؛ وضعیت: ${provider.status}.`);
+   await read(await apiFetch(`/api/stores/${project.id}/payment-providers/ZARINPAL`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({credentialReference:merchantId,config:{sandbox:sandboxInput}})}));
+   setMerchantIdInput("");await loadProviders();
+   setPaymentMessage("ذخیره شد. پرداخت آنلاین تا زمان «تست و فعال‌سازی» غیرفعال است.");
   }catch(e){setPaymentMessage(e instanceof Error?e.message:"خطا در ذخیره تنظیمات پرداخت")}
   finally{setPaymentBusy(false)}
+ }
+ async function activateZarinpal(){
+  if(!project)return;
+  setPaymentBusy(true);setPaymentMessage("");
+  try{
+   await read(await apiFetch(`/api/stores/${project.id}/payment-providers/ZARINPAL/activate`,{method:"POST"}));
+   setPaymentMessage("اتصال به زرین‌پال تأیید شد. پرداخت آنلاین فعال است.");
+  }catch(e){setPaymentMessage(e instanceof Error?e.message:"فعال‌سازی درگاه ناموفق بود")}
+  finally{setPaymentBusy(false);await loadProviders()}
  }
 
  const stock=useMemo(()=>products.reduce((n,p)=>n+(p.variants||[]).reduce((x,v)=>x+v.inventoryQuantity,0),0),[products]);
@@ -118,7 +125,7 @@ export default function StoreCommerceManagerPage(){
  <div className="mb-5 flex gap-2">{([["products","محصولات"],["orders","سفارش‌ها"],["payments","تنظیمات پرداخت"]] as const).map(([key,label])=><button key={key} type="button" onClick={()=>setView(key)} className={`rounded-xl px-4 py-2 text-sm font-bold ${view===key?"bg-violet-600 text-white":"border border-white/10 text-white/60"}`}>{label}</button>)}</div>
  <section className="mb-7 grid gap-3 md:grid-cols-3"><Stat icon={<Cube/>} title="محصولات" value={String(products.length)}/><Stat icon={<Package/>} title="موجودی کل" value={String(stock)}/><Stat icon={<ShoppingCartSimple/>} title="سفارش‌ها" value={String(orders.length)}/></section>{message&&<div className={`mb-5 rounded-xl border p-3 text-sm ${errors.submit?"border-rose-500/30 bg-rose-500/10 text-rose-200":"border-white/10 bg-white/5"}`}>{message}</div>}
  {view==="orders"&&<OrdersView orders={orders} selectedOrderId={selectedOrderId} onSelect={setSelectedOrderId} busy={orderBusy} message={orderMessage} onUpdateStatus={updateOrderStatus}/>}
- {view==="payments"&&<PaymentSettingsView providerKey={providerKeyInput} onProviderKey={setProviderKeyInput} credentialReference={credentialReferenceInput} onCredentialReference={setCredentialReferenceInput} busy={paymentBusy} message={paymentMessage} lastConfigured={lastConfiguredProvider} onSubmit={configureProvider}/>}
+ {view==="payments"&&<PaymentSettingsView provider={zarinpal} merchantId={merchantIdInput} onMerchantId={setMerchantIdInput} sandbox={sandboxInput} onSandbox={setSandboxInput} busy={paymentBusy} message={paymentMessage} onSave={saveZarinpal} onActivate={activateZarinpal}/>}
  {view==="products"&&<div className="grid gap-6 xl:grid-cols-[440px_1fr]"><section className="h-fit rounded-2xl border border-white/10 bg-[#0d1320] p-5"><div className="mb-4 flex items-center justify-between"><b className="flex items-center gap-2"><Plus/> ایجاد محصول</b><button onClick={()=>setAdvanced(v=>!v)} className="text-xs text-violet-300">{advanced?"فرم ساده":"SEO و پیشرفته"}</button></div><div className="space-y-3"><Input label="نام محصول" value={form.name} error={errors.name} onChange={v=>{setForm({...form,name:v});setErrors(e=>({...e,name:undefined}))}}/><label className="block text-xs text-white/45">توضیحات<textarea className="input mt-2 min-h-24" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></label><MediaPicker title="تصویر اصلی محصول" files={primary?[primary]:[]} single onPick={fs=>setPrimary(fs[0]||null)} onRemove={()=>setPrimary(null)}/><MediaPicker title="گالری محصول" files={gallery} onPick={fs=>setGallery(x=>[...x,...fs].slice(0,8))} onRemove={i=>setGallery(x=>x.filter((_,j)=>j!==i))}/><div className="grid grid-cols-2 gap-3"><Input label="قیمت" value={form.price} error={errors.price} placeholder="۰ برای محصول رایگان" onChange={v=>{setForm({...form,price:v});setErrors(e=>({...e,price:undefined}))}}/><Input label="قیمت خط‌خورده" value={form.compareAt} onChange={v=>setForm({...form,compareAt:v})}/><Input label="SKU (اختیاری)" value={form.sku} placeholder="اگر خالی باشد خودکار ساخته می‌شود" onChange={v=>setForm({...form,sku:v})}/><Input label="موجودی" value={form.inventory} error={errors.inventory} onChange={v=>{setForm({...form,inventory:v});setErrors(e=>({...e,inventory:undefined}))}}/><Input label="دسته‌بندی" value={form.category} onChange={v=>setForm({...form,category:v})}/><Input label="برند" value={form.brand} onChange={v=>setForm({...form,brand:v})}/></div><label className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-xs"><span className="flex items-center gap-2"><Star/> محصول ویژه</span><input type="checkbox" checked={form.featured} onChange={e=>setForm({...form,featured:e.target.checked})}/></label>{advanced&&<div className="space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3"><Input label="Slug" value={form.slug} onChange={v=>setForm({...form,slug:v})}/><Input label="عنوان SEO" value={form.seoTitle} onChange={v=>setForm({...form,seoTitle:v})}/><Input label="توضیحات SEO" value={form.seoDescription} onChange={v=>setForm({...form,seoDescription:v})}/></div>}<label className="block text-xs text-white/45">ارز<select className="input mt-2" value={form.currency} onChange={e=>setForm({...form,currency:e.target.value})}><option>IRT</option><option>IRR</option><option>USD</option><option>EUR</option><option>AED</option></select></label>{errors.submit&&<div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs leading-6 text-rose-200">{errors.submit}</div>}<button disabled={busy} onClick={()=>void createProduct()} className="w-full rounded-xl bg-violet-600 p-3 text-sm font-black disabled:cursor-wait disabled:opacity-60">{busy?"در حال ثبت و آپلود تصاویر…":"ثبت محصول"}</button><p className="text-center text-[10px] leading-5 text-white/30">تصاویر مستقیماً در Media Storage ذخیره می‌شوند؛ SKU در صورت خالی بودن خودکار ساخته می‌شود.</p></div>
  <div className="mt-6 border-t border-white/10 pt-5"><b>تنوع رنگ / سایز</b><div className="mt-3 space-y-3"><label className="block text-xs text-white/45">محصول<select className="input mt-2" value={variantForm.productId} onChange={e=>setVariantForm({...variantForm,productId:e.target.value})}><option value="">انتخاب محصول</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><Input label="عنوان تنوع" value={variantForm.title} onChange={v=>setVariantForm({...variantForm,title:v})}/><Input label="SKU" value={variantForm.sku} onChange={v=>setVariantForm({...variantForm,sku:v})}/><Input label="رنگ" value={variantForm.color} onChange={v=>setVariantForm({...variantForm,color:v})}/><Input label="سایز" value={variantForm.size} onChange={v=>setVariantForm({...variantForm,size:v})}/><Input label="قیمت اختصاصی" value={variantForm.price} onChange={v=>setVariantForm({...variantForm,price:v})}/><Input label="موجودی" value={variantForm.inventory} onChange={v=>setVariantForm({...variantForm,inventory:v})}/></div><MediaPicker title="تصویر این تنوع" files={variantImage?[variantImage]:[]} single onPick={fs=>setVariantImage(fs[0]||null)} onRemove={()=>setVariantImage(null)}/><button disabled={busy} onClick={()=>void addVariant()} className="w-full rounded-xl border border-violet-500/40 p-3 text-sm font-bold text-violet-200">افزودن Variant</button></div></div></section>
  <section className="rounded-2xl border border-white/10 bg-[#0d1320] p-5"><label className="relative mb-4 block"><MagnifyingGlass className="absolute right-3 top-3 text-white/30"/><input className="input pr-10" placeholder="جستجو نام، SKU، برند…" value={query} onChange={e=>setQuery(e.target.value)}/></label><div className="space-y-3">{filtered.length?filtered.map(p=>{const image=(Array.isArray(p.metadata?.gallery)?(p.metadata!.gallery as string[])[0]:undefined)||p.variants?.[0]?.imageUrl;return <article key={p.id} className="rounded-xl border border-white/10 bg-white/[.025] p-4"><div className="flex gap-4"><div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/5">{image?<img src={image} alt={p.name} className="h-full w-full object-cover"/>:<ImageSquare size={30} className="text-white/20"/>}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><b>{p.name}</b><p className="mt-1 text-xs text-white/35">{p.brand||"بدون برند"} · {p.category||"بدون دسته"}</p></div><b className="text-violet-300">{fmt(p.basePriceMinor,p.currency)}</b></div><div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/50"><span className="rounded bg-white/5 px-2 py-1">{p.status}</span><span className="rounded bg-white/5 px-2 py-1">{p.variants?.length||0} تنوع</span><span className="rounded bg-white/5 px-2 py-1">موجودی {(p.variants||[]).reduce((n,v)=>n+v.inventoryQuantity,0)}</span></div><div className="mt-3 flex gap-2"><Link to={`/dashboard/websites/commerce/product/${p.id}`} className="rounded-lg border border-white/10 px-3 py-2 text-xs">صفحه محصول</Link><Link to="/dashboard/websites/commerce/operations" className="rounded-lg border border-white/10 px-3 py-2 text-xs">ویرایش کامل</Link></div></div></div></article>}):<div className="grid min-h-72 place-items-center rounded-xl border border-dashed border-white/10 text-sm text-white/35">هنوز محصولی نداریم؛ اولین محصول را از فرم کناری بساز.</div>}</div></section></div>}</div></main>
@@ -152,16 +159,23 @@ function OrdersView({orders,selectedOrderId,onSelect,busy,message,onUpdateStatus
  </section>;
 }
 
-function PaymentSettingsView({providerKey,onProviderKey,credentialReference,onCredentialReference,busy,message,lastConfigured,onSubmit}:{providerKey:string;onProviderKey:(v:string)=>void;credentialReference:string;onCredentialReference:(v:string)=>void;busy:boolean;message:string;lastConfigured:PaymentProviderConfig|null;onSubmit:()=>void}){
+const PROVIDER_STATUS_LABEL:Record<string,string>={PENDING:"ذخیره شده، فعال نیست",CONNECTED:"فعال",ERROR:"خطا در اتصال",DISCONNECTED:"غیرفعال"};
+function PaymentSettingsView({provider,merchantId,onMerchantId,sandbox,onSandbox,busy,message,onSave,onActivate}:{provider:PaymentProviderConfig|null;merchantId:string;onMerchantId:(v:string)=>void;sandbox:boolean;onSandbox:(v:boolean)=>void;busy:boolean;message:string;onSave:()=>void;onActivate:()=>void}){
+ const connected=provider?.status==="CONNECTED";
  return <section className="max-w-xl rounded-2xl border border-white/10 bg-[#0d1320] p-5">
-  <b>تنظیمات درگاه پرداخت</b>
-  <p className="mt-1 text-xs leading-6 text-white/40">این بخش فقط پیکربندی درگاه را ذخیره می‌کند؛ اتصال واقعی به درگاه پرداخت هنوز انجام نشده و پرداخت آنلاین در فروشگاه فعال نیست.</p>
+  <b>درگاه پرداخت زرین‌پال</b>
+  <p className="mt-1 text-xs leading-6 text-white/40">{connected?`پرداخت آنلاین فعال است${provider?.sandbox?" (حالت آزمایشی)":""}؛ مشتری‌ها هنگام خرید به زرین‌پال منتقل می‌شوند.`:"پرداخت آنلاین فعال نیست؛ سفارش‌ها به‌صورت دستی ثبت می‌شوند. مرچنت کد را ذخیره کن و سپس «تست و فعال‌سازی» را بزن."}</p>
+  {provider&&<p className="mt-3 text-xs text-white/60">وضعیت: <b className={connected?"text-emerald-300":provider.status==="ERROR"?"text-rose-300":"text-amber-200"}>{PROVIDER_STATUS_LABEL[provider.status]||provider.status}</b>{provider.credentialHint&&<> · مرچنت کد {provider.credentialHint}</>}</p>}
   <div className="mt-4 space-y-3">
-   <Input label="کلید درگاه (مثال: zarinpal)" value={providerKey} onChange={onProviderKey}/>
-   <Input label="شناسه اعتبارنامه (اختیاری)" value={credentialReference} onChange={onCredentialReference} placeholder="مرجع اعتبارنامه ذخیره‌شده، نه خود کلید محرمانه"/>
+   <Input label="مرچنت کد زرین‌پال" value={merchantId} onChange={onMerchantId} placeholder={provider?.credentialHint?`ذخیره‌شده: ${provider.credentialHint}`:"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}/>
+   <label className="flex items-center gap-2 text-xs text-white/60"><input type="checkbox" checked={sandbox} onChange={e=>onSandbox(e.target.checked)}/> حالت آزمایشی (Sandbox)</label>
+   <p className="text-[10px] leading-5 text-white/35">هر ذخیره، پرداخت آنلاین را تا فعال‌سازی دوباره غیرفعال می‌کند. فعال‌سازی یک درخواست واقعی و بدون پرداخت به زرین‌پال می‌فرستد.</p>
    {message&&<div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs">{message}</div>}
-   <button disabled={busy} onClick={onSubmit} className="w-full rounded-xl bg-violet-600 p-3 text-sm font-black disabled:cursor-wait disabled:opacity-60">{busy?"در حال ذخیره…":"ذخیره تنظیمات درگاه"}</button>
-   {lastConfigured&&<p className="text-center text-[10px] text-white/30">آخرین ذخیره: {lastConfigured.providerKey} · وضعیت: {lastConfigured.status}</p>}
+   <div className="grid grid-cols-2 gap-2">
+    <button disabled={busy} onClick={onSave} className="rounded-xl border border-white/15 p-3 text-sm font-black disabled:cursor-wait disabled:opacity-60">{busy?"…":"ذخیره"}</button>
+    <button disabled={busy||!provider?.credentialHint||connected} onClick={onActivate} className="rounded-xl bg-violet-600 p-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-50">{busy?"در حال بررسی…":"تست و فعال‌سازی"}</button>
+   </div>
   </div>
  </section>;
 }
+

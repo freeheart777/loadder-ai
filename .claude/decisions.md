@@ -27,3 +27,7 @@ Append-only record of non-obvious decisions and their reasoning, so future sessi
 ## 2026-09-24 — ZarinPal is the first payment gateway (Commerce Gate 3)
 
 User-approved. Market is Persian (IRT prices, Kavenegar SMS, Persian UI); ZarinPal's redirect model fits the existing server checkout without client payment JS, and a single merchant ID fits `credential_reference` with no migration. Stripe was deferred: needs a webhook signing secret and currency-aware minor units. Adapters are looked up by `provider_key` in `auth.mjs`'s `paymentAdapters` map — add a second gateway there, no new registry layer.
+
+## 2026-09-24 — Payment provider activation by real gateway probe (Gate 3.5)
+
+User chose a real ZarinPal request over format-only validation. Sandbox rows probe the sandbox; live rows send a 1,000 IRR request that is never paid (it expires at the gateway, visible as unpaid in the merchant dashboard). Every save resets to PENDING so changed credentials can never stay CONNECTED unverified. The ZarinPal merchant ID is stored as plain `credential_reference`: it is a per-request identifier, not a signing secret. Activation logic lives in its own service (`payment-provider-activation-service.mjs`), not in routes.

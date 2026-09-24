@@ -9,6 +9,7 @@ import { createDesignCopilotService } from "./services/design-copilot-service.mj
 import { createEcommerceService } from "./services/ecommerce-service.mjs";
 import { createFinancialLedgerService } from "./commerce/v2/financial-ledger.mjs";
 import { createRefundService } from "./commerce/v2/refund-service.mjs";
+import { createPaymentProviderActivationService } from "./commerce/payment-provider-activation-service.mjs";
 import { createSupabaseStorageService } from "./storage/supabase-storage-service.mjs";
 import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
@@ -51,6 +52,7 @@ export function mountSiteBuilderControlPlane({
   // gating; this is the one dependency that was never wired into the router
   // mount actually running in production, so refund endpoints 503'd.
   const refundService = createRefundService({ db });
+  const paymentProviderActivationService = createPaymentProviderActivationService({ db });
 
   const mountPath = basePath || "/";
   app.use(mountPath, createSiteProjectsRouter({ service: projectService }));
@@ -72,6 +74,7 @@ export function mountSiteBuilderControlPlane({
       service: ecommerceService,
       financialLedgerService,
       refundService,
+      paymentProviderActivationService,
     })
   );
 

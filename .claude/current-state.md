@@ -350,3 +350,17 @@ Public checkout (`auth.mjs`, `POST /storefront/carts/:cartId/checkout`) always c
 **Tests:** new e2e 5/5 (manual unchanged, full paid path incl. forged-Authority 404 and replay, cancel, verify-reject, request-reject); full server suite 1035/1035; `npx tsc -b` clean.
 
 **Open:** (1) nothing in the UI sets a provider to `CONNECTED` yet — Gate 2 form saves `PENDING`; needs a decision (on-save vs sandbox check). (2) Callback URL built from `req.protocol`/host — needs `trust proxy` or a public base URL behind TLS termination. (3) `order-success` page does not read `?payment=`; it shows the order's real `paymentStatus`. (4) Refunds, stale `REDIRECT_READY` cleanup — P1.
+
+## Commerce Gate 3.5 — Payment Provider Activation (2026-09-24)
+
+**Status: implemented and verified, not yet committed.** Gate 3 committed as `e4e8c64`.
+
+**Rule now enforced:** `CONNECTED` is reachable only through `server/app/commerce/payment-provider-activation-service.mjs`. `configurePaymentProvider()` always writes `PENDING` (client `status` is dropped in the route and ignored in the service), so any credential change disables online payment until re-activated. ZarinPal merchant ID must be a UUID.
+
+**Activation:** `POST /stores/:id/payment-providers/:key/activate` → service loads the workspace-scoped row → adapter from shared `commerce/payment-adapters.mjs` → `adapter.createPayment()` probe of 1,000 IRR (sandbox host if `config.sandbox`, else a minimal live request that is never paid) → code 100 ⇒ `CONNECTED`, else `ERROR` + 422. The status write is conditional on `credential_reference`/`config_json` being unchanged since the probe started (409 otherwise). ZarinPal sandbox confirmed live (`sandbox.zarinpal.com/pg/v4/payment/request.json` returned code 100); it accepts any UUID, so only live rows truly validate a merchant ID.
+
+**Also:** `GET /stores/:id/payment-providers` (merchant ID masked to last 4); `PaymentSettingsView` is now ZarinPal-only with merchant ID, sandbox toggle, Save, "Test and activate", and persisted status on reload. `auth.mjs` only swapped to the shared adapter map. No schema change, adapter contract unchanged.
+
+**Tests:** new `commerce-payment-provider-activation.test.mjs` 7/7 (real control-plane mount + auth router): forced CONNECTED ignored, UUID check, unsupported/missing-credential never hits gateway, rejection ⇒ ERROR + manual checkout, save→activate→checkout redirect→re-save disconnects, probe race ⇒ 409, cross-workspace 404. Full server suite 1042/1042; `tsc -b` clean; `npm run build` OK.
+
+**Open:** rows set `CONNECTED` via the old PUT loophole before this change are not reset (no migration). Probe callback host comes from the dashboard request host — ZarinPal may reject if the merchant's registered domain differs. Proxy/TLS base URL still open from Gate 3.
