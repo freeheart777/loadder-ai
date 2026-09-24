@@ -364,3 +364,13 @@ Public checkout (`auth.mjs`, `POST /storefront/carts/:cartId/checkout`) always c
 **Tests:** new `commerce-payment-provider-activation.test.mjs` 7/7 (real control-plane mount + auth router): forced CONNECTED ignored, UUID check, unsupported/missing-credential never hits gateway, rejection ⇒ ERROR + manual checkout, save→activate→checkout redirect→re-save disconnects, probe race ⇒ 409, cross-workspace 404. Full server suite 1042/1042; `tsc -b` clean; `npm run build` OK.
 
 **Open:** rows set `CONNECTED` via the old PUT loophole before this change are not reset (no migration). Probe callback host comes from the dashboard request host — ZarinPal may reject if the merchant's registered domain differs. Proxy/TLS base URL still open from Gate 3.
+
+## Payment Production Hardening — P0 frontend fixes (2026-09-24)
+
+**Status: implemented, `tsc -b` + `npm run build` clean, not committed; Playwright `test:e2e:commerce` NOT run (needs a live stack via E2E_BASE_URL/E2E_API_BASE_URL).** Audit (read-only, at `f0d4631`) found three P0 bugs that made Gate 3 unusable for real customers; these three files fix them, no backend change.
+
+- `src/pages/PublicCheckoutPage.tsx` — dropped its private checkout `fetch`; now calls `checkoutPublicCart()`, so the `/store/:id/checkout` route follows `payment.redirectUrl` to ZarinPal (previously it ignored it and showed "success" for an unpaid order).
+- `src/lib/publicCart.ts` — `PublicCheckoutInput.shippingMethod` added (the page sends it); `readPublicOrderReference()` accepts the legacy bare-token format the old checkout page stored, so existing customer receipts keep working. Writes stay JSON.
+- `src/pages/PublicOrderSuccessPage.tsx` — reads through `getPublicOrder()` (fixes JSON-vs-raw receipt mismatch that broke the page after a gateway return); shows state from server `paymentStatus` only: PAID ⇒ green; UNPAID + `?payment=failed` ⇒ red "not paid"; UNPAID + other `?payment=` ⇒ amber "being verified"; UNPAID with no gateway ⇒ amber "order placed, not yet paid". `?payment=paid` can never make an unpaid order look paid.
+
+**Remaining from the audit (P1, not started):** retry-payment endpoint, callback verify-error ⇒ `?payment=pending` instead of JSON, customer SMS on PAID via `sendMessage`, env-driven `trust proxy`, merchant visibility of attempt status/ref_id, sweep for abandoned REDIRECT_READY attempts.

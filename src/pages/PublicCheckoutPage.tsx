@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { cartCapabilityHeaders, cartStorageKey, orderStorageKey, readPublicCartReference } from "../lib/publicCart";
+import { cartCapabilityHeaders, checkoutPublicCart, readPublicCartReference } from "../lib/publicCart";
 
 type Cart = { id: string; currency: string; totalMinor: number };
 type Shipping = { id: string; name: string; priceMinor: number };
@@ -42,16 +42,13 @@ export default function PublicCheckoutPage() {
   }
   async function submit() {
     if (!siteProjectId || !cart) return;
-    const reference = readPublicCartReference(siteProjectId); if (!reference) return;
     if (!form.fullName.trim() || !form.phone.trim() || !form.address.trim()) { setMessage("نام، موبایل و آدرس را کامل کن."); return; }
     try {
       setBusy(true);
       const method = shipping.find((item) => item.id === selected);
-      const data = await read(fetch(`/api/auth/storefront/carts/${cart.id}/checkout`, { method: "POST", headers: cartCapabilityHeaders(reference.capability, true), body: JSON.stringify({ fullName: form.fullName, phone: form.phone, email: form.email, shippingMethod: method?.name || "manual", shippingAddress: { province: form.province, city: form.city, address: form.address, postalCode: form.postalCode, notes: form.notes } }) }));
-      if (!data.receiptCapability) throw new Error("رسید سفارش ایجاد نشد.");
-      localStorage.removeItem(cartStorageKey(siteProjectId));
-      localStorage.setItem(orderStorageKey(data.order.id), data.receiptCapability);
-      navigate(`/store/${siteProjectId}/order-success/${data.order.id}`);
+      // Shared checkout: persists the receipt and hands off to a connected gateway (never resolves in that case).
+      const { order } = await checkoutPublicCart(siteProjectId, { fullName: form.fullName, phone: form.phone, email: form.email, shippingMethod: method?.name || "manual", shippingAddress: { province: form.province, city: form.city, address: form.address, postalCode: form.postalCode, notes: form.notes } });
+      navigate(`/store/${siteProjectId}/order-success/${order.id}`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "ثبت سفارش ناموفق بود"); } finally { setBusy(false); }
   }
   if (!siteProjectId) return null;

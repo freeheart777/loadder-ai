@@ -6,7 +6,7 @@ export type PublicOrderReference = { id: string; capability: string };
 export type PublicCartItem = { id: string; productId: string; variantId: string; productName: string; sku: string; variantTitle: string; quantity: number; unitPriceMinor: number; lineTotalMinor: number };
 export type PublicCart = { id: string; siteProjectId: string; currency: string; status: string; couponCode: string | null; subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number; items: PublicCartItem[]; createdAt: string; updatedAt: string };
 export type PublicShippingAddress = { province?: string; city?: string; address?: string; postalCode?: string; notes?: string };
-export type PublicCheckoutInput = { fullName: string; phone: string; email?: string; shippingAddress?: PublicShippingAddress };
+export type PublicCheckoutInput = { fullName: string; phone: string; email?: string; shippingMethod?: string; shippingAddress?: PublicShippingAddress };
 export type PublicOrder = { id: string; siteProjectId: string; currency: string; status: string; paymentStatus: string; fulfillmentStatus: string; subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number; items: PublicCartItem[]; createdAt: string };
 
 export const cartStorageKey = (siteProjectId: string) => `loadder-public-cart:${siteProjectId}`;
@@ -30,10 +30,14 @@ export function writePublicCartReference(siteProjectId: string, reference: Publi
 export function readPublicOrderReference(orderId: string): PublicOrderReference | null {
   const raw = localStorage.getItem(orderStorageKey(orderId));
   if (!raw) return null;
-  try {
-    const value = JSON.parse(raw) as PublicOrderReference;
-    return typeof value.id === "string" && typeof value.capability === "string" && value.id && value.capability ? value : null;
-  } catch { return null; }
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { value = null; }
+  if (value && typeof value === "object") {
+    const ref = value as PublicOrderReference;
+    return typeof ref.id === "string" && typeof ref.capability === "string" && ref.id && ref.capability ? ref : null;
+  }
+  // Legacy: PublicCheckoutPage used to store the bare receipt token under the same key.
+  return { id: orderId, capability: raw };
 }
 
 export function writePublicOrderReference(reference: PublicOrderReference) {
@@ -159,6 +163,7 @@ export async function checkoutPublicCart(
         fullName: input.fullName,
         phone: input.phone,
         email: input.email || "",
+        ...(input.shippingMethod ? { shippingMethod: input.shippingMethod } : {}),
         shippingAddress: input.shippingAddress || {},
       }),
     }),
