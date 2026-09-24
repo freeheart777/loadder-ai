@@ -14,7 +14,9 @@ export function gatewayCredentials(config) {
 //   paid    - order is PAID
 //   failed  - gateway definitively said not paid (attempt FAILED/CANCELLED)
 //   pending - unknown right now (gateway unreachable, no answer code, or settlement needs a human)
-export function createPaymentVerificationService({ db, paymentAttemptService, adapters = paymentAdapters, logger = console } = {}) {
+// onSettled({ db, workspaceId, orderId, attemptId, refId }) runs once, after commit, only for the call that
+// actually settled the order -- never for a replayed callback or a repeat reconcile. Its failures are logged only.
+export function createPaymentVerificationService({ db, paymentAttemptService, adapters = paymentAdapters, logger = console, onSettled = null } = {}) {
   if (!db || !paymentAttemptService) throw new Error("db and paymentAttemptService are required.");
   return Object.freeze({
     async verifyAndSettle(attemptId) {
@@ -39,10 +41,19 @@ export function createPaymentVerificationService({ db, paymentAttemptService, ad
         return { result: "failed", attempt: paymentAttemptService.recordOutcome(attempt.id, "FAILED", `GATEWAY_VERIFY_${verification.code}`) };
       }
       try {
-        return { result: "paid", attempt: paymentAttemptService.settleVerified(attempt.id, {
+        // Same synchronous step as settleVerified (no await in between), so a concurrent callback cannot
+        // interleave: exactly one caller sees "not yet SUCCEEDED" and performs the real settlement.
+        // ponytail: single API process assumed; multi-process would need a DB-side claim (worst case: duplicate SMS).
+        const settledHere = paymentAttemptService.get(attempt.id).status !== "SUCCEEDED";
+        const settled = paymentAttemptService.settleVerified(attempt.id, {
           providerTransactionId: verification.refId, provider: attempt.provider, providerConfigId: attempt.providerConfigId,
           amountMinor: attempt.amountMinor, currency: attempt.currency, verificationCode: `GATEWAY_VERIFIED_${verification.code}`,
-        }) };
+        });
+        if (settledHere && onSettled) {
+          const event = { db, workspaceId: settled.workspaceId, orderId: settled.orderId, attemptId: settled.id, refId: settled.providerTransactionId };
+          void Promise.resolve().then(() => onSettled(event)).catch((error) => logger.error?.(`Post-settlement hook failed for payment ${settled.id}:`, error));
+        }
+        return { result: "paid", attempt: settled };
       } catch (settleError) {
         // Gateway took the money but the order could not be marked PAID: flag for a human, never drop it.
         logger.error?.(`Payment ${attempt.id} verified by gateway (ref ${verification.refId}) but settlement failed:`, settleError);

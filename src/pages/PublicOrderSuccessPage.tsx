@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle, Clock, Storefront, WarningCircle } from "@phosphor-icons/react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getPublicOrder, type PublicOrder } from "../lib/publicCart";
+import { getPublicOrder, retryPublicPayment, type PublicOrder } from "../lib/publicCart";
 
 function money(value: number, currency: string) { return `${new Intl.NumberFormat("fa-IR").format((value || 0) / 100)} ${currency === "IRT" ? "تومان" : currency}`; }
 
@@ -26,17 +26,29 @@ export default function PublicOrderSuccessPage() {
   const [searchParams] = useSearchParams();
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [message, setMessage] = useState("");
+  const [paying, setPaying] = useState(false);
   useEffect(() => {
     if (!orderId) return;
     void getPublicOrder(orderId)
       .then((found) => (found ? setOrder(found) : setMessage("رسید سفارش در دسترس نیست.")))
       .catch((error) => setMessage(error instanceof Error ? error.message : "خطا"));
   }, [orderId]);
-  const view = order ? paymentView(order, searchParams.get("payment")) : null;
+  const gatewayResult = searchParams.get("payment");
+  const view = order ? paymentView(order, gatewayResult) : null;
+  // Only orders that went through a gateway can be paid online again; manual orders have none.
+  const canRetry = order?.paymentStatus === "UNPAID" && Boolean(gatewayResult);
+  async function payAgain() {
+    if (!orderId) return;
+    setPaying(true); setMessage("");
+    try { await retryPublicPayment(orderId); setOrder(await getPublicOrder(orderId)); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "پرداخت دوباره ممکن نشد."); }
+    finally { setPaying(false); }
+  }
   return <main dir="rtl" className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950"><div className="mx-auto max-w-xl rounded-3xl border bg-white p-6 text-center shadow-sm sm:p-8">
     {view ? <><div className={`mx-auto grid h-16 w-16 place-items-center rounded-full ${TONE[view.tone].box}`}>{TONE[view.tone].icon}</div><h1 className="mt-5 text-2xl font-black">{view.title}</h1><p className="mt-2 text-sm leading-7 text-slate-500">{view.note}</p></>
       : !message && <p className="text-sm text-slate-400">در حال دریافت وضعیت سفارش…</p>}
     {order && <><div className="mt-6 rounded-2xl bg-slate-50 p-4 text-right"><p className="flex justify-between text-sm"><span className="text-slate-400">شماره سفارش</span><b dir="ltr">{order.id}</b></p><p className="mt-3 flex justify-between text-sm"><span className="text-slate-400">مبلغ</span><b>{money(order.totalMinor, order.currency)}</b></p></div><div className="mt-5 space-y-2 text-right">{order.items.map((item, index) => <div key={index} className="flex justify-between rounded-xl border p-3 text-sm"><span>{item.productName} × {new Intl.NumberFormat("fa-IR").format(item.quantity)}</span><b>{money(item.lineTotalMinor, order.currency)}</b></div>)}</div></>}
+    {canRetry && <button type="button" disabled={paying} onClick={() => void payAgain()} className="mt-6 flex min-h-11 w-full items-center justify-center rounded-2xl bg-emerald-600 py-3 text-sm font-black text-white disabled:opacity-60">{paying ? "در حال انتقال به درگاه…" : "پرداخت دوباره"}</button>}
     {message && <div className="mt-5 rounded-2xl bg-rose-50 p-3 text-sm text-rose-700">{message}</div>}
     <Link to={`/store/${siteProjectId}`} className="mt-7 flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 text-sm font-black text-white"><Storefront /> بازگشت به فروشگاه</Link>
   </div></main>;

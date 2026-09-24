@@ -182,6 +182,21 @@ export async function checkoutPublicCart(
   return { order: data.order, receiptCapability: data.receiptCapability };
 }
 
+/** P1b: pay again for an UNPAID order. Leaves for the gateway (never resolves), or resolves "paid"
+ *  when the server found an earlier attempt was already paid -- it never starts a second charge then. */
+export async function retryPublicPayment(orderId: string): Promise<"paid"> {
+  const reference = readPublicOrderReference(orderId);
+  if (!reference) throw new PublicCartApiError("رسید سفارش یافت نشد.", { status: 404, code: "ORDER_NOT_FOUND" });
+  const data = await readPublicCartResponse<{ result?: string; redirectUrl?: string }>(
+    await fetch(`/api/auth/storefront/orders/${reference.id}/pay`, { method: "POST", headers: orderCapabilityHeaders(reference.capability) }),
+  );
+  if (data.redirectUrl) {
+    window.location.assign(data.redirectUrl);
+    return new Promise(() => {});
+  }
+  return "paid";
+}
+
 /** The real order for this receipt reference, or null if it can no longer be found. */
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
   const reference = readPublicOrderReference(orderId);

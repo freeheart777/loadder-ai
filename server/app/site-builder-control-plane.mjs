@@ -12,6 +12,7 @@ import { createRefundService } from "./commerce/v2/refund-service.mjs";
 import { createPaymentProviderActivationService } from "./commerce/payment-provider-activation-service.mjs";
 import { createPaymentAttemptService } from "./commerce/payment-attempt-service.mjs";
 import { createPaymentVerificationService } from "./commerce/payment-verification-service.mjs";
+import { notifyCustomerPaid } from "./commerce/payment-customer-notification.mjs";
 import { createSupabaseStorageService } from "./storage/supabase-storage-service.mjs";
 import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
@@ -56,7 +57,7 @@ export function mountSiteBuilderControlPlane({
   const refundService = createRefundService({ db });
   const paymentProviderActivationService = createPaymentProviderActivationService({ db });
   const paymentAttemptService = createPaymentAttemptService({ db });
-  const paymentVerificationService = createPaymentVerificationService({ db, paymentAttemptService });
+  const paymentVerificationService = createPaymentVerificationService({ db, paymentAttemptService, onSettled: notifyCustomerPaid });
 
   const mountPath = basePath || "/";
   app.use(mountPath, createSiteProjectsRouter({ service: projectService }));

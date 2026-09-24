@@ -390,3 +390,16 @@ Public checkout (`auth.mjs`, `POST /storefront/carts/:cartId/checkout`) always c
 **Deploy note:** set `TRUST_PROXY=<hops>` (usually 1) behind nginx/Cloudflare, and have the proxy forward `Host` (`proxy_set_header Host $host`). Without it, express-rate-limit logs `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`.
 
 **Next (P1b, awaiting go):** retry-payment endpoint + UI, customer SMS on PAID via `beforeOrderSettlement`, merchant order-detail UI for attempts/ref_id/reconcile.
+
+## Payment Hardening P1b — retry, customer SMS, merchant attempts UI (2026-09-24)
+
+**Status: implemented and verified, not committed.** P1a committed as `e57891d`.
+
+- **`commerce/payment-initiation-service.mjs` (new):** `start()` = Gate 3 initiation moved out of `auth.mjs` (checkout now calls it; behavior unchanged, Gate 3 test untouched and passing). `retry()` guards against double charge: (1) any `CREATED/REDIRECT_READY/PENDING_VERIFICATION` attempt touched in the last 15 min (`updated_at`, i.e. link issue time) ⇒ 409 `PAYMENT_IN_PROGRESS`, never verified or superseded — the customer may be paying it; (2) older open attempts go through `verifyAndSettle`, any `paid` ⇒ `{result:"paid"}`, no new charge; (3) anything still open ⇒ 409; stale `CREATED` ⇒ `CANCELLED`; then `start()` with key `retry:{order}:{n}`. PAID order ⇒ `{result:"paid"}`; no gateway ⇒ 422 `PAYMENT_PROVIDER_UNAVAILABLE`.
+- **Route:** `POST /storefront/orders/:orderId/pay` (receipt capability, checkout rate limiter).
+- **Customer SMS:** `commerce/payment-customer-notification.mjs` `notifyCustomerPaid()` → existing `sendMessage({channel:"sms"})` to the checkout phone. Wired as `verifyAndSettle`'s new `onSettled`, which fires only when that call performed the real settlement (status read and `settleVerified` in one synchronous step), after commit, fire-and-forget; hook errors are logged only. Wired in both `auth.mjs` (callback/retry) and the control plane (merchant reconcile). Simulator unless Kavenegar is configured.
+- **Frontend:** `retryPublicPayment()` in `publicCart.ts`; "پرداخت دوباره" on the success page for UNPAID orders that came back from a gateway; merchant order detail `PaymentAttemptsPanel` (ref_id, attempts with status/code, RECONCILIATION_REQUIRED warning, "بررسی مجدد" → reconcile).
+
+**Tests:** new `commerce-payment-hardening-p1b.test.mjs` 10/10 (retry after cancel, paid-old-attempt settles without new charge, unknown outcome ⇒ 409, unpaid-old ⇒ FAILED + new attempt, fresh link untouched, concurrent retries ⇒ one charge, receipt/gateway required, SMS exactly once across concurrent callbacks + reconcile, no SMS on fail/cancel, failing SMS hook doesn't affect PAID). Gate 3 + P1a tests unchanged and passing; payment-related 50/50; full server suite 1060/1060; `tsc -b` clean; build OK. Playwright not run.
+
+**Known limits:** SMS once-guard assumes a single API process (worst case otherwise: duplicate SMS, never double charge). 15-min in-flight window is a fixed constant. A customer who pays an old link after a retry closed it as FAILED is refunded by ZarinPal's auto-reversal of unverified payments — not settled twice.

@@ -13,7 +13,9 @@ import { createPublicBusinessAppRouter } from "../business-builder/public-app-ro
 import { CART_CAPABILITY_HEADER, ORDER_CAPABILITY_HEADER, createPublicCapability, matchesPublicCapability } from "../services/public-commerce-capability.mjs";
 import { createPaymentAttemptService } from "../commerce/payment-attempt-service.mjs";
 import { paymentAdapters } from "../commerce/payment-adapters.mjs";
-import { createPaymentVerificationService, gatewayCredentials } from "../commerce/payment-verification-service.mjs";
+import { createPaymentVerificationService } from "../commerce/payment-verification-service.mjs";
+import { createPaymentInitiationService } from "../commerce/payment-initiation-service.mjs";
+import { notifyCustomerPaid } from "../commerce/payment-customer-notification.mjs";
 import { sendMessage } from "../../services/messaging.mjs";
 
 export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false }) {
@@ -22,7 +24,10 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   const ecommerceService = createEcommerceService({ db });
   const siteLeadService = createSiteLeadService({ db });
   const paymentAttemptService = createPaymentAttemptService({ db });
-  const paymentVerificationService = createPaymentVerificationService({ db, paymentAttemptService });
+  const paymentVerificationService = createPaymentVerificationService({ db, paymentAttemptService, onSettled: notifyCustomerPaid });
+  const paymentInitiationService = createPaymentInitiationService({ db, paymentAttemptService, paymentVerificationService });
+  // ponytail: req.protocol/host; correct behind TLS only with TRUST_PROXY set (see environment.mjs).
+  const callbackBase=(req)=>`${req.protocol}://${req.get("host")}${req.baseUrl}`;
   const sendOtpLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message: { success:false, message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const leadLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const checkoutLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"درخواست‌های خرید زیاد است. کمی بعد دوباره تلاش کنید." } });
@@ -69,36 +74,15 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   router.post("/storefront/carts/:cartId/coupon",checkoutLimiter,(req,res)=>{try{const row=cartRow(req);if(!row)return cartNotFound(res);const code=String(req.body?.code||"").trim().slice(0,64);const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.applyCoupon(row.id,code));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
   router.post("/storefront/carts/:cartId/shipping",checkoutLimiter,(req,res)=>{try{const row=cartRow(req);if(!row)return cartNotFound(res);const methodId=String(req.body?.shippingMethodId||"");const method=db.prepare("SELECT id FROM ecommerce_shipping_methods WHERE id=? AND workspace_id=? AND site_project_id=? AND active=1").get(methodId,row.workspaceId,row.siteProjectId);if(!method)return res.status(404).json({success:false,code:"SHIPPING_NOT_FOUND",message:"Shipping method not available."});const cart=runWithWorkspace(row.workspaceId,()=>ecommerceService.setCartShipping(row.id,method.id));return res.json({success:true,cart})}catch(e){return storefrontError(e,res)}});
   router.post("/storefront/carts/:cartId/checkout",checkoutLimiter,async(req,res)=>{try{const row=cartRow(req);if(!row)return cartNotFound(res);const email=String(req.body?.email||"").trim().slice(0,180),phone=String(req.body?.phone||"").trim().slice(0,32),fullName=String(req.body?.fullName||"").trim().slice(0,120);if(!fullName||!phone)return res.status(400).json({success:false,message:"نام و شماره موبایل الزامی است."});const address=req.body?.shippingAddress||{};const shippingAddress={fullName,phone,province:String(address.province||"").slice(0,80),city:String(address.city||"").slice(0,80),address:String(address.address||"").slice(0,500),postalCode:String(address.postalCode||"").slice(0,32),notes:String(address.notes||"").slice(0,500)},receipt=createPublicCapability();
-    const { order, store, attempt, providerConfig } = runWithWorkspace(row.workspaceId,()=>{
+    const { order, store } = runWithWorkspace(row.workspaceId,()=>{
       const createdOrder=ecommerceService.checkout(row.id,{email:email||null,paymentProvider:"manual",shippingMethod:String(req.body?.shippingMethod||"").slice(0,120)||null,shippingAddress,receiptCapabilityHash:receipt.hash});
-      // P0-3: connect the existing payment-attempt contract, without integrating any
-      // external gateway. Only activates if a merchant has already configured a CONNECTED
-      // payment provider (today, none are -- configurePaymentProvider() has no caller in
-      // the audited frontend); the order's own paymentProvider stays "manual" either way.
-      const providerConfig=db.prepare("SELECT id,provider_key,credential_reference,config_json FROM ecommerce_payment_providers WHERE workspace_id=? AND site_project_id=? AND status='CONNECTED' ORDER BY created_at LIMIT 1").get(row.workspaceId,row.siteProjectId);
-      let attempt=null;
-      if(providerConfig){
-        try{ attempt=paymentAttemptService.create({orderId:createdOrder.id,provider:providerConfig.provider_key,providerConfigId:providerConfig.id,idempotencyKey:`checkout:${createdOrder.id}`}); }
-        catch(attemptError){ console.error("Payment attempt creation failed:",attemptError); }
-      }
-      return { order:createdOrder, store:publicStore(row.siteProjectId), attempt, providerConfig };
+      return { order:createdOrder, store:publicStore(row.siteProjectId) };
     });
-    // Gate 3: hand the customer to the connected gateway. Any gateway failure leaves the order
-    // exactly as manual checkout does today (UNPAID, "manual"); it never fails the checkout.
+    // Gate 3: hand the customer to the site's CONNECTED gateway, if any. Any gateway failure leaves
+    // the order exactly as manual checkout does (UNPAID, "manual"); it never fails the checkout.
     let payment=null;
-    const adapter=attempt&&paymentAdapters[String(providerConfig.provider_key).toUpperCase()];
-    if(adapter){
-      try{
-        const initiated=await adapter.createPayment({...gatewayCredentials(providerConfig),amountMinor:attempt.amountMinor,currency:attempt.currency,description:`سفارش ${order.id}`,
-          // ponytail: req.protocol/host; set app "trust proxy" (or a public base URL) when deployed behind TLS termination.
-          callbackUrl:`${req.protocol}://${req.get("host")}${req.baseUrl}/storefront/payments/${attempt.id}/callback`});
-        runWithWorkspace(row.workspaceId,()=>paymentAttemptService.markRedirectReady(attempt.id,initiated.authority));
-        payment={provider:attempt.provider,redirectUrl:initiated.redirectUrl};
-      }catch(gatewayError){
-        console.error("Payment initiation failed; order stays manual:",gatewayError);
-        try{ runWithWorkspace(row.workspaceId,()=>paymentAttemptService.recordOutcome(attempt.id,"FAILED",gatewayError?.code||"GATEWAY_REQUEST_FAILED")); }catch(e){ console.error("Payment attempt failure not recorded:",e); }
-      }
-    }
+    try{ payment=await runWithWorkspace(row.workspaceId,()=>paymentInitiationService.start(order.id,{idempotencyKey:`checkout:${order.id}`,callbackBase:callbackBase(req)})); }
+    catch(gatewayError){ console.error("Payment initiation failed; order stays manual:",gatewayError); }
     // P0-1: best-effort merchant notification via the existing messaging service. Never
     // fabricates a recipient, and a failure here must never fail the checkout response
     // the customer already has a successful order.
@@ -111,6 +95,10 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
     }
     return res.status(201).json({success:true,receiptCapability:receipt.value,...(payment?{payment}:{}),order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
   router.get("/storefront/orders/:orderId",(req,res)=>{try{const row=orderRow(req);if(!row)return publicNotFound(res);const order=runWithWorkspace(row.workspaceId,()=>ecommerceService.getOrder(row.id));return res.json({success:true,order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
+
+  // P1b: customer "pay again" for an UNPAID order. Receipt capability required; double-charge guards
+  // (settle-or-refuse on every open attempt) live in paymentInitiationService.retry().
+  router.post("/storefront/orders/:orderId/pay",checkoutLimiter,async(req,res)=>{try{const row=orderRow(req);if(!row)return publicNotFound(res);const outcome=await runWithWorkspace(row.workspaceId,()=>paymentInitiationService.retry(row.id,{callbackBase:callbackBase(req)}));return res.json({success:true,...outcome})}catch(e){return storefrontError(e,res)}});
 
   // Gate 3 / P1a: gateway return. The customer's browser lands here, so every exit is a redirect
   // to the order page or a small HTML page -- never JSON. The query is only a lookup key: the

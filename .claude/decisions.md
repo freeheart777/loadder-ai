@@ -35,3 +35,7 @@ User chose a real ZarinPal request over format-only validation. Sandbox rows pro
 ## 2026-09-24 — Payment verification outcomes: unknown is `pending`, never `FAILED` (P1a)
 
 `payment-verification-service.verifyAndSettle()` is the only verify→settle path (callback and merchant reconcile). Only a definite ZarinPal error code marks an attempt `FAILED`; a network error, timeout, or reply without a code leaves it untouched and reports `pending`, because marking a possibly-paid attempt FAILED would lose a real payment. Abandoned attempts are handled by merchant-triggered reconcile instead of a scheduler; an automatic sweep can call the same function later. `TRUST_PROXY` accepts only an exact hop count — `true` would let clients forge `X-Forwarded-For` past rate limits.
+
+## 2026-09-24 — Retry payment: freshness window before verification (P1b)
+
+ZarinPal reports a live link as "unpaid" until the customer finishes, so verifying a just-issued attempt and marking it FAILED would break a payment in progress (found by the concurrent-retry test). Retry therefore refuses (409) while any attempt was issued in the last 15 minutes, verifies only older open attempts, and refuses if any outcome stays unknown. Customer SMS fires from `verifyAndSettle`'s `onSettled` only for the call that performed the real settlement.
