@@ -42,6 +42,46 @@ const itemsHtml = (section, withMedia) => (section.items || []).map((item) => `<
   withMedia ? `<div class="thumb">${url(item.imageUrl) ? `<img src="${escape(url(item.imageUrl))}" alt="${escape(item.title)}" loading="lazy">` : ""}</div>` : ""
 }<div class="card-body"><b>${escape(item.title)}</b>${item.subtitle ? `<span>${escape(item.subtitle)}</span>` : ""}${item.body ? `<p>${escape(item.body)}</p>` : ""}</div></article>`).join("");
 
+// Section render functions, dispatched by the stored legacy section type
+// (docs/decisions/PR4B-render-boundary.md). Bodies are unchanged from the
+// former if-chain; `parts` carries the shared wrapper values computed once.
+const spacerHtml = (section) => `<div style="height:${num(section.spacingTop, 0) + num(section.spacingBottom, 0)}px"></div>`;
+
+const splitHtml = (section, { open, close, head }) => {
+  const media = url(section.imageUrl) ? `<div class="media"><img src="${escape(url(section.imageUrl))}" alt="${escape(section.title)}" loading="lazy"></div>` : "";
+  const copy = `<div>${head}${section.body ? `<p class="body">${escape(section.body)}</p>` : ""}</div>`;
+  return `${open}<div class="split">${section.mediaPosition === "start" ? media + copy : copy + media}</div>${close}`;
+};
+
+const cardsHtml = (section, { open, close, head, columns }) => `${open}${head}<div class="grid" style="--cols:${columns}">${itemsHtml(section, section.type !== "services")}</div>${close}`;
+
+const ctaHtml = (section, { open, close }) => `${open}<div class="cta"><div><h2>${escape(section.title)}</h2>${section.subtitle ? `<p>${escape(section.subtitle)}</p>` : ""}</div>${section.ctaLabel ? `<a class="cta-btn" href="${escape(String(section.ctaHref || "#"))}">${escape(section.ctaLabel)}</a>` : ""}</div>${close}`;
+
+const contactHtml = (section, { open, close, head }) => {
+  const rows = [["تلفن", section.contact?.phone], ["ایمیل", section.contact?.email], ["نشانی", section.contact?.address]]
+    .filter(([, value]) => Boolean(value))
+    .map(([label, value]) => `<div class="card"><div class="card-body"><b>${escape(label)}</b><span>${escape(value)}</span></div></div>`).join("");
+  return `${open}${head}<div class="grid" style="--cols:3">${rows}</div>${close}`;
+};
+
+/** Unknown types (including prototype names such as "toString") render this fallback. */
+const unknownSectionHtml = (section, { open, close, head }) => `${open}${head}${section.body ? `<p class="body">${escape(section.body)}</p>` : ""}${close}`;
+
+// A Map, never a plain object: lookup is by exact own key only.
+const SECTION_RENDERERS = new Map([
+  ["spacer", spacerHtml],
+  ["about", splitHtml],
+  ["text-image", splitHtml],
+  ["services", cardsHtml],
+  ["team", cardsHtml],
+  ["portfolio", cardsHtml],
+  ["cta", ctaHtml],
+  ["contact", contactHtml],
+]);
+
+/** Section types with a dedicated corporate renderer (read-only; for agreement tests). */
+export const CORPORATE_SECTION_TYPES = Object.freeze([...SECTION_RENDERERS.keys()]);
+
 function sectionHtml(section) {
   const id = anchorOf(section);
   const style = `background:${color(section.backgroundColor, "#ffffff")};color:${color(section.textColor, "#0f172a")};padding-top:${num(section.spacingTop, 32)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
@@ -49,27 +89,7 @@ function sectionHtml(section) {
   const columns = Math.min(4, Math.max(1, num(section.columns, 3)));
   const open = `<section id="${escape(id)}" data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
   const close = `</div></section>`;
-
-  if (section.type === "spacer") return `<div style="height:${num(section.spacingTop, 0) + num(section.spacingBottom, 0)}px"></div>`;
-
-  if (section.type === "about" || section.type === "text-image") {
-    const media = url(section.imageUrl) ? `<div class="media"><img src="${escape(url(section.imageUrl))}" alt="${escape(section.title)}" loading="lazy"></div>` : "";
-    const copy = `<div>${head}${section.body ? `<p class="body">${escape(section.body)}</p>` : ""}</div>`;
-    return `${open}<div class="split">${section.mediaPosition === "start" ? media + copy : copy + media}</div>${close}`;
-  }
-  if (section.type === "services" || section.type === "team" || section.type === "portfolio") {
-    return `${open}${head}<div class="grid" style="--cols:${columns}">${itemsHtml(section, section.type !== "services")}</div>${close}`;
-  }
-  if (section.type === "cta") {
-    return `${open}<div class="cta"><div><h2>${escape(section.title)}</h2>${section.subtitle ? `<p>${escape(section.subtitle)}</p>` : ""}</div>${section.ctaLabel ? `<a class="cta-btn" href="${escape(String(section.ctaHref || "#"))}">${escape(section.ctaLabel)}</a>` : ""}</div>${close}`;
-  }
-  if (section.type === "contact") {
-    const rows = [["تلفن", section.contact?.phone], ["ایمیل", section.contact?.email], ["نشانی", section.contact?.address]]
-      .filter(([, value]) => Boolean(value))
-      .map(([label, value]) => `<div class="card"><div class="card-body"><b>${escape(label)}</b><span>${escape(value)}</span></div></div>`).join("");
-    return `${open}${head}<div class="grid" style="--cols:3">${rows}</div>${close}`;
-  }
-  return `${open}${head}${section.body ? `<p class="body">${escape(section.body)}</p>` : ""}${close}`;
+  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, head, columns });
 }
 
 /**
