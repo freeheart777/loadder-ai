@@ -151,7 +151,7 @@ export async function checkoutPublicCart(
 ): Promise<{ order: PublicOrder; receiptCapability: string }> {
   const reference = readPublicCartReference(siteProjectId);
   if (!reference) throw new PublicCartApiError("سبد خرید یافت نشد.", { status: 404, code: "CART_NOT_FOUND" });
-  const data = await readPublicCartResponse<{ order?: PublicOrder; receiptCapability?: string }>(
+  const data = await readPublicCartResponse<{ order?: PublicOrder; receiptCapability?: string; payment?: { redirectUrl?: string } }>(
     await fetch(`/api/auth/storefront/carts/${reference.id}/checkout`, {
       method: "POST",
       headers: cartCapabilityHeaders(reference.capability, true),
@@ -169,6 +169,11 @@ export async function checkoutPublicCart(
   // P0-2: preserve the receipt capability so this order can be looked up again later,
   // instead of it being read once from the response and discarded.
   writePublicOrderReference({ id: data.order.id, capability: data.receiptCapability });
+  // Gate 3: a connected gateway takes over; the gateway callback returns the customer to order-success.
+  if (data.payment?.redirectUrl) {
+    window.location.assign(data.payment.redirectUrl);
+    return new Promise(() => {}); // page is leaving; keep the caller from navigating first
+  }
   return { order: data.order, receiptCapability: data.receiptCapability };
 }
 

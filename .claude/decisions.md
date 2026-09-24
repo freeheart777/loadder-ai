@@ -23,3 +23,7 @@ Append-only record of non-obvious decisions and their reasoning, so future sessi
 **Decision:** Standing rule, also recorded in `project-memory.md`: never declare a feature "never implemented" without first running `git fetch --all --prune` and checking `origin/<branch>` refs.
 
 **Why:** An earlier investigation in this same session concluded Website Builder V16 had never been implemented anywhere in git history — a real finding for the *local* refs, but wrong once the remote was fetched: it produced ~200 previously-unknown branches, several already merged into `origin/main` containing the full V16 implementation.
+
+## 2026-09-24 — ZarinPal is the first payment gateway (Commerce Gate 3)
+
+User-approved. Market is Persian (IRT prices, Kavenegar SMS, Persian UI); ZarinPal's redirect model fits the existing server checkout without client payment JS, and a single merchant ID fits `credential_reference` with no migration. Stripe was deferred: needs a webhook signing secret and currency-aware minor units. Adapters are looked up by `provider_key` in `auth.mjs`'s `paymentAdapters` map — add a second gateway there, no new registry layer.

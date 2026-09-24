@@ -336,3 +336,17 @@ Public checkout (`auth.mjs`, `POST /storefront/carts/:cartId/checkout`) always c
 3. Idempotent webhook replay handling (gateways routinely retry webhook delivery) — the existing `UNIQUE(provider,provider_config_id,provider_transaction_id)` index already gives a strong building block for this.
 
 **Next step:** none taken — audit only, per explicit instruction. No code was modified.
+
+## Commerce Gate 3 — ZarinPal payment gateway (2026-09-24)
+
+**Status: implemented and verified, not yet committed.** Gate 2 committed as `9f3408c` before this work.
+
+**Files:** new `server/app/commerce/zarinpal-payment-provider.mjs` (adapter via `defineCommercePaymentProviderAdapter`; `createPayment`/`verifyPayment` against ZarinPal v4 REST; refunds throw `ZARINPAL_REFUND_UNSUPPORTED`); `payment-attempt-service.mjs` (+`markRedirectReady`, +`recordOutcome` for FAILED/CANCELLED/RECONCILIATION_REQUIRED; success still only via `settleVerified`); `server/app/routes/auth.mjs` (checkout initiation + `GET /storefront/payments/:attemptId/callback`); `src/lib/publicCart.ts` (follows `payment.redirectUrl`); new `server/test/commerce-zarinpal-gateway.test.mjs`. No migration.
+
+**Flow:** checkout creates order (unchanged, `manual`/`UNPAID`) → if a `CONNECTED` ZARINPAL provider row exists: `create()` attempt → `createPayment` → `markRedirectReady(Authority)` → response `payment.redirectUrl` → customer pays → callback: Authority must equal stored reference → `Status!=OK` ⇒ CANCELLED; else server-to-server `verifyPayment` with stored amount → `settleVerified(ref_id)` ⇒ order `PAID` (DB triggers enforce) → 303 to `/store/:site/order-success/:order?payment=paid|failed|pending`. Settlement failure after gateway success ⇒ `RECONCILIATION_REQUIRED` + error log. Gateway request failure ⇒ attempt FAILED, checkout still 201 as manual.
+
+**Money:** `amount_minor / 100` = Toman (IRT) or Rial (IRR); other currencies and non-whole amounts are refused. Merchant ID = `credential_reference`; `config_json.sandbox=true` targets sandbox.
+
+**Tests:** new e2e 5/5 (manual unchanged, full paid path incl. forged-Authority 404 and replay, cancel, verify-reject, request-reject); full server suite 1035/1035; `npx tsc -b` clean.
+
+**Open:** (1) nothing in the UI sets a provider to `CONNECTED` yet — Gate 2 form saves `PENDING`; needs a decision (on-save vs sandbox check). (2) Callback URL built from `req.protocol`/host — needs `trust proxy` or a public base URL behind TLS termination. (3) `order-success` page does not read `?payment=`; it shows the order's real `paymentStatus`. (4) Refunds, stale `REDIRECT_READY` cleanup — P1.

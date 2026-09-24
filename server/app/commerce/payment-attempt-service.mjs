@@ -112,5 +112,21 @@ export function createPaymentAttemptService({ db, clock = () => new Date().toISO
     },
     get(attemptId) { return map(requireAttempt(attemptId)); },
     settleVerified(attemptId, verification = {}) { return settleTransaction(attemptId, verification); },
+    // Gateway accepted the request; store its reference (e.g. ZarinPal Authority) for callback matching.
+    markRedirectReady(attemptId, providerAttemptReference) {
+      const reference = required(providerAttemptReference, "provider_attempt_reference", 300);
+      const changed = db.prepare("UPDATE ecommerce_payment_attempts SET status='REDIRECT_READY',provider_attempt_reference=?,updated_at=? WHERE id=? AND workspace_id=? AND status='CREATED'")
+        .run(reference, clock(), attemptId, workspaceId()).changes;
+      if (!changed) throw new PaymentAttemptError("Payment attempt is not awaiting redirect.", "PAYMENT_ATTEMPT_NOT_CREATED", 409);
+      return map(requireAttempt(attemptId));
+    },
+    // Unsuccessful outcomes only; success goes exclusively through settleVerified(). DB triggers enforce the transition graph.
+    recordOutcome(attemptId, status, verificationCode) {
+      if (!["FAILED", "CANCELLED", "RECONCILIATION_REQUIRED"].includes(status)) throw new PaymentAttemptError("Unsupported payment outcome.", "PAYMENT_OUTCOME_INVALID", 500);
+      const at = clock();
+      db.prepare("UPDATE ecommerce_payment_attempts SET status=?,verification_code=?,terminal_at=?,updated_at=? WHERE id=? AND workspace_id=?")
+        .run(status, String(verificationCode || status).slice(0, 100), status === "RECONCILIATION_REQUIRED" ? null : at, at, attemptId, workspaceId());
+      return map(requireAttempt(attemptId));
+    },
   });
 }
