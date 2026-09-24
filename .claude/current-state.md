@@ -188,3 +188,64 @@ Implements exactly the week-1 audit recommendation: a new user can now create a 
 - `server/db/loadder.sqlite` confirmed untouched throughout (checked after every test run).
 
 **Not done (deliberately, per explicit constraints):** no real merchant contact resolution (blocked on a future settings field, marked with a TODO, not invented); no real payment gateway; no frontend UI for order lookup or payment-method selection (would be Studio/builder changes, out of scope this task).
+
+## Commercial Commerce Gate 2 Audit — Merchant Operations (2026-09-24)
+
+**Status: audit only, no code changed.** Scope: `StoreCommerceManagerPage(Core).tsx`, `StoreAdminDashboardPage.tsx`, `store-studio-v16/` (existing store-management UI), `ecommerce.mjs` (routes), `ecommerce-service.mjs`, `server/app/commerce/`, payment routes/services, `messaging.mjs`. Goal: the minimum implementation needed for Merchant Operations. No new doc file this time — full findings recorded here only, per instruction.
+
+### 1. Current merchant capabilities
+
+| Capability | Backend | Frontend | Overall |
+|---|---|---|---|
+| View orders | **PASS** — `GET /stores/:id/orders` returns full order objects (status, paymentStatus, fulfillmentStatus, totals, items), live and wired. | **MISSING** — both `StoreCommerceManagerPageCore.tsx` (`type Order={id:string}`, orders only ever used for a count) and `StoreAdminDashboardPage.tsx` (fetches full order objects but only aggregates a revenue stat) fetch orders and never render a list. | **PARTIAL** — data is one API call away; zero UI. |
+| Order details | **PASS** — `GET /commerce/orders/:orderId` exists, live. | **MISSING** — no file in scope calls it. | **MISSING** |
+| Update status | **PASS** — `PATCH /commerce/orders/:orderId/status` exists, live, and correctly refuses payment-state fields ("require their canonical financial authority" — confirmed in the Payment Audit). | **MISSING** | **MISSING** |
+| Refunds | **PARTIAL, and less ready than it looks.** `commerce/v2/refund-service.mjs` is real and tested; `ecommerce.mjs`'s router has full refund routes (`GET/POST .../refunds`, `GET /commerce/refunds/:id`, `POST .../transitions`) correctly gated by `requireFinancialAdmin` and with a genuine safety block (a direct "SUCCEEDED" transition is refused without provider verification, since no gateway exists yet). **But the router mount that's actually live** (`site-builder-control-plane.mjs` → `site-builder-runtime.mjs`) passes `financialLedgerService` but never passes `refundService` — so in the running app these routes 503 with `REFUND_SERVICE_UNAVAILABLE` today. A second router factory (`canonical-commerce.mjs`) *does* wire a real `refundService`, but it is dead code — `grep -rln "createCanonicalCommerceRouter" server` finds no importer anywhere except its own file. | **MISSING** | **MISSING** (not actually usable today at either layer) |
+| Fulfillment | **PARTIAL** — no dedicated fulfillment engine is wired (`commerce/v2/fulfillment-engine.mjs` remains test-only, per the Commercial Readiness Audit), but `setOrderStatus()` already accepts `fulfillmentStatus` as a mutable field, so a minimal "mark shipped/delivered" capability exists today at the API layer. | **MISSING** | **MISSING** |
+| Payment settings | **PARTIAL** — `PUT /stores/:id/payment-providers/:key` exists and is live, but performs zero validation of the provider key or credentials (defaults `status:'PENDING'`), and — confirmed in the Payment Audit — nothing reads this configuration at checkout time regardless. | **MISSING** — no file in scope ever calls this endpoint. | **MISSING** |
+| Notifications | **PARTIAL** — `messaging.mjs`'s `sendMessage()` is real (Kavenegar SMS / Resend email) and, as of Commerce Gate 1, is wired into the checkout success path — but always skips today (no merchant-contact field exists, by design, marked with a TODO). No order-status-change or refund-status-change notification exists anywhere. | N/A — no settings UI exists for a merchant to provide a notification contact either. | **PARTIAL** |
+
+### 2. Existing APIs — frontend need → backend endpoint (all already implemented, just unused)
+
+- Order list → `GET /stores/:siteProjectId/orders`
+- Order detail → `GET /commerce/orders/:orderId`
+- Update order/fulfillment status → `PATCH /commerce/orders/:orderId/status`
+- List/create refund → `GET` / `POST /commerce/orders/:orderId/refunds` (**blocked**: needs `refundService` wired into the live router first)
+- Refund detail/transition → `GET /commerce/refunds/:refundId`, `POST /commerce/refunds/:refundId/transitions`
+- Financial ledger → `GET /stores/:siteProjectId/financial-ledger`
+- Order financials + reconciliation → `GET /commerce/orders/:orderId/financials`, `POST /commerce/orders/:orderId/financials/reconcile`
+- Configure a payment provider → `PUT /stores/:siteProjectId/payment-providers/:providerKey`
+
+### 3. Missing UI only — files a real implementation would need
+
+- A new order-list page/component (e.g. `src/pages/StoreOrdersPage.tsx`) — table of orders from `GET /stores/:id/orders`, filterable by status.
+- An order-detail view (new page or a drawer/modal within the orders page) — calls `GET /commerce/orders/:orderId`, `PATCH .../status`, and (once unblocked) the refund endpoints.
+- A payment-settings section (new page or an addition to `StoreAdminDashboardPage.tsx`) — calls `PUT /stores/:id/payment-providers/:key`. Today's "روش‌های پرداخت" checklist item on `StoreAdminDashboardPage.tsx` links to the *product* page, not any real payment-settings screen.
+- Routing entries (outside this audit's scope to edit, e.g. `App.tsx`) linking the above from the dashboard.
+- **One backend prerequisite, not a UI file:** `site-builder-control-plane.mjs` needs `refundService: createRefundService({db})` passed into its `createEcommerceRouter(...)` call (exactly as `canonical-commerce.mjs` already does) — otherwise a refund UI would be built against a 503 endpoint.
+
+### 4. Commercial priority
+
+**P0 — needed for first paying merchants:**
+1. Order list + order detail view. A merchant cannot run a business blind to what customers bought.
+2. Wire `refundService` into the live router mount (one line, already proven correct in `canonical-commerce.mjs`) — otherwise refunds are unbuildable.
+3. Basic status/fulfillment update UI (mark shipped/delivered/cancelled) — the API already supports this.
+
+**P1 — needed for scaling:**
+1. Refund request + history UI, once unblocked.
+2. Payment-provider settings UI (pairs with Commerce Gate 1's real-gateway P0).
+3. Merchant-facing financial ledger / reconciliation view (a real backend exists; whether `StoreFinancialsPage.tsx` already covers this was outside this audit's file scope).
+
+**P2 — future:**
+1. Order-status-change and refund-status-change customer notifications.
+2. Merchant notification-contact settings screen (closes the Gate 1 TODO).
+3. Bulk order actions / CSV export.
+
+### 5. Recommended Gate 2 implementation plan
+1. Fix the one-line backend wiring gap (`refundService` into the live mount) — unblocks everything refund-related with near-zero risk.
+2. Build the order list + detail view against the already-complete, already-tested `GET /stores/:id/orders` / `GET /commerce/orders/:orderId` / `PATCH .../status` endpoints.
+3. Add refund request/history UI once step 1 lands.
+4. Add a payment-provider settings screen against the existing (unvalidated) `configurePaymentProvider` endpoint — pair with provider-key validation as a companion backend fix.
+5. Revisit notifications (order-status changes, merchant-contact settings) after the above, consistent with Commerce Gate 1's already-flagged TODO.
+
+**Next step:** none taken — audit only, per explicit instruction. No code was modified.
