@@ -59,3 +59,12 @@ Not in the original PR 1.2 scope (core, commerce, payments), but required: the e
 ## 2026-09-25 — Commerce loading stays STORE-only
 
 `resolveCapabilities()` grants `commerce` and `payments` if and only if `siteType === "STORE"`, whatever the document declares, matching today's `productsFor` gate in `public-sites.mjs`. Changing this rule (e.g. commerce on a BUSINESS site) requires a separate ADR. Why: preserves exact current behavior while the runtime is not yet capability-driven.
+
+## 2026-09-25 — Runtime capability access boundary (PR 3)
+
+- Runtime capability decisions go through `server/app/site-platform/runtime-capabilities.mjs` only. Public routers import that module and nothing else from `site-platform/`.
+- Renderers (`corporate-site-html.mjs`, `store-site-html.mjs`, `store-public-presentation.mjs`, `renderPublishedSite`) cannot import `site-platform/`; they stay capability-unaware.
+- The `site-platform` runtime module cannot import renderers, ecommerce modules, the registry or `capabilities.mjs` (it uses the resolver and the manifest reader only). This keeps the import graph one-way and avoids a cycle once capabilities gain render functions.
+- Manifest v2 is metadata, not commerce authority. A manifest records `siteType` at publish time; the runtime follows the project's current `siteType`. `commerceEnabled()` therefore re-resolves from the current `siteType` (STORE-only rule), so a store changed to BUSINESS after publishing loads no catalog even though its manifest lists commerce.
+
+Why: one audited entry point for capability decisions, renderers that cannot drift from the byte-identical baselines, and no change to the STORE-only commerce rule without a separate ADR. All four rules are enforced by the agreement test in `server/test/site-platform-registry.test.mjs`.
