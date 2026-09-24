@@ -39,3 +39,23 @@ User chose a real ZarinPal request over format-only validation. Sandbox rows pro
 ## 2026-09-24 — Retry payment: freshness window before verification (P1b)
 
 ZarinPal reports a live link as "unpaid" until the customer finishes, so verifying a just-issued attempt and marking it FAILED would break a payment in progress (found by the concurrent-retry test). Retry therefore refuses (409) while any attempt was issued in the last 15 minutes, verifies only older open attempts, and refuses if any outcome stays unknown. Customer SMS fires from `verifyAndSettle`'s `onSettled` only for the call that performed the real settlement.
+
+## 2026-09-25 — Website platform is capability-first (ADR-004)
+
+A website is Core + Capabilities + Sections + Theme + Published Snapshot, not a fixed product type. `STORE`, `BUSINESS`, `MEDICAL`, `LEGAL`, `NEWS` remain only as legacy experience presets: they seed capabilities and starter sections at creation; afterwards the site's own capability list is the truth. Why: one builder must serve many domains (store, clinic, academy, law firm) without a new site type, renderer or builder per industry.
+
+## 2026-09-25 — Capability and Section Registry ownership
+
+The Capability Registry owns available capabilities, their dependencies and the sections each provides (`server/app/site-platform/registry.mjs`, `capabilities.mjs`). The Section Registry owns section definitions, legacy aliases and editor metadata (variants, fields, interactive, seo). Section types are namespaced `<capability>.<name>`; existing plain types (`products`, `about`, …) are aliases, and stored or published documents are never rewritten (rollback copies old content verbatim). The registry lives server-side only for now: `tsconfig.app.json` includes only `src/`, and Phase 1 needs no frontend.
+
+## 2026-09-25 — Canonical capability names
+
+`core`, `commerce`, `payments`, `people`, `forms`, `blog`; `booking` and `courses` are recognized but pending (resolved into `unregistered`, never loaded). `payments` is internal: only reachable as a dependency of `commerce`, never selected directly. Legacy names from `website-platform-definition.mjs` / `site-types.ts` are mapped by the resolver, not migrated. Capabilities stay in the existing `content.websitePlatform.capabilities` for V1; a `site_capabilities` table is deferred.
+
+## 2026-09-25 — `people` capability added in PR 1.2
+
+Not in the original PR 1.2 scope (core, commerce, payments), but required: the existing corporate `team` section must alias to `people.profileGrid`, and BUSINESS/LEGAL sites already resolve `people` from the legacy `team` capability. Added with a single section (`people.profileGrid`) so resolver and registry agree.
+
+## 2026-09-25 — Commerce loading stays STORE-only
+
+`resolveCapabilities()` grants `commerce` and `payments` if and only if `siteType === "STORE"`, whatever the document declares, matching today's `productsFor` gate in `public-sites.mjs`. Changing this rule (e.g. commerce on a BUSINESS site) requires a separate ADR. Why: preserves exact current behavior while the runtime is not yet capability-driven.

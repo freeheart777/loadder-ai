@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-09-24, after environment-preparation + repo sync milestone.
+Last updated: 2026-09-25, after Website Platform Phase 1 (PR 1.0–1.3).
 
 ## Git
 
@@ -403,3 +403,26 @@ Public checkout (`auth.mjs`, `POST /storefront/carts/:cartId/checkout`) always c
 **Tests:** new `commerce-payment-hardening-p1b.test.mjs` 10/10 (retry after cancel, paid-old-attempt settles without new charge, unknown outcome ⇒ 409, unpaid-old ⇒ FAILED + new attempt, fresh link untouched, concurrent retries ⇒ one charge, receipt/gateway required, SMS exactly once across concurrent callbacks + reconcile, no SMS on fail/cancel, failing SMS hook doesn't affect PAID). Gate 3 + P1a tests unchanged and passing; payment-related 50/50; full server suite 1060/1060; `tsc -b` clean; build OK. Playwright not run.
 
 **Known limits:** SMS once-guard assumes a single API process (worst case otherwise: duplicate SMS, never double charge). 15-min in-flight window is a fixed constant. A customer who pays an old link after a retry closed it as FAILED is refunded by ZarinPal's auto-reversal of unverified payments — not settled twice.
+
+## Website Platform Phase 1 — capability-first foundation (2026-09-25)
+
+Branch `feature/site-platform-baseline`. Architecture: `docs/architecture/ADR-004-website-platform-architecture.md`, `docs/architecture/WEBSITE_COMPONENT_ARCHITECTURE.md`.
+
+**Model:** Website = Core + Capabilities + Sections + Theme + Published Snapshot. Site types (`STORE`, `BUSINESS`, `MEDICAL`, `LEGAL`, `NEWS`) are legacy experience presets only.
+
+**Completed (no runtime or rendering change, no migration):**
+
+- **PR 1.0** `2800fa0` — `server/test/site-render-baseline.test.mjs` + 7 HTML baselines in `server/test/__snapshots__/site-render-baseline/` (V16 store, V16 corporate single/multi-page, legacy STORE, legacy generic BUSINESS/MEDICAL) and 4 dispatch-edge tests. Regenerate only on intended change: `UPDATE_SNAPSHOTS=1`.
+- **PR 1.1** `9c7b45d` — `server/app/site-platform/capability-resolver.mjs`: `resolveCapabilities(project, content)` → `{ capabilities, unregistered, ignored, source }`. Legacy names mapped (`catalog→commerce`, `lead→forms`, `team→people`, `content→blog`; `landing/location/portfolio→core`; `analytics/ads` ignored).
+- **PR 1.2** `af1eec2` — `server/app/site-platform/registry.mjs` (`defineCapability`, `defineSection`, `createRegistry`) and `capabilities.mjs` (`core`, `people`, `payments` internal, `commerce` → requires `payments`). All 14 existing section types registered via legacy aliases; metadata only.
+- **PR 1.3** — this documentation update.
+
+**Capabilities:** `core`, `commerce`, `payments` (internal), `people`, `forms`, `blog`; pending: `booking`, `courses`. `forms` and `blog` are resolved but not yet in the registry (no sections).
+
+**Commerce rule:** commerce/payments resolve for `STORE` only. Renderers still dispatch by `siteType` (`isCorporateV16` / `isStoreV16`); nothing in the runtime imports `site-platform/` yet (enforced by an agreement test).
+
+**Tests:** `node --test test/site-platform*` 30/30; server suite 1101/1101.
+
+**Known rendering inconsistencies recorded (not fixed):** BUSINESS V16 docs with only `text`/`spacer` fall back to `genericSite`; empty STORE V16 falls back to the legacy storefront; `genericSite` prints raw `siteType` (e.g. "MEDICAL") to visitors; MEDICAL/LEGAL/NEWS have no V16 renderer; STORE is single-page; sale countdown depends on request time; spacers carry no `data-section-type`. Open issue from ADR-004 verification: `/preview/sites/:id` on the standalone public server likely lacks workspace context (unconfirmed).
+
+**Next:** PR 2 — publish manifest capability metadata (`manifestVersion: 2`, `capabilities`, `sectionTypes` in existing `site_publish_versions.manifest_json`; additive, no migration).
