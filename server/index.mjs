@@ -215,6 +215,8 @@ import {
 } from "./db/workspace-database.mjs";
 
 const app = express();
+// Behind TLS termination: makes req.protocol/req.ip reflect the client (payment callback URLs, rate limits).
+if (environment.trustProxy) app.set("trust proxy", environment.trustProxy);
 
 app.use(
   cors({

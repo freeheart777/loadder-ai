@@ -374,3 +374,19 @@ Public checkout (`auth.mjs`, `POST /storefront/carts/:cartId/checkout`) always c
 - `src/pages/PublicOrderSuccessPage.tsx` — reads through `getPublicOrder()` (fixes JSON-vs-raw receipt mismatch that broke the page after a gateway return); shows state from server `paymentStatus` only: PAID ⇒ green; UNPAID + `?payment=failed` ⇒ red "not paid"; UNPAID + other `?payment=` ⇒ amber "being verified"; UNPAID with no gateway ⇒ amber "order placed, not yet paid". `?payment=paid` can never make an unpaid order look paid.
 
 **Remaining from the audit (P1, not started):** retry-payment endpoint, callback verify-error ⇒ `?payment=pending` instead of JSON, customer SMS on PAID via `sendMessage`, env-driven `trust proxy`, merchant visibility of attempt status/ref_id, sweep for abandoned REDIRECT_READY attempts.
+
+## Payment Hardening P1a — server safety (2026-09-24)
+
+**Status: implemented and verified, not committed.** P0 committed as `237149b`. P1b (retry payment, customer SMS, merchant UI) NOT started, per instruction.
+
+- **TRUST_PROXY:** `environment.mjs` `parseTrustProxy()` — exact hop count 1–10, default off; `true`/`*`/IP lists/out-of-range throw at startup. `server/index.mjs` applies `app.set("trust proxy", n)` only when set. Fixes https callback URLs and per-client rate-limit keys behind TLS termination.
+- **`commerce/payment-verification-service.mjs` (new):** `verifyAndSettle(attemptId)` ⇒ `paid|failed|pending` — the single verify→settle path (reuses `paymentAttemptService` + `paymentAdapters`). Gateway unreachable/timeout or no ZarinPal code (5xx/HTML) ⇒ `pending`, attempt untouched; definite ZarinPal error code ⇒ `FAILED`; verified ⇒ `settleVerified`, settle failure ⇒ `RECONCILIATION_REQUIRED`. Also owns `gatewayCredentials()` (removed from `auth.mjs`).
+- **ZarinPal adapter:** `call()` now surfaces `errors.code` so the service can tell reject from outage. Adapter contract unchanged.
+- **Callback (`auth.mjs`):** uses `verifyAndSettle`; every exit is a 303 to order-success or a small HTML page (404 for unknown/forged) — never JSON; any exception ⇒ `?payment=pending`. `Status=NOK` only cancels `CREATED`/`REDIRECT_READY` (a verified-but-unsettled attempt is never cancelled).
+- **Merchant APIs (`ecommerce.mjs`, `requireFinancialAdmin` like refunds):** `GET /commerce/orders/:orderId/payment-attempts` (`paymentAttemptService.listForOrder`, workspace-scoped, 404 cross-workspace), `POST /commerce/payment-attempts/:attemptId/reconcile` (⇒ `verifyAndSettle`). `PaymentAttemptError` now mapped by the router's error handler. Wired in `site-builder-control-plane.mjs`.
+
+**Tests:** `commerce-zarinpal-gateway.test.mjs` unchanged, passes. New `commerce-payment-hardening-p1a.test.mjs` 8/8: verify timeout + 5xx ⇒ pending, verify reject ⇒ FAILED, no-JSON callback + NOK doesn't cancel RECONCILIATION_REQUIRED, reconcile paid (idempotent), reconcile failed, workspace isolation, permission guard (403 incl. refunds parity), TRUST_PROXY https callback + untrusted ignores headers + unsafe values rejected. Full server suite 1050/1050; `tsc -b` clean; `npm run build` OK.
+
+**Deploy note:** set `TRUST_PROXY=<hops>` (usually 1) behind nginx/Cloudflare, and have the proxy forward `Host` (`proxy_set_header Host $host`). Without it, express-rate-limit logs `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`.
+
+**Next (P1b, awaiting go):** retry-payment endpoint + UI, customer SMS on PAID via `beforeOrderSettlement`, merchant order-detail UI for attempts/ref_id/reconcile.

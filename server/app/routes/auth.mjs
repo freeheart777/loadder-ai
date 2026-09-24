@@ -13,6 +13,7 @@ import { createPublicBusinessAppRouter } from "../business-builder/public-app-ro
 import { CART_CAPABILITY_HEADER, ORDER_CAPABILITY_HEADER, createPublicCapability, matchesPublicCapability } from "../services/public-commerce-capability.mjs";
 import { createPaymentAttemptService } from "../commerce/payment-attempt-service.mjs";
 import { paymentAdapters } from "../commerce/payment-adapters.mjs";
+import { createPaymentVerificationService, gatewayCredentials } from "../commerce/payment-verification-service.mjs";
 import { sendMessage } from "../../services/messaging.mjs";
 
 export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false }) {
@@ -21,6 +22,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   const ecommerceService = createEcommerceService({ db });
   const siteLeadService = createSiteLeadService({ db });
   const paymentAttemptService = createPaymentAttemptService({ db });
+  const paymentVerificationService = createPaymentVerificationService({ db, paymentAttemptService });
   const sendOtpLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message: { success:false, message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const leadLimiter = rateLimit({ windowMs: 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید." } });
   const checkoutLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false, message:{ success:false,message:"درخواست‌های خرید زیاد است. کمی بعد دوباره تلاش کنید." } });
@@ -45,7 +47,6 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   // TODO(merchant-notifications): once a real "order notification contact" field exists
   // (e.g. on the site project or workspace), resolve it here and return { channel, address }.
   function resolveMerchantNotificationRecipient(_store) { return null; }
-  function gatewayCredentials(config){let options={};try{options=JSON.parse(config.config_json||"{}")}catch{}return{merchantId:config.credential_reference,sandbox:options.sandbox===true}}
 
   if(process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true") router.use(createPublicBusinessAppRouter({db}));
   router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"}));
@@ -111,31 +112,30 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
     return res.status(201).json({success:true,receiptCapability:receipt.value,...(payment?{payment}:{}),order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
   router.get("/storefront/orders/:orderId",(req,res)=>{try{const row=orderRow(req);if(!row)return publicNotFound(res);const order=runWithWorkspace(row.workspaceId,()=>ecommerceService.getOrder(row.id));return res.json({success:true,order:{id:order.id,siteProjectId:order.siteProjectId,currency:order.currency,status:order.status,paymentStatus:order.paymentStatus,fulfillmentStatus:order.fulfillmentStatus,subtotalMinor:order.subtotalMinor,discountMinor:order.discountMinor,shippingMinor:order.shippingMinor,totalMinor:order.totalMinor,items:order.items,createdAt:order.createdAt}})}catch(e){return storefrontError(e,res)}});
 
-  // Gate 3: gateway return. Nothing in the query is trusted except as a lookup key: the
-  // Authority must match the stored reference, and success is decided only by a
-  // server-to-server verify with the stored amount, then settleVerified() + DB triggers.
-  router.get("/storefront/payments/:attemptId/callback",checkoutLimiter,async(req,res)=>{try{
-    const row=db.prepare("SELECT id,workspace_id AS workspaceId,site_project_id AS siteProjectId,order_id AS orderId,provider,provider_config_id AS providerConfigId,provider_attempt_reference AS reference,amount_minor AS amountMinor,currency,status FROM ecommerce_payment_attempts WHERE id=?").get(req.params.attemptId);
-    const authority=String(req.query.Authority||"");
-    if(!row||!row.reference||row.reference!==authority||!paymentAdapters[row.provider])return publicNotFound(res);
+  // Gate 3 / P1a: gateway return. The customer's browser lands here, so every exit is a redirect
+  // to the order page or a small HTML page -- never JSON. The query is only a lookup key: the
+  // Authority must match the stored reference; the outcome comes from verifyAndSettle().
+  const callbackPage=(res,status,text)=>res.status(status).type("html").send(`<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><title>${text}</title><p style="font-family:sans-serif;text-align:center;margin-top:20vh">${text}</p></html>`);
+  router.get("/storefront/payments/:attemptId/callback",checkoutLimiter,async(req,res)=>{
+    const row=db.prepare("SELECT id,workspace_id AS workspaceId,site_project_id AS siteProjectId,order_id AS orderId,provider,provider_attempt_reference AS reference,status FROM ecommerce_payment_attempts WHERE id=?").get(req.params.attemptId);
+    if(!row||!row.reference||row.reference!==String(req.query.Authority||"")||!paymentAdapters[row.provider])return callbackPage(res,404,"لینک پرداخت معتبر نیست.");
     const back=(result)=>res.redirect(303,`/store/${encodeURIComponent(row.siteProjectId)}/order-success/${encodeURIComponent(row.orderId)}?payment=${result}`);
-    if(row.status==="SUCCEEDED")return back("paid");
-    if(["FAILED","CANCELLED"].includes(row.status))return back("failed");
-    const inWorkspace=(fn)=>runWithWorkspace(row.workspaceId,fn);
-    if(req.query.Status!=="OK"){inWorkspace(()=>paymentAttemptService.recordOutcome(row.id,"CANCELLED","GATEWAY_STATUS_NOK"));return back("failed")}
-    const config=db.prepare("SELECT credential_reference,config_json FROM ecommerce_payment_providers WHERE id=? AND workspace_id=?").get(row.providerConfigId,row.workspaceId);
-    if(!config)return publicNotFound(res);
-    const verification=await paymentAdapters[row.provider].verifyPayment({...gatewayCredentials(config),amountMinor:row.amountMinor,currency:row.currency,authority});
-    if(!verification.verified){inWorkspace(()=>paymentAttemptService.recordOutcome(row.id,"FAILED",`GATEWAY_VERIFY_${verification.code??"UNKNOWN"}`));return back("failed")}
-    try{inWorkspace(()=>paymentAttemptService.settleVerified(row.id,{providerTransactionId:verification.refId,provider:row.provider,providerConfigId:row.providerConfigId,amountMinor:row.amountMinor,currency:row.currency,verificationCode:`GATEWAY_VERIFIED_${verification.code}`}))}
-    catch(settleError){
-      // The gateway took the money but the order could not be marked PAID: flag for a human, never drop it.
-      console.error(`Payment ${row.id} verified by gateway (ref ${verification.refId}) but settlement failed:`,settleError);
-      try{inWorkspace(()=>paymentAttemptService.recordOutcome(row.id,"RECONCILIATION_REQUIRED",settleError?.code||"SETTLEMENT_FAILED"))}catch(e){console.error("Reconciliation flag not recorded:",e)}
+    try{
+      if(row.status==="SUCCEEDED")return back("paid");
+      if(row.status==="FAILED"||row.status==="CANCELLED")return back("failed");
+      if(req.query.Status!=="OK"){
+        // Only an attempt still waiting on the customer can be cancelled; a verified-but-unsettled one never is.
+        if(row.status!=="CREATED"&&row.status!=="REDIRECT_READY")return back("pending");
+        runWithWorkspace(row.workspaceId,()=>paymentAttemptService.recordOutcome(row.id,"CANCELLED","GATEWAY_STATUS_NOK"));
+        return back("failed");
+      }
+      const { result }=await runWithWorkspace(row.workspaceId,()=>paymentVerificationService.verifyAndSettle(row.id));
+      return back(result);
+    }catch(error){
+      console.error(`Payment callback ${row.id} failed; customer sent to pending:`,error);
       return back("pending");
     }
-    return back("paid");
-  }catch(e){return storefrontError(e,res)}});
+  });
 
   router.post("/send-otp",sendOtpLimiter,(req,res)=>{try{const result=authService.requestOtp(req.body||{}),response={success:true,message:"کد تأیید ایجاد شد.",expiresAt:result.challenge.expiresAt};if(nodeEnv!=="production"&&exposeDevelopmentOtp)response.developmentOtp=result.code;return res.json(response)}catch(e){return handleAuthError(e,res)}});
   router.post("/verify-otp",(req,res)=>{try{const result=authService.verifyOtp(req.body||{});res.cookie(SESSION_COOKIE_NAME,result.sessionToken,authService.sessionCookieOptions(nodeEnv));return res.json({success:true,user:result.user,memberships:result.memberships,activeWorkspace:result.activeWorkspace,authDisposition:result.authDisposition})}catch(e){return handleAuthError(e,res)}});

@@ -2,11 +2,12 @@ import express from "express";
 import { EcommerceError } from "../services/ecommerce-service.mjs";
 import { FinancialLedgerError } from "../commerce/v2/financial-ledger.mjs";
 import { RefundPersistenceError } from "../commerce/v2/refund-service.mjs";
+import { PaymentAttemptError } from "../commerce/payment-attempt-service.mjs";
 
-export function createEcommerceRouter({ service, financialLedgerService = null, refundService = null, paymentProviderActivationService = null }) {
+export function createEcommerceRouter({ service, financialLedgerService = null, refundService = null, paymentProviderActivationService = null, paymentAttemptService = null, paymentVerificationService = null }) {
   const router = express.Router();
   const handle = (error, res) => {
-    if (error instanceof EcommerceError || error instanceof FinancialLedgerError || error instanceof RefundPersistenceError) {
+    if (error instanceof EcommerceError || error instanceof FinancialLedgerError || error instanceof RefundPersistenceError || error instanceof PaymentAttemptError) {
       return res.status(error.status).json({ success: false, code: error.code, message: error.message });
     }
     if (String(error?.message || "").includes("UNIQUE constraint failed")) {
@@ -66,6 +67,16 @@ export function createEcommerceRouter({ service, financialLedgerService = null, 
   router.get("/commerce/orders/:orderId", (req, res) => run(res, () => ({ order: service.getOrder(req.params.orderId) })));
   router.patch("/commerce/orders/:orderId/status", (req, res) => run(res, () => ({ order: service.setOrderStatus(req.params.orderId, req.body || {}) })));
 
+  // P1a: merchant visibility of payment attempts and manual re-verification of an open attempt.
+  const payments = () => {
+    if (!paymentAttemptService || !paymentVerificationService) throw new PaymentAttemptError("Payment verification is unavailable.", "PAYMENT_VERIFICATION_UNAVAILABLE", 503);
+    return { attempts: paymentAttemptService, verification: paymentVerificationService };
+  };
+  router.get("/commerce/orders/:orderId/payment-attempts", requireFinancialAdmin, (req, res) => run(res, () => ({ attempts: payments().attempts.listForOrder(req.params.orderId) })));
+  router.post("/commerce/payment-attempts/:attemptId/reconcile", requireFinancialAdmin, async (req, res) => {
+    try { return res.json({ success: true, ...(await payments().verification.verifyAndSettle(req.params.attemptId)) }); }
+    catch (error) { return handle(error, res); }
+  });
   router.get("/commerce/orders/:orderId/refunds", requireFinancialAdmin, (req, res) => run(res, () => ({ refunds: refunds().list(req.params.orderId) })));
   router.post("/commerce/orders/:orderId/refunds", requireFinancialAdmin, (req, res) => run(res, () => ({ refund: refunds().create(req.params.orderId, req.body || {}) }), 201));
   router.get("/commerce/refunds/:refundId", requireFinancialAdmin, (req, res) => run(res, () => ({ refund: refunds().get(req.params.refundId) })));

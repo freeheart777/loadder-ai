@@ -10,6 +10,8 @@ import { createEcommerceService } from "./services/ecommerce-service.mjs";
 import { createFinancialLedgerService } from "./commerce/v2/financial-ledger.mjs";
 import { createRefundService } from "./commerce/v2/refund-service.mjs";
 import { createPaymentProviderActivationService } from "./commerce/payment-provider-activation-service.mjs";
+import { createPaymentAttemptService } from "./commerce/payment-attempt-service.mjs";
+import { createPaymentVerificationService } from "./commerce/payment-verification-service.mjs";
 import { createSupabaseStorageService } from "./storage/supabase-storage-service.mjs";
 import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
@@ -53,6 +55,8 @@ export function mountSiteBuilderControlPlane({
   // mount actually running in production, so refund endpoints 503'd.
   const refundService = createRefundService({ db });
   const paymentProviderActivationService = createPaymentProviderActivationService({ db });
+  const paymentAttemptService = createPaymentAttemptService({ db });
+  const paymentVerificationService = createPaymentVerificationService({ db, paymentAttemptService });
 
   const mountPath = basePath || "/";
   app.use(mountPath, createSiteProjectsRouter({ service: projectService }));
@@ -75,6 +79,8 @@ export function mountSiteBuilderControlPlane({
       financialLedgerService,
       refundService,
       paymentProviderActivationService,
+      paymentAttemptService,
+      paymentVerificationService,
     })
   );
 

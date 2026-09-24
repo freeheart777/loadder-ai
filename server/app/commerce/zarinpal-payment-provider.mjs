@@ -22,7 +22,9 @@ async function call(sandbox, operation, body) {
     signal: AbortSignal.timeout(15000),
   });
   const payload = await response.json().catch(() => ({}));
-  return payload?.data && !Array.isArray(payload.data) ? payload.data : {};
+  const data = payload?.data && !Array.isArray(payload.data) ? payload.data : {};
+  // ZarinPal puts rejection codes under errors.code; a 5xx/HTML reply leaves no code at all.
+  return { ...data, code: data.code ?? payload?.errors?.code ?? null };
 }
 
 const unsupported = () => { throw new PaymentAttemptError("ZarinPal refunds are not supported yet.", "ZARINPAL_REFUND_UNSUPPORTED", 501); };

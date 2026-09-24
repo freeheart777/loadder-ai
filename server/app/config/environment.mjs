@@ -9,6 +9,15 @@ const projectDirectory = join(serverDirectory, "..");
 dotenv.config({ path: [join(projectDirectory, ".env"), join(serverDirectory, ".env"), join(serverDirectory, ".env.cloudflare")], quiet: true });
 
 function parsePort(value, fallback) { const port = Number(value); return Number.isInteger(port) && port > 0 && port <= 65535 ? port : fallback; }
+// Express "trust proxy" as an exact proxy hop count. Off by default; true/"*"/IP lists are refused
+// because trusting every hop lets clients forge X-Forwarded-For and dodge per-IP rate limits.
+export function parseTrustProxy(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "false") return false;
+  const hops = Number(raw);
+  if (!/^\d+$/.test(raw) || hops < 1 || hops > 10) throw new Error(`TRUST_PROXY must be a proxy hop count between 1 and 10 (got "${raw}").`);
+  return hops;
+}
 function parseOrigins(value) { return String(value || "http://localhost:5173").split(",").map((origin) => origin.trim()).filter(Boolean); }
 
 const nodeEnv = process.env.NODE_ENV || "development";
@@ -20,6 +29,7 @@ export const environment = Object.freeze({
   apiHost: process.env.API_HOST || "127.0.0.1",
   apiPort: parsePort(process.env.API_PORT || process.env.PORT, 3001),
   clientOrigins: parseOrigins(process.env.CLIENT_ORIGINS),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   openAIConfigured: Boolean(process.env.OPENAI_API_KEY),
   cloudflareAIConfigured: Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
   supabaseStorageConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),

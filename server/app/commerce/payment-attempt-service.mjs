@@ -111,6 +111,11 @@ export function createPaymentAttemptService({ db, clock = () => new Date().toISO
       return map(requireAttempt(attemptId));
     },
     get(attemptId) { return map(requireAttempt(attemptId)); },
+    listForOrder(orderId) {
+      const order = db.prepare("SELECT id FROM ecommerce_orders WHERE id=? AND workspace_id=?").get(String(orderId || ""), workspaceId());
+      if (!order) throw new PaymentAttemptError("Order not found.", "PAYMENT_ORDER_NOT_FOUND", 404);
+      return db.prepare("SELECT * FROM ecommerce_payment_attempts WHERE workspace_id=? AND order_id=? ORDER BY created_at DESC,id DESC").all(workspaceId(), order.id).map(map);
+    },
     settleVerified(attemptId, verification = {}) { return settleTransaction(attemptId, verification); },
     // Gateway accepted the request; store its reference (e.g. ZarinPal Authority) for callback matching.
     markRedirectReady(attemptId, providerAttemptReference) {
