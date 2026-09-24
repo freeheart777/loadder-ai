@@ -11,19 +11,34 @@ The V16 Website Builder models websites as fixed types:
 - Frontend: `SITE_TYPES` / `SiteKind` in `src/components/store-studio-v16/site-types.ts`
 - Server: `ARCHETYPE_BY_SITE_TYPE` → `CAPABILITIES_BY_ARCHETYPE` in `server/app/services/website-platform-definition.mjs`
 
-Capabilities already exist (`SiteCapability`, `hasCapability()`, `allowsSectionType()`) but are derived from the type.
+Capabilities already exist and are **already persisted per site**: `ensureWebsitePlatformContent()` writes `content.websitePlatform.capabilities`, seeded from the archetype at creation and preserved afterwards. Frontend helpers (`SiteCapability`, `hasCapability()`, `allowsSectionType()`) exist too.
 
-Rendering dispatches by type (`isCorporateV16` / `isStoreV16` in `server/app/routes/public-sites.mjs`).
+The gap is that **the runtime ignores them**: rendering dispatches by `siteType` + section types (`isCorporateV16` / `isStoreV16` in `server/app/routes/public-sites.mjs`), and commerce is gated by `siteType === "STORE"`.
 
-The public server always constructs `createEcommerceService()`, even for non-commerce sites.
+The public server constructs `createEcommerceService()` eagerly at startup, though it only queries it for STORE sites.
+
+Verified against source on 2026-09-24 (see "Verification Findings").
 
 Loadder must serve many business domains without a new site type per industry.
 
 ## Decision
 
-A website is **Website Core + a set of enabled Capabilities**.
+A website is **Website Core + enabled Capabilities + selected Sections + Theme**.
 
-Site types are removed as a runtime concept. They survive only as **presets** that seed capabilities and default sections at creation time.
+Site types are removed as a runtime concept. They are replaced by **experience presets**.
+
+### Experience Presets
+
+A preset is a starting point, not a type:
+
+```
+Preset = { capabilities[], starter pages + section lists, theme defaults }
+```
+
+- Presets are applied once, at creation (e.g. "Online store", "Clinic", "Music academy", "Law firm", "Corporate").
+- One preset may offer several starter layouts (e.g. two store homepages from the same "Online store" preset).
+- After creation, the site's own capability list, sections and theme are the only truth. Changing a preset later never changes existing sites.
+- Existing `siteType` / archetype values act as legacy presets through the resolver (see Capability Storage Decision).
 
 ## 1. Capability-First Model
 
@@ -41,21 +56,40 @@ Rules:
 - Disabling a capability hides its sections and routes; its data is retained.
 - Presets (`store`, `clinic`, `academy`, …) are creation templates only. After creation, the site's capability list is the only truth.
 
-Capability catalogue (initial):
+Capability catalogue and mapping from existing names (`CAPABILITIES_BY_ARCHETYPE`):
 
-| Capability | Owns |
-|---|---|
-| `payments` | provider activation, payment attempts (existing 086/087) |
-| `commerce` | products, cart, orders, ledger (existing 049/072) |
-| `forms` | forms, submissions → CRM (generalizes `site-lead-service`) |
-| `crm` | contacts linkage for forms / bookings / orders |
-| `blog` | posts, categories |
-| `people` | staff profiles (doctor, instructor, lawyer, team member) |
-| `booking` | services, availability, appointments |
-| `courses` | courses, lessons, enrollments |
-| `seo` | advanced SEO (sitemaps, structured data); basic SEO stays in Core |
+| ADR capability | Existing name(s) | Owns |
+|---|---|---|
+| `payments` | — (new) | provider activation, payment attempts (existing 086/087) |
+| `commerce` | `commerce`, `catalog` | products, cart, orders, ledger (existing 049/072) |
+| `campaigns` | — (new); **requires `commerce`** | flash sales, scheduled promos, discount pricing |
+| `forms` | `forms`, `lead` | forms, submissions (generalizes `site-lead-service`) |
+| `crm` | `lead` (contact side) | contact linkage for forms / bookings / orders |
+| `blog` | `content` | posts, categories |
+| `people` | `team` | staff profiles (doctor, instructor, lawyer, team member) |
+| `booking` | `booking` | services, availability, appointments |
+| `courses` | — (new) | courses, lessons, enrollments |
+| `seo` | — (new) | sitemaps, structured data; basic SEO stays in Core |
+| Core (not a capability) | `landing`, `location` | landing pages; location = a core section (Map/Contact) |
+| Out of website runtime | `analytics`, `ads` | integrations; never loaded by the public runtime |
+
+The resolver normalizes existing names to ADR names on read. Stored documents are not rewritten.
+
+### Capability Storage Decision
+
+V1 storage is the existing `content.websitePlatform.capabilities` array. No new table, no migration.
+
+Resolution order (`resolveCapabilities(project, content)`):
+
+1. `content.websitePlatform.capabilities` (normalized via the mapping above)
+2. otherwise archetype defaults from `siteType`
+3. always: `siteType === "STORE"` ⇒ `commerce` (preserves current behavior)
+
+A dedicated `site_capabilities` table is **deferred** until per-capability config or cross-site querying is actually needed.
 
 `people` is shared: DoctorProfile, InstructorProfile and LawyerProfile are sections over one entity, not separate domains.
+
+Brand storytelling (`story.*`: brandStory, values, lifestyleCollection, logoWall) is **not a capability**. Story sections have no data or services and belong to Core.
 
 ## 2. Core Website Engine
 
@@ -76,10 +110,20 @@ Site document shape:
 
 ```
 theme:   { tokens }
+chrome:  { utilityBar, header, categoryNav, footer }
 nav, seo
 pages[]: { id, slug, seo, sections[] }
-sections[]: { id, type: "<capability>.<section>", props, variant, visibility }
+sections[]: { id, type: "<capability>.<section>", variant, props, data, style, visibility }
 ```
+
+### Site Chrome vs Page Sections
+
+Site chrome (utility bar, header, category nav, footer) is **separate from page sections**:
+
+- One instance per site, rendered on every page; not draggable, not part of `pages[].sections`.
+- Edited through site settings (Header / Footer), not the section palette.
+- Capabilities contribute **slots** to chrome instead of sections (e.g. `commerce` adds the cart slot to the header; `forms` adds a newsletter slot to the footer).
+- Current `header` / `footer` config under `content.storeBuilderV16` maps to chrome; no document rewrite.
 
 ## 3. Capability Registry
 
@@ -113,7 +157,7 @@ Rules:
 - Paid capabilities (booking, courses, subscriptions) create normal orders and reuse the existing attempt → verification → ledger path. No parallel payment flows.
 - Existing commerce/payments code is wrapped as capabilities; it is not rewritten.
 
-Site ↔ capability persistence:
+Site ↔ capability persistence: see "Capability Storage Decision" (§1). Future table, when needed:
 
 ```
 site_capabilities (site_id, workspace_id, capability_key, enabled, config_json, version)
@@ -145,8 +189,10 @@ Section catalogue (initial):
 
 | Capability | Sections |
 |---|---|
-| core | Hero, RichText, Gallery, FAQ, Contact, CTA, Testimonials, Map |
-| commerce | ProductGrid, ProductDetail, Cart★, Checkout★ |
+| core | Hero, BannerGroup, CategoryGrid, FeatureList, Trust, RichText, Gallery, FAQ, Contact, CTA, Testimonials, Map |
+| core (story) | BrandStory, Values, LifestyleCollection, LogoWall |
+| commerce | ProductShelf, CategoryShelf, ProductDetail, Cart★, Checkout★ |
+| campaigns | FlashSale★, PromoBanner |
 | blog | PostList, PostDetail, Categories |
 | people | StaffProfile (Doctor / Instructor / Lawyer variants), StaffGrid |
 | booking | ServiceList, AppointmentCalendar★ |
@@ -157,6 +203,8 @@ Section catalogue (initial):
 
 The existing corporate and store `sectionHtml()` renderers become the `core` and `commerce` section renderers.
 
+Existing section types are plain strings (`about`, `services`, `team`, `portfolio`, `text-image`, `cta`, `contact`, `spacer`) under `content.storeBuilderV16`. Namespaced types are **aliases**: `about` ≡ `core.about`. Stored and published documents are never rewritten (rollback copies old content verbatim).
+
 ## 5. Publish Manifest
 
 Publishing produces an immutable snapshot plus a manifest.
@@ -165,11 +213,18 @@ Publishing produces an immutable snapshot plus a manifest.
 Builder → Publish → Snapshot + Manifest → Public Runtime → Domain → Customer
 ```
 
-Manifest (stored with the publish version, 043):
+`site_publish_versions.manifest_json` **already exists**. Current content (written by `repository.publish()`):
+
+```
+{ projectId, slug, siteType, contextVersionId, publishedAt, assetIds }
+```
+
+The manifest is **extended additively** (no migration):
 
 ```
 {
-  siteId, versionId, builtAt,
+  ...existing fields,
+  manifestVersion: 2,
   capabilities: ["core", "blog", "booking", "payments"],
   sectionTypes: ["core.hero", "booking.appointmentCalendar", ...],
   islands:      ["booking.appointmentCalendar"],
@@ -178,12 +233,27 @@ Manifest (stored with the publish version, 043):
 }
 ```
 
+Manifests without `manifestVersion: 2` (all versions published before this change) are resolved at runtime via `resolveCapabilities()`.
+
 Rules:
 
-- The public runtime serves only published snapshots, never drafts (drafts only via preview token, 045).
+- The public runtime serves published versions, never drafts (drafts only via preview token, 045).
 - The manifest is computed at publish time from the document; it is never edited by hand.
 - Publishing validates that every section type belongs to an enabled capability.
-- Rollback = re-pointing the live version to an earlier snapshot.
+
+### Rollback Model
+
+Rollback is **copy-forward**, not re-pointing. `rollbackPublishVersion()` creates a new version whose content copies the target, with `manifest.rollbackOfVersionId`. The live version is always the highest `version`. The v2 manifest fields are recomputed for the new version.
+
+### Asset Snapshot Limitation
+
+Content is snapshotted; **assets are not**. `getPublishedPublic()` loads all current `site_assets` for the project and ignores `manifest.assetIds`. Effects:
+
+- Legacy renderers (`storefront`, `genericSite`) display current assets, not published ones.
+- V16 renderers use URLs embedded in content, so they are unaffected unless an asset is deleted from storage.
+- Store products are always live (`ecommerceService.listProducts`); this is intended.
+
+Accepted for V1. Freezing assets (filtering by `manifest.assetIds`, retaining referenced storage objects) is a later phase.
 
 ## 6. Public Runtime Architecture
 
@@ -201,7 +271,10 @@ request(host)
 Rules:
 
 - **Capability-based loading.** A site without `commerce` never imports commerce services, routes or client code.
-- `public-site-server.mjs` stops constructing `createEcommerceService()` eagerly.
+- `public-site-server.mjs` stops constructing `createEcommerceService()` eagerly; it is imported on the first commerce-site request.
+- The commerce gate changes from `siteType === "STORE"` to "resolved capabilities include `commerce`". The resolver guarantees today's STORE behavior is preserved.
+- Core rendering must not depend on store modules. `renderCorporateSite` currently uses `projectPublicStorePresentation(..., { includeCommerce: false })`; this is replaced by a neutral presentation function.
+- Legacy renderers (`storefront`, `genericSite`) remain as fallbacks for projects with no V16 document; they are not moved into the registry.
 - **One renderer.** Server HTML is the single source of truth. The editor preview renders the same output (iframe + preview token). The unused `server/app/services/site-public-runtime.mjs` is removed.
 - Interactive features (cart, checkout, booking calendar, forms) are client islands, lazy-loaded per page.
 - Public process has no builder and no AI imports.
@@ -239,7 +312,7 @@ Domains are capability combinations plus a preset. No domain-specific code in Co
 
 | Domain | Capabilities | Typical sections |
 |---|---|---|
-| Ecommerce (retail store) | core, commerce, payments, blog, crm, seo | Hero, ProductGrid, ProductDetail, Cart, Checkout, PostList |
+| Ecommerce (retail store) | core, commerce, payments, blog, crm, seo (+ campaigns) | Hero, BannerGroup, ProductShelf, BrandStory, Trust, FlashSale, Cart, Checkout, PostList |
 | Medical (clinic) | core, people, booking, forms, payments, blog | Hero, StaffGrid (Doctor), AppointmentCalendar, FormBlock (intake), FAQ |
 | Legal (law firm) | core, people, booking, forms, crm, blog | Hero, StaffProfile (Lawyer), ServiceList, AppointmentCalendar (consultation), FormBlock (case intake) |
 | Education (music academy) | core, courses, people, booking, commerce, payments, blog | CourseList, InstructorProfile, AppointmentCalendar (trial lesson), ProductGrid, PostList |
@@ -259,26 +332,40 @@ Positive:
 Negative / costs:
 
 - Renderer migration (type dispatch → registry) touches public output; requires HTML snapshot tests of existing sites.
-- Existing sites need a backfill: archetype → `site_capabilities` rows.
+- No backfill needed: existing sites already carry `websitePlatform.capabilities`; old manifests are handled by the resolver.
 - Retiring older studio versions requires confirming none are still routed.
 
-## Migration Strategy
+## Verification Findings
 
-Gated PRs, in order:
+Verified against `public-sites.mjs`, `website-platform-definition.mjs`, `site-project-repository.mjs`, `public-site-server.mjs`, `corporate-site-html.mjs`.
 
-1. Decisions and cleanup (single studio, remove unused runtime).
-2. Capability + section contract; wrap existing core/commerce sections. No behavior change.
-3. `site_capabilities` table; presets seed it; backfill from archetype.
-4. Public renderer dispatches through the section registry (HTML snapshot parity tests).
-5. Publish manifest + capability-based loading in the public runtime.
-6. Editor: registry palette, drag and drop, floating panel, iframe preview.
-7. New capabilities: forms → blog → people + booking → courses.
-8. AI-assisted editing layer.
+Confirmed: type-based dispatch; eager commerce construction; standalone host-routed public process (`site_domains.status='ACTIVE'`); transactional content snapshot on publish; hashed, non-cached preview tokens; domain-neutral page model; no builder/AI imports in the public process.
 
-Migration numbers are assigned at implementation time (coordinate with ADR-003 subscription migrations).
+Corrected in this ADR: capability storage already exists; `manifest_json` already exists; rollback is copy-forward; assets are not snapshotted; capability names differ; core renderer depends on store presentation.
+
+Open issue (outside this ADR): `/preview/sites/:id` on the public server calls `getPreviewByToken()` → `requireWorkspaceId()` without `runWithWorkspace`. Likely returns 500 on the standalone public server; confirm in `tenant-context.mjs`.
+
+## Implementation Order
+
+Gated PRs. Phases 1–6 need **no database migration**.
+
+1. **Capability resolver.** Pure `resolveCapabilities(project, content)` + name mapping + STORE ⇒ commerce rule. Unit tests only.
+2. **Manifest v2.** `publish()` and `rollbackPublishVersion()` write `manifestVersion`, `capabilities`, `sectionTypes`. Additive JSON.
+3. **Capability-gated commerce.** Public router gates on resolved capabilities; `public-site-server.mjs` lazy-imports `ecommerce-service`. Test: a corporate site loads no commerce module.
+4. **Section registry (corporate first).** HTML snapshot tests of existing published versions first; then `sectionHtml()` if-chain → `{ type: render }` map with namespaced aliases; byte-identical output. Then store renderer.
+5. **Neutral core presentation.** Remove the corporate renderer's dependency on `projectPublicStorePresentation`.
+6. **Cleanup.** Single studio (V16Core); remove unused `site-public-runtime.mjs`.
+7. **Editor.** Registry palette, drag and drop, floating panel, iframe preview.
+8. **New capabilities.** forms → blog → people + booking → courses (these introduce migrations; numbers assigned at implementation time, coordinated with ADR-003).
+9. **Asset freezing.** Serve only `manifest.assetIds`.
+10. **AI-assisted editing layer.**
+
+The preview workspace-context issue is fixed independently, before phase 1 if confirmed.
 
 ## Related
 
 - ADR-002 Subscription Payments
 - ADR-003 Subscription Domain Model
+- `docs/architecture/WEBSITE_COMPONENT_ARCHITECTURE.md` (component registry, section schema, builder UX)
+- `docs/design-references/ecommerce-pattern-analysis.md`
 - `docs/WEBSITE_BUILDER_V16_AUDIT.md`
