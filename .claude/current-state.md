@@ -249,3 +249,90 @@ Implements exactly the week-1 audit recommendation: a new user can now create a 
 5. Revisit notifications (order-status changes, merchant-contact settings) after the above, consistent with Commerce Gate 1's already-flagged TODO.
 
 **Next step:** none taken — audit only, per explicit instruction. No code was modified.
+
+## Commerce Gate 2 — Merchant Operations UI (2026-09-24)
+
+**Status: implemented and verified, not yet committed** (review requested before commit, per instruction). Checkpoint commit `cbb3a9f` ("checkpoint before merchant operations UI") was created before any edit.
+
+**Files changed (two only):** `server/app/site-builder-control-plane.mjs`, `src/pages/StoreCommerceManagerPageCore.tsx`. No commerce-engine files modified, no checkout-flow changes, no template changes, no Website Builder core changes, no new backend endpoints, no new schema.
+
+**P0-1 (refund service wiring — one-line fix, exactly the audit's finding):** `site-builder-control-plane.mjs` now imports `createRefundService` and passes a real `refundService` into `createEcommerceRouter(...)`, exactly mirroring the pattern already proven correct in the (unused) `canonical-commerce.mjs`. Before this fix, every refund route (`GET/POST .../refunds`, `GET /commerce/refunds/:id`, `POST .../transitions`) 503'd with `REFUND_SERVICE_UNAVAILABLE` in the actually-running app. Verified with a real HTTP test against the real `mountSiteBuilderControlPlane` mount (not a standalone router, which is what the existing `commerce-refund-api.test.mjs` uses and would not have caught this bug): create product → cart → checkout → settle payment via the real `payment-attempt-service.mjs` path → refund creation now succeeds (was 503, now 201) → the pre-existing safety gate (no unverified `SUCCEEDED` transition) is still intact.
+
+**P0-2 (order management UI):** `StoreCommerceManagerPageCore.tsx` gained a 3-way tab switcher (محصولات/سفارش‌ها/تنظیمات پرداخت) added just below the header, replacing nothing — the existing product-catalog view is unchanged and still the default. New "سفارش‌ها" tab (`OrdersView`):
+- Order list, each row showing id, email, created date, `status`/`paymentStatus`/`fulfillmentStatus` (Persian-labeled), and total — sourced from the already-fetched `GET /api/stores/:id/orders` (the `Order` type was widened from `{id:string}` to the real shape; `refresh()` itself needed no change, it already fetched full orders).
+- Click-to-expand order detail: line items, shipping address, and two status dropdowns (order status, fulfillment status) that `PATCH /api/commerce/orders/:orderId/status`. `REFUNDED` is deliberately excluded from the order-status picker, matching the backend's own refusal to accept it via this endpoint ("requires canonical financial authority").
+- No refund UI was added in this pass (out of the approved P0-2 feature list, which was list/detail/status-update only); refund UI is a natural P1 follow-up now that P0-1 unblocks it.
+
+**P1-a (payment settings UI):** new "تنظیمات پرداخت" tab (`PaymentSettingsView`) — a form for provider key + optional credential reference, calling the existing `PUT /api/stores/:id/payment-providers/:providerKey`. Honestly labeled: the form explicitly tells the merchant this only saves configuration, real online payment is not yet active (matches the Payment Audit's finding that nothing reads this config at checkout time). Known limitation, not fixed here since it would mean a new endpoint: there is no GET to read back a previously configured provider, so only the just-saved result is shown for the session; a page reload won't show prior configuration.
+
+**P1-b (merchant notification settings UI): deliberately not built.** The task's own condition — "only if existing storage path exists" — is false: the Payment & Notification Audit and this session's own searches found no merchant-contact/notification-settings field anywhere in the data model, and creating one would mean new schema, explicitly disallowed. Skipped, not silently dropped.
+
+**Tests run:**
+- `npx tsc -b` — clean, exit 0.
+- `npm run build` — full production build succeeded, no bundling errors.
+- Existing tests covering the touched surface: `commerce-refund-api.test.mjs`, `commerce-financial-admin.test.mjs`, `site-builder-runtime-mount.test.mjs`, `ecommerce-core.test.mjs` — **14/14 pass**, no regressions.
+- A new real end-to-end HTTP test against the actual `mountSiteBuilderControlPlane` production mount (not a standalone router) — **9/9 checks pass**, proving the P0-1 fix works through the real app composition, not just in isolation.
+- `server/db/loadder.sqlite` confirmed untouched throughout.
+
+**Not done (deliberately, per explicit constraints):** no refund UI (P1, follow-up now that it's unblocked), no provider-key validation (pre-existing gap, not this task's scope), no merchant-contact settings (no storage path exists), no new backend endpoints, no changes to `commerce/v2` engines beyond wiring an existing one into an existing mount.
+
+## Commerce Gate 3 Audit — Payment Provider Architecture (2026-09-24)
+
+**Status: audit only, no code changed.** Scope: `server/app/commerce/payment*`, `commerce-provider-contract.mjs`, `ecommerce-service.mjs`, `ecommerce.mjs`, `auth.mjs`, payment migrations, `StoreCommerceManagerPageCore.tsx`'s payment-settings area, checkout UI. Goal: the correct production payment architecture. No new doc file — findings recorded here only, per instruction.
+
+### 1. Current payment flow
+
+Public checkout (`auth.mjs`, `POST /storefront/carts/:cartId/checkout`) always creates the order with `paymentProvider:"manual"` and `payment_status:"UNPAID"` via `ecommerceService.checkout()`. Since Commerce Gate 1, the same route (inside the same `runWithWorkspace` call) additionally checks for a `CONNECTED` row in `ecommerce_payment_providers` for the site; if one exists, it calls `paymentAttemptService.create()` to record a `CREATED`-status payment attempt referencing it. **No gateway is ever called** — `createPayment`/`verifyPayment` are never invoked, there is no redirect, and the order's own `payment_provider` field stays `"manual"` regardless. In practice, since no UI ever sets a provider to `CONNECTED` (only `PENDING`, via `StoreCommerceManagerPageCore.tsx`'s Gate 2 payment-settings form → `PUT /stores/:id/payment-providers/:key`), this new code path is a no-op for every real merchant today. The only way an order becomes `PAID` today is a DB trigger-enforced verified payment attempt (see below) — nothing in the audited scope drives that from a real transaction.
+
+### 2. Existing provider abstraction — genuinely strong, two distinct layers
+
+- **Ecommerce backend abstraction** (`commerce-provider-contract.mjs`): `COMMERCE_PROVIDER_CAPABILITIES`/`REQUIRED_METHODS` define a swappable *commerce backend* (products, carts, checkout, orders) — `loadder-commerce-provider.mjs` is the one native implementation. This is unrelated to payment gateways; it's about swapping the whole commerce engine, not a payment method.
+- **Payment gateway adapter contract** (`payment-attempt-service.mjs`): `defineCommercePaymentProviderAdapter({createPayment, verifyPayment, refundPayment, verifyRefund})` — exactly the four methods a real gateway integration needs. `createPaymentAttemptService({db})` provides `create()` (idempotent, rejects client-supplied money, looks up a real provider config) and `settleVerified()` (cross-checks provider/amount/currency before marking an order `PAID`). **No concrete adapter for any real gateway exists** — this contract has zero implementations outside tests.
+- **Database-level integrity (migration 087) is the strongest part of the whole payment architecture** and deserves emphasis: `ecommerce_payment_attempts` has trigger-enforced identity immutability, a strict state-transition graph (`CREATED → REDIRECT_READY/PENDING_VERIFICATION/SUCCEEDED/FAILED/CANCELLED/RECONCILIATION_REQUIRED`, no arbitrary jumps), a `SUCCEEDED` guard requiring both `provider_transaction_id` and `verified_at`, terminal-state immutability, and — critically — `ecommerce_orders.payment_status` can only reach `PAID` if a matching `SUCCEEDED` attempt row exists with the same amount/currency/provider/transaction reference. This means **even a bug in application code cannot mark an order paid without a real, verified attempt** — the safety is enforced by SQLite itself, not just JS. Refunds have an equivalent guard (`trg_ecommerce_verified_refund_required`).
+
+### 3. What is missing for real gateway integration
+
+1. **A concrete adapter** implementing `createPayment`/`verifyPayment`/`refundPayment`/`verifyRefund` for at least one real gateway. Nothing exists today.
+2. **A checkout-route decision point that actually branches on a configured, verified-ready provider** — today's Gate 1 wiring only records an attempt; it never calls `createPayment` to get a redirect URL, and never redirects the customer anywhere.
+3. **A payment callback/webhook route.** Both ZarinPal (customer redirect back) and Stripe (webhook, primarily) need a server endpoint to receive the gateway's result and call `paymentAttemptService.settleVerified()`. No such route exists anywhere in the audited scope.
+4. **Provider-key validation.** `configurePaymentProvider()` accepts any string with zero validation and defaults to `status:'PENDING'`; nothing ever transitions a provider to `CONNECTED` (no UI, no backend logic) — confirmed no code path sets that status anywhere in the audited scope.
+5. **Frontend payment step.** `CheckoutForm` (Studio checkout UI) collects name/phone/email/address only; there is no payment-method selection, no redirect-to-gateway handling, and no return-from-gateway page.
+6. **Webhook signature/authenticity verification** (gateway-specific) — doesn't exist because no webhook route exists yet.
+7. **Currency/amount-unit handling per provider** — ZarinPal historically speaks Rial (not Toman) in some API versions; Stripe wants ISO currency codes and its own minor-unit conventions per currency. Neither is normalized anywhere yet since `amount_minor` is currently treated as a single generic minor-unit integer.
+
+### 4. ZarinPal vs Stripe adapter requirements — technical comparison only, no recommendation
+
+| Aspect | ZarinPal | Stripe |
+|---|---|---|
+| Initiate (`createPayment`) | `PaymentRequest.json` call with merchant ID, amount, callback URL, description → returns an `Authority` token and a redirect URL to ZarinPal's hosted payment page. | `PaymentIntents` (or `Checkout Sessions`) API call → returns a `client_secret` (for Stripe.js/Elements, no redirect) or a hosted `Checkout Session` URL (redirect-based, closer to ZarinPal's model). |
+| Customer flow | Full redirect to ZarinPal, then redirect back to a fixed callback URL with `Authority` + `Status` query params. | Either stays on-site (Elements/PaymentIntents, JS-heavy, needs Stripe.js on the checkout page) or redirects to Stripe Checkout and back — Loadder's current server-rendered checkout page (no client JS payment SDK) fits the *redirect* model of both, but Stripe's non-redirect mode would need real frontend JS integration Loadder doesn't have today. |
+| Confirm (`verifyPayment`) | `PaymentVerification.json` call with merchant ID, amount, and the returned `Authority` — synchronous, called right after the customer redirect returns. | Primarily **webhook-driven** (`payment_intent.succeeded` event with signature verification via `Stripe-Signature` header + webhook secret); the redirect-back page alone is not authoritative per Stripe's own guidance — a webhook route is the correct source of truth. |
+| Refund (`refundPayment`) | ZarinPal's refund API availability/terms vary by merchant tier; not universally available on all account types. | `Refunds` API — straightforward, well-documented, works for essentially all Stripe accounts. |
+| Verify refund (`verifyRefund`) | Typically synchronous with the refund call itself. | Async via webhook (`charge.refunded`) for full confirmation, though the initial API response usually already reflects success. |
+| Currency | Iranian Rial-oriented (some API versions historically used Rial while the merchant dashboard shows Toman — a real historical source of 10x bugs industry-wide); single-currency in practice for this product's market. | Multi-currency, ISO 4217 codes, well-defined minor-unit rules that already vary per currency (e.g. JPY has no minor unit) — `amount_minor` handling would need to become currency-aware if Stripe is ever added, which it doesn't need to be for ZarinPal-only. |
+| Auth model | Merchant ID (a single string) is the primary secret/identifier. | API secret key + a separate webhook signing secret; meaningfully more moving credential parts. |
+| Fit with existing schema | Maps cleanly onto today's single `provider_config_id` + `credential_reference` model — one merchant ID per site. | Also maps onto the existing model, but the webhook signing secret is a second credential the current `ecommerce_payment_providers` schema doesn't explicitly separate from `credential_reference` (would likely reuse `config_json` for it, no schema change strictly required). |
+
+### 5. Exact files needed for implementation (once a provider is chosen)
+
+- **New:** one adapter module (e.g. `server/app/commerce/zarinpal-payment-provider.mjs` or `stripe-payment-provider.mjs`) implementing `defineCommercePaymentProviderAdapter(...)`.
+- **New:** one webhook/callback route (e.g. `server/app/routes/payment-callbacks.mjs`) that receives the gateway's confirmation and calls `paymentAttemptService.settleVerified()` — this is the piece that's missing regardless of which provider is chosen.
+- **Modify:** `server/app/routes/auth.mjs` — the checkout route needs to call the adapter's `createPayment()` when a `CONNECTED` provider exists and return a redirect target instead of (or alongside) the current immediate order-creation response.
+- **Modify:** `server/app/services/ecommerce-service.mjs`'s `configurePaymentProvider()` — needs real validation before a provider can reach `CONNECTED` (out of this audit's "do not modify" scope to fix now, but is a hard prerequisite).
+- **Modify (frontend):** the checkout UI (`StudioCanvas.tsx`'s `CheckoutForm` or a successor) — needs a payment-method step and redirect handling; and a return-from-gateway landing page.
+- **No schema migration is strictly required** for either provider — the existing `ecommerce_payment_providers`/`ecommerce_payment_attempts` tables and their trigger-enforced integrity already accommodate this model.
+
+### 6. P0/P1 roadmap
+
+**P0 — needed before real payments can flow at all:**
+1. Add provider-key validation + a real path to `CONNECTED` status (currently no code path ever sets it).
+2. Build the webhook/callback route and wire it to `settleVerified()` — this is required regardless of provider choice and is the single biggest missing piece.
+3. Implement one concrete adapter (`createPayment`/`verifyPayment` at minimum) for the chosen provider and call `createPayment()` from the checkout route instead of only creating a bare attempt record.
+4. Add the frontend redirect-to-gateway and return-from-gateway handling.
+
+**P1 — needed for completeness:**
+1. `refundPayment`/`verifyRefund` adapter methods, wired to the existing (already Gate-2-unblocked) refund UI/routes.
+2. Currency/amount-unit normalization if a second, multi-currency provider is ever added.
+3. Idempotent webhook replay handling (gateways routinely retry webhook delivery) — the existing `UNIQUE(provider,provider_config_id,provider_transaction_id)` index already gives a strong building block for this.
+
+**Next step:** none taken — audit only, per explicit instruction. No code was modified.
