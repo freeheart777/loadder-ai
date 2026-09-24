@@ -3,6 +3,7 @@ import express from "express";
 import { isCorporateV16, renderCorporateSite } from "../services/corporate-site-html.mjs";
 import { isStoreV16, renderStoreSite } from "../services/store-site-html.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
+import { commerceEnabled } from "../site-platform/runtime-capabilities.mjs";
 
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const normalizeHost = (value) => String(value ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
@@ -44,14 +45,21 @@ export const renderPublishedSite = (project, version, assets = [], page = {}, pr
   return project?.siteType === "STORE" ? storefront(project, version, assets, content) : genericSite(project, version, assets, content);
 };
 
-export function createPublicSitesRouter({ repository, ecommerceService = null }) {
+export function createPublicSitesRouter({ repository, ecommerceService = null, createEcommerceService = null }) {
   const router = express.Router();
-  // The live catalog for a STORE project, fetched only when needed — a
-  // BUSINESS project never touches ecommerce data.
+  // The ecommerce service is created on the first commerce request and reused;
+  // a site without commerce never creates it.
+  let ecommerce = ecommerceService;
+  const ecommerceFor = () => (ecommerce ??= createEcommerceService ? createEcommerceService() : null);
+  // The live catalog, fetched only when the runtime capability decision needs it
+  // (STORE only) — a BUSINESS project never touches ecommerce data.
   const productsFor = (project) => {
-    if (!ecommerceService || project?.siteType !== "STORE") return [];
-    try { return runWithWorkspace(project.workspaceId, () => ecommerceService.listProducts(project.id)); }
-    catch (error) { console.error("Public storefront catalog error:", error); return []; }
+    if (!commerceEnabled(project)) return [];
+    try {
+      const service = ecommerceFor();
+      if (!service) return [];
+      return runWithWorkspace(project.workspaceId, () => service.listProducts(project.id));
+    } catch (error) { console.error("Public storefront catalog error:", error); return []; }
   };
   const sendPublished = (req, res, published, page = {}) => {
     if (!published) return res.status(404).send("Site not found");

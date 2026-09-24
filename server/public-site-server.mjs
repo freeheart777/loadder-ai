@@ -7,10 +7,10 @@ import { createEcommerceService } from "./app/services/ecommerce-service.mjs";
 
 const app = express();
 const repository = createSiteProjectRepository(db);
-const ecommerceService = createEcommerceService({ db });
 
 app.disable("x-powered-by");
-app.use(createPublicSitesRouter({ repository, ecommerceService }));
+// Lazy: no ecommerce service at startup; created on the first STORE request.
+app.use(createPublicSitesRouter({ repository, createEcommerceService: () => createEcommerceService({ db }) }));
 
 const port = Number(process.env.PUBLIC_SITE_PORT || Number(environment.apiPort) + 1);
 const host = process.env.PUBLIC_SITE_HOST || environment.apiHost;

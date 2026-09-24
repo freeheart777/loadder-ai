@@ -144,9 +144,16 @@ test("agreement: no corporate section belongs to commerce", () => {
 });
 
 test("agreement: the registry does not replace renderers yet", () => {
-  for (const file of ["server/app/routes/public-sites.mjs", "server/app/services/corporate-site-html.mjs", "server/app/services/store-site-html.mjs", "server/public-site-server.mjs"]) {
-    assert.doesNotMatch(source(file), /site-platform\//, `${file} must not import the registry in Phase 1`);
+  // Renderers stay unaware of capabilities.
+  for (const file of ["server/app/services/corporate-site-html.mjs", "server/app/services/store-site-html.mjs", "server/app/services/store-public-presentation.mjs", "server/public-site-server.mjs"]) {
+    assert.doesNotMatch(source(file), /site-platform\//, `${file} must not import site-platform`);
   }
+  // Since PR 3 the public routers may use the runtime capability context, and nothing else from site-platform.
+  for (const file of ["server/app/routes/public-sites.mjs", "server/app/routes/auth.mjs"]) {
+    const imports = [...source(file).matchAll(/from\s+"([^"]*site-platform\/[^"]*)"/g)].map((match) => match[1]);
+    assert.deepEqual(imports, ["../site-platform/runtime-capabilities.mjs"], `${file} imports only the runtime capability context`);
+  }
+  assert.doesNotMatch(source("server/app/site-platform/runtime-capabilities.mjs"), /from\s+"[^"]*(site-html|ecommerce|commerce\/|capabilities\.mjs|registry\.mjs)/, "runtime context imports only the resolver and manifest reader");
   for (const capability of INITIAL_CAPABILITIES) {
     for (const section of capability.sections) assert.equal(section.render, undefined, `${section.type} carries metadata only`);
   }
