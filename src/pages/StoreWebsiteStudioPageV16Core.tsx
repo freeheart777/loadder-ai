@@ -8,7 +8,7 @@ import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
 import { isCommerceSite, siteTypeDefinition } from "../components/store-studio-v16/site-types";
 import { activePageOf, navigationPages, newPage, normalizeSlug, slugProblem, withActivePageSections, withPages } from "../components/store-studio-v16/pages";
-import { createConfigFromTemplate, TEMPLATES } from "../components/store-studio-v16/templates/registry";
+import { createConfigFromTemplate, templatesForSiteKind } from "../components/store-studio-v16/templates/registry";
 import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { apiFetch } from "../lib/api";
@@ -146,7 +146,7 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
       <p className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</p>
       <h1 className="mt-2 text-xl font-black">{commerce ? "ساخت فروشگاه اینترنتی" : "ساخت سایت شرکتی"}</h1>
       <p className="mt-2 text-xs leading-6 text-white/45">{commerce ? "یک قالب آماده را انتخاب کنید یا از یک فروشگاه خالی شروع کنید." : "برای شروع، یک سایت خالی می‌سازیم؛ همه‌چیز را در همین Studio ویرایش می‌کنید."}</p>
-      {commerce && templates.length > 0 && <div className="mt-5 grid gap-3">
+      {templates.length > 0 && <div className="mt-5 grid gap-3">
         {templates.map((template) => <button key={template.id} type="button" onClick={() => onSelectTemplate(template.id)} aria-pressed={selectedTemplateId === template.id} className={`overflow-hidden rounded-2xl border text-right transition ${selectedTemplateId === template.id ? "border-emerald-400 bg-emerald-400/10 shadow-[0_14px_36px_rgba(52,211,153,.12)]" : "border-white/10 bg-white/[.03] hover:border-white/25 hover:bg-white/[.05]"}`}>
           <div className="grid h-24 grid-cols-[1.1fr_.9fr] gap-2 border-b border-white/10 bg-gradient-to-bl from-violet-400/20 via-slate-900 to-emerald-400/10 p-3" aria-hidden="true"><span className="rounded-lg bg-white/15"/><span className="space-y-2"><i className="block h-3 w-3/4 rounded bg-white/50"/><i className="block h-2 w-full rounded bg-white/20"/><i className="block h-2 w-4/5 rounded bg-white/20"/><i className="block h-5 w-2/5 rounded bg-emerald-300/70"/></span></div>
           <span className="block p-4"><b className="block text-sm">{template.label}</b><span className="mt-1 block text-[11px] leading-5 text-white/40">{template.description}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black ${selectedTemplateId === template.id ? "bg-emerald-400 text-slate-950" : "bg-white/10 text-white/60"}`}>{selectedTemplateId === template.id ? "انتخاب شده" : "انتخاب قالب"}</span></span>
@@ -154,7 +154,7 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
       </div>}
       {message && <p role="alert" className="mt-4 rounded-xl bg-rose-500/10 p-3 text-xs font-bold text-rose-300">{message}</p>}
       <div className="mt-6 flex flex-col gap-2">
-        {commerce && templates.length > 0 && <button type="button" disabled={creating || !selectedTemplateId} onClick={onCreate} className="min-h-12 rounded-xl bg-emerald-400 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{creating ? "در حال ساخت…" : "ساخت از روی قالب انتخاب‌شده"}</button>}
+        {templates.length > 0 && <button type="button" disabled={creating || !selectedTemplateId} onClick={onCreate} className="min-h-12 rounded-xl bg-emerald-400 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{creating ? "در حال ساخت…" : "ساخت از روی قالب انتخاب‌شده"}</button>}
         <button type="button" disabled={creating} onClick={onCreateBlank} className="min-h-12 rounded-xl border border-white/15 text-sm font-bold text-white/80 disabled:cursor-not-allowed disabled:opacity-50">{creating ? "در حال ساخت…" : commerce ? "شروع از فروشگاه خالی" : "ساخت سایت خالی"}</button>
       </div>
     </div>
@@ -176,7 +176,9 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // createProject() once a real project exists.
   const [needsCreate, setNeedsCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(commerce ? TEMPLATES[0]?.id ?? null : null);
+  const templateOptions = templatesForSiteKind(siteKind);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(templateOptions[0]?.id ?? null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pickerSectionId, setPickerSectionId] = useState<string | null>(null);
   const [createProductOpen, setCreateProductOpen] = useState(false);
@@ -599,12 +601,12 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   if (!busy && needsCreate) {
     return <CreateWebsiteScreen
       commerce={commerce}
-      templates={commerce ? TEMPLATES : []}
+      templates={templateOptions}
       selectedTemplateId={selectedTemplateId}
       onSelectTemplate={setSelectedTemplateId}
       creating={creating}
       message={message}
-      onCreate={() => { const template = TEMPLATES.find((t) => t.id === selectedTemplateId) || null; void createProject(template); }}
+      onCreate={() => { const template = templateOptions.find((t) => t.id === selectedTemplateId) || null; void createProject(template); }}
       onCreateBlank={() => void createProject(null)}
     />;
   }
@@ -620,6 +622,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       <section className="order-2 min-h-0 overflow-auto bg-[#dfe5ec] p-3 lg:order-1 lg:p-5">
         <div className="sticky top-2 z-40 mx-auto mb-3 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-white/15 bg-[#111827]/92 p-1.5 shadow-xl backdrop-blur">
           <span className="px-3 py-2 text-[10px] font-bold text-emerald-200">عکس‌ها: مستقیم روی خود تصویر</span>
+          <button onClick={() => setTemplatePickerOpen(true)} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">قالب‌ها</button>
           <button onClick={() => { setTab("sections"); setInspectorOpen(true); }} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> افزودن بخش</button>
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
           <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
@@ -638,6 +641,8 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     </div>
 
     {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p></div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
+
+    {templatePickerOpen && <div className="fixed inset-0 z-[105] grid place-items-center bg-slate-950/75 p-4"><section className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#0d1622] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black tracking-[.16em] text-emerald-300">TEMPLATES</p><h2 className="mt-1 text-lg font-black">شروع از یک طرح آماده</h2><p className="mt-2 text-xs leading-6 text-white/45">قالب انتخابی روی پیش‌نویس فعلی اعمال می‌شود؛ قبل از ذخیره آن را بررسی کنید.</p></div><button type="button" aria-label="بستن قالب‌ها" onClick={() => setTemplatePickerOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><X /></button></div><div className="mt-5 grid gap-3 md:grid-cols-2">{templateOptions.map((template) => <button key={template.id} type="button" onClick={() => { setConfig(createConfigFromTemplate(template)); setTemplatePickerOpen(false); setInspectorOpen(true); setTab("context"); setMessage(`قالب «${template.label}» روی پیش‌نویس آماده شد؛ برای ثبت نهایی ذخیره کنید.`); }} className="rounded-2xl border border-white/10 bg-white/[.03] p-4 text-right transition hover:border-emerald-400/50 hover:bg-emerald-400/10"><b className="block text-sm">{template.label}</b><span className="mt-2 block text-xs leading-6 text-white/45">{template.description}</span><span className="mt-4 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">انتخاب این قالب</span></button>)}</div></section></div>}
 
     {pickerSectionId && <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-4">
       <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622] shadow-2xl">
