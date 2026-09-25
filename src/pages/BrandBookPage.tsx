@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { withDemo } from "../lib/demoMode";
 import { apiFetch } from "../lib/api";
 import {
@@ -56,6 +56,7 @@ const steps = [
     fields: [
       ["visualStyle", "سبک بصری", "مثلاً مینیمال، تکنولوژیک یا لوکس", true],
       ["colors", "رنگ‌های برند", "مثلاً بنفش، آبی، مشکی", false],
+      ["typography", "تایپوگرافی برند", "مثلاً فونت تیتر و متن", false],
     ],
   },
   {
@@ -118,6 +119,7 @@ export default function BrandBookPage() {
     tone: "",
     visualStyle: "",
     colors: "",
+    typography: "",
     competitors: "",
     competitorDifference: "",
   });
@@ -148,6 +150,7 @@ export default function BrandBookPage() {
             tone: current.toneOfVoice || "",
             visualStyle: current.visualDirection || "",
             colors: current.primaryColors.join("، "),
+            typography: current.typography.primary || current.typography.body || current.typography.fontFamily || "",
             competitors: current.brandIdentity.competitors || "",
             competitorDifference: current.brandIdentity.competitorDifference || "",
           });
@@ -168,7 +171,7 @@ export default function BrandBookPage() {
     ...(baseVersion ? {
       messagingPrinciples: baseVersion.messagingPrinciples,
       secondaryColors: baseVersion.secondaryColors,
-      typography: baseVersion.typography,
+      typography: { ...baseVersion.typography, ...(form.typography ? { primary: form.typography } : {}) },
       logoUsageNotes: baseVersion.logoUsageNotes,
       imageryDirection: baseVersion.imageryDirection,
       prohibitedPatterns: baseVersion.prohibitedPatterns,
@@ -190,6 +193,7 @@ export default function BrandBookPage() {
     toneOfVoice: form.tone,
     visualDirection: form.visualStyle,
     primaryColors: splitItems(form.colors),
+    typography: { ...(baseVersion?.typography || {}), ...(form.typography ? { primary: form.typography } : {}) },
     });
   };
 
@@ -319,11 +323,11 @@ export default function BrandBookPage() {
 
             <div>
               <h1 className="text-sm font-semibold">
-                ساخت برند بوک
+                Brand Core
               </h1>
 
               <p className="mt-1 text-[10px] text-white/30">
-                متخصص هوش مصنوعی برند
+                هسته اطلاعات برند
               </p>
             </div>
           </div>
@@ -347,18 +351,18 @@ export default function BrandBookPage() {
             />
 
             <span className="text-[10px] text-violet-200/70">
-              برند هوشمند
+              BRAND CORE
             </span>
           </div>
 
           <h2 className="mt-4 text-3xl font-semibold">
-            برندت را به Loadder معرفی کن.
+            یک برند، همه‌چیز را نیرو می‌دهد.
           </h2>
 
           <p className="mt-3 max-w-2xl text-sm leading-7 text-white/40">
-            اطلاعاتی که اینجا وارد می‌کنی بعداً توسط سایت‌ساز، تولید
-            محتوا، تبلیغات و سایر متخصص‌های هوش مصنوعی استفاده می‌شود.
+            هویت کسب‌وکار، مخاطب، جایگاه، لحن و هویت بصری را یک‌جا تعریف کن؛ این مبنا برای پروپوزال، وب‌سایت و بازاریابی در دسترس می‌ماند.
           </p>
+          <div className="mt-5 flex flex-wrap items-center gap-2 text-[11px]"><Link to="/dashboard/business-proposal" className="rounded-full border border-white/10 bg-white/[.04] px-3 py-2 text-white/70">Business Proposal</Link><span className="text-white/25">→</span><Link to="/dashboard/websites/corporate" className="rounded-full border border-white/10 bg-white/[.04] px-3 py-2 text-white/70">Website Builder</Link><span className="text-white/25">→</span><Link to="/dashboard/marketing" className="rounded-full border border-white/10 bg-white/[.04] px-3 py-2 text-white/70">Marketing</Link></div>
         </div>
 
         {/* STEPS */}
@@ -499,7 +503,7 @@ export default function BrandBookPage() {
             </h3>
 
             <p className="mt-1 text-[10px] text-white/25">
-              خلاصه اطلاعات واردشده
+              {draftVersion ? `پیش‌نویس نسخه ${draftVersion.versionNumber}` : activeVersion ? `نسخه فعال ${activeVersion.versionNumber}` : "پروفایل ذخیره‌شده و در حال تکمیل"}
             </p>
 
             <div className="mt-6 space-y-5">
@@ -512,6 +516,10 @@ export default function BrandBookPage() {
                 label="حوزه فعالیت"
                 value={form.industry}
               />
+
+              <Summary label="معرفی کسب‌وکار" value={form.description} />
+              <Summary label="مخاطب هدف" value={form.audience} />
+              <Summary label="جایگاه برند" value={form.valueProposition || form.differentiation} />
 
               <Summary
                 label="شخصیت برند"
@@ -527,7 +535,10 @@ export default function BrandBookPage() {
                 label="رنگ‌ها"
                 value={form.colors}
               />
+              <Summary label="تایپوگرافی" value={form.typography} />
             </div>
+
+            {form.colors && <div className="mt-4 flex flex-wrap gap-2">{splitItems(form.colors).map((color) => <span key={color} className="rounded-full border border-white/10 bg-white/[.05] px-3 py-1.5 text-[10px] text-white/60">{color}</span>)}</div>}
 
             <div className="mt-7 rounded-2xl border border-violet-400/10 bg-violet-500/[0.05] p-4">
               <div className="flex items-center gap-2">
@@ -538,13 +549,12 @@ export default function BrandBookPage() {
                 />
 
                 <span className="text-[10px] text-white/60">
-                  حافظه مشترک Loadder
+                  یک مبنا برای همه خروجی‌ها
                 </span>
               </div>
 
               <p className="mt-2 text-[10px] leading-5 text-white/25">
-                این اطلاعات بعداً در سایر متخصص‌های هوش مصنوعی قابل
-                استفاده خواهد بود.
+                داده ساختگی نمایش داده نمی‌شود؛ هر فیلد از نسخه فعال یا پیش‌نویس برند می‌آید و موارد خالی مشخص می‌مانند.
               </p>
             </div>
           </aside>
