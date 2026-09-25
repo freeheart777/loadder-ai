@@ -73,6 +73,8 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       await journey.page.getByLabel("عنوان", { exact: true }).fill("قهرمان فارسی فروشگاه");
       await journey.page.getByLabel("چیدمان", { exact: true }).selectOption("background");
       await expect(journey.page.locator('[data-editor-element="hero"]')).toContainText("قهرمان فارسی فروشگاه");
+      await expect(journey.page.locator('[data-hero-layout="background"]')).toBeVisible();
+      await expect(journey.page.locator('[data-hero-layout="background"] [data-hero-overlay]')).toBeVisible();
 
       const persisted = journey.page.waitForResponse((response) =>
         response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}`
@@ -142,6 +144,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       await savedB;
       await journey.page.getByRole("button", { name: "پیش‌نمایش پیش‌نویس", exact: true }).click();
       await expect(journey.page.locator('[data-canvas-interactive="false"]').getByRole("heading", { name: "پیش‌نویس منتشرنشده ب", exact: true })).toBeVisible();
+      await expect(journey.page.locator('[data-canvas-interactive="false"] [data-hero-layout="background"]')).toBeVisible();
       await journey.page.getByText("پیش‌نمایش پیش‌نویس", { exact: true }).locator("..").getByRole("button").click();
 
       await journey.page.goto(`/store/${journey.projectId}`);

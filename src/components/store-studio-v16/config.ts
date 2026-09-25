@@ -341,7 +341,9 @@ export function restoreConfig(content: Record<string, any>, siteKind: SiteKind =
       ...(corporate ? corporateHeroDefaults : heroDefaults),
       ...storedHero,
       imageUrl: storedHero.imageUrl || heroDefaults.imageUrl,
-      height: Math.min(Number(storedHero.height || heroDefaults.height), 360),
+      // Hero presets intentionally range up to 720px. Clamping at 360 made
+      // the persisted full-width and campaign presets silently collapse.
+      height: Math.min(Math.max(Number(storedHero.height || heroDefaults.height), 280), 720),
     },
     // The legacy mirror always tracks Home, so older readers and the STORE
     // path (which never uses pages) keep working unchanged.
