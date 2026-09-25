@@ -13,6 +13,7 @@ import AskLoadderPanel from "./AskLoadderPanel";
 import type {
   MediaAsset,
   Product,
+  Selection,
   SectionConfig,
   SectionItem,
   StudioActions,
@@ -180,11 +181,21 @@ function SectionTree({ config, moveSection, duplicateSection, deleteSection, add
 
 type AskLoadderProps = { projectId: string; onApplied: (content: Record<string, any>, revision: number) => void };
 
+function selectedElementName(selection: Selection, section?: SectionConfig, product?: Product) {
+  if (selection.type === "hero") return "بنر اصلی";
+  if (selection.type === "header") return "هدر سایت";
+  if (selection.type === "product-card") return product ? `محصول: ${product.name}` : "محصول";
+  if (selection.type === "cart") return "سبد خرید";
+  if (selection.type === "checkout") return "تسویه حساب";
+  if (selection.type === "success") return "سفارش موفق";
+  return section?.title || "بخش انتخاب‌شده";
+}
+
 export default function InspectorPanel(props: Props & { tab: "context" | "sections" | "design" | "pages"; onTab: (tab: "context" | "sections" | "design" | "pages") => void; askLoadder?: AskLoadderProps }) {
   const { config, products, assets, actions, tab, onTab, askLoadder } = props;
   const selection = config.selectedElement;
   const section = config.sections.find((item) => item.id === selection.id);
   const product = products.find((item) => item.id === selection.id);
   const sectionEditor = section?.type === "products" ? <ProductSectionEditor section={section} products={products} actions={actions}/> : section && siteTypeDefinition(config.siteKind).capabilities.includes("lead") ? <CorporateSectionEditor section={section} assets={assets} actions={actions}/> : section ? <GenericSectionEditor section={section} assets={assets} actions={actions}/> : null;
-  return <aside className="flex h-full min-h-0 flex-col border-r border-white/10 bg-[#0d1520] text-white"><div className="grid grid-cols-4 gap-1 border-b border-white/10 p-3">{(siteTypeDefinition(config.siteKind).capabilities.includes("commerce") ? (["context", "sections", "design"] as const) : (["context", "sections", "pages", "design"] as const)).map((value) => <button key={value} type="button" onClick={() => onTab(value)} className={`min-h-11 rounded-xl text-xs font-black ${tab === value ? "bg-emerald-400 text-slate-950" : "bg-white/5 text-white/50"}`}>{value === "context" ? "ویرایش" : value === "sections" ? "بخش‌ها" : value === "pages" ? "صفحه‌ها" : "طراحی"}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto p-5">{tab === "pages" ? <PageManager config={config} actions={actions}/> : tab === "sections" ? <SectionTree {...props}/> : tab === "design" ? <><DesignEditor {...props}/><div className="mt-6 border-t border-white/10 pt-6"><SiteSettingsEditor {...props}/></div></> : selection.type === "header" ? <HeaderEditor {...props}/> : selection.type === "hero" ? <HeroEditor {...props}/> : selection.type === "product-card" && product ? <ProductCardEditor product={product} config={config} assets={assets} actions={actions}/> : section ? <>{askLoadder && <AskLoadderPanel projectId={askLoadder.projectId} sectionId={section.id} sectionTitle={section.title || section.type} onApplied={askLoadder.onApplied}/>}{sectionEditor}</> : selection.type === "cart" ? <CommerceEditor config={config} actions={actions} kind="cart"/> : selection.type === "checkout" ? <CommerceEditor config={config} actions={actions} kind="checkout"/> : selection.type === "success" ? <CommerceEditor config={config} actions={actions} kind="success"/> : <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm leading-7 text-white/35">یک عنصر را روی بوم انتخاب کنید تا کنترل‌های مرتبط همین‌جا نمایش داده شوند.</div>}</div></aside>;
+  return <aside className="flex h-full min-h-0 flex-col border-r border-white/10 bg-[#0d1520] text-white"><div className="border-b border-white/10 px-4 pt-4"><span className="text-[10px] font-black tracking-[.14em] text-emerald-300">SELECTED</span><b className="mt-1 block text-sm">{selectedElementName(selection, section, product)}</b><p className="mt-1 text-[10px] leading-5 text-white/35">تغییرات همین عنصر را انجام دهید.</p></div><div className="grid grid-cols-4 gap-1 border-b border-white/10 p-3">{(siteTypeDefinition(config.siteKind).capabilities.includes("commerce") ? (["context", "sections", "design"] as const) : (["context", "sections", "pages", "design"] as const)).map((value) => <button key={value} type="button" onClick={() => onTab(value)} className={`min-h-11 rounded-xl text-xs font-black ${tab === value ? "bg-emerald-400 text-slate-950" : "bg-white/5 text-white/50"}`}>{value === "context" ? "ویرایش" : value === "sections" ? "بخش‌ها" : value === "pages" ? "صفحه‌ها" : "طراحی"}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto p-5">{tab === "pages" ? <PageManager config={config} actions={actions}/> : tab === "sections" ? <SectionTree {...props}/> : tab === "design" ? <><DesignEditor {...props}/><div className="mt-6 border-t border-white/10 pt-6"><SiteSettingsEditor {...props}/></div></> : selection.type === "header" ? <HeaderEditor {...props}/> : selection.type === "hero" ? <HeroEditor {...props}/> : selection.type === "product-card" && product ? <ProductCardEditor product={product} config={config} assets={assets} actions={actions}/> : section ? <>{askLoadder && <AskLoadderPanel projectId={askLoadder.projectId} sectionId={section.id} sectionTitle={section.title || section.type} onApplied={askLoadder.onApplied}/>}{sectionEditor}</> : selection.type === "cart" ? <CommerceEditor config={config} actions={actions} kind="cart"/> : selection.type === "checkout" ? <CommerceEditor config={config} actions={actions} kind="checkout"/> : selection.type === "success" ? <CommerceEditor config={config} actions={actions} kind="success"/> : <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm leading-7 text-white/35">یک عنصر را روی بوم انتخاب کنید تا کنترل‌های مرتبط همین‌جا نمایش داده شوند.</div>}</div></aside>;
 }

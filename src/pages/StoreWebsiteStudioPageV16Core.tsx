@@ -146,10 +146,10 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
       <p className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</p>
       <h1 className="mt-2 text-xl font-black">{commerce ? "ساخت فروشگاه اینترنتی" : "ساخت سایت شرکتی"}</h1>
       <p className="mt-2 text-xs leading-6 text-white/45">{commerce ? "یک قالب آماده را انتخاب کنید یا از یک فروشگاه خالی شروع کنید." : "برای شروع، یک سایت خالی می‌سازیم؛ همه‌چیز را در همین Studio ویرایش می‌کنید."}</p>
-      {commerce && templates.length > 0 && <div className="mt-5 grid gap-2">
-        {templates.map((template) => <button key={template.id} type="button" onClick={() => onSelectTemplate(template.id)} className={`rounded-2xl border p-4 text-right transition ${selectedTemplateId === template.id ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/[.03]"}`}>
-          <b className="block text-sm">{template.label}</b>
-          <span className="mt-1 block text-[11px] text-white/40">{template.description}</span>
+      {commerce && templates.length > 0 && <div className="mt-5 grid gap-3">
+        {templates.map((template) => <button key={template.id} type="button" onClick={() => onSelectTemplate(template.id)} aria-pressed={selectedTemplateId === template.id} className={`overflow-hidden rounded-2xl border text-right transition ${selectedTemplateId === template.id ? "border-emerald-400 bg-emerald-400/10 shadow-[0_14px_36px_rgba(52,211,153,.12)]" : "border-white/10 bg-white/[.03] hover:border-white/25 hover:bg-white/[.05]"}`}>
+          <div className="grid h-24 grid-cols-[1.1fr_.9fr] gap-2 border-b border-white/10 bg-gradient-to-bl from-violet-400/20 via-slate-900 to-emerald-400/10 p-3" aria-hidden="true"><span className="rounded-lg bg-white/15"/><span className="space-y-2"><i className="block h-3 w-3/4 rounded bg-white/50"/><i className="block h-2 w-full rounded bg-white/20"/><i className="block h-2 w-4/5 rounded bg-white/20"/><i className="block h-5 w-2/5 rounded bg-emerald-300/70"/></span></div>
+          <span className="block p-4"><b className="block text-sm">{template.label}</b><span className="mt-1 block text-[11px] leading-5 text-white/40">{template.description}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black ${selectedTemplateId === template.id ? "bg-emerald-400 text-slate-950" : "bg-white/10 text-white/60"}`}>{selectedTemplateId === template.id ? "انتخاب شده" : "انتخاب قالب"}</span></span>
         </button>)}
       </div>}
       {message && <p role="alert" className="mt-4 rounded-xl bg-rose-500/10 p-3 text-xs font-bold text-rose-300">{message}</p>}
@@ -259,6 +259,8 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
 
   function selectCanvasElement(selectedElement: Selection) {
     setConfig((cur) => ({ ...cur, selectedElement }));
+    setTab("context");
+    setInspectorOpen(true);
   }
 
   function patchProductSection(sectionId: string, updater: (s: ProductSettings) => ProductSettings) {
@@ -618,14 +620,15 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       <section className="order-2 min-h-0 overflow-auto bg-[#dfe5ec] p-3 lg:order-1 lg:p-5">
         <div className="sticky top-2 z-40 mx-auto mb-3 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-white/15 bg-[#111827]/92 p-1.5 shadow-xl backdrop-blur">
           <span className="px-3 py-2 text-[10px] font-bold text-emerald-200">عکس‌ها: مستقیم روی خود تصویر</span>
-          <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> بنر</button>
+          <button onClick={() => { setTab("sections"); setInspectorOpen(true); }} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> افزودن بخش</button>
+          <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
           <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
         </div>
         {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
       <aside className={`order-1 min-h-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-        <div className="border-b border-white/10 px-4 py-3"><b className="text-xs">تنظیمات دقیق</b><p className="mt-1 text-[10px] text-white/35">برای کارهای معمول از ابزار روی خود سایت استفاده کنید.</p></div>
+        <div className="border-b border-white/10 px-4 py-3"><b className="text-xs">تنظیمات عنصر انتخاب‌شده</b><p className="mt-1 text-[10px] text-white/35">برای ویرایش سریع، روی خود سایت کلیک کنید؛ جزئیات اینجا نمایش داده می‌شود.</p></div>
         <InspectorPanel {...inspectorProps} tab={tab} onTab={setTab} />
       </aside>
 
@@ -634,7 +637,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       </button>
     </div>
 
-    {previewOpen && <div className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] items-center justify-between"><b>پیش‌نمایش پیش‌نویس</b><button onClick={() => setPreviewOpen(false)} className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
+    {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p></div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
 
     {pickerSectionId && <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-4">
       <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622] shadow-2xl">
