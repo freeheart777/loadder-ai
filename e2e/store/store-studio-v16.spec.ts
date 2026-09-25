@@ -145,7 +145,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       await journey.page.getByRole("button", { name: "پیش‌نمایش پیش‌نویس", exact: true }).click();
       await expect(journey.page.locator('[data-canvas-interactive="false"]').getByRole("heading", { name: "پیش‌نویس منتشرنشده ب", exact: true })).toBeVisible();
       await expect(journey.page.locator('[data-canvas-interactive="false"] [data-hero-layout="background"]')).toBeVisible();
-      await journey.page.getByText("پیش‌نمایش پیش‌نویس", { exact: true }).locator("..").getByRole("button").click();
+      await journey.page.getByRole("button", { name: "بستن پیش‌نمایش", exact: true }).click();
 
       await journey.page.goto(`/store/${journey.projectId}`);
       await expect(journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true })).toBeVisible();

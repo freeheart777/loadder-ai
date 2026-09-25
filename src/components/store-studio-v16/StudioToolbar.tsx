@@ -25,7 +25,11 @@ const pages = [
   ["success", "سفارش موفق"],
 ] as const;
 
-export default function StudioToolbar({ device, page, status, busy, onDevice, onPage, onPreview, onSave, onPublish }: {
+// A corporate (non-commerce) site has no collection/product/cart/checkout pages.
+const corporatePages = [["storefront", "صفحه اصلی"]] as const;
+
+export default function StudioToolbar({ commerce = true, device, page, status, busy, onDevice, onPage, onPreview, onSave, onPublish }: {
+  commerce?: boolean;
   device: DeviceMode;
   page: PageMode;
   busy: boolean;
@@ -49,7 +53,7 @@ export default function StudioToolbar({ device, page, status, busy, onDevice, on
       <label className="relative min-w-[155px]">
         <span className="sr-only">صفحه فروشگاه</span>
         <select value={page} onChange={(event) => onPage(event.target.value as PageMode)} className="min-h-11 w-full appearance-none rounded-2xl border border-white/10 bg-white/[.045] py-2 pl-8 pr-3 text-xs font-black text-white outline-none transition hover:bg-white/[.07] focus:border-violet-400/50">
-          {pages.map(([value, label]) => <option key={value} value={value} className="bg-slate-950">{label}</option>)}
+          {(commerce ? pages : corporatePages).map(([value, label]) => <option key={value} value={value} className="bg-slate-950">{label}</option>)}
         </select>
         <GlobeHemisphereWest className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-white/35" size={15} />
       </label>

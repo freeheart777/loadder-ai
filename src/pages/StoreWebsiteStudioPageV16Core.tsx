@@ -6,7 +6,7 @@ import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
 import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCanvas";
 import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
-import { isCommerceSite, siteTypeDefinition } from "../components/store-studio-v16/site-types";
+import { allowsSectionType, isCommerceSite, siteTypeDefinition } from "../components/store-studio-v16/site-types";
 import { activePageOf, navigationPages, newPage, normalizeSlug, slugProblem, withActivePageSections, withPages } from "../components/store-studio-v16/pages";
 import { createConfigFromTemplate, templatesForSiteKind } from "../components/store-studio-v16/templates/registry";
 import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
@@ -620,7 +620,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
   const inspectorProps = {
     config: canvasConfig, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection,
-    askLoadder: project ? { projectId: project.id, onApplied: onAskLoadderApplied } : undefined,
+    askLoadder: project ? { projectId: project.id, onApplied: onAskLoadderApplied, beforePropose: () => persistConfig(config) } : undefined,
   };
   const pickerSection = pickerSectionId ? config.sections.find((s) => s.id === pickerSectionId) : null;
   const pickerSettings = pickerSection?.type === "products" && pickerSection.productSettings ? normalizeManual(pickerSection.productSettings, products) : null;
@@ -641,8 +641,8 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   return <main dir="rtl" className="h-screen overflow-hidden bg-[#070b12] text-white" data-studio-version="16">
     <header className="flex min-h-20 items-center gap-3 border-b border-white/10 bg-[#0a111b] px-4 py-3">
       <Link to="/dashboard" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10"><ArrowRight /></Link>
-      <div className="min-w-56"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</div><h1 className="font-black">فروشگاه شما</h1><p className="mt-1 flex items-center gap-1 text-[10px] text-white/35"><CursorClick /> روی خود تصویر کلیک کنید تا همان‌جا تعویض شود</p></div>
-      <StudioToolbar device={device} page={config.activePage} status={project?.status} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} onPublish={() => void publish()} />
+      <div className="min-w-56"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</div><h1 className="font-black">{commerce ? "فروشگاه شما" : "سایت شما"}</h1><p className="mt-1 flex items-center gap-1 text-[10px] text-white/35"><CursorClick /> روی خود تصویر کلیک کنید تا همان‌جا تعویض شود</p></div>
+      <StudioToolbar commerce={commerce} device={device} page={config.activePage} status={project?.status} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} onPublish={() => void publish()} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
@@ -651,8 +651,9 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
           <span className="px-3 py-2 text-[10px] font-bold text-emerald-200">عکس‌ها: مستقیم روی خود تصویر</span>
           <button onClick={() => setTemplatePickerOpen(true)} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">قالب‌ها</button>
           <button onClick={() => { setTab("sections"); setInspectorOpen(true); }} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> افزودن بخش</button>
-          <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
-          <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
+          {/* Store-only shortcuts: a corporate site cannot hold banner or product sections. */}
+          {allowsSectionType(siteKind, "banner") && <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>}
+          {allowsSectionType(siteKind, "products") && <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>}
         </div>
         {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>

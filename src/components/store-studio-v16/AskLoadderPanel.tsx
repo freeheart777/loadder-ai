@@ -41,9 +41,14 @@ type Props = {
   sectionId: string;
   sectionTitle: string;
   onApplied: (content: Record<string, any>, revision: number) => void;
+  // Saves the editor's current draft first. The translator and the patch engine
+  // work on the SAVED document, so without this a section that exists only in
+  // the editor (e.g. defaults of a never-saved project) is "not found", and
+  // unsaved edits would be overwritten by the applied patch.
+  beforePropose?: () => Promise<void>;
 };
 
-export default function AskLoadderPanel({ projectId, sectionId, sectionTitle, onApplied }: Props) {
+export default function AskLoadderPanel({ projectId, sectionId, sectionTitle, onApplied, beforePropose }: Props) {
   const [instruction, setInstruction] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [busy, setBusy] = useState(false);
@@ -72,6 +77,7 @@ export default function AskLoadderPanel({ projectId, sectionId, sectionTitle, on
     setBusy(true);
     setError("");
     try {
+      await beforePropose?.();
       const translated = await read(await apiFetch(`/api/site-projects/${projectId}/ask-loadder/translate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
