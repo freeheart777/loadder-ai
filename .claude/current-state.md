@@ -1,6 +1,29 @@
 # Current State
 
-Last updated: 2026-09-25, after Website Platform PR 3 (runtime capability resolution).
+Last updated: 2026-09-26, Website Builder MVP Phase 0 (branch backed up). Sections below this one are the history up to 2026-09-25; where they disagree with this section, this section wins.
+
+## Now (2026-09-26) — Website Builder MVP
+
+**Git**
+- Working base: `feature/site-platform-baseline`, now **pushed to `origin`** (it was 36–41 commits ahead of `origin/main` and existed only locally). Backed up at `ad67c4f` ("feat(home): add website builder workspace").
+- `origin/main` is still `570927a` (2026-09-17). `feature/site-platform-baseline` is 41 commits ahead and 0 behind. It has not been merged; it will go to `main` through PRs.
+- The "Git" section below (HEAD `570927a` on `main`) is **stale**.
+- MVP work happens on `feature/website-lifecycle-mvp` in a separate worktree (`../power-ai-hero-lifecycle`). Other sessions commit to `feature/site-platform-baseline` in the main checkout, so the two are kept apart.
+- Still untracked in the main checkout: `server/server/data/site-media/` (4 images uploaded while the media root depended on the process cwd; no DB row references them — see Phase 1).
+
+**Already on the baseline (2026-09-26, other sessions):**
+- 4 BUSINESS launch templates (medical, legal, education, corporate) in `templates/business-launch-v1.ts`
+- `templatesForSiteKind()`
+- the create screen now offers templates for BUSINESS sites
+- visual template previews
+- all V16 hero layouts render
+- a website builder home workspace
+
+**Approved MVP plan**
+- **Phase 1:** the full lifecycle — create, template, edit, preview, publish, public URL. The public URL is `PUBLIC_SITE_BASE_URL + /s/:slug`, and `/sites/:id` stays internal.
+- **Phase 2:** vertical template metadata. Verticals are BUSINESS templates, not site types.
+- **Phase 3:** `brandProjection()` from Business Context (Profile + DNA + Brand Book). Brand hooks are applied only at site creation, with no AI calls.
+- **Not now:** PR #246 (corporate production hardening) — it conflicts in `public-sites.mjs`. Ads, Proposals, CRM.
 
 ## Git
 
