@@ -25,11 +25,12 @@ const pages = [
   ["success", "سفارش موفق"],
 ] as const;
 
-export default function StudioToolbar({ device, page, status, busy, onDevice, onPage, onPreview, onSave, onPublish }: {
+export default function StudioToolbar({ device, page, status, dirty = false, busy, onDevice, onPage, onPreview, onSave, onPublish }: {
   device: DeviceMode;
   page: PageMode;
   busy: boolean;
   status?: string;
+  dirty?: boolean;
   onDevice: (device: DeviceMode) => void;
   onPage: (page: PageMode) => void;
   onPreview: () => void;
@@ -43,7 +44,7 @@ export default function StudioToolbar({ device, page, status, busy, onDevice, on
           <Storefront size={16} weight="fill" />
           <i className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0a111b]" />
         </span>
-        <div className="leading-tight"><b className="block text-[11px] text-white/80">{status === "PUBLISHED" ? "نسخه‌ای منتشر شده" : "پیش‌نویس"}</b><span className="text-[9px] text-white/35">ذخیره و انتشار مستقل‌اند</span></div>
+        <div className="leading-tight"><b className="block text-[11px] text-white/80">{status === "PUBLISHED" ? "نسخه‌ای منتشر شده" : "پیش‌نویس"}</b><span className={`text-[9px] ${dirty ? "text-amber-200" : "text-white/35"}`}>{dirty ? "تغییرات ذخیره نشده" : "آخرین تغییرات ذخیره شده"} · ذخیره و انتشار مستقل‌اند</span></div>
       </div>
 
       <label className="relative min-w-[155px]">

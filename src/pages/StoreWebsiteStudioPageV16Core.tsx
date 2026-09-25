@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
 import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
 import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCanvas";
@@ -11,7 +11,7 @@ import { activePageOf, navigationPages, newPage, normalizeSlug, slugProblem, wit
 import { createConfigFromTemplate, templatesForSiteKind } from "../components/store-studio-v16/templates/registry";
 import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
-import { apiFetch } from "../lib/api";
+import { API_BASE_URL, apiFetch } from "../lib/api";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
 type Project = { id: string; name?: string; status?: string; content: Record<string, any> };
@@ -42,6 +42,11 @@ const emptyProductDraft: ProductDraft = {
   geoDescription: "",
   imageUrl: "",
 };
+
+function editorDocumentKey(config: StudioConfig) {
+  const { selectedElement: _selectedElement, activePage: _activePage, activePageId: _activePageId, ...document } = config;
+  return JSON.stringify(document);
+}
 
 async function read(response: Response) {
   const data = await response.json().catch(() => ({}));
@@ -179,6 +184,10 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
 }
 
 export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { siteKind?: SiteKind } = {}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedProjectId = searchParams.get("project");
+  const forceCreate = searchParams.get("new") === "1";
+  const showPreviewOnOpen = searchParams.get("preview") === "1";
   const commerce = isCommerceSite(siteKind);
   const [project, setProject] = useState<Project | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -188,6 +197,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [tab, setTab] = useState<"context" | "sections" | "design" | "pages">("context");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
+  const [previewTokenUrl, setPreviewTokenUrl] = useState("");
   // No project of this siteKind exists yet — the user is offered a create-website
   // screen instead of the empty Studio shell. Set by the load effect, cleared by
   // createProject() once a real project exists.
@@ -208,21 +218,38 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // flight: its idempotency key together with the exact document it carried.
   const draftRevision = useRef<number | null>(null);
   const pendingSave = useRef<{ key: string; document: string } | null>(null);
+  const savedDocument = useRef<string | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
 
   useEffect(() => {
     const c = new AbortController();
     void (async () => {
+      setBusy(true);
+      setMessage("");
       try {
+        if (forceCreate) {
+          setProject(null);
+          setNeedsCreate(true);
+          return;
+        }
+        setNeedsCreate(false);
+        setProject(null);
         const listing = await read(await apiFetch("/api/site-projects", { signal: c.signal }));
-        const selected = (listing.projects || []).find((i: any) => String(i.siteType).toUpperCase() === siteKind);
+        const projects = Array.isArray(listing.projects) ? listing.projects : [];
+        const selected = requestedProjectId
+          ? projects.find((item: any) => String(item.id) === requestedProjectId && String(item.siteType).toUpperCase() === siteKind)
+          : projects.find((item: any) => String(item.siteType).toUpperCase() === siteKind);
+        if (requestedProjectId && !selected) throw new Error("این وب‌سایت در دسترس نیست یا از نوع دیگری است.");
         if (!selected) { setNeedsCreate(true); return; }
         const detail = await read(await apiFetch(`/api/site-projects/${selected.id}`, { signal: c.signal }));
         const loaded = detail.project as Project;
         setProject(loaded);
         draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
-        setConfig(restoreConfig(loaded.content || {}, siteKind));
+        const loadedConfig = restoreConfig(loaded.content || {}, siteKind);
+        setConfig(loadedConfig);
+        savedDocument.current = editorDocumentKey(loadedConfig);
+        if (showPreviewOnOpen) setPreviewOpen(true);
         setAssets((detail.assets || []).filter((a: MediaAsset) => typeof a.url === "string"));
         // A corporate site never loads Commerce concepts.
         if (commerce) {
@@ -237,7 +264,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       }
     })();
     return () => c.abort();
-  }, [commerce, siteKind]);
+  }, [commerce, forceCreate, requestedProjectId, showPreviewOnOpen, siteKind]);
 
   const actions = useMemo<StudioActions>(() => ({
     select: (selectedElement) => {
@@ -498,9 +525,12 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       const createdProject = out.project as Project;
       setProject(createdProject);
       draftRevision.current = null;
-      setConfig(restoreConfig(createdProject.content || {}, siteKind));
+      const createdConfig = restoreConfig(createdProject.content || {}, siteKind);
+      setConfig(createdConfig);
+      savedDocument.current = editorDocumentKey(createdConfig);
       setAssets([]);
       setNeedsCreate(false);
+      setSearchParams({ project: createdProject.id }, { replace: true });
       if (commerce) {
         const catalog = await read(await apiFetch(`/api/stores/${createdProject.id}/products`));
         setProducts(catalog.products || []);
@@ -532,6 +562,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     }));
     // Cleared only on success, so a save that threw keeps its key for a retry.
     setProject(out.project);
+    savedDocument.current = editorDocumentKey(storeBuilderV16);
     if (typeof out.revision === "number") draftRevision.current = out.revision;
     pendingSave.current = null;
   }
@@ -572,7 +603,9 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // system, never by overwriting content directly. This just syncs the
   // Studio's own view onto whatever that system just made authoritative.
   function onAskLoadderApplied(content: Record<string, any>, revision: number) {
-    setConfig(restoreConfig(content, siteKind));
+    const nextConfig = restoreConfig(content, siteKind);
+    setConfig(nextConfig);
+    savedDocument.current = editorDocumentKey(nextConfig);
     setProject((current) => (current ? { ...current, content } : current));
     draftRevision.current = revision;
     setMessage("Ask Loadder بخش انتخاب‌شده را به‌روزرسانی کرد.");
@@ -581,6 +614,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   async function save() {
     if (!project) return;
     setBusy(true);
+    setMessage("در حال ذخیره…");
     try {
       await persistConfig(config);
       setMessage("طراحی ذخیره شد.");
@@ -594,7 +628,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   async function publish() {
     if (!project) return;
     setBusy(true);
-    setMessage("");
+    setMessage("در حال انتشار…");
     try {
       await persistConfig(config);
       const out = await read(await apiFetch(`/api/site-projects/${project.id}/publish`, { method: "POST" }));
@@ -605,9 +639,27 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     } finally { setBusy(false); }
   }
 
+  async function createPreviewLink() {
+    if (!project || commerce) return;
+    setBusy(true);
+    setMessage("در حال آماده‌سازی لینک خصوصی پیش‌نمایش…");
+    setPreviewTokenUrl("");
+    try {
+      if (savedDocument.current !== editorDocumentKey(config)) await persistConfig(config);
+      const out = await read(await apiFetch(`/api/site-projects/${project.id}/preview-token`, { method: "POST" }));
+      if (typeof out.previewUrl !== "string") throw new Error("لینک پیش‌نمایش دریافت نشد.");
+      setPreviewTokenUrl(new URL(out.previewUrl, API_BASE_URL).toString());
+      setMessage("لینک خصوصی پیش‌نمایش آماده شد.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "ساخت لینک پیش‌نمایش ناموفق بود.");
+    } finally { setBusy(false); }
+  }
+
   // The canvas and inspector always operate on the SELECTED page's sections.
   // For a single-page site (every STORE) this is exactly config.sections.
   const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
+  const hasUnsavedChanges = Boolean(project && savedDocument.current !== editorDocumentKey(config));
+  const publishedUrl = project?.status === "PUBLISHED" ? `${commerce ? "/store" : "/site"}/${project.id}` : "";
   const inspectorProps = {
     config: canvasConfig, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection,
     askLoadder: project ? { projectId: project.id, onApplied: onAskLoadderApplied } : undefined,
@@ -628,11 +680,15 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     />;
   }
 
+  if (!busy && !project) return <main dir="rtl" className="grid min-h-screen place-items-center bg-[#070b12] p-6 text-white"><section className="w-full max-w-lg rounded-3xl border border-rose-300/15 bg-[#0d1622] p-7 text-center"><h1 className="text-lg font-black">وب‌سایت بارگذاری نشد</h1><p role="alert" className="mt-3 rounded-2xl bg-rose-500/10 p-4 text-sm leading-7 text-rose-100">{message || "اتصال به پروژه ناموفق بود."}</p><div className="mt-5 flex justify-center gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-xl bg-white px-5 py-3 text-sm font-black text-slate-950">تلاش دوباره</button><Link to="/dashboard" className="rounded-xl border border-white/10 px-5 py-3 text-sm text-white/65">بازگشت به داشبورد</Link></div></section></main>;
+
   return <main dir="rtl" className="h-screen overflow-hidden bg-[#070b12] text-white" data-studio-version="16">
     <header className="flex min-h-20 items-center gap-3 border-b border-white/10 bg-[#0a111b] px-4 py-3">
       <Link to="/dashboard" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10"><ArrowRight /></Link>
-      <div className="min-w-56"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO</div><h1 className="font-black">فروشگاه شما</h1><p className="mt-1 flex items-center gap-1 text-[10px] text-white/35"><CursorClick /> روی خود تصویر کلیک کنید تا همان‌جا تعویض شود</p></div>
-      <StudioToolbar device={device} page={config.activePage} status={project?.status} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => setPreviewOpen(true)} onSave={() => void save()} onPublish={() => void publish()} />
+      <div className="min-w-36"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO · V16</div><h1 className="font-black">{project?.name || (commerce ? "فروشگاه شما" : "وب‌سایت شما")}</h1><p className={`mt-1 flex items-center gap-1 text-[10px] ${hasUnsavedChanges ? "text-amber-200" : "text-white/35"}`}><CursorClick />{hasUnsavedChanges ? "تغییرات ذخیره‌نشده" : "همه تغییرات ذخیره شده"}</p></div>
+      <Link to={`${commerce ? "/dashboard/websites" : "/dashboard/websites/corporate"}?new=1`} className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/65 hover:bg-white/[.05] xl:flex">سایت جدید</Link>
+      {publishedUrl && <a href={publishedUrl} target="_blank" rel="noreferrer" className="hidden min-h-10 items-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 lg:flex">آدرس عمومی <ArrowRight size={13} className="rotate-[-45deg]"/></a>}
+      <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
@@ -657,7 +713,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       </button>
     </div>
 
-    {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p></div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
+    {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p>{!commerce && <div className="mt-2 flex flex-wrap items-center gap-2">{previewTokenUrl ? <a href={previewTokenUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100">بازکردن لینک خصوصی پیش‌نمایش</a> : <button type="button" disabled={busy || hasUnsavedChanges === false && !project} onClick={() => void createPreviewLink()} className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100 disabled:opacity-40">ساخت لینک خصوصی پیش‌نمایش</button>}{hasUnsavedChanges && <span className="text-[9px] text-amber-200">برای ساخت لینک، تغییرات ذخیره می‌شوند.</span>}</div>}</div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
 
     {templatePickerOpen && <div className="fixed inset-0 z-[105] grid place-items-center bg-slate-950/75 p-4"><section className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#0d1622] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black tracking-[.16em] text-emerald-300">TEMPLATES</p><h2 className="mt-1 text-lg font-black">شروع از یک طرح آماده</h2><p className="mt-2 text-xs leading-6 text-white/45">قالب انتخابی روی پیش‌نویس فعلی اعمال می‌شود؛ قبل از ذخیره آن را بررسی کنید.</p></div><button type="button" aria-label="بستن قالب‌ها" onClick={() => setTemplatePickerOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><X /></button></div><div className="mt-5 grid gap-3 md:grid-cols-2">{templateOptions.map((template) => <button key={template.id} type="button" onClick={() => { setConfig(createConfigFromTemplate(template)); setTemplatePickerOpen(false); setInspectorOpen(true); setTab("context"); setMessage(`قالب «${template.label}» روی پیش‌نویس آماده شد؛ برای ثبت نهایی ذخیره کنید.`); }} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.03] text-right transition hover:border-emerald-400/50 hover:bg-emerald-400/10"><div className="p-3"><TemplatePreview template={template}/></div><span className="block border-t border-white/10 p-4"><b className="block text-sm">{template.label}</b><span className="mt-1 block text-[10px] font-bold text-emerald-200">{templateExperience(template).useCases}</span><span className="mt-2 block text-xs leading-6 text-white/45">{templateExperience(template).recommendation}</span><span className="mt-3 block text-[10px] text-white/35">شامل: {template.sections.slice(0, 4).map((section) => section.title).join(" · ")}</span><span className="mt-4 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">انتخاب این قالب</span></span></button>)}</div></section></div>}
 

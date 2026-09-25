@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import StoreWebsiteStudioPageV16Core from "./StoreWebsiteStudioPageV16Core";
 import { ensureSiteProject } from "../lib/activeSiteProject";
 
@@ -7,12 +8,19 @@ type GateState = "loading" | "ready" | "error";
 // Direct entry: choosing "سایت شرکتی" opens the same V16 core with the
 // corporate capability set. No Growth / Goal / Plan / Brain prerequisite.
 export default function CorporateWebsiteStudioPage() {
+  const [searchParams] = useSearchParams();
+  const forceCreate = searchParams.get("new") === "1";
   const [state, setState] = useState<GateState>("loading");
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    if (forceCreate) {
+      setState("ready");
+      setError("");
+      return () => { active = false; };
+    }
     setState("loading");
     setError("");
     void ensureSiteProject("BUSINESS")
@@ -23,7 +31,7 @@ export default function CorporateWebsiteStudioPage() {
         setState("error");
       });
     return () => { active = false; };
-  }, [attempt]);
+  }, [attempt, forceCreate]);
 
   if (state === "ready") return <StoreWebsiteStudioPageV16Core siteKind="BUSINESS" />;
 

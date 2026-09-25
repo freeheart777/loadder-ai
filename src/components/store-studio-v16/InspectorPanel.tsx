@@ -142,6 +142,7 @@ function CorporateSectionEditor({ section, assets, actions }: { section: Section
       <Field label="متن دکمه" value={section.ctaLabel || ""} onChange={(ctaLabel) => actions.patchSection(section.id, { ctaLabel })}/>
       <Field label="مقصد دکمه" value={section.ctaHref || ""} onChange={(ctaHref) => actions.patchSection(section.id, { ctaHref })}/>
     </div>}
+    {section.type === "text" && <TextArea label="متن بخش" value={section.body || ""} onChange={(body) => actions.patchSection(section.id, { body })}/>}
     {section.type === "contact" && <>
       <Toggle label="فرم تماس فعال" checked={section.contact?.formEnabled !== false} onChange={(formEnabled) => actions.patchSection(section.id, { contact: { ...(section.contact || { submitLabel: "ارسال", successMessage: "ثبت شد." }), formEnabled } })}/>
       <Field label="متن دکمه ارسال" value={section.contact?.submitLabel || ""} onChange={(submitLabel) => actions.patchSection(section.id, { contact: { ...(section.contact || { formEnabled: true, successMessage: "ثبت شد." }), submitLabel } })}/>
