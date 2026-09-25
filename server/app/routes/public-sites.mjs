@@ -96,6 +96,17 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: "", basePath: `/sites/${req.params.id}` }); }
     catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
   });
+  // User-facing public URL: PUBLIC_SITE_BASE_URL + /s/:slug (slug is globally
+  // unique, published-only lookup). /sites/:id above stays as the internal route.
+  const slugBasePath = (slug) => `/s/${encodeURIComponent(slug)}`;
+  router.get("/s/:slug/:page", (req, res) => {
+    try { return sendPublished(req, res, repository.getPublishedPublicBySlug(req.params.slug), { slug: req.params.page, basePath: slugBasePath(req.params.slug) }); }
+    catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
+  });
+  router.get("/s/:slug", (req, res) => {
+    try { return sendPublished(req, res, repository.getPublishedPublicBySlug(req.params.slug), { slug: "", basePath: slugBasePath(req.params.slug) }); }
+    catch (error) { console.error("Public site error:", error); return res.status(500).send("Unable to render site"); }
+  });
   const domainHandler = (slug) => (req, res, next) => {
     const host = normalizeHost(req.headers.host);
     if (!host || host === "localhost" || host === "127.0.0.1") return next();

@@ -25,6 +25,25 @@ Last updated: 2026-09-26, Website Builder MVP Phase 0 (branch backed up). Sectio
 - **Phase 3:** `brandProjection()` from Business Context (Profile + DNA + Brand Book). Brand hooks are applied only at site creation, with no AI calls.
 - **Not now:** PR #246 (corporate production hardening) — it conflicts in `public-sites.mjs`. Ads, Proposals, CRM.
 
+**Phase 1 — website lifecycle (branch `feature/website-lifecycle-mvp`)**
+- **Local runtime:** `npm run dev` now starts three processes: FRONTEND, BACKEND and PUBLIC. `dev:public` and `start:public` run `server/public-site-server.mjs`. The public-site host, port and base URL live in `environment.mjs` as `publicSiteHost`, `publicSitePort` and `publicSiteBaseUrl`. `PUBLIC_SITE_BASE_URL` defaults to `http://<PUBLIC_SITE_HOST>:<PUBLIC_SITE_PORT>` (port = API port + 1, so 3002).
+- **Public URL:** visitors reach a site at `PUBLIC_SITE_BASE_URL/s/:slug` (`/s/:slug` and `/s/:slug/:page` in `public-sites.mjs`, added without changing existing routes). The lookup is published-only. `/sites/:id` stays as the internal route.
+- **API responses:**
+  - `GET /api/site-projects/:id` and `POST …/publish` return `publicUrl`, which is null until the site is first published.
+  - `POST …/preview-token` returns an absolute `previewUrl` on the public base. It used to be a relative path, which did not work from the studio's origin.
+  - URLs are built in `server/app/services/public-site-urls.mjs`.
+- **Slugs:**
+  - Migration 092 makes `site_projects.slug` globally unique. It renames existing cross-workspace duplicates first: the oldest project keeps its slug.
+  - `create()` generates collision-safe slugs with a random 6-hex suffix. It also fixes a latent 500 when two sites in one workspace had the same name.
+  - An explicit slug change that clashes returns 409 `SITE_SLUG_TAKEN`.
+- **Studio:**
+  - shows the published address (`data-public-url`)
+  - the draft preview has a "create preview link" action (`data-preview-link`), which saves the draft first
+- **Media:** the local media root is anchored to the module (`server/data/site-media`); `SITE_MEDIA_LOCAL_DIR` still overrides it.
+  - The 4 files in the main checkout's `server/server/data/site-media/` were **not moved**. They belong to a workspace and project that do not exist in the runtime DB (`server/db/loadder.sqlite`, at migration 37, with no site tables), so no row references them.
+- **Tests:** full server suite 1155/1155 with an isolated `DATABASE_PATH`, and `tsc -b` clean. Two hard-coded "latest migration" assertions were updated, following the precedent set when 091 was added.
+- **Risk:** the runtime DB `server/db/loadder.sqlite` is **tracked in git** and at migration 37. Starting the API migrates it to 92 and produces a large binary diff. It should be untracked, or replaced with a `DATABASE_PATH` outside the repo, before anyone runs the app for real.
+
 ## Git
 
 - Branch: `main`

@@ -10,6 +10,8 @@ const MAX_ASSET_NAME = 200;
 const MAX_ASSET_URL = 8 * 1024 * 1024;
 const MAX_ASSET_BYTES = 3 * 1024 * 1024;
 const MAX_STORAGE_KEY = 500;
+const SLUG_MAX = 80;
+const isSlugConflict = (error) => /UNIQUE constraint failed:.*\bsite_projects\.slug\b/.test(String(error?.message || ""));
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`;
 const hashPreviewToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
@@ -52,13 +54,34 @@ export function createSiteProjectService({ repository, businessContextService, d
     if (current.isStale) return null;
     return current.activeContext;
   }
+  // Slugs are globally unique (public URL /s/:slug). A generated slug that is
+  // taken gets a short random suffix; a random suffix (not "-2", "-3") keeps
+  // other tenants' site addresses from being enumerable.
+  const slugTaken = (slug, excludeId = null) => (repository.isSlugTaken ? repository.isSlugTaken(slug, excludeId) : false);
+  function availableSlug(base) {
+    if (!slugTaken(base)) return base;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const suffix = `-${crypto.randomUUID().replace(/-/g, "").slice(0, 6)}`;
+      const candidate = `${base.slice(0, SLUG_MAX - suffix.length)}${suffix}`;
+      if (!slugTaken(candidate)) return candidate;
+    }
+    throw new SiteProjectError("Unable to allocate a unique site address.", 409, "SITE_SLUG_UNAVAILABLE");
+  }
   function create({ name, siteType, slug, content = {} }) {
     const context = optionalContextSeed();
     if (typeof name !== "string" || !name.trim()) throw new SiteProjectError("name is required.");
     requireType(siteType);
     const cleanName = name.trim();
     const normalizedContent = ensureWebsitePlatformContent(validateSiteDocument(content), { siteType, name: cleanName });
-    return repository.create({ name: cleanName, siteType, slug: slugify(slug || cleanName), contextVersionId: context?.id ?? null, content: normalizedContent, now: now().toISOString() });
+    const base = slugify(slug || cleanName);
+    // One retry covers a concurrent create that claimed the same slug between check and insert.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return repository.create({ name: cleanName, siteType, slug: availableSlug(base), contextVersionId: context?.id ?? null, content: normalizedContent, now: now().toISOString() });
+      } catch (error) {
+        if (!isSlugConflict(error) || attempt >= 1) throw isSlugConflict(error) ? new SiteProjectError("Unable to allocate a unique site address.", 409, "SITE_SLUG_UNAVAILABLE") : error;
+      }
+    }
   }
   function get(id) {
     const workspaceId = requireWorkspaceId();
@@ -74,12 +97,22 @@ export function createSiteProjectService({ repository, businessContextService, d
     const nextContent = input.content === undefined
       ? undefined
       : ensureWebsitePlatformContent(validateSiteDocument(input.content), { siteType: nextSiteType, name: nextName });
-    return repository.update(id, {
-      ...input,
-      ...(nextContent === undefined ? {} : { content: nextContent }),
-      slug: input.slug ? slugify(input.slug) : undefined,
-      now: now().toISOString(),
-    });
+    const nextSlug = input.slug ? slugify(input.slug) : undefined;
+    // An explicitly chosen address is never silently changed: a clash is a 409.
+    if (nextSlug !== undefined && nextSlug !== current.slug && slugTaken(nextSlug, id)) {
+      throw new SiteProjectError("This site address is already in use.", 409, "SITE_SLUG_TAKEN");
+    }
+    try {
+      return repository.update(id, {
+        ...input,
+        ...(nextContent === undefined ? {} : { content: nextContent }),
+        slug: nextSlug,
+        now: now().toISOString(),
+      });
+    } catch (error) {
+      if (isSlugConflict(error)) throw new SiteProjectError("This site address is already in use.", 409, "SITE_SLUG_TAKEN");
+      throw error;
+    }
   }
   // A tracked draft save: the same validation and normalisation the ordinary
   // update path applies, plus an immutable revision recorded in the same

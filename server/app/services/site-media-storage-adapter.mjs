@@ -1,5 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Default local media root, anchored to this module (server/app/services →
+// server/data/site-media) so it never depends on the process working directory.
+export const DEFAULT_SITE_MEDIA_LOCAL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "data", "site-media");
 
 export class SiteMediaStorageError extends Error {
   constructor(message, code = "SITE_MEDIA_STORAGE_ERROR", status = 500) {
@@ -12,7 +17,7 @@ export function createSiteMediaStorageAdapter({ fetchImpl = fetch, env = process
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY;
   const bucket = env.SITE_MEDIA_BUCKET || "site-media";
   const remoteConfigured = Boolean(baseUrl && serviceRoleKey);
-  const localRoot = path.resolve(env.SITE_MEDIA_LOCAL_DIR || path.join(process.cwd(), "server", "data", "site-media"));
+  const localRoot = path.resolve(env.SITE_MEDIA_LOCAL_DIR || DEFAULT_SITE_MEDIA_LOCAL_DIR);
   const pendingUploads = new Map();
   const localApiBaseUrl = String(
     env.SITE_MEDIA_LOCAL_API_BASE_URL ||

@@ -448,7 +448,7 @@ test("migration 091 is registered exactly once with no collision", () => {
   const versions = migrations.map((m) => m.version);
   assert.equal(versions.filter((v) => v === 91).length, 1);
   assert.equal(versions.length, new Set(versions).size);
-  assert.equal(Math.max(...versions), 91);
+  assert.ok(Math.max(...versions) >= 91, "091 is never superseded by a lower version");
   assert.ok(!versions.includes(88), "088 stays reserved for the open inventory PR");
 
   const db = createSiteTestDb();

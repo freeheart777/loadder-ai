@@ -8,6 +8,7 @@ import { migration087CommercePaymentAttempts } from "./087_commerce_payment_atte
 import { migration089LeadEnquiryMessage } from "./089_lead_enquiry_message.mjs";
 import { migration090SiteDocumentRevisions } from "./090_site_document_revisions.mjs";
 import { migration091SiteDocumentPatches } from "./091_site_document_patches.mjs";
+import { migration092SiteProjectGlobalSlug } from "./092_site_project_global_slug.mjs";
 import { migration002TenantDomainData } from "./002_tenant_domain_data.mjs";
 import { migration003TenantRelationshipGuards } from "./003_tenant_relationship_guards.mjs";
 import { migration004WorkspaceManagementAudit } from "./004_workspace_management_audit.mjs";
@@ -180,4 +181,5 @@ export const migrations = [
   migration089LeadEnquiryMessage,
   migration090SiteDocumentRevisions,
   migration091SiteDocumentPatches,
+  migration092SiteProjectGlobalSlug,
 ];

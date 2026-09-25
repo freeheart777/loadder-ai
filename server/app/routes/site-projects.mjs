@@ -2,8 +2,10 @@ import express from "express";
 import { SiteProjectError } from "../services/site-project-service.mjs";
 import { SitePatchError } from "../services/site-document-patch-service.mjs";
 import { InstructionTranslatorError } from "../services/v16-instruction-translator.mjs";
+import { environment } from "../config/environment.mjs";
+import { previewSiteUrl, projectPublicUrl } from "../services/public-site-urls.mjs";
 
-export function createSiteProjectsRouter({ service }) {
+export function createSiteProjectsRouter({ service, publicSiteBaseUrl = environment.publicSiteBaseUrl }) {
   const router = express.Router();
   const handle = (error, res) => {
     if (error instanceof SiteProjectError || error instanceof SitePatchError || error instanceof InstructionTranslatorError) {
@@ -30,6 +32,8 @@ export function createSiteProjectsRouter({ service }) {
       return res.json({
         success: true,
         project,
+        // User-facing address of the live site (PUBLIC_SITE_BASE_URL/s/:slug); null until published.
+        publicUrl: projectPublicUrl(publicSiteBaseUrl, project),
         assets: optional(() => service.assets(req.params.id), [], "assets"),
         versions: optional(() => service.versions(req.params.id), [], "versions"),
         domains: optional(() => service.domains(req.params.id), [], "domains"),
@@ -168,9 +172,9 @@ export function createSiteProjectsRouter({ service }) {
       });
     } catch (e) { return handle(e, res); }
   });
-  router.post("/site-projects/:id/preview-token", (req, res) => { try { const token = service.createPreviewToken(req.params.id); return res.status(201).json({ success: true, previewUrl: `/preview/sites/${encodeURIComponent(req.params.id)}?token=${encodeURIComponent(token)}` }); } catch (e) { return handle(e, res); } });
+  router.post("/site-projects/:id/preview-token", (req, res) => { try { const token = service.createPreviewToken(req.params.id); return res.status(201).json({ success: true, previewUrl: previewSiteUrl(publicSiteBaseUrl, req.params.id, token) }); } catch (e) { return handle(e, res); } });
   router.delete("/site-projects/:id/preview-token", (req, res) => { try { return res.json({ success: true, revoked: service.revokePreviewToken(req.params.id) }); } catch (e) { return handle(e, res); } });
-  router.post("/site-projects/:id/publish", (req, res) => { try { return res.json({ success: true, project: service.publish(req.params.id) }); } catch (e) { return handle(e, res); } });
+  router.post("/site-projects/:id/publish", (req, res) => { try { const project = service.publish(req.params.id); return res.json({ success: true, project, publicUrl: projectPublicUrl(publicSiteBaseUrl, project) }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects/:id/publish-rollback", (req, res) => { try { return res.json({ success: true, ...service.rollbackPublishVersion(req.params.id, req.body?.targetVersionId) }); } catch (e) { return handle(e, res); } });
   router.delete("/site-projects/:id", (req, res) => { try { service.remove(req.params.id); return res.json({ success: true }); } catch (e) { return handle(e, res); } });
   router.post("/site-projects/:id/assets", (req, res) => { try { return res.status(201).json({ success: true, asset: service.addAsset(req.params.id, req.body || {}) }); } catch (e) { return handle(e, res); } });

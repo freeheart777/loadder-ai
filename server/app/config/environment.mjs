@@ -18,16 +18,32 @@ export function parseTrustProxy(value) {
   if (!/^\d+$/.test(raw) || hops < 1 || hops > 10) throw new Error(`TRUST_PROXY must be a proxy hop count between 1 and 10 (got "${raw}").`);
   return hops;
 }
+// Public-site runtime (server/public-site-server.mjs). PUBLIC_SITE_BASE_URL is the
+// origin visitors use; it is what published /s/:slug and preview URLs are built on.
+export function parsePublicSiteBaseUrl(value, fallback) {
+  const raw = String(value ?? "").trim() || fallback;
+  let url;
+  try { url = new URL(raw); } catch { throw new Error(`PUBLIC_SITE_BASE_URL must be an absolute http(s) URL (got "${raw}").`); }
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`PUBLIC_SITE_BASE_URL must use http or https (got "${raw}").`);
+  return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+}
 function parseOrigins(value) { return String(value || "http://localhost:5173").split(",").map((origin) => origin.trim()).filter(Boolean); }
 
 const nodeEnv = process.env.NODE_ENV || "development";
+const apiHost = process.env.API_HOST || "127.0.0.1";
+const apiPort = parsePort(process.env.API_PORT || process.env.PORT, 3001);
+const publicSiteHost = process.env.PUBLIC_SITE_HOST || apiHost;
+const publicSitePort = parsePort(process.env.PUBLIC_SITE_PORT, apiPort + 1);
 const authHashSecret = process.env.AUTH_HASH_SECRET || (nodeEnv === "production" ? null : "loadder-development-only-otp-secret");
 if (!authHashSecret) throw new Error("AUTH_HASH_SECRET is required in production.");
 
 export const environment = Object.freeze({
   nodeEnv,
-  apiHost: process.env.API_HOST || "127.0.0.1",
-  apiPort: parsePort(process.env.API_PORT || process.env.PORT, 3001),
+  apiHost,
+  apiPort,
+  publicSiteHost,
+  publicSitePort,
+  publicSiteBaseUrl: parsePublicSiteBaseUrl(process.env.PUBLIC_SITE_BASE_URL, `http://${publicSiteHost}:${publicSitePort}`),
   clientOrigins: parseOrigins(process.env.CLIENT_ORIGINS),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   openAIConfigured: Boolean(process.env.OPENAI_API_KEY),

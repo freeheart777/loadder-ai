@@ -12,9 +12,8 @@ app.disable("x-powered-by");
 // Lazy: no ecommerce service at startup; created on the first STORE request.
 app.use(createPublicSitesRouter({ repository, createEcommerceService: () => createEcommerceService({ db }) }));
 
-const port = Number(process.env.PUBLIC_SITE_PORT || Number(environment.apiPort) + 1);
-const host = process.env.PUBLIC_SITE_HOST || environment.apiHost;
+const { publicSitePort: port, publicSiteHost: host, publicSiteBaseUrl } = environment;
 
 app.listen(port, host, () => {
-  console.log(`Loadder Public Site Runtime listening on http://${host}:${port}`);
+  console.log(`Loadder Public Site Runtime listening on http://${host}:${port} (public base URL ${publicSiteBaseUrl})`);
 });

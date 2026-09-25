@@ -170,6 +170,9 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
 export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { siteKind?: SiteKind } = {}) {
   const commerce = isCommerceSite(siteKind);
   const [project, setProject] = useState<Project | null>(null);
+  // User-facing live address (PUBLIC_SITE_BASE_URL/s/:slug), set by the server; null until published.
+  const [publicUrl, setPublicUrl] = useState<string | null>(null);
+  const [previewLink, setPreviewLink] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [config, setConfig] = useState<StudioConfig>(() => restoreConfig({}, siteKind));
@@ -210,6 +213,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         const detail = await read(await apiFetch(`/api/site-projects/${selected.id}`, { signal: c.signal }));
         const loaded = detail.project as Project;
         setProject(loaded);
+        setPublicUrl(typeof detail.publicUrl === "string" ? detail.publicUrl : null);
         draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
         setConfig(restoreConfig(loaded.content || {}, siteKind));
         setAssets((detail.assets || []).filter((a: MediaAsset) => typeof a.url === "string"));
@@ -580,6 +584,22 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     }
   }
 
+  // Shareable server-rendered draft preview. The server renders the saved draft,
+  // so the current edits are saved first; the link is shown, not auto-opened
+  // (a window.open after an await is blocked as a popup).
+  async function createPreviewLink() {
+    if (!project) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await persistConfig(config);
+      const out = await read(await apiFetch(`/api/site-projects/${project.id}/preview-token`, { method: "POST" }));
+      setPreviewLink(typeof out.previewUrl === "string" ? out.previewUrl : null);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "ساخت لینک پیش‌نمایش ناموفق بود.");
+    } finally { setBusy(false); }
+  }
+
   async function publish() {
     if (!project) return;
     setBusy(true);
@@ -588,6 +608,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       await persistConfig(config);
       const out = await read(await apiFetch(`/api/site-projects/${project.id}/publish`, { method: "POST" }));
       setProject(out.project);
+      setPublicUrl(typeof out.publicUrl === "string" ? out.publicUrl : null);
       setMessage("نسخه منتشرشده با موفقیت ایجاد شد.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "انتشار ناموفق بود؛ نسخه زنده قبلی بدون تغییر باقی ماند.");
@@ -646,7 +667,9 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       </button>
     </div>
 
-    {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p></div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
+    {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p></div><div className="flex items-center gap-2">{previewLink
+      ? <a data-preview-link href={previewLink} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-emerald-400/15 px-3 py-2 text-[10px] font-bold text-emerald-200 underline">باز کردن لینک پیش‌نمایش</a>
+      : <button type="button" onClick={() => void createPreviewLink()} disabled={busy || !project} className="rounded-xl bg-white/10 px-3 py-2 text-[10px] font-bold disabled:opacity-50">ساخت لینک پیش‌نمایش</button>}<div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
 
     {templatePickerOpen && <div className="fixed inset-0 z-[105] grid place-items-center bg-slate-950/75 p-4"><section className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#0d1622] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black tracking-[.16em] text-emerald-300">TEMPLATES</p><h2 className="mt-1 text-lg font-black">شروع از یک طرح آماده</h2><p className="mt-2 text-xs leading-6 text-white/45">قالب انتخابی روی پیش‌نویس فعلی اعمال می‌شود؛ قبل از ذخیره آن را بررسی کنید.</p></div><button type="button" aria-label="بستن قالب‌ها" onClick={() => setTemplatePickerOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><X /></button></div><div className="mt-5 grid gap-3 md:grid-cols-2">{templateOptions.map((template) => <button key={template.id} type="button" onClick={() => { setConfig(createConfigFromTemplate(template)); setTemplatePickerOpen(false); setInspectorOpen(true); setTab("context"); setMessage(`قالب «${template.label}» روی پیش‌نویس آماده شد؛ برای ثبت نهایی ذخیره کنید.`); }} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.03] text-right transition hover:border-emerald-400/50 hover:bg-emerald-400/10"><div className="p-3"><TemplatePreview template={template}/></div><span className="block border-t border-white/10 p-4"><b className="block text-sm">{template.label}</b><span className="mt-2 block text-xs leading-6 text-white/45">{template.description}</span><span className="mt-4 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">انتخاب این قالب</span></span></button>)}</div></section></div>}
 
@@ -710,6 +733,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       </div>
     </div>}
 
+    {publicUrl && <div data-public-url className="fixed bottom-16 left-5 z-[140] max-w-[min(90vw,420px)] truncate rounded-xl bg-slate-950 px-4 py-3 text-xs shadow-2xl">آدرس سایت: <a href={publicUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="font-bold text-emerald-300 underline">{publicUrl}</a></div>}
     {message && <div className="fixed bottom-5 left-5 z-[140] rounded-xl bg-slate-950 px-4 py-3 text-xs shadow-2xl">{message}</div>}
   </main>;
 }

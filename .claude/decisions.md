@@ -68,3 +68,19 @@ Not in the original PR 1.2 scope (core, commerce, payments), but required: the e
 - Manifest v2 is metadata, not commerce authority. A manifest records `siteType` at publish time; the runtime follows the project's current `siteType`. `commerceEnabled()` therefore re-resolves from the current `siteType` (STORE-only rule), so a store changed to BUSINESS after publishing loads no catalog even though its manifest lists commerce.
 
 Why: one audited entry point for capability decisions, renderers that cannot drift from the byte-identical baselines, and no change to the STORE-only commerce rule without a separate ADR. All four rules are enforced by the agreement test in `server/test/site-platform-registry.test.mjs`.
+
+## 2026-09-26 — Public site URL is `PUBLIC_SITE_BASE_URL/s/:slug`, with globally unique slugs
+
+- The user-facing address of a published site is `PUBLIC_SITE_BASE_URL + /s/:slug`. `/sites/:id` stays an internal route, and custom domains keep using the host-based domain handler.
+- Slugs are globally unique (migration 092, `ux_site_projects_slug`), because the URL carries no workspace. The old `UNIQUE(workspace_id,slug)` stays, since SQLite cannot drop it without a table rebuild.
+- Generated slugs that clash get a random suffix, not `-2`/`-3`, so other tenants' addresses cannot be enumerated. An explicitly chosen slug is never silently changed: a clash is a 409 `SITE_SLUG_TAKEN`.
+- URL building lives in `services/public-site-urls.mjs`, not `site-platform/`, which stays capability-only (see the PR 3 boundary above).
+
+Why: a slug URL is shareable and readable, and uniqueness has to hold across tenants or `/s/:slug` could resolve to another workspace's site.
+
+## 2026-09-26 — Local media root is anchored to the module, not the process cwd
+
+- `site-media-storage-adapter.mjs` defaults to `server/data/site-media`, resolved from its own file location (`DEFAULT_SITE_MEDIA_LOCAL_DIR`). `SITE_MEDIA_LOCAL_DIR` still overrides it.
+- Stored media are relative keys, so a root change never breaks a stored reference.
+
+Why: starting the server from `server/` wrote uploads to `server/server/data/site-media`, where the API and public server could not find them.
