@@ -11,7 +11,11 @@ const MAX_ASSET_URL = 8 * 1024 * 1024;
 const MAX_ASSET_BYTES = 3 * 1024 * 1024;
 const MAX_STORAGE_KEY = 500;
 const SLUG_MAX = 80;
-const isSlugConflict = (error) => /UNIQUE constraint failed:.*\bsite_projects\.slug\b/.test(String(error?.message || ""));
+const isSlugConflict = (error) => {
+  const message = String(error?.message || "");
+  return message.includes("site_projects.slug") ||
+    message.includes("site_projects.workspace_id, site_projects.slug");
+};
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `site-${crypto.randomUUID().slice(0, 8)}`;
 const hashPreviewToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
