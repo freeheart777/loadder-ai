@@ -3554,7 +3554,14 @@ app.use(
 app.listen(
   PORT,
   environment.apiHost,
-  () => {
+  (error) => {
+    // Express 5 passes listen errors (e.g. EADDRINUSE) to this callback instead
+    // of throwing. Ignoring it printed the "running" banner and exited 0, so a
+    // restart silently left the UI talking to an older process on the port.
+    if (error) {
+      console.error(`Loadder API could not listen on http://${environment.apiHost}:${PORT}: ${error.code || error.message}. Another process is probably using the port; stop it and start again.`);
+      process.exit(1);
+    }
     console.log("");
 
     console.log(

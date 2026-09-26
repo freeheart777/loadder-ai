@@ -15,6 +15,11 @@ app.use(createPublicSitesRouter({ repository, createEcommerceService: () => crea
 const port = Number(process.env.PUBLIC_SITE_PORT || Number(environment.apiPort) + 1);
 const host = process.env.PUBLIC_SITE_HOST || environment.apiHost;
 
-app.listen(port, host, () => {
+app.listen(port, host, (error) => {
+  // Express 5 reports listen errors here; never claim to be running without a port.
+  if (error) {
+    console.error(`Loadder Public Site Runtime could not listen on http://${host}:${port}: ${error.code || error.message}. Another process is probably using the port; stop it and start again.`);
+    process.exit(1);
+  }
   console.log(`Loadder Public Site Runtime listening on http://${host}:${port}`);
 });
