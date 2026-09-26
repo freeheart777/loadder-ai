@@ -1,3 +1,5 @@
+import type { SectionItemIcon } from "./item-icons";
+
 export type DeviceMode = "desktop" | "tablet" | "mobile";
 export type SiteKind = "STORE" | "BUSINESS";
 export type PageMode = "storefront" | "collection" | "product" | "cart" | "checkout" | "success";
@@ -43,7 +45,7 @@ export type HeaderConfig = { logoUrl: string; storeName: string; showSearch: boo
 export type HeroConfig = { enabled: boolean; layout: "centered" | "split" | "background" | "minimal"; eyebrow: string; title: string; subtitle: string; ctaLabel: string; ctaHref: string; imageUrl: string; backgroundColor: string; textColor: string; overlayOpacity: number; height: number; alignment: "right" | "center" | "left" };
 export type ProductSettings = { source: "featured" | "latest" | "bestselling" | "discounted" | "manual"; productIds: string[]; columnsDesktop: number; columnsTablet: number; columnsMobile: number; imageRatio: "square" | "portrait" | "landscape" | "auto"; cardStyle: "vertical" | "compact" | "horizontal" | "minimal"; showBrand: boolean; showPrice: boolean; showCompareAt: boolean; showStock: boolean; showPromotionBadge: boolean; showCartButton: boolean };
 /** A repeatable entry inside a services / team / portfolio section. */
-export type SectionItem = { id: string; title: string; subtitle?: string; body?: string; imageUrl?: string; meta?: string; href?: string };
+export type SectionItem = { id: string; title: string; subtitle?: string; body?: string; imageUrl?: string; meta?: string; href?: string; icon?: SectionItemIcon };
 export type ContactConfig = { formEnabled: boolean; submitLabel: string; successMessage: string; phone?: string; email?: string; address?: string; mapUrl?: string };
 export type SeoConfig = { title: string; description: string };
 /** A page owns its address, its sections, its SEO and its navigation visibility.

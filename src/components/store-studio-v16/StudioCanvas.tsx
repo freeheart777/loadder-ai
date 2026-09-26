@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, Heart, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
+import { ArrowDown, ArrowLeft, ArrowUp, Bank, Briefcase, Buildings, Certificate, ChatCircleText, CheckCircle, Clock, CopySimple, DotsSixVertical, FileText, Gavel, Handshake, Headset, Heart, HouseLine, ImageSquare, Lightning, MagnifyingGlass, Medal, Package, PencilSimple, Plus, Scales, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Trophy, Truck, UserCircle, Users } from "@phosphor-icons/react";
 import { defaultProductSettings, formatMoney, productView, productsForSection } from "./config";
 import { isCommerceSite, sectionAnchor, siteTypeDefinition } from "./site-types";
 import { navigationPages } from "./pages";
 import type { DeviceMode, ElementType, PageMode, Product, ProductSettings, SectionConfig, SectionItem, Selection, StudioConfig } from "./types";
+import type { SectionItemIcon } from "./item-icons";
 
 export type InlineMediaTarget = { kind: "hero" | "banner" | "logo" | "product"; id?: string };
 export type RuntimeCartItem = { id: string; productName: string; variantTitle?: string; quantity: number; unitPriceMinor: number; lineTotalMinor: number };
@@ -218,6 +219,9 @@ function CorporateFooter({ config }: { config: StudioConfig }) {
   </footer>;
 }
 
+// Repeater item icons (see item-icons.ts); an item without one keeps the star.
+const ITEM_ICON_COMPONENTS: Record<SectionItemIcon, typeof Star> = { scales: Scales, gavel: Gavel, briefcase: Briefcase, handshake: Handshake, bank: Bank, buildings: Buildings, house: HouseLine, users: Users, shield: ShieldCheck, certificate: Certificate, trophy: Trophy, medal: Medal, clock: Clock, chat: ChatCircleText, file: FileText, lightning: Lightning, star: Star };
+
 function ItemCard({ item, section, config, variant }: { item: SectionItem; section: SectionConfig; config: StudioConfig; variant: "service" | "team" | "portfolio" }) {
   const rounded = { borderRadius: config.design.cardRadius };
   return <article className="overflow-hidden border border-black/5 bg-white" style={rounded}>
@@ -225,7 +229,7 @@ function ItemCard({ item, section, config, variant }: { item: SectionItem; secti
       {item.imageUrl ? <img src={item.imageUrl} alt={item.title} loading="lazy" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-slate-300">{variant === "team" ? <UserCircle size={44} /> : <ImageSquare size={44} />}</div>}
     </div>}
     <div className="p-5">
-      {variant === "service" && <span className="mb-3 inline-grid h-10 w-10 place-items-center rounded-xl text-white" style={{ background: config.design.primaryColor }}><Star size={20} /></span>}
+      {variant === "service" && <span className="mb-3 inline-grid h-10 w-10 place-items-center rounded-xl text-white" style={{ background: config.design.primaryColor }}>{(() => { const Icon = (item.icon && ITEM_ICON_COMPONENTS[item.icon]) || Star; return <Icon size={20} data-item-icon={item.icon || "star"} />; })()}</span>}
       <b className="block text-sm" style={{ color: section.textColor }}>{item.title}</b>
       {item.subtitle && <span className="mt-1 block text-xs opacity-60">{item.subtitle}</span>}
       {item.body && <p className="mt-3 text-xs leading-6 opacity-70">{item.body}</p>}

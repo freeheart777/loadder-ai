@@ -2,10 +2,11 @@ import { restoreConfig } from "../config";
 import type { SiteKind, StudioConfig } from "../types";
 import { commerceModernV1 } from "./commerce-modern-v1";
 import { businessLaunchTemplates } from "./business-launch-v1";
+import { legalFirmStarterV1 } from "./business-legal-firm-v1";
 import type { WebsiteTemplate } from "./types";
 
 /** The full set of templates a new site can be created from. Adding a template means adding an entry here — no other file changes. */
-export const TEMPLATES: readonly WebsiteTemplate[] = [commerceModernV1, ...businessLaunchTemplates];
+export const TEMPLATES: readonly WebsiteTemplate[] = [commerceModernV1, ...businessLaunchTemplates, legalFirmStarterV1];
 export const templatesForSiteKind = (siteKind: SiteKind): readonly WebsiteTemplate[] => TEMPLATES.filter((template) => template.siteKind === siteKind);
 
 export const findTemplate = (id: string): WebsiteTemplate | undefined => TEMPLATES.find((template) => template.id === id);
