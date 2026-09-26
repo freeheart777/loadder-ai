@@ -1,5 +1,6 @@
 import { expect, request, test, type Browser, type Page } from "@playwright/test";
 import { businessLaunchTemplates } from "../../src/components/store-studio-v16/templates/business-launch-v1";
+import { legalFirmStarterV1 } from "../../src/components/store-studio-v16/templates/business-legal-firm-v1";
 
 // Website Builder V16 release flow, for every shipped template:
 // template → create → Studio → edit → save → preview → (private preview link)
@@ -11,7 +12,7 @@ test.use({ actionTimeout: 15_000 });
 
 type Case = { route: string; label: string; heroTitle: string; commerce: boolean };
 const cases: Case[] = [
-  ...businessLaunchTemplates.map((template) => ({ route: "/dashboard/websites/corporate", label: template.label, heroTitle: String(template.hero?.title || ""), commerce: false })),
+  ...[...businessLaunchTemplates, legalFirmStarterV1].map((template) => ({ route: "/dashboard/websites/corporate", label: template.label, heroTitle: String(template.hero?.title || ""), commerce: false })),
   { route: "/dashboard/websites", label: "Loadder Commerce Modern V1", heroTitle: "کالای مورد نظرتان را با بهترین قیمت پیدا کنید", commerce: true },
 ];
 const viewports = [

@@ -67,7 +67,9 @@ function EditorGroup({ title, hint, children }: { title: string; hint: string; c
 }
 
 function MediaSelect({ label, value, assets, onChange }: { label: string; value: string; assets: MediaAsset[]; onChange: (value: string) => void }) {
-  return <Select label={label} value={value} onChange={onChange}><option value="">بدون تصویر</option>{assets.map((asset) => <option key={asset.id} value={asset.url}>{asset.name}</option>)}</Select>;
+  // A template's default image is not a Media Library asset; keep it selectable so the field shows it.
+  const external = value && !assets.some((asset) => asset.url === value);
+  return <Select label={label} value={value} onChange={onChange}><option value="">بدون تصویر</option>{external && <option value={value}>تصویر پیش‌فرض قالب</option>}{assets.map((asset) => <option key={asset.id} value={asset.url}>{asset.name}</option>)}</Select>;
 }
 
 function HeaderEditor({ config, assets, actions }: Props) {

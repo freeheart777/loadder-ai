@@ -37,6 +37,44 @@ test("the Legal Firm Starter template loads in the V16 BUSINESS schema", () => {
   assert.equal(template.sections.at(-1).contact?.formEnabled, true, "ContactFormSection → contact form");
 });
 
+const isSvgDataImage = (value) => typeof value === "string" && value.startsWith("data:image/svg+xml") && decodeURIComponent(value.slice(value.indexOf(",") + 1)).startsWith("<svg ");
+const byId = (id) => template.sections.find((section) => section.id === id);
+
+test("the starter is a complete website: metadata, hero, 6 services, lawyer placeholders, cases, articles, consultation form", () => {
+  assert.deepEqual(template.metadata, { industry: "LEGAL", targetAudience: ["law firms", "legal offices", "consultants"] });
+  const { hero } = template;
+  for (const field of ["eyebrow", "title", "subtitle", "ctaLabel", "ctaHref"]) assert.ok(hero[field], `hero.${field} (trust badge = eyebrow)`);
+  assert.ok(isSvgDataImage(hero.imageUrl), "heroImage placeholder");
+  assert.ok(template.seo?.title && template.seo?.description, "SEO defaults");
+
+  const services = byId("practice-main").items;
+  assert.equal(services.length, 6, "6 legal services");
+  for (const item of services) {
+    assert.ok(item.title && item.subtitle && item.body && item.icon, `${item.id} is complete`);
+    // The services card renders no media and its server output is pinned byte-for-byte
+    // (docs/decisions/PR4B-render-boundary.md), so a service image would be invisible.
+    assert.equal(item.imageUrl, "", `${item.id} ships no invisible image`);
+  }
+  for (const item of byId("attorneys-main").items) {
+    assert.equal(item.title, "وکیل پایه یک دادگستری", "generic lawyer identity, never a real person");
+    assert.ok(item.subtitle && item.body && isSvgDataImage(item.imageUrl), `${item.id} teamImage placeholder`);
+  }
+  for (const item of byId("cases-main").items) assert.ok(item.body && isSvgDataImage(item.imageUrl), `${item.id} anonymous case with image`);
+  for (const item of byId("articles-main").items) {
+    assert.ok(item.title.length >= 30 && item.body && /مطالعه/.test(item.subtitle), `${item.id} SEO-style title, excerpt and reading time`);
+    assert.ok(item.href && isSvgDataImage(item.imageUrl), `${item.id} link and articleImage placeholder`);
+  }
+  const contact = byId("contact-main");
+  assert.ok(contact.contact.formEnabled && contact.contact.submitLabel && contact.contact.successMessage && contact.subtitle, "consultation form defaults");
+});
+
+test("no empty sections: every card section ships at least three complete cards", () => {
+  for (const section of template.sections.filter((s) => s.type !== "contact")) {
+    assert.ok(section.items.length >= 3, `${section.id} has cards`);
+    for (const item of section.items) assert.ok(item.title && (item.subtitle || item.body), `${item.id} has text`);
+  }
+});
+
 test("every template section and repeater item renders on the published site", () => {
   const repository = createSiteProjectRepository(createSiteTestDb());
   const service = createSiteProjectService({ repository, businessContextService: { getCurrent: () => ({}) } });
@@ -45,6 +83,8 @@ test("every template section and repeater item renders on the published site", (
   const published = repository.getPublishedPublic(project.id);
   const html = renderPublishedSite(published.project, published.version, published.assets, { slug: "", basePath: `/sites/${project.id}` }, []);
   assert.match(html, new RegExp(template.hero.title));
+  const imageCount = [template.hero.imageUrl, ...template.sections.flatMap((section) => (section.items || []).map((item) => item.imageUrl))].filter(Boolean).length;
+  assert.equal((html.match(/<img src="data:image\/svg\+xml/g) || []).length, imageCount, "every default image renders on the published site");
   for (const section of template.sections) {
     assert.ok(html.includes(section.title), `section "${section.title}" renders`);
     for (const item of section.items || []) assert.ok(html.includes(item.title), `item "${item.title}" renders`);

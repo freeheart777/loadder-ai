@@ -60,6 +60,15 @@ test("Legal Firm Starter: loads, renders every section, and persists Inspector e
     }
     await expect(canvas.locator('[data-item-icon="scales"]').first()).toBeVisible();
 
+    // Complete starter: all default images load (none broken) and are editable image fields.
+    const templateImages = [template.hero?.imageUrl, ...template.sections.flatMap((section) => (section.items || []).map((item) => item.imageUrl))].filter(Boolean).length;
+    await expect.poll(() => canvas.locator('img[src^="data:image/svg+xml"]').count()).toBe(templateImages - 1); // hero image is a CSS background
+    await expect.poll(() => canvas.locator("img").evaluateAll((images) => images.filter((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth === 0).length)).toBe(0);
+
+    // Lawyer cards carry editable images: the template default shows as the selected image.
+    await selectSection(page, template.sections.find((section) => section.id === "attorneys-main")!.title);
+    await expect(page.getByLabel("تصویر", { exact: true }).first().locator("option:checked")).toHaveText("تصویر پیش‌فرض قالب");
+
     // Inspector edits on the practice-areas section: section title, first item title, first item icon.
     const practice = template.sections.find((section) => section.id === "practice-main")!;
     await selectSection(page, practice.title);
