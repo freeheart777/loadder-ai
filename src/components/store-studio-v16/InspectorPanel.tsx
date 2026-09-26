@@ -8,7 +8,6 @@ import {
 } from "@phosphor-icons/react";
 import { defaultProductSettings, formatMoney, productView } from "./config";
 import { siteTypeDefinition } from "./site-types";
-import { SECTION_ITEM_ICONS, isSectionItemIcon } from "./item-icons";
 import PageManager from "./PageManager";
 import AskLoadderPanel from "./AskLoadderPanel";
 import type {
@@ -67,9 +66,7 @@ function EditorGroup({ title, hint, children }: { title: string; hint: string; c
 }
 
 function MediaSelect({ label, value, assets, onChange }: { label: string; value: string; assets: MediaAsset[]; onChange: (value: string) => void }) {
-  // A template's default image is not a Media Library asset; keep it selectable so the field shows it.
-  const external = value && !assets.some((asset) => asset.url === value);
-  return <Select label={label} value={value} onChange={onChange}><option value="">بدون تصویر</option>{external && <option value={value}>تصویر پیش‌فرض قالب</option>}{assets.map((asset) => <option key={asset.id} value={asset.url}>{asset.name}</option>)}</Select>;
+  return <Select label={label} value={value} onChange={onChange}><option value="">بدون تصویر</option>{assets.map((asset) => <option key={asset.id} value={asset.url}>{asset.name}</option>)}</Select>;
 }
 
 function HeaderEditor({ config, assets, actions }: Props) {
@@ -121,9 +118,6 @@ function ItemsEditor({ section, assets, actions }: { section: SectionConfig; ass
       <Field label="زیرعنوان" value={entry.subtitle || ""} onChange={(subtitle) => actions.patchSectionItem(section.id, entry.id, { subtitle })}/>
       <TextArea label="توضیح" value={entry.body || ""} onChange={(body) => actions.patchSectionItem(section.id, entry.id, { body })}/>
       {section.type !== "services" && <MediaSelect label="تصویر" value={entry.imageUrl || ""} assets={assets} onChange={(imageUrl) => actions.patchSectionItem(section.id, entry.id, { imageUrl })}/>}
-      {section.type === "services" && <Select label="آیکون" value={entry.icon || "star"} onChange={(icon) => { if (isSectionItemIcon(icon)) actions.patchSectionItem(section.id, entry.id, { icon }); }}>
-        {SECTION_ITEM_ICONS.map(([name, label]) => <option key={name} value={name}>{label}</option>)}
-      </Select>}
       <div className="flex gap-1">
         <button type="button" aria-label="بالا" onClick={() => move(index, -1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowUp/></button>
         <button type="button" aria-label="پایین" onClick={() => move(index, 1)} className="grid min-h-9 min-w-9 place-items-center rounded-lg bg-white/5"><ArrowDown/></button>

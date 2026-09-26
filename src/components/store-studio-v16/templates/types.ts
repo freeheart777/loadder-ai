@@ -20,11 +20,4 @@ export type WebsiteTemplate = {
   seo?: Partial<SeoConfig>;
   commerce?: Partial<CommerceConfig>;
   sections: SectionConfig[];
-  /** Descriptive catalogue data; never applied to the site document. */
-  metadata?: TemplateMetadata;
-};
-
-export type TemplateMetadata = {
-  industry: "LEGAL" | "MEDICAL" | "EDUCATION" | "CORPORATE" | "COMMERCE";
-  targetAudience: readonly string[];
 };
