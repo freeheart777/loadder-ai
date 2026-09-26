@@ -62,6 +62,8 @@ for (const scenario of cases) {
       await expect(page).toHaveURL(new RegExp(`project=${project.id}`));
       const canvas = page.locator('[data-canvas-interactive="true"]');
       await expect(canvas.getByText(scenario.heroTitle, { exact: true }).first()).toBeVisible();
+      // Studio keeps its editor control for inserting sections.
+      await expect(canvas.getByRole("button", { name: "افزودن بخش در اینجا" }).first()).toBeVisible();
 
       // Edit the hero title and save.
       const newTitle = `نسخه انتشار ${Date.now()}`;
@@ -101,6 +103,7 @@ for (const scenario of cases) {
         await site.setViewportSize({ width: viewport.width, height: viewport.height });
         await site.goto(href!);
         await expect(site.getByText(newTitle).first(), `public site on ${viewport.name}`).toBeVisible();
+        await expect(site.getByRole("button", { name: "افزودن بخش در اینجا" }), `no editor controls on the public site (${viewport.name})`).toHaveCount(0);
         expect(await site.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `no horizontal scroll on ${viewport.name}`).toBeLessThanOrEqual(1);
       }
       await site.close();
