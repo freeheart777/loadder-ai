@@ -19,16 +19,38 @@ const medical: WebsiteTemplate = {
     contact("درخواست نوبت"),
   ],
 };
+// Legal: default copy and a few self-contained SVG images (data:image URLs render the
+// same on the canvas and the published site). All text and images stay editable.
+const legalImage = (body: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">${body}</svg>`)}`;
+const legalHeroImage = legalImage(`<rect width="800" height="600" fill="#292524"/><g fill="#a16207" opacity=".35"><polygon points="250,200 400,120 550,200"/><rect x="250" y="205" width="300" height="22" rx="4"/>${[275, 345, 415, 485].map((x) => `<rect x="${x}" y="240" width="30" height="190" rx="8"/>`).join("")}<rect x="235" y="440" width="330" height="26" rx="4"/></g>`);
+const legalPortrait = legalImage(`<rect width="800" height="600" fill="#f5f0e6"/><circle cx="400" cy="235" r="95" fill="#a8a29e"/><path d="M220 600c0-120 80-200 180-200s180 80 180 200z" fill="#a8a29e"/><path d="M370 400h60l-30 120z" fill="#292524" opacity=".8"/>`);
+const legalDocumentImage = legalImage(`<rect width="800" height="600" fill="#fef3c7"/><rect x="290" y="130" width="220" height="300" rx="14" fill="#ffffff"/><g fill="#a16207" opacity=".45"><rect x="320" y="180" width="160" height="12" rx="6"/><rect x="320" y="215" width="120" height="12" rx="6"/><rect x="320" y="250" width="145" height="12" rx="6"/></g><circle cx="490" cy="410" r="44" fill="#a16207" opacity=".7"/>`);
+const legalCards = (id: string, type: "services" | "team" | "portfolio", title: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][]) =>
+  ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
+
 const legal: WebsiteTemplate = {
   id: "legal-firm-v1", label: "موسسه حقوقی", description: "معرفی وکلا، تخصص‌ها، تجربه‌ها و درخواست مشاوره.", siteKind: "BUSINESS",
   design: { primaryColor: "#a16207", secondaryColor: "#fef3c7" }, header: { storeName: "موسسه حقوقی شما" },
-  hero: { layout: "background", eyebrow: "مشاوره حقوقی قابل اعتماد", title: "کنار شما برای تصمیم‌های مهم", subtitle: "مشاوره روشن و پیگیری دقیق پرونده.", ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main", backgroundColor: "#292524", overlayOpacity: 58 },
+  hero: { layout: "background", eyebrow: "مشاوره و وکالت تخصصی", title: "همراه حقوقی شما در تصمیم‌های مهم", subtitle: "از اولین جلسه مشاوره تا پایان پرونده، مسیر حقوقی را روشن توضیح می‌دهیم و با دقت پیگیری می‌کنیم.", ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main", imageUrl: legalHeroImage, backgroundColor: "#292524", overlayOpacity: 58 },
   sections: [
-    cards("attorneys-main", "team", "وکلای ما", "وکلا", [["وکیل نام شما", "وکیل پایه یک دادگستری"], ["وکیل همکار", "مشاور حقوقی"]]),
-    cards("practice-main", "services", "حوزه‌های فعالیت", "تخصص‌ها", [["حقوق خانواده", "مشاوره و پیگیری"], ["حقوق شرکت‌ها", "قرارداد و امور تجاری"], ["دعاوی ملکی", "بررسی و دفاع حقوقی"]]),
-    cards("cases-main", "portfolio", "پرونده‌ها و تجربه‌ها", "تجربه‌ها", [["پرونده نمونه", "حقوق تجاری"], ["پرونده نمونه", "دعاوی ملکی"]]),
-    story("articles-main", "مقالات حقوقی", "مقالات", "راهنما و دیدگاه تخصصی", "مقاله‌های تأییدشده و اطلاعات حقوقی به‌روز خود را اینجا منتشر کنید.", "text-image"),
-    contact("درخواست مشاوره حقوقی"),
+    legalCards("attorneys-main", "team", "وکلای ما", "وکلا", [
+      ["وکیل پایه یک دادگستری", "دعاوی خانواده و ملکی", "معرفی کوتاه وکیل، سوابق و حوزه تخصص را اینجا بنویسید.", legalPortrait],
+      ["وکیل پایه یک دادگستری", "حقوق شرکت‌ها و قراردادها", "معرفی کوتاه وکیل، سوابق و حوزه تخصص را اینجا بنویسید.", legalPortrait],
+    ]),
+    legalCards("practice-main", "services", "حوزه‌های فعالیت", "تخصص‌ها", [
+      ["حقوق خانواده", "طلاق، مهریه، حضانت و نفقه", "مشاوره و وکالت در دعاوی خانواده با رعایت کامل حریم خصوصی."],
+      ["حقوق شرکت‌ها", "ثبت شرکت، قرارداد و امور تجاری", "همراهی حقوقی کسب‌وکار از تأسیس تا حل اختلاف میان شرکا."],
+      ["دعاوی ملکی", "الزام به تنظیم سند، خلع ید، تخلیه", "بررسی اسناد ملکی و دفاع در دعاوی ملک و مستغلات."],
+      ["حقوق کیفری", "دفاع در دادسرا و دادگاه", "همراهی و دفاع در مراحل تحقیق و رسیدگی کیفری."],
+      ["تنظیم قرارداد", "نگارش و بازبینی قرارداد", "بررسی بندهای قرارداد پیش از امضا برای کاهش ریسک اختلاف."],
+      ["داوری و حل اختلاف", "داوری، میانجی‌گری و سازش", "تلاش برای حل اختلاف بیرون از فرایند طولانی دادگاه."],
+    ]),
+    legalCards("cases-main", "portfolio", "پرونده‌ها و تجربه‌ها", "تجربه‌ها", [
+      ["اختلاف میان شرکای تجاری", "حقوق تجارت · نمونه پرونده", "بررسی اسناد شرکت، مذاکره میان شرکا و پیگیری مسیر حل اختلاف.", legalDocumentImage],
+      ["الزام به تنظیم سند رسمی", "دعاوی ملکی · نمونه پرونده", "بررسی قرارداد خرید، استعلام‌های ثبتی و طرح دعوای الزام به تنظیم سند.", legalDocumentImage],
+    ]),
+    { ...story("articles-main", "مقالات حقوقی", "مقالات", "راهنما و دیدگاه تخصصی", "در این بخش راهنماهای کوتاه حقوقی منتشر کنید؛ مثلاً نکات پیش از امضای قرارداد اجاره، مراحل ثبت شرکت یا حقوق مالی زوجه.", "text-image"), imageUrl: legalDocumentImage },
+    { ...contact("درخواست مشاوره حقوقی"), subtitle: "موضوع خود را کوتاه بنویسید تا برای هماهنگی جلسه مشاوره با شما تماس بگیریم." },
   ],
 };
 const education: WebsiteTemplate = {
