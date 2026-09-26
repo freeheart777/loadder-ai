@@ -29,7 +29,13 @@ test(`creating a website from "${template.label}" twice in one workspace never f
   test.setTimeout(120_000);
   const api = await request.newContext({ baseURL: apiBaseURL });
   const mobile = `092${String(Date.now()).slice(-8)}`;
-  const otp = await (await api.post("/api/auth/send-otp", { data: { mobile, name: "Template Creation E2E" } })).json();
+  // send-otp is rate limited (5/min per IP); wait out the window when other journeys ran just before.
+  let sent = await api.post("/api/auth/send-otp", { data: { mobile, name: "Template Creation E2E" } });
+  for (let attempt = 0; sent.status() === 429 && attempt < 3; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, ((Number(sent.headers()["retry-after"]) || 60) + 1) * 1000));
+    sent = await api.post("/api/auth/send-otp", { data: { mobile, name: "Template Creation E2E" } });
+  }
+  const otp = await sent.json();
   expect((await api.post("/api/auth/verify-otp", { data: { mobile, code: otp.developmentOtp } })).ok()).toBeTruthy();
   const context = await browser.newContext({ storageState: await api.storageState() });
   await api.dispose();

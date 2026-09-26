@@ -4,10 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail -n FRONTEND,BACKEND -c auto \"npm run dev:frontend\" \"npm run dev:server\"",
+    "dev": "concurrently --kill-others-on-fail -n FRONTEND,BACKEND,PUBLIC -c auto \"npm run dev:frontend\" \"npm run dev:server\" \"npm run dev:public\"",
     "dev:frontend": "vite",
     "dev:server": "node --watch server/index.mjs",
+    "dev:public": "node --watch server/public-site-server.mjs",
     "start:server": "node server/index.mjs",
+    "start:public": "node server/public-site-server.mjs",
     "test:server": "npm --prefix server test",
     "check:db-boundary": "node server/scripts/check-db-boundaries.mjs",
     "demo:growth": "node server/scripts/demo-growth-bootstrap.mjs",

@@ -12,8 +12,7 @@ app.disable("x-powered-by");
 // Lazy: no ecommerce service at startup; created on the first STORE request.
 app.use(createPublicSitesRouter({ repository, createEcommerceService: () => createEcommerceService({ db }) }));
 
-const port = Number(process.env.PUBLIC_SITE_PORT || Number(environment.apiPort) + 1);
-const host = process.env.PUBLIC_SITE_HOST || environment.apiHost;
+const { publicSitePort: port, publicSiteHost: host, publicSiteBaseUrl } = environment;
 
 app.listen(port, host, (error) => {
   // Express 5 reports listen errors here; never claim to be running without a port.
@@ -21,5 +20,5 @@ app.listen(port, host, (error) => {
     console.error(`Loadder Public Site Runtime could not listen on http://${host}:${port}: ${error.code || error.message}. Another process is probably using the port; stop it and start again.`);
     process.exit(1);
   }
-  console.log(`Loadder Public Site Runtime listening on http://${host}:${port}`);
+  console.log(`Loadder Public Site Runtime listening on http://${host}:${port} (public base URL ${publicSiteBaseUrl})`);
 });

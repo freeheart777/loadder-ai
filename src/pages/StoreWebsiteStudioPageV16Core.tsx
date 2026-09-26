@@ -11,7 +11,8 @@ import { activePageOf, navigationPages, newPage, normalizeSlug, slugProblem, wit
 import { createConfigFromTemplate, templatesForSiteKind } from "../components/store-studio-v16/templates/registry";
 import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
-import { API_BASE_URL, apiFetch } from "../lib/api";
+import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
+import { invalidateActiveStoreProject } from "../lib/activeStoreProject";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
 type Project = { id: string; name?: string; status?: string; content: Record<string, any> };
@@ -235,6 +236,11 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         }
         setNeedsCreate(false);
         setProject(null);
+        // apiFetch answers GET /api/site-projects from the single canonical
+        // store snapshot (set by the /dashboard/websites gate). A specific other
+        // store — one just created from a template, or opened via ?project= —
+        // is not in that snapshot, so drop it and read the real listing.
+        if (commerce && requestedProjectId && requestedProjectId !== getCanonicalStoreProjectId()) invalidateActiveStoreProject();
         const listing = await read(await apiFetch("/api/site-projects", { signal: c.signal }));
         const projects = Array.isArray(listing.projects) ? listing.projects : [];
         const selected = requestedProjectId
