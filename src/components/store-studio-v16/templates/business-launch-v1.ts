@@ -73,16 +73,31 @@ const legal: WebsiteTemplate = {
     { ...contact("درخواست مشاوره حقوقی"), subtitle: "موضوع خود را کوتاه بنویسید تا برای هماهنگی جلسه مشاوره با شما تماس بگیریم." },
   ],
 };
+// Education: default copy and two self-contained SVG images (hero, instructor portrait).
+// All text and images stay editable; course cards and text sections carry no images.
+const educationImage = (body: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">${body}</svg>`)}`;
+const educationHeroImage = educationImage(`<rect width="800" height="600" fill="#312e81"/><g fill="#a5b4fc" opacity=".3"><polygon points="400,150 600,230 400,310 200,230"/><path d="M290 270v80c0 35 50 60 110 60s110-25 110-60v-80l-110 45z"/><rect x="592" y="232" width="10" height="120" rx="5"/><circle cx="597" cy="360" r="14"/></g>`);
+const educationPortrait = educationImage(`<rect width="800" height="600" fill="#eef2ff"/><circle cx="400" cy="230" r="92" fill="#94a3b8"/><path d="M220 600c0-118 80-196 180-196s180 78 180 196z" fill="#6366f1" opacity=".75"/><rect x="330" y="470" width="140" height="90" rx="8" fill="#ffffff" opacity=".9"/>`);
+const educationCards = (id: string, type: "services" | "team", title: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][]) =>
+  ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
+
 const education: WebsiteTemplate = {
   id: "education-center-v1", label: "مرکز آموزشی", description: "دوره‌ها، مدرسان، تجربه دانش‌پذیران و ثبت‌نام.", siteKind: "BUSINESS",
   design: { primaryColor: "#4338ca", secondaryColor: "#e0e7ff" }, header: { storeName: "آموزشگاه شما" },
-  hero: { layout: "centered", eyebrow: "یادگیری برای آینده", title: "مهارتی که آینده شما را می‌سازد", subtitle: "دوره‌های عملی با مسیر یادگیری روشن.", ctaLabel: "ثبت‌نام در دوره", ctaHref: "#contact-main", backgroundColor: "#312e81" },
+  hero: { layout: "centered", eyebrow: "آموزش کاربردی، قدم‌به‌قدم", title: "مهارتی که در عمل به کار می‌آید", subtitle: "دوره‌های عملی با مسیر یادگیری روشن و همراهی مدرس در هر مرحله.", ctaLabel: "درخواست ثبت‌نام", ctaHref: "#contact-main", imageUrl: educationHeroImage, backgroundColor: "#312e81", overlayOpacity: 60 },
   sections: [
-    cards("courses-main", "services", "دوره‌های آموزشی", "دوره‌ها", [["دوره پایه", "شروع اصولی و کاربردی"], ["دوره پیشرفته", "پروژه‌محور و تخصصی"], ["کارگاه عملی", "تمرین با مربی"]]),
-    cards("teachers-main", "team", "مدرسان", "مدرسان", [["مدرس شما", "مدرس ارشد"], ["مدرس همکار", "مربی عملی"]]),
-    story("features-main", "ویژگی‌های آموزش", "ویژگی‌ها", "یک مسیر یادگیری روشن", "جزئیات برنامه آموزشی، پشتیبانی و شیوه یادگیری مرکزتان را اینجا شرح دهید."),
-    story("testimonials-main", "تجربه دانش‌پذیران", "تجربه‌ها", "داستان‌های یادگیری", "تجربه‌های واقعی دانش‌پذیران را با اجازه آن‌ها به اشتراک بگذارید."),
-    contact("ثبت‌نام و مشاوره"),
+    educationCards("courses-main", "services", "دوره‌های آموزشی", "دوره‌ها", [
+      ["دوره مقدماتی", "شروع اصولی و کاربردی", "آشنایی با مفاهیم پایه و تمرین عملی از جلسه اول."],
+      ["دوره پیشرفته", "پروژه‌محور و تخصصی", "یادگیری مهارت‌های تخصصی با انجام پروژه‌های واقعی."],
+      ["کارگاه عملی", "تمرین در کنار مدرس", "جلسه‌های کوتاه و متمرکز برای تمرین و رفع اشکال."],
+    ]),
+    educationCards("teachers-main", "team", "مدرسان", "مدرسان", [
+      ["مدرس دوره", "حوزه تدریس", "معرفی کوتاه مدرس و دوره‌هایی که تدریس می‌کند را اینجا بنویسید.", educationPortrait],
+      ["مدرس دوره", "حوزه تدریس", "معرفی کوتاه مدرس و دوره‌هایی که تدریس می‌کند را اینجا بنویسید.", educationPortrait],
+    ]),
+    story("features-main", "چرا این مرکز آموزشی", "ویژگی‌ها", "یادگیری عملی با مسیر روشن", "آموزش پروژه‌محور، تمرین در هر جلسه و امکان رفع اشکال با مدرس؛ تا آنچه یاد می‌گیرید در عمل به کار بیاید."),
+    story("testimonials-main", "تجربه دانش‌پذیران", "تجربه‌ها", "داستان‌های یادگیری", "تجربه دانش‌پذیران را پس از دریافت اجازه آن‌ها در این بخش منتشر کنید."),
+    { ...contact("ثبت‌نام و مشاوره"), subtitle: "دوره مورد نظر و شماره تماس خود را بنویسید تا برای راهنمایی و ثبت‌نام با شما تماس بگیریم." },
   ],
 };
 const corporate: WebsiteTemplate = { id: "corporate-company-v1", label: "شرکت حرفه‌ای", description: "درباره شرکت، خدمات، نمونه‌کارها، مشتریان و تماس.", siteKind: "BUSINESS", design: { primaryColor: "#0369a1", secondaryColor: "#e0f2fe" }, header: { storeName: "شرکت شما" }, hero: { layout: "split", eyebrow: "راهکارهای حرفه‌ای", title: "همراه مطمئن رشد کسب‌وکار شما", subtitle: "خدمات روشن و نتیجه‌محور برای سازمان شما.", ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main" }, sections: [section("about-main", "about", "درباره شرکت", "داستان و مزیت رقابتی شما", { showInNav: true, navLabel: "درباره ما", body: "این بخش را با داستان، تخصص و دستاوردهای شرکت خود کامل کنید." }), cards("services-main", "services", "خدمات ما", "خدمات", [["مشاوره", "تحلیل و نقشه راه"], ["اجرا", "پیاده‌سازی راهکار"], ["پشتیبانی", "بهبود مستمر"]]), cards("portfolio-main", "portfolio", "نمونه‌کارها", "نمونه‌کارها", [["پروژه نمونه", "صنعت شما"], ["پروژه نمونه", "صنعت شما"]]), story("clients-main", "مشتریان و شرکای ما", "مشتریان", "مورد اعتماد مشتریان", "نام‌ها یا لوگوهای مشتریان را فقط با مجوز استفاده اضافه کنید."), contact("شروع گفت‌وگو")] };
