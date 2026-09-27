@@ -100,6 +100,37 @@ const education: WebsiteTemplate = {
     { ...contact("ثبت‌نام و مشاوره"), subtitle: "دوره مورد نظر و شماره تماس خود را بنویسید تا برای راهنمایی و ثبت‌نام با شما تماس بگیریم." },
   ],
 };
-const corporate: WebsiteTemplate = { id: "corporate-company-v1", label: "شرکت حرفه‌ای", description: "درباره شرکت، خدمات، نمونه‌کارها، مشتریان و تماس.", siteKind: "BUSINESS", design: { primaryColor: "#0369a1", secondaryColor: "#e0f2fe" }, header: { storeName: "شرکت شما" }, hero: { layout: "split", eyebrow: "راهکارهای حرفه‌ای", title: "همراه مطمئن رشد کسب‌وکار شما", subtitle: "خدمات روشن و نتیجه‌محور برای سازمان شما.", ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main" }, sections: [section("about-main", "about", "درباره شرکت", "داستان و مزیت رقابتی شما", { showInNav: true, navLabel: "درباره ما", body: "این بخش را با داستان، تخصص و دستاوردهای شرکت خود کامل کنید." }), cards("services-main", "services", "خدمات ما", "خدمات", [["مشاوره", "تحلیل و نقشه راه"], ["اجرا", "پیاده‌سازی راهکار"], ["پشتیبانی", "بهبود مستمر"]]), cards("portfolio-main", "portfolio", "نمونه‌کارها", "نمونه‌کارها", [["پروژه نمونه", "صنعت شما"], ["پروژه نمونه", "صنعت شما"]]), story("clients-main", "مشتریان و شرکای ما", "مشتریان", "مورد اعتماد مشتریان", "نام‌ها یا لوگوهای مشتریان را فقط با مجوز استفاده اضافه کنید."), contact("شروع گفت‌وگو")] };
+// Corporate: default copy and three self-contained SVG images (hero, about, projects).
+// All text and images stay editable; service cards and the clients text block carry no images.
+const corporateImage = (body: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">${body}</svg>`)}`;
+const corporateHeroImage = corporateImage(`<rect width="800" height="600" fill="#e0f2fe"/><rect x="120" y="360" width="560" height="26" rx="13" fill="#0369a1" opacity=".85"/>${[[230, "#0369a1"], [400, "#0ea5e9"], [570, "#0369a1"]].map(([x, c]) => `<circle cx="${x}" cy="215" r="52" fill="${c}" opacity=".75"/><path d="M${Number(x) - 85} 360c0-70 38-110 85-110s85 40 85 110z" fill="${c}" opacity=".75"/>`).join("")}<rect x="330" y="400" width="140" height="120" rx="10" fill="#ffffff"/>`);
+const corporateAboutImage = corporateImage(`<rect width="800" height="600" fill="#0c4a6e"/><g fill="#7dd3fc" opacity=".35"><rect x="160" y="140" width="150" height="360" rx="8"/><rect x="330" y="80" width="170" height="420" rx="8"/><rect x="520" y="200" width="130" height="300" rx="8"/></g><g fill="#e0f2fe" opacity=".55">${[180, 240, 300, 360, 420].map((y) => `<rect x="360" y="${y - 60}" width="110" height="22" rx="4"/>`).join("")}</g>`);
+const corporateProjectImage = (tone: string) => corporateImage(`<rect width="800" height="600" fill="${tone}"/><rect x="170" y="130" width="460" height="300" rx="18" fill="#ffffff"/><g fill="#0369a1" opacity=".55"><rect x="210" y="330" width="60" height="70" rx="6"/><rect x="290" y="280" width="60" height="120" rx="6"/><rect x="370" y="230" width="60" height="170" rx="6"/></g><circle cx="540" cy="250" r="50" fill="#0ea5e9" opacity=".6"/>`);
+const corporateCards = (id: string, type: "services" | "portfolio", title: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][]) =>
+  ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
+
+const corporate: WebsiteTemplate = {
+  id: "corporate-company-v1", label: "شرکت حرفه‌ای", description: "درباره شرکت، خدمات، نمونه‌کارها، مشتریان و تماس.", siteKind: "BUSINESS",
+  design: { primaryColor: "#0369a1", secondaryColor: "#e0f2fe" }, header: { storeName: "شرکت شما" },
+  hero: { layout: "split", eyebrow: "راهکارهای حرفه‌ای برای رشد کسب‌وکار", title: "همراه مطمئن کسب‌وکار شما", subtitle: "خدمات، توانمندی‌ها و پروژه‌های مجموعه خود را روشن و حرفه‌ای به مشتریان معرفی کنید.", ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main", imageUrl: corporateHeroImage },
+  sections: [
+    section("about-main", "about", "درباره شرکت", "داستان و رویکرد ما", { showInNav: true, navLabel: "درباره ما", imageUrl: corporateAboutImage, body: "در این بخش داستان شکل‌گیری مجموعه، توانمندی‌ها و رویکرد کاری خود را کوتاه و روشن معرفی کنید." }),
+    corporateCards("services-main", "services", "خدمات ما", "خدمات", [
+      ["مشاوره و راهکار", "تحلیل نیاز و نقشه راه", "بررسی وضعیت فعلی و پیشنهاد مسیر روشن برای رسیدن به هدف."],
+      ["اجرای پروژه", "از برنامه تا تحویل", "اجرای مرحله‌به‌مرحله پروژه با گزارش منظم پیشرفت."],
+      ["پشتیبانی و خدمات", "همراهی پس از تحویل", "پاسخ‌گویی و بهبود مستمر پس از راه‌اندازی."],
+      ["توسعه کسب‌وکار", "رشد و ورود به فرصت‌های تازه", "شناسایی فرصت‌ها و برنامه‌ریزی برای گسترش فعالیت."],
+      ["راهکارهای اختصاصی", "متناسب با نیاز هر سازمان", "طراحی راهکاری که با شرایط و اهداف شما هماهنگ است."],
+      ["همکاری سازمانی", "همراهی بلندمدت", "همکاری پایدار برای پروژه‌های مستمر و چندمرحله‌ای."],
+    ]),
+    corporateCards("portfolio-main", "portfolio", "نمونه‌کارها", "نمونه‌کارها", [
+      ["پروژه نمونه", "حوزه فعالیت پروژه", "شرح کوتاه پروژه و نقش مجموعه شما در آن را اینجا بنویسید.", corporateProjectImage("#e0f2fe")],
+      ["راهکار سازمانی", "حوزه فعالیت پروژه", "شرح کوتاه پروژه و نقش مجموعه شما در آن را اینجا بنویسید.", corporateProjectImage("#f0f9ff")],
+      ["پروژه همکاری", "حوزه فعالیت پروژه", "شرح کوتاه پروژه و نقش مجموعه شما در آن را اینجا بنویسید.", corporateProjectImage("#e0f2fe")],
+    ]),
+    story("clients-main", "مشتریان و شرکای ما", "مشتریان", "همکاری‌هایی که به آن افتخار می‌کنیم", "تجربه مشتریان خود را پس از دریافت بازخورد در این بخش منتشر کنید."),
+    { ...contact("شروع همکاری"), subtitle: "برای دریافت اطلاعات بیشتر یا بررسی زمینه همکاری، اطلاعات تماس خود را ثبت کنید تا با شما در ارتباط باشیم." },
+  ],
+};
 
 export const businessLaunchTemplates: readonly WebsiteTemplate[] = [medical, legal, education, corporate];
