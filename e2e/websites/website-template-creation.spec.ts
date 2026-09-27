@@ -60,3 +60,34 @@ test(`creating a website from "${template.label}" twice in one workspace never f
     await context.close();
   }
 });
+
+test("all five starter choices are discoverable from the new-website picker; Store stays STORE", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const api = await request.newContext({ baseURL: apiBaseURL });
+  const mobile = `093${String(Date.now()).slice(-8)}`;
+  let sent = await api.post("/api/auth/send-otp", { data: { mobile, name: "Store Entry E2E" } });
+  for (let attempt = 0; sent.status() === 429 && attempt < 3; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, ((Number(sent.headers()["retry-after"]) || 60) + 1) * 1000));
+    sent = await api.post("/api/auth/send-otp", { data: { mobile, name: "Store Entry E2E" } });
+  }
+  const otp = await sent.json();
+  expect((await api.post("/api/auth/verify-otp", { data: { mobile, code: otp.developmentOtp } })).ok()).toBeTruthy();
+  const context = await browser.newContext({ storageState: await api.storageState() });
+  await api.dispose();
+  const page = await context.newPage();
+  try {
+    await page.goto("/dashboard/websites/corporate?new=1");
+    for (const label of ["موسسه حقوقی", "کلینیک و پزشک", "مرکز آموزشی", "شرکت حرفه‌ای"]) await expect(page.getByRole("button", { name: new RegExp(label) })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /Loadder Commerce Modern V1/ }), "store template is not offered as a BUSINESS template").toHaveCount(0);
+    const storeEntry = page.locator("[data-store-entry]");
+    await expect(storeEntry).toHaveCount(1);
+    await expect(storeEntry).toContainText("فروشگاه اینترنتی");
+    await storeEntry.click();
+    await expect(page).toHaveURL(/\/dashboard\/websites\?new=1$/);
+    await expect(page.getByRole("button", { name: /Loadder Commerce Modern V1/ })).toHaveCount(1);
+    await expect(page.locator("[data-store-entry]"), "the store picker does not link to itself").toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "ساخت فروشگاه اینترنتی" })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
