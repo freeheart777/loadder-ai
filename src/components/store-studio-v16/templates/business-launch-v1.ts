@@ -7,18 +7,38 @@ const contact = (label: string) => section("contact-main", "contact", label, "ف
 const cards = (id: string, type: "services" | "team" | "portfolio", title: string, navLabel: string, values: [string, string][]) => section(id, type, title, "برای شروع آماده و قابل ویرایش است.", { showInNav: true, navLabel, columns: 3, items: values.map(([name, detail], index) => item(`${id}-${index}`, name, detail)) });
 const story = (id: string, title: string, navLabel: string, subtitle: string, body: string, type: "text" | "text-image" = "text") => section(id, type, title, subtitle, { showInNav: true, navLabel, body });
 
+// Medical: default copy and two self-contained SVG images (hero, doctor portrait).
+// All text and images stay editable; services and text sections carry no images.
+const medicalImage = (body: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">${body}</svg>`)}`;
+const medicalHeroImage = medicalImage(`<rect width="800" height="600" fill="#134e4a"/><g fill="#5eead4" opacity=".28"><rect x="250" y="190" width="300" height="250" rx="18"/><rect x="370" y="235" width="60" height="160" rx="10" fill="#134e4a"/><rect x="320" y="285" width="160" height="60" rx="10" fill="#134e4a"/><rect x="235" y="440" width="330" height="24" rx="6"/></g>`);
+const medicalPortrait = medicalImage(`<rect width="800" height="600" fill="#ecfdf5"/><circle cx="400" cy="230" r="92" fill="#94a3b8"/><path d="M220 600c0-118 80-196 180-196s180 78 180 196z" fill="#ffffff"/><path d="M340 420c0 70 30 110 60 110s60-40 60-110" fill="none" stroke="#0f766e" stroke-width="10"/><circle cx="460" cy="420" r="14" fill="#0f766e"/>`);
+const medicalCards = (id: string, type: "services" | "team", title: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][]) =>
+  ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
+
 const medical: WebsiteTemplate = {
   id: "medical-practice-v1", label: "کلینیک و پزشک", description: "معرفی پزشک، خدمات درمانی و درخواست نوبت.", siteKind: "BUSINESS",
   design: { primaryColor: "#0f766e", secondaryColor: "#ccfbf1" }, header: { storeName: "کلینیک شما" },
-  hero: { layout: "background", eyebrow: "مراقبت حرفه‌ای", title: "سلامت شما، اولویت ماست", subtitle: "با آرامش، خدمات مناسب را انتخاب کنید.", ctaLabel: "درخواست نوبت", ctaHref: "#contact-main", backgroundColor: "#134e4a", overlayOpacity: 52 },
+  hero: { layout: "background", eyebrow: "مراقبت درمانی حرفه‌ای", title: "مراقبت از سلامت شما، با آرامش و دقت", subtitle: "خدمات تخصصی، توضیح روشن مسیر درمان و پیگیری پس از مراجعه در یک مکان.", ctaLabel: "رزرو نوبت", ctaHref: "#contact-main", imageUrl: medicalHeroImage, backgroundColor: "#134e4a", overlayOpacity: 52 },
   sections: [
-    cards("doctor-main", "team", "پزشک شما", "پزشک", [["دکتر نام شما", "متخصص و مشاور درمان"]]),
-    cards("services-main", "services", "خدمات کلینیک", "خدمات", [["ویزیت تخصصی", "بررسی و برنامه درمان"], ["درمان‌های کلینیک", "خدمت حرفه‌ای و ایمن"], ["پیگیری درمان", "همراهی پس از مراجعه"]]),
-    cards("treatments-main", "services", "درمان‌ها", "درمان‌ها", [["ارزیابی اولیه", "بررسی نیاز و شرایط مراجعه‌کننده"], ["برنامه درمان", "مسیر درمان متناسب با نیاز فرد"], ["مراقبت پس از درمان", "پیگیری و پاسخ‌گویی پس از مراجعه"]]),
-    story("testimonials-main", "تجربه مراجعان", "نظرات", "نظر و رضایت مراجعان", "تجربه‌های تأییدشده مراجعان را پس از دریافت رضایت آن‌ها اضافه کنید."),
-    contact("درخواست نوبت"),
+    medicalCards("doctor-main", "team", "پزشکان ما", "پزشکان", [
+      ["پزشک متخصص", "حوزه تخصص پزشک", "معرفی کوتاه پزشک و روزهای حضور در کلینیک را اینجا بنویسید.", medicalPortrait],
+      ["پزشک متخصص", "حوزه تخصص پزشک", "معرفی کوتاه پزشک و روزهای حضور در کلینیک را اینجا بنویسید.", medicalPortrait],
+    ]),
+    medicalCards("services-main", "services", "خدمات کلینیک", "خدمات", [
+      ["ویزیت تخصصی", "معاینه و مشاوره", "بررسی دقیق شرایط و توضیح روشن گزینه‌های درمان."],
+      ["خدمات درمانی کلینیک", "انجام درمان در محیطی ایمن", "درمان‌های رایج کلینیک با رعایت اصول بهداشت و ایمنی."],
+      ["پیگیری درمان", "همراهی پس از مراجعه", "پاسخ به پرسش‌ها و بررسی روند بهبود پس از درمان."],
+    ]),
+    medicalCards("treatments-main", "services", "مسیر درمان", "درمان‌ها", [
+      ["ارزیابی اولیه", "آشنایی با نیاز مراجعه‌کننده", "گفت‌وگو و معاینه برای شناخت دقیق شرایط."],
+      ["برنامه درمان", "متناسب با شرایط هر فرد", "پیشنهاد مسیر درمان همراه با توضیح مراحل آن."],
+      ["مراقبت پس از درمان", "توصیه‌ها و پیگیری", "راهنمایی برای دوره بهبود و مراجعه‌های بعدی."],
+    ]),
+    story("testimonials-main", "تجربه مراجعان", "نظرات", "نظر مراجعان برای ما ارزشمند است", "تجربه مراجعان را پس از دریافت رضایت آن‌ها در این بخش منتشر کنید."),
+    { ...contact("درخواست نوبت"), subtitle: "نام و شماره تماس خود را بنویسید تا برای هماهنگی زمان مراجعه با شما تماس بگیریم." },
   ],
 };
+
 // Legal: default copy and a few self-contained SVG images (data:image URLs render the
 // same on the canvas and the published site). All text and images stay editable.
 const legalImage = (body: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">${body}</svg>`)}`;
