@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${1:-/Users/azaddel/Desktop/python-course/make_deck.py/power-ai-hero}"
-for x in gh jq codex; do command -v "$x" >/dev/null||{ echo "Missing $x"; exit 1; }; done
+for x in gh jq codex python3; do command -v "$x" >/dev/null||{ echo "Missing $x"; exit 1; }; done
 gh auth status >/dev/null 2>&1||{ echo "Run: gh auth login"; exit 1; }
 SRC="$ROOT/ops/loadder-supervisor/run.sh"; DEST="$HOME/.local/share/loadder-supervisor"; PLIST="$HOME/Library/LaunchAgents/com.loadder.local-supervisor.plist"
 mkdir -p "$DEST" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/loadder-supervisor"; cp "$SRC" "$DEST/run.sh"; chmod 700 "$DEST/run.sh"
@@ -19,6 +19,8 @@ cat >"$PLIST" <<EOF
 <key>LOADDER_REPO</key><string>freeheart777/loadder-ai</string><key>LOADDER_ISSUE</key><string>250</string>
 <key>LOADDER_WORKTREE</key><string>/private/tmp/loadder-booking-pr6-2</string>
 <key>CODEX_BIN</key><string>/Users/azaddel/.nvm/versions/node/v22.23.2/bin/codex</string>
+<key>LOADDER_MAX_SECONDS</key><string>2700</string>
+<key>LOADDER_MAX_RETRIES</key><string>2</string>
 </dict></dict></plist>
 EOF
 launchctl bootout "gui/$(id -u)/com.loadder.local-supervisor" 2>/dev/null||true
