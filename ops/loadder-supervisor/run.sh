@@ -24,6 +24,20 @@ for x in gh jq python3; do command -v "$x" >/dev/null || { log "missing dependen
 git -C "$WORKTREE" rev-parse --is-inside-work-tree >/dev/null || { log "invalid worktree: $WORKTREE"; exit 22; }
 
 comments="$(gh api --paginate "repos/$REPO/issues/$ISSUE/comments?per_page=100")"
+# Bootstrap ledger from historical successful Local Supervisor reports so v2
+# never replays already-completed v1 instructions after an upgrade.
+success_ids="$(jq -r '[.[] | select(.body|contains("## Local Supervisor execution")) | select(.body|contains("Exit: `0`")) | .body | capture("issuecomment-(?<id>[0-9]+)").id] | unique[]?' <<<"$comments")"
+if [[ -n "$success_ids" ]]; then
+  tmp_seed="$(mktemp)"
+  cp "$LEDGER" "$tmp_seed"
+  while IFS= read -r sid; do
+    [[ -n "$sid" ]] || continue
+    next="$(mktemp)"
+    jq --arg id "$sid" 'if .[$id] then . else .[$id]={attempts:1,status:"success",migrated_from_v1:true} end' "$tmp_seed" >"$next"
+    mv "$next" "$tmp_seed"
+  done <<<"$success_ids"
+  mv "$tmp_seed" "$LEDGER"
+fi
 # FIFO queue: oldest executable instruction that has not succeeded and has retries left.
 row="$(jq -r --argjson ledger "$(cat "$LEDGER")" --argjson max "$MAX_RETRIES" '
   [ .[] | select(.body|contains("[LOADDER-RUN]"))
