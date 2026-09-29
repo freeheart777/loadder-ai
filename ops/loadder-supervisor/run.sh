@@ -30,7 +30,7 @@ Execute only this instruction, validate it fully, commit coherent source/test ch
 EOF
 log "starting instruction $id"
 set +e
-"$CODEX" exec --cd "$WORKTREE" --sandbox workspace-write --approve-for-me --json -o "$result" - <"$prompt" >"$trace" 2>>"$LOG/supervisor.log"
+"$CODEX" exec --cd "$WORKTREE" --approve-for-me --json -o "$result" - <"$prompt" >"$trace" 2>>"$LOG/supervisor.log"
 rc=$?
 set -e
 report="$(cat "$result" 2>/dev/null||true)"; [[ -n "$report" ]]||report="Codex exited $rc without final message. Trace: $trace"
