@@ -33,7 +33,7 @@ if [[ -n "$success_ids" ]]; then
   while IFS= read -r sid; do
     [[ -n "$sid" ]] || continue
     next="$(mktemp)"
-    jq --arg id "$sid" 'if .[$id] then . else .[$id]={attempts:1,status:"success",migrated_from_v1:true} end' "$tmp_seed" >"$next"
+    jq --arg id "$sid" '.[$id]=((.[$id] // {}) + {status:"success",migrated_from_v1:true}) | .[$id].attempts = ([.[$id].attempts // 0, 1] | max)' "$tmp_seed" >"$next"
     mv "$next" "$tmp_seed"
   done <<<"$success_ids"
   mv "$tmp_seed" "$LEDGER"
