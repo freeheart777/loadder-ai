@@ -8,11 +8,17 @@ export function createBookingRepository(db) {
   const owns = (table,id) => Boolean(db.prepare(`SELECT 1 FROM ${table} WHERE id=? AND workspace_id=?`).get(id,ws()));
   return Object.freeze({
     listServices:()=>list("booking_services"), listProviders:()=>list("booking_providers"), listAppointments:()=>list("booking_appointments"),
+    listAssociations:()=>db.prepare("SELECT provider_id AS providerId, service_id AS serviceId, created_at AS createdAt FROM booking_provider_services WHERE workspace_id=? ORDER BY created_at DESC").all(ws()),
     createService: ({name,durationMinutes})=>map(insert("booking_services",{name,duration_minutes:durationMinutes,active:1})),
     createProvider: ({name})=>map(insert("booking_providers",{name,active:1})),
     associate(providerId,serviceId) { if(!owns("booking_providers",providerId)||!owns("booking_services",serviceId)) return false; db.prepare("INSERT OR IGNORE INTO booking_provider_services(workspace_id,provider_id,service_id,created_at) VALUES(?,?,?,?)").run(ws(),providerId,serviceId,now()); return true; },
     addAvailability({providerId,weekday,startsAt,endsAt}) { if(!owns("booking_providers",providerId)) return null; const id=crypto.randomUUID(); db.prepare("INSERT INTO booking_availability(id,workspace_id,provider_id,weekday,starts_at,ends_at,created_at) VALUES(?,?,?,?,?,?,?)").run(id,ws(),providerId,weekday,startsAt,endsAt,now()); return db.prepare("SELECT * FROM booking_availability WHERE id=? AND workspace_id=?").get(id,ws()); },
     listAvailability:()=>list("booking_availability"),
-    createAppointment({serviceId,providerId,customerName,startsAt}) { if(!owns("booking_services",serviceId)||!owns("booking_providers",providerId)) return null; return map(insert("booking_appointments",{service_id:serviceId,provider_id:providerId,customer_name:customerName,starts_at:startsAt,status:"PENDING"})); },
+    createAppointment({serviceId,providerId,customerName,startsAt}) {
+      if(!owns("booking_services",serviceId)||!owns("booking_providers",providerId)) return null;
+      const association=db.prepare("SELECT 1 FROM booking_provider_services WHERE workspace_id=? AND provider_id=? AND service_id=?").get(ws(),providerId,serviceId);
+      if(!association) return null;
+      return map(insert("booking_appointments",{service_id:serviceId,provider_id:providerId,customer_name:customerName,starts_at:startsAt,status:"PENDING"}));
+    },
   });
 }

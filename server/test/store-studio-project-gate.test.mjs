@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = path.resolve(process.cwd(), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 
 test("Store Studio is gated behind a readable persistent STORE project", () => {
@@ -28,10 +29,10 @@ test("Commerce manager uses the same active-store identity contract", () => {
   assert.match(wrapper, /<StoreCommerceManagerPageCore/);
 });
 
-test("all website builder entry routes converge on one canonical gated V16", () => {
+test("legacy Store Studio entry routes converge on one canonical gated V16", () => {
   const app = read("src/App.tsx");
-  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites" replace \/>/);
-  assert.match(app, /path="\/dashboard\/websites" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
+  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites\/store" replace \/>/);
+  assert.match(app, /path="\/dashboard\/websites" element=\{<WebsiteProjectsPage \/>\}/);
   for (const route of [
     "/dashboard/websites/new",
     "/dashboard/websites/quick-start",

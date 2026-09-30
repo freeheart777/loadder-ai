@@ -68,7 +68,7 @@ export function mountSiteBuilderControlPlane({
 
   const mountPath = basePath || "/";
   app.use(mountPath, createSiteProjectsRouter({ service: projectService }));
-  app.use(mountPath, createBookingRouter({ repository: bookingRepository }));
+  app.use(mountPath, createBookingRouter({ repository: bookingRepository, siteProjectService: projectService }));
   app.use(mountPath, createControlCenterRouter({ service: controlCenterService }));
   app.use(
     mountPath,

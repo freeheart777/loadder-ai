@@ -12,6 +12,8 @@ export type WebsiteTemplate = {
   label: string;
   description: string;
   siteKind: SiteKind;
+  /** Persisted Site Project vertical. The canvas kind remains STORE/BUSINESS. */
+  siteType: "MEDICAL" | "LEGAL" | "CORPORATE" | "EDUCATION" | "ECOMMERCE" | "HYBRID" | "STORE";
   design?: Partial<DesignConfig>;
   header?: Partial<HeaderConfig>;
   hero?: Partial<HeroConfig>;

@@ -25,9 +25,9 @@ export const LEGACY_CAPABILITY_MAP = Object.freeze({
 /** Integrations, never loaded by the website runtime. */
 const INTEGRATION_CAPABILITIES = new Set(["analytics", "ads"]);
 
-/** Current compatibility rule: commerce is gated by siteType, not by capabilities (changes in ADR-004 phase 3). */
+/** Commerce is available only to the persisted commerce-capable verticals. */
 const COMMERCE_CAPABILITIES = new Set(["commerce", "payments"]);
-const isStore = (project) => String(project?.siteType || "").toUpperCase() === "STORE";
+const isCommerceProject = (project) => new Set(["STORE", "ECOMMERCE", "HYBRID"]).has(String(project?.siteType || "").toUpperCase());
 
 const declaredCapabilities = (project, content) => {
   const stored = content?.websitePlatform?.capabilities;
@@ -52,7 +52,7 @@ export function resolveCapabilities(project, content = project?.content) {
     else if (name) ignored.add(INTEGRATION_CAPABILITIES.has(name) ? name : String(raw).trim());
   }
   for (const name of COMMERCE_CAPABILITIES) {
-    if (isStore(project)) found.add(name);
+    if (isCommerceProject(project)) found.add(name);
     else found.delete(name);
   }
   const ordered = SUPPORTED_CAPABILITIES.filter((name) => found.has(name));

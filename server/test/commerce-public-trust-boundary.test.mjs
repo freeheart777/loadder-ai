@@ -214,7 +214,11 @@ test("migration remains backward-compatible for internal legacy carts and orders
   const orderColumns = new Set(db.prepare("PRAGMA table_info(ecommerce_orders)").all().map((row) => row.name));
   assert.ok(cartColumns.has("public_capability_hash"));
   assert.ok(orderColumns.has("receipt_capability_hash"));
-  assert.equal(db.prepare("SELECT MAX(version) AS value FROM schema_migrations").get().value, 91);
+  assert.equal(
+    db.prepare("SELECT MAX(version) AS value FROM schema_migrations").get().value,
+    Math.max(...migrations.map((migration) => migration.version)),
+    "the fixture applies the current registered migration set"
+  );
 });
 
 test("upgrade migration preserves pre-086 cart and order rows with nullable capabilities", () => {

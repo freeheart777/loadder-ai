@@ -17,6 +17,6 @@ test("booking operations are persistent, associated and tenant isolated", () => 
 
 test("control center is truthful for empty and capability-enabled workspaces",()=>{
  const db=createSiteTestDb(), projects=createSiteProjectService({repository:createSiteProjectRepository(db),businessContextService:{getCurrent:()=>({activeContext:null,isStale:false})}}), service=createControlCenterService({repository:createControlCenterRepository(db),siteProjectService:projects});
- runWithWorkspace("ws-2",()=>{const s=service.summary();assert.deepEqual(s.counts,{projects:0,services:0,providers:0,appointments:0,leads:0,orders:0});assert.deepEqual(s.capabilities,[]);});
- runWithWorkspace("ws-1",()=>{projects.create({name:"کلینیک",siteType:"MEDICAL"});const s=service.summary();assert.ok(s.capabilities.includes("booking"));assert.ok(s.actions.some(a=>a.id==="booking"));}); db.close();
+ runWithWorkspace("ws-2",()=>{const s=service.summary();assert.deepEqual(s.counts,{projects:0,services:0,providers:0,appointments:0,leads:0,orders:0});assert.deepEqual(s.capabilities,[]);assert.deepEqual(s.actions,[]);});
+ runWithWorkspace("ws-1",()=>{projects.create({name:"کلینیک",siteType:"MEDICAL"});projects.create({name:"فروشگاه",siteType:"STORE"});const s=service.summary();assert.ok(s.capabilities.includes("booking"));assert.deepEqual(s.actions.find(a=>a.id==="booking"),{id:"booking",href:"/dashboard/booking"});assert.deepEqual(s.actions.find(a=>a.id==="customers"),{id:"customers",href:"/dashboard/crm"});assert.deepEqual(s.actions.find(a=>a.id==="commerce"),{id:"commerce",href:"/dashboard/websites/commerce"});}); db.close();
 });

@@ -4,6 +4,7 @@ import { SitePatchError } from "../services/site-document-patch-service.mjs";
 import { InstructionTranslatorError } from "../services/v16-instruction-translator.mjs";
 import { environment } from "../config/environment.mjs";
 import { previewSiteUrl } from "../services/public-site-urls.mjs";
+import { resolveCapabilities } from "../site-platform/capability-resolver.mjs";
 
 export function createSiteProjectsRouter({ service, publicSiteBaseUrl = environment.publicSiteBaseUrl }) {
   const router = express.Router();
@@ -25,13 +26,17 @@ export function createSiteProjectsRouter({ service, publicSiteBaseUrl = environm
     catch (error) { console.error(`Site project optional ${label} error:`, error); return fallback; }
   };
   router.get("/site-projects", (req, res) => { try { return res.json({ success: true, projects: service.list() }); } catch (e) { return handle(e, res); } });
-  router.post("/site-projects", (req, res) => { try { return res.status(201).json({ success: true, project: service.create(req.body || {}) }); } catch (e) { return handle(e, res); } });
+  router.post("/site-projects", (req, res) => { try { const project = service.create(req.body || {}); return res.status(201).json({ success: true, project, capabilities: resolveCapabilities(project).capabilities }); } catch (e) { return handle(e, res); } });
   router.get("/site-projects/:id", (req, res) => {
     try {
       const project = service.get(req.params.id);
       return res.json({
         success: true,
         project,
+        // The Studio must use server-resolved, persisted capability truth for
+        // its integration links. Do not make the browser infer a vertical from
+        // a template name or site type.
+        capabilities: resolveCapabilities(project).capabilities,
         assets: optional(() => service.assets(req.params.id), [], "assets"),
         versions: optional(() => service.versions(req.params.id), [], "versions"),
         domains: optional(() => service.domains(req.params.id), [], "domains"),

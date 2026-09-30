@@ -106,3 +106,17 @@ test("HTTP: template selection → create twice → both 201", async () => {
     server.close();
   }
 });
+
+test("all approved starter site types are accepted and retain their platform definition", () => {
+  const { service } = setup();
+  const expected = {
+    MEDICAL: "doctor", LEGAL: "lawyer", CORPORATE: "corporate", EDUCATION: "education", ECOMMERCE: "store", HYBRID: "hybrid",
+  };
+  runWithWorkspace("ws-1", () => {
+    for (const [siteType, archetype] of Object.entries(expected)) {
+      const project = service.create({ name: `starter ${siteType}`, siteType, content: templateDoc });
+      assert.equal(project.siteType, siteType);
+      assert.equal(project.content.websitePlatform.archetype, archetype);
+    }
+  });
+});

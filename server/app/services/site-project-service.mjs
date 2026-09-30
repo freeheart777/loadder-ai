@@ -4,7 +4,7 @@ import { ensureWebsitePlatformContent } from "./website-platform-definition.mjs"
 import { validateSiteDocument } from "./site-page-model.mjs";
 import { translateInstruction } from "./v16-instruction-translator.mjs";
 
-const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL"]);
+const TYPES = new Set(["BUSINESS", "STORE", "NEWS", "LEGAL", "MEDICAL", "CORPORATE", "EDUCATION", "ECOMMERCE", "HYBRID"]);
 const ASSET_KINDS = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
 const MAX_ASSET_NAME = 200;
 const MAX_ASSET_URL = 8 * 1024 * 1024;

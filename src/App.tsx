@@ -16,6 +16,8 @@ const ExperienceShell = import.meta.env.DEV
   : null;
 
 const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
+const WebsiteProjectsPage = lazy(() => import("./pages/WebsiteProjectsPage"));
+const BookingStudioPage = lazy(() => import("./pages/BookingStudioPage"));
 const CorporateWebsiteStudioPage = lazy(() => import("./pages/CorporateWebsiteStudioPage"));
 const PublicCorporateSitePage = lazy(() => import("./pages/PublicCorporateSitePage"));
 const PublicBusinessAppPage = lazy(() => import("./pages/PublicBusinessAppPage"));
@@ -64,7 +66,7 @@ const HomePage = lazy(() => import("./pages/HomePage")),
   PublicOrderSuccessPage = lazy(() => import("./pages/PublicOrderSuccessPage")),
   SiteOperationsDashboardPage = lazy(() => import("./pages/SiteOperationsDashboardPage"));
 
-const canonicalBuilder = <Navigate to="/dashboard/websites" replace />;
+const canonicalBuilder = <Navigate to="/dashboard/websites/store" replace />;
 
 export default function App() {
   return (
@@ -123,7 +125,9 @@ export default function App() {
               <Route path="/dashboard/business-builder/integrations" element={<BusinessBuilderIntegrationsPage />} />
               <Route path="/dashboard/business-builder/apps/:projectId" element={<GeneratedBusinessAppPage />} />
 
-              <Route path="/dashboard/websites" element={<StoreWebsiteStudioPageV16 />} />
+              <Route path="/dashboard/websites" element={<WebsiteProjectsPage />} />
+              <Route path="/dashboard/websites/store" element={<StoreWebsiteStudioPageV16 />} />
+              <Route path="/dashboard/booking" element={<BookingStudioPage />} />
               <Route path="/dashboard/websites/corporate" element={<CorporateWebsiteStudioPage />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
               <Route path="/dashboard/websites/admin" element={<StoreAdminDashboardPage />} />

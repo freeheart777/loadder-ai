@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
 import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
 import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCanvas";
@@ -15,7 +15,7 @@ import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
 import { invalidateActiveStoreProject } from "../lib/activeStoreProject";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
-type Project = { id: string; name?: string; status?: string; content: Record<string, any> };
+type Project = { id: string; name?: string; siteType?: string; status?: string; content: Record<string, any> };
 type ProductDraft = {
   name: string;
   basePriceMinor: string;
@@ -176,7 +176,7 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
         </button>)}
       </div>}
       {/* Store stays STORE: this only links to the canonical store creation flow. */}
-      {!commerce && <Link to="/dashboard/websites?new=1" data-store-entry className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-right transition hover:border-emerald-400/50 hover:bg-emerald-400/10"><span><b className="block text-sm">فروشگاه اینترنتی</b><span className="mt-1 block text-[11px] leading-5 text-white/40">فروش آنلاین محصولات با کاتالوگ، سبد خرید و سفارش؛ در سازنده فروشگاه ساخته می‌شود.</span></span><span className="shrink-0 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-white/60">سازنده فروشگاه ←</span></Link>}
+      {!commerce && <Link to="/dashboard/websites/store?new=1" data-store-entry className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-right transition hover:border-emerald-400/50 hover:bg-emerald-400/10"><span><b className="block text-sm">فروشگاه اینترنتی</b><span className="mt-1 block text-[11px] leading-5 text-white/40">فروش آنلاین محصولات با کاتالوگ، سبد خرید و سفارش؛ در سازنده فروشگاه ساخته می‌شود.</span></span><span className="shrink-0 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-white/60">سازنده فروشگاه ←</span></Link>}
       {message && <p role="alert" className="mt-4 rounded-xl bg-rose-500/10 p-3 text-xs font-bold text-rose-300">{message}</p>}
       <div className="mt-6 flex flex-col gap-2">
         {templates.length > 0 && <button type="button" disabled={creating || !selectedTemplateId} onClick={onCreate} className="min-h-12 rounded-xl bg-emerald-400 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{creating ? "در حال ساخت…" : "ساخت از روی قالب انتخاب‌شده"}</button>}
@@ -187,6 +187,7 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
 }
 
 export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { siteKind?: SiteKind } = {}) {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProjectId = searchParams.get("project");
   const forceCreate = searchParams.get("new") === "1";
@@ -195,6 +196,10 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [project, setProject] = useState<Project | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
+  // These come from the Site Projects API, which resolves the persisted
+  // Website Platform document on the server. They are deliberately not
+  // inferred from template labels or the current canvas kind.
+  const [capabilities, setCapabilities] = useState<string[]>([]);
   const [config, setConfig] = useState<StudioConfig>(() => restoreConfig({}, siteKind));
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [tab, setTab] = useState<"context" | "sections" | "design" | "pages">("context");
@@ -238,6 +243,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         }
         setNeedsCreate(false);
         setProject(null);
+        setCapabilities([]);
         // apiFetch answers GET /api/site-projects from the single canonical
         // store snapshot (set by the /dashboard/websites gate). A specific other
         // store — one just created from a template, or opened via ?project= —
@@ -245,16 +251,21 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         if (commerce && requestedProjectId && requestedProjectId !== getCanonicalStoreProjectId()) invalidateActiveStoreProject();
         const listing = await read(await apiFetch("/api/site-projects", { signal: c.signal }));
         const projects = Array.isArray(listing.projects) ? listing.projects : [];
+        const isCompatibleProject = (item: any) => {
+          const type = String(item?.siteType || "").toUpperCase();
+          return siteKind === "STORE" ? type === "STORE" || type === "ECOMMERCE" : type !== "STORE" && type !== "ECOMMERCE";
+        };
         const selected = requestedProjectId
-          ? projects.find((item: any) => String(item.id) === requestedProjectId && String(item.siteType).toUpperCase() === siteKind)
-          : projects.find((item: any) => String(item.siteType).toUpperCase() === siteKind);
+          ? projects.find((item: any) => String(item.id) === requestedProjectId && isCompatibleProject(item))
+          : projects.find(isCompatibleProject);
         if (requestedProjectId && !selected) throw new Error("این وب‌سایت در دسترس نیست یا از نوع دیگری است.");
         if (!selected) { setNeedsCreate(true); return; }
         const detail = await read(await apiFetch(`/api/site-projects/${selected.id}`, { signal: c.signal }));
         const loaded = detail.project as Project;
         setProject(loaded);
+        setCapabilities(Array.isArray(detail.capabilities) ? detail.capabilities.filter((value: unknown): value is string => typeof value === "string") : []);
         draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
-        const loadedConfig = restoreConfig(loaded.content || {}, siteKind);
+        const loadedConfig = restoreConfig(loaded.content || {}, String(loaded.siteType).toUpperCase() === "STORE" ? "STORE" : "BUSINESS");
         setConfig(loadedConfig);
         savedDocument.current = editorDocumentKey(loadedConfig);
         if (showPreviewOnOpen) setPreviewOpen(true);
@@ -528,17 +539,22 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       const out = await read(await apiFetch("/api/site-projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, siteType: siteKind, content }),
+        body: JSON.stringify({ name, siteType: template?.siteType || (siteKind === "STORE" ? "STORE" : "CORPORATE"), content }),
       }));
       const createdProject = out.project as Project;
       setProject(createdProject);
+      setCapabilities(Array.isArray(out.capabilities) ? out.capabilities.filter((value: unknown): value is string => typeof value === "string") : []);
       draftRevision.current = null;
       const createdConfig = restoreConfig(createdProject.content || {}, siteKind);
       setConfig(createdConfig);
       savedDocument.current = editorDocumentKey(createdConfig);
       setAssets([]);
       setNeedsCreate(false);
-      setSearchParams({ project: createdProject.id }, { replace: true });
+      if (template?.siteKind === "STORE" && siteKind !== "STORE") {
+        navigate(`/dashboard/websites/store?project=${encodeURIComponent(createdProject.id)}`, { replace: true });
+      } else {
+        setSearchParams({ project: createdProject.id }, { replace: true });
+      }
       if (commerce) {
         const catalog = await read(await apiFetch(`/api/stores/${createdProject.id}/products`));
         setProducts(catalog.products || []);
@@ -667,6 +683,11 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // For a single-page site (every STORE) this is exactly config.sections.
   const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
   const hasUnsavedChanges = Boolean(project && savedDocument.current !== editorDocumentKey(config));
+  const managerLinks = [
+    capabilities.includes("blog") ? { id: "content", to: "/dashboard/content", label: "مدیریت محتوا" } : null,
+    capabilities.includes("commerce") ? { id: "commerce", to: "/dashboard/websites/commerce", label: "مدیریت فروش" } : null,
+    capabilities.includes("booking") ? { id: "booking", to: "/dashboard/booking", label: "مدیریت نوبت‌دهی" } : null,
+  ].filter((link): link is { id: string; to: string; label: string } => Boolean(link));
   const publishedUrl = project?.status === "PUBLISHED" ? `${commerce ? "/store" : "/site"}/${project.id}` : "";
   const inspectorProps = {
     config: canvasConfig, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection,
@@ -694,13 +715,17 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     <header className="flex min-h-20 items-center gap-3 border-b border-white/10 bg-[#0a111b] px-4 py-3">
       <Link to="/dashboard" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10"><ArrowRight /></Link>
       <div className="min-w-36"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO · V16</div><h1 className="font-black">{project?.name || (commerce ? "فروشگاه شما" : "وب‌سایت شما")}</h1><p className={`mt-1 flex items-center gap-1 text-[10px] ${hasUnsavedChanges ? "text-amber-200" : "text-white/35"}`}><CursorClick />{hasUnsavedChanges ? "تغییرات ذخیره‌نشده" : "همه تغییرات ذخیره شده"}</p></div>
-      <Link to={`${commerce ? "/dashboard/websites" : "/dashboard/websites/corporate"}?new=1`} className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/65 hover:bg-white/[.05] xl:flex">سایت جدید</Link>
+      <Link to="/dashboard/websites" className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/65 hover:bg-white/[.05] xl:flex">سایت‌های من</Link>
+      {managerLinks.map((link) => <Link key={link.id} to={link.to} data-site-manager={link.id} className="hidden min-h-10 items-center rounded-xl border border-sky-300/20 bg-sky-400/10 px-3 text-[10px] font-bold text-sky-100 hover:bg-sky-400/20 lg:flex">{link.label}</Link>)}
       {publishedUrl && <a href={publishedUrl} target="_blank" rel="noreferrer" className="hidden min-h-10 items-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 lg:flex">آدرس عمومی <ArrowRight size={13} className="rotate-[-45deg]"/></a>}
       <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
       <section className="order-2 min-h-0 overflow-auto bg-[#dfe5ec] p-3 lg:order-1 lg:p-5">
+        {managerLinks.length > 0 && <nav data-site-manager-menu className="mx-auto mb-3 grid w-full max-w-[390px] grid-cols-1 gap-2 lg:hidden">
+          {managerLinks.map((link) => <Link key={link.id} to={link.to} data-site-manager={link.id} className="min-h-11 rounded-xl border border-sky-300/25 bg-sky-950 px-3 py-3 text-center text-xs font-black text-sky-100">{link.label}</Link>)}
+        </nav>}
         <div className="sticky top-2 z-40 mx-auto mb-3 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-white/15 bg-[#111827]/92 p-1.5 shadow-xl backdrop-blur">
           <span className="px-3 py-2 text-[10px] font-bold text-emerald-200">عکس‌ها: مستقیم روی خود تصویر</span>
           <button onClick={() => setTemplatePickerOpen(true)} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">قالب‌ها</button>

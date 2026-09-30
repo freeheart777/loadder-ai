@@ -1,19 +1,28 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import StoreWebsiteStudioPageV16Core from "./StoreWebsiteStudioPageV16Core";
-import { loadActiveStoreProject } from "../lib/activeStoreProject";
+import { loadActiveStoreProject, loadStoreProjectById } from "../lib/activeStoreProject";
 
 type GateState = "loading" | "ready" | "error";
 
 export default function StoreWebsiteStudioPageV16() {
+  const [searchParams] = useSearchParams();
+  const forceCreate = searchParams.get("new") === "1";
+  const requestedProjectId = searchParams.get("project");
   const [state, setState] = useState<GateState>("loading");
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    if (forceCreate) {
+      setState("ready");
+      setError("");
+      return () => { active = false; };
+    }
     setState("loading");
     setError("");
-    void loadActiveStoreProject()
+    void (requestedProjectId ? loadStoreProjectById(requestedProjectId) : loadActiveStoreProject())
       .then(() => { if (active) setState("ready"); })
       .catch((cause) => {
         if (!active) return;
@@ -21,7 +30,7 @@ export default function StoreWebsiteStudioPageV16() {
         setState("error");
       });
     return () => { active = false; };
-  }, [attempt]);
+  }, [attempt, forceCreate, requestedProjectId]);
 
   if (state === "ready") return (
     <>

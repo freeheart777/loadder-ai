@@ -6,7 +6,7 @@ import {
 } from "../app/site-platform/capability-resolver.mjs";
 import { ensureWebsitePlatformContent } from "../app/services/website-platform-definition.mjs";
 
-const SITE_TYPES = ["STORE", "BUSINESS", "MEDICAL", "LEGAL", "NEWS", "UNKNOWN", undefined];
+const SITE_TYPES = ["STORE", "BUSINESS", "MEDICAL", "LEGAL", "CORPORATE", "EDUCATION", "ECOMMERCE", "HYBRID", "NEWS", "UNKNOWN", undefined];
 // The content a site project actually stores after creation.
 const created = (siteType) => ensureWebsitePlatformContent({}, { siteType, name: "نمونه" });
 
@@ -22,16 +22,24 @@ test("BUSINESS resolves core + forms + blog + people and never commerce", () => 
   });
 });
 
-test("MEDICAL recognizes booking as unregistered", () => {
+test("MEDICAL resolves registered booking", () => {
   assert.deepEqual(resolveCapabilities({ siteType: "MEDICAL" }, created("MEDICAL")), {
-    capabilities: ["core", "forms", "blog"], unregistered: ["booking"], ignored: ["ads", "analytics"], source: "document",
+    capabilities: ["core", "forms", "blog", "booking"], unregistered: [], ignored: ["ads", "analytics"], source: "document",
   });
 });
 
-test("LEGAL recognizes booking as unregistered and keeps people", () => {
+test("LEGAL resolves registered booking and keeps people", () => {
   assert.deepEqual(resolveCapabilities({ siteType: "LEGAL" }, created("LEGAL")), {
-    capabilities: ["core", "forms", "blog", "people"], unregistered: ["booking"], ignored: ["ads", "analytics"], source: "document",
+    capabilities: ["core", "forms", "blog", "people", "booking"], unregistered: [], ignored: ["ads", "analytics"], source: "document",
   });
+});
+
+test("approved starters persist their vertical capabilities", () => {
+  assert.deepEqual(resolveCapabilities({ siteType: "ECOMMERCE" }, created("ECOMMERCE")).capabilities, ["core", "commerce", "payments", "forms"]);
+  assert.deepEqual(resolveCapabilities({ siteType: "HYBRID" }, created("HYBRID")).capabilities, ["core", "commerce", "payments", "forms", "blog", "people"]);
+  const education = resolveCapabilities({ siteType: "EDUCATION" }, created("EDUCATION"));
+  assert.ok(education.capabilities.includes("blog"));
+  assert.deepEqual(education.unregistered, ["courses"]);
 });
 
 test("legacy names map to canonical capabilities", () => {
@@ -43,7 +51,7 @@ test("legacy names map to canonical capabilities", () => {
   assert.equal(LEGACY_CAPABILITY_MAP.content, "blog");
 });
 
-test("compatibility: commerce and payments present if and only if siteType is STORE", () => {
+test("compatibility: commerce and payments are limited to persisted commerce verticals", () => {
   for (const siteType of SITE_TYPES) {
     const variants = [
       resolveCapabilities({ siteType }, created(siteType)),
@@ -52,7 +60,7 @@ test("compatibility: commerce and payments present if and only if siteType is ST
       resolveCapabilities({ siteType }, { websitePlatform: { capabilities: [] } }),
     ];
     for (const { capabilities } of variants) {
-      const expected = siteType === "STORE";
+      const expected = siteType === "STORE" || siteType === "ECOMMERCE" || siteType === "HYBRID";
       assert.equal(capabilities.includes("commerce"), expected, `${siteType} commerce`);
       assert.equal(capabilities.includes("payments"), expected, `${siteType} payments`);
     }
@@ -71,8 +79,8 @@ test("stored capabilities win over archetype defaults", () => {
 
 test("courses is recognized but unregistered until its phase ships", () => {
   const result = resolveCapabilities({ siteType: "BUSINESS" }, { websitePlatform: { capabilities: ["courses", "booking"] } });
-  assert.deepEqual(result.capabilities, ["core"]);
-  assert.deepEqual(result.unregistered, ["booking", "courses"]);
+  assert.deepEqual(result.capabilities, ["core", "booking"]);
+  assert.deepEqual(result.unregistered, ["courses"]);
 });
 
 test("missing or malformed content falls back to archetype defaults", () => {
@@ -91,8 +99,8 @@ test("content defaults to project.content", () => {
 
 test("core is always present; output is ordered, unique and canonical", () => {
   const result = resolveCapabilities({ siteType: "STORE" }, { websitePlatform: { capabilities: ["forms", "lead", " Forms ", "catalog", "commerce", null, 42, "", "booking"] } });
-  assert.deepEqual(result.capabilities, ["core", "commerce", "payments", "forms"]);
-  assert.deepEqual(result.unregistered, ["booking"]);
+  assert.deepEqual(result.capabilities, ["core", "commerce", "payments", "forms", "booking"]);
+  assert.deepEqual(result.unregistered, []);
   assert.deepEqual(result.ignored, [], "non-string and empty entries are skipped");
   for (const name of [...result.capabilities, ...result.unregistered]) assert.ok(SUPPORTED_CAPABILITIES.includes(name));
 });

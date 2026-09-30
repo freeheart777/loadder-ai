@@ -16,7 +16,7 @@ const medicalCards = (id: string, type: "services" | "team", title: string, navL
   ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
 
 const medical: WebsiteTemplate = {
-  id: "medical-practice-v1", label: "کلینیک و پزشک", description: "معرفی پزشک، خدمات درمانی و درخواست نوبت.", siteKind: "BUSINESS",
+  id: "medical-practice-v1", label: "کلینیک و پزشک", description: "معرفی پزشک، خدمات درمانی و درخواست نوبت.", siteKind: "BUSINESS", siteType: "MEDICAL",
   design: { primaryColor: "#0f766e", secondaryColor: "#ccfbf1" }, header: { storeName: "کلینیک شما" },
   hero: { layout: "background", eyebrow: "مراقبت درمانی حرفه‌ای", title: "مراقبت از سلامت شما، با آرامش و دقت", subtitle: "خدمات تخصصی، توضیح روشن مسیر درمان و پیگیری پس از مراجعه در یک مکان.", ctaLabel: "رزرو نوبت", ctaHref: "#contact-main", imageUrl: templatePhoto("medical/hero"), backgroundColor: "#134e4a", overlayOpacity: 52 },
   sections: [
@@ -45,7 +45,7 @@ const legalCards = (id: string, type: "services" | "team" | "portfolio", title: 
   ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
 
 const legal: WebsiteTemplate = {
-  id: "legal-firm-v1", label: "موسسه حقوقی", description: "معرفی وکلا، تخصص‌ها، تجربه‌ها و درخواست مشاوره.", siteKind: "BUSINESS",
+  id: "legal-firm-v1", label: "موسسه حقوقی", description: "معرفی وکلا، تخصص‌ها، تجربه‌ها و درخواست مشاوره.", siteKind: "BUSINESS", siteType: "LEGAL",
   design: { primaryColor: "#a16207", secondaryColor: "#fef3c7" }, header: { storeName: "موسسه حقوقی شما" },
   hero: { layout: "background", eyebrow: "مشاوره و وکالت تخصصی", title: "همراه حقوقی شما در تصمیم‌های مهم", subtitle: "از اولین جلسه مشاوره تا پایان پرونده، مسیر حقوقی را روشن توضیح می‌دهیم و با دقت پیگیری می‌کنیم.", ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main", imageUrl: templatePhoto("legal/hero"), backgroundColor: "#292524", overlayOpacity: 58 },
   sections: [
@@ -75,7 +75,7 @@ const educationCards = (id: string, type: "services" | "team", title: string, na
   ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
 
 const education: WebsiteTemplate = {
-  id: "education-center-v1", label: "مرکز آموزشی", description: "دوره‌ها، مدرسان، تجربه دانش‌پذیران و ثبت‌نام.", siteKind: "BUSINESS",
+  id: "education-center-v1", label: "مرکز آموزشی", description: "دوره‌ها، مدرسان، تجربه دانش‌پذیران و ثبت‌نام.", siteKind: "BUSINESS", siteType: "EDUCATION",
   design: { primaryColor: "#4338ca", secondaryColor: "#e0e7ff" }, header: { storeName: "آموزشگاه شما" },
   hero: { layout: "centered", eyebrow: "آموزش کاربردی، قدم‌به‌قدم", title: "مهارتی که در عمل به کار می‌آید", subtitle: "دوره‌های عملی با مسیر یادگیری روشن و همراهی مدرس در هر مرحله.", ctaLabel: "درخواست ثبت‌نام", ctaHref: "#contact-main", imageUrl: templatePhoto("education/hero"), backgroundColor: "#312e81", overlayOpacity: 60 },
   sections: [
@@ -99,7 +99,7 @@ const corporateCards = (id: string, type: "services" | "portfolio", title: strin
   ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
 
 const corporate: WebsiteTemplate = {
-  id: "corporate-company-v1", label: "شرکت حرفه‌ای", description: "درباره شرکت، خدمات، نمونه‌کارها، مشتریان و تماس.", siteKind: "BUSINESS",
+  id: "corporate-company-v1", label: "شرکت حرفه‌ای", description: "درباره شرکت، خدمات، نمونه‌کارها، مشتریان و تماس.", siteKind: "BUSINESS", siteType: "CORPORATE",
   design: { primaryColor: "#0369a1", secondaryColor: "#e0f2fe" }, header: { storeName: "شرکت شما" },
   hero: { layout: "split", eyebrow: "راهکارهای حرفه‌ای برای رشد کسب‌وکار", title: "همراه مطمئن کسب‌وکار شما", subtitle: "خدمات، توانمندی‌ها و پروژه‌های مجموعه خود را روشن و حرفه‌ای به مشتریان معرفی کنید.", ctaLabel: "درخواست مشاوره", ctaHref: "#contact-main", imageUrl: templatePhoto("corporate/hero") },
   sections: [
@@ -122,4 +122,15 @@ const corporate: WebsiteTemplate = {
   ],
 };
 
-export const businessLaunchTemplates: readonly WebsiteTemplate[] = [medical, legal, education, corporate];
+const hybrid: WebsiteTemplate = {
+  id: "hybrid-business-v1", label: "کسب‌وکار ترکیبی", description: "صفحات معرفی، مقالات و فروش محصولات در یک سایت.", siteKind: "BUSINESS", siteType: "HYBRID",
+  design: { primaryColor: "#0f766e", secondaryColor: "#ecfdf5" }, header: { storeName: "کسب‌وکار شما" },
+  hero: { layout: "split", eyebrow: "کسب‌وکار شما، یکپارچه و حرفه‌ای", title: "معرفی، محتوا و فروش در یک سایت", subtitle: "داستان کسب‌وکار، مقاله‌ها و محصولات خود را در کنار هم به مشتریان نشان دهید.", ctaLabel: "مشاهده محصولات", ctaHref: "#products-main", imageUrl: templatePhoto("corporate/hero") },
+  sections: [
+    section("about-main", "about", "درباره ما", "داستان کسب‌وکار ما", { showInNav: true, navLabel: "درباره ما", imageUrl: templatePhoto("corporate/about"), body: "در این بخش داستان شکل‌گیری کسب‌وکار، رویکرد و ارزش پیشنهادی خود را معرفی کنید." }),
+    story("articles-main", "مقالات", "مقالات", "دانش و تجربه ما", "مقاله‌ها و راهنماهای مفید خود را در این بخش منتشر کنید."),
+    { ...contact("شروع گفتگو"), subtitle: "اطلاعات تماس خود را ثبت کنید تا با شما در ارتباط باشیم." },
+  ],
+};
+
+export const businessLaunchTemplates: readonly WebsiteTemplate[] = [medical, legal, education, corporate, hybrid];

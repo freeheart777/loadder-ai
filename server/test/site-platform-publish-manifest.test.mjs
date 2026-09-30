@@ -58,8 +58,8 @@ test("builder: unknown capabilities and section types are reported, never thrown
     storeBuilderV16: { sections: [section("h", "hologram", "?"), section("a", "about", "a"), { type: 7 }, null, "text"] },
   };
   const manifest = buildCapabilityManifest({ siteType: "MEDICAL" }, content);
-  assert.deepEqual(manifest.capabilities, ["core", "forms"]);
-  assert.deepEqual(manifest.unregisteredCapabilities, ["booking", "courses"]);
+  assert.deepEqual(manifest.capabilities, ["core", "forms", "booking"]);
+  assert.deepEqual(manifest.unregisteredCapabilities, ["courses"]);
   assert.deepEqual(manifest.sectionTypes, ["core.about"]);
   assert.deepEqual(manifest.unknownSectionTypes, ["hologram"]);
 });
@@ -125,8 +125,8 @@ test("publish: unknown capabilities do not break publishing", () => {
     const project = service.create({ name: "مطب", siteType: "MEDICAL", content });
     service.publish(project.id);
     const { manifest } = repository.getPublishedPublic(project.id).version;
-    assert.deepEqual(manifest.capabilities, ["core", "people"]);
-    assert.deepEqual(manifest.unregisteredCapabilities, ["booking"]);
+    assert.deepEqual(manifest.capabilities, ["core", "people", "booking"]);
+    assert.deepEqual(manifest.unregisteredCapabilities, []);
   });
 });
 

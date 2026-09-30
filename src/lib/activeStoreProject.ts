@@ -75,6 +75,24 @@ export async function loadActiveStoreProject(fetcher: Fetcher = apiFetch): Promi
   return canonicalProjectPromise;
 }
 
+/**
+ * Opens a merchant-selected Store or Ecommerce Site Project without creating
+ * a separate default STORE project. Ecommerce is deliberately rendered by the
+ * canonical Store Studio, while its selected project remains the active one.
+ */
+export async function loadStoreProjectById(projectId: string, fetcher: Fetcher = apiFetch): Promise<ActiveStoreProjectDetail> {
+  const id = String(projectId || "").trim();
+  if (!id) throw new Error("شناسه پروژه فروشگاه نامعتبر است.");
+  const detail = await read(await fetcher(`/api/site-projects/${encodeURIComponent(id)}`));
+  const type = String(detail?.project?.siteType || "").toUpperCase();
+  if (type !== "STORE" && type !== "ECOMMERCE") throw new Error("این پروژه یک فروشگاه نیست.");
+  if (fetcher === apiFetch) {
+    canonicalProjectPromise = null;
+    setCanonicalStoreProjectSnapshot(detail as Record<string, unknown>);
+  }
+  return detail as ActiveStoreProjectDetail;
+}
+
 export async function ensureActiveStoreProject(fetcher: Fetcher = apiFetch): Promise<ActiveStoreProject> {
   return (await loadActiveStoreProject(fetcher)).project;
 }

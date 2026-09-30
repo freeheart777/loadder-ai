@@ -444,11 +444,12 @@ test("STORE and Corporate documents survive the tracked path unchanged", () => {
   db.close();
 });
 
-test("migration 091 is registered exactly once with no collision", () => {
+test("site-document migrations through 093 are registered exactly once with no collision", () => {
   const versions = migrations.map((m) => m.version);
   assert.equal(versions.filter((v) => v === 91).length, 1);
+  assert.equal(versions.filter((v) => v === 93).length, 1);
   assert.equal(versions.length, new Set(versions).size);
-  assert.equal(Math.max(...versions), 91);
+  assert.equal(Math.max(...versions), 93);
   assert.ok(!versions.includes(88), "088 stays reserved for the open inventory PR");
 
   const db = createSiteTestDb();
@@ -528,6 +529,24 @@ test("the HTTP draft mutation surface is tracked, CAS-guarded and idempotent", a
     assert.equal(retry.status, 200);
     assert.equal(retry.body.applied, false);
     assert.deepEqual(ws(() => service.documentRevisions(project.id)).map((r) => r.revision), [1, 2]);
+  } finally { await close(); }
+});
+
+test("the Site Project API exposes persisted resolved capabilities for canonical manager links", async () => {
+  const { call, close } = await httpFixture();
+  try {
+    const created = await call("POST", "/site-projects", {
+      name: "کلینیک بدون داده ساختگی",
+      siteType: "MEDICAL",
+      content: { websitePlatform: { schemaVersion: 1, capabilities: ["booking", "content"], pages: [], integrations: { analytics: [], ads: [] }, conversionGoals: [] } },
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(created.body.capabilities, ["core", "blog", "booking"]);
+
+    const detail = await call("GET", `/site-projects/${created.body.project.id}`);
+    assert.equal(detail.status, 200);
+    assert.deepEqual(detail.body.capabilities, ["core", "blog", "booking"]);
+    assert.equal(detail.body.capabilities.includes("commerce"), false);
   } finally { await close(); }
 });
 

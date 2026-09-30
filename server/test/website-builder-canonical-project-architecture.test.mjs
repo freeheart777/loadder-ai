@@ -43,7 +43,9 @@ test("save and publish update the canonical project snapshot before any later re
 
 test("legacy website-builder routes cannot execute legacy builders", () => {
   const app = read("src/App.tsx");
-  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites" replace \/>/);
+  assert.match(app, /<Route path="\/dashboard\/websites" element=\{<WebsiteProjectsPage \/>\} \/>/);
+  assert.match(app, /<Route path="\/dashboard\/websites\/store" element=\{<StoreWebsiteStudioPageV16 \/>\} \/>/);
+  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites\/store" replace \/>/);
   for (const pathName of [
     "/dashboard/websites/store-v1",
     "/dashboard/websites/studio-v2",

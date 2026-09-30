@@ -3,6 +3,10 @@ const ARCHETYPE_BY_SITE_TYPE = Object.freeze({
   BUSINESS: "corporate",
   MEDICAL: "doctor",
   LEGAL: "lawyer",
+  CORPORATE: "corporate",
+  EDUCATION: "education",
+  ECOMMERCE: "store",
+  HYBRID: "hybrid",
   NEWS: "custom",
 });
 
@@ -12,6 +16,8 @@ const CAPABILITIES_BY_ARCHETYPE = Object.freeze({
   catalog: ["catalog", "lead", "forms", "analytics", "ads", "landing"],
   doctor: ["booking", "lead", "location", "content", "forms", "analytics", "ads", "landing"],
   lawyer: ["booking", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
+  education: ["courses", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
+  hybrid: ["commerce", "catalog", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
   custom: ["forms", "analytics", "landing"],
 });
 

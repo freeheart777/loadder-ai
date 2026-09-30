@@ -6,7 +6,10 @@ import type { WebsiteTemplate } from "./types";
 
 /** The full set of templates a new site can be created from. Adding a template means adding an entry here — no other file changes. */
 export const TEMPLATES: readonly WebsiteTemplate[] = [commerceModernV1, ...businessLaunchTemplates];
-export const templatesForSiteKind = (siteKind: SiteKind): readonly WebsiteTemplate[] => TEMPLATES.filter((template) => template.siteKind === siteKind);
+// The business starter picker intentionally includes Ecommerce: it creates an
+// ECOMMERCE project and then opens its existing canonical Store Studio.
+export const templatesForSiteKind = (siteKind: SiteKind): readonly WebsiteTemplate[] =>
+  siteKind === "BUSINESS" ? TEMPLATES : TEMPLATES.filter((template) => template.siteKind === siteKind);
 
 export const findTemplate = (id: string): WebsiteTemplate | undefined => TEMPLATES.find((template) => template.id === id);
 
