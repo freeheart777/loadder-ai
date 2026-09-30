@@ -17,7 +17,7 @@ cat >"$PLIST" <<EOF
 <key>EnvironmentVariables</key><dict>
 <key>PATH</key><string>/Users/azaddel/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
 <key>LOADDER_REPO</key><string>freeheart777/loadder-ai</string><key>LOADDER_ISSUE</key><string>250</string>
-<key>LOADDER_WORKTREE</key><string>/private/tmp/loadder-booking-pr6-2</string>
+<key>LOADDER_WORKTREE</key><string>/Users/azaddel/Developer/loadder-agent</string>
 <key>CODEX_BIN</key><string>/Users/azaddel/.nvm/versions/node/v22.23.2/bin/codex</string>
 <key>LOADDER_MAX_SECONDS</key><string>2700</string>
 <key>LOADDER_MAX_RETRIES</key><string>2</string>
