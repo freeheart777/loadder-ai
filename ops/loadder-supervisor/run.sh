@@ -42,7 +42,7 @@ fi
 row="$(jq -r --argjson ledger "$(cat "$LEDGER")" --argjson max "$MAX_RETRIES" '
   [ .[] | select(.body|contains("[LOADDER-RUN]"))
     | . + {attempts: ($ledger[(.id|tostring)].attempts // 0), status: ($ledger[(.id|tostring)].status // "pending")}
-    | select(.status != "success" and .attempts < $max)
+    | select(.status != "success" and .status != "superseded" and .attempts < $max)
   ] | first // empty | "\(.id)\u001f\(.html_url)\u001f\(.body)"
 ' <<<"$comments")"
 [[ -n "$row" ]] || exit 0
@@ -88,7 +88,14 @@ set -e
 
 report="$(cat "$result" 2>/dev/null || true)"
 [[ -n "$report" ]] || report="Codex exited $rc without a final message. Trace: $trace"
-status="failed"; [[ "$rc" -eq 0 ]] && status="success"
+status="failed"
+if [[ "$rc" -eq 0 ]]; then
+  if grep -Eiq '(^|[[:space:]])(BLOCKED|CUSTOMER-READY:[[:space:]]*NO|: BLOCKED|— .*BLOCKED)' "$result" 2>/dev/null; then
+    status="blocked"
+  else
+    status="success"
+  fi
+fi
 tmp_ledger="$(mktemp)"
 jq --arg id "$id" --arg status "$status" --arg at "$(date -u '+%FT%TZ')" --argjson rc "$rc"   '.[$id] = ((.[$id] // {}) + {status:$status,finished_at:$at,exit_code:$rc})' "$LEDGER" >"$tmp_ledger"
 mv "$tmp_ledger" "$LEDGER"
