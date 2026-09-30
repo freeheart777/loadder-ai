@@ -1,0 +1,59 @@
+Spec: Commerce taxonomy and merchandising — Phase C
+Platform: Loadder canonical Commerce + Store Studio V16
+Purpose:
+  Replace legacy product category/brand text as the source of truth with
+  workspace-scoped canonical taxonomy, and provide truthful merchandising
+  sources to the existing V16 product presentation.
+Owns:
+  - Canonical Commerce Categories, Brands, Collections and collection membership.
+  - Product assignment to canonical taxonomy records.
+  - Product-section source resolution for Featured, Newest, On-sale and manual
+    Collections in Store Studio V16.
+Can modify:
+  - server/db/migrations/094_commerce_taxonomy_merchandising.mjs
+  - server/app/services/ecommerce-service.mjs
+  - server/app/routes/ecommerce.mjs
+  - src/pages/StoreCommerceManagerPageCore.tsx
+  - src/components/store-studio-v16/
+  - focused Commerce/V16 tests and isolated E2E.
+Must:
+  - Scope every taxonomy and merchandising record, lookup and mutation to the
+    authenticated workspace and to its owning STORE Site Project where relevant.
+  - Give Categories and Brands stable IDs and workspace-unique slugs, with
+    active/archive lifecycle. Archived records remain readable for existing
+    products but cannot be newly assigned.
+  - Backfill nonblank legacy ecommerce_products.category and .brand values
+    idempotently into canonical records, preserving product ownership and never
+    creating a record for blank or whitespace-only values.
+  - Make product category_id and brand_id the canonical source after backfill;
+    legacy text is compatibility display data only.
+  - Support manual Collections and ordered membership, plus deterministic
+    Featured, Newest and On-sale sources from canonical product data.
+  - Defer Best sellers: it is unavailable unless a reliable eligible-order
+    evidence contract exists. No fabricated sales ranking.
+  - Extend the existing V16 product section and renderer only; preserve manual
+    Product Slots and do not introduce a renderer or Website product copies.
+  - Keep selected variant/cart/checkout/order truth in canonical Commerce.
+  - Keep the management UX usable in RTL at 390px.
+Must not:
+  - Copy Products, Variants, Inventory, Cart, Orders or Payments into Website
+    records or published snapshots.
+  - Create Store Studio V17, a parallel Commerce runtime, or an invented
+    best-seller signal.
+  - Modify protected visual-checkout baseline 82217cc.
+Done when:
+  - Focused migration, service, route and V16 regressions prove lifecycle,
+    legacy backfill, isolation, collision safety, source selection and Store
+    compatibility; isolated browser flows prove management and 390px behavior.
+Scenario: Idempotent legacy transition
+  Given products in one workspace with legacy nonblank category and brand text
+  When the taxonomy migration runs more than once
+  Then each normalized value has one canonical record in that workspace
+  And products retain stable canonical assignments
+  And blank values create no taxonomy records.
+Scenario: Truthful merchandising
+  Given a Store Studio V16 product section
+  When a merchant chooses Featured, Newest, On-sale or a manual Collection
+  Then the renderer resolves products from canonical Commerce only
+  And draft Website content contains only the chosen source reference
+  And Best sellers is not offered without eligible-order evidence.
