@@ -19,6 +19,11 @@ import { createSiteStorageRouter } from "./routes/site-storage.mjs";
 import { createSiteMediaRouter } from "./routes/site-media.mjs";
 import { createDesignCopilotRouter } from "./routes/design-copilot.mjs";
 import { createEcommerceRouter } from "./routes/ecommerce.mjs";
+import { createBookingRepository } from "./repositories/booking-repository.mjs";
+import { createBookingRouter } from "./routes/booking.mjs";
+import { createControlCenterRepository } from "./repositories/control-center-repository.mjs";
+import { createControlCenterService } from "./services/control-center-service.mjs";
+import { createControlCenterRouter } from "./routes/control-center.mjs";
 
 export function mountSiteBuilderControlPlane({
   app,
@@ -47,6 +52,8 @@ export function mountSiteBuilderControlPlane({
     modelRouter: createDesignModelRouter(),
   });
   const ecommerceService = createEcommerceService({ db });
+  const bookingRepository = createBookingRepository(db);
+  const controlCenterService = createControlCenterService({ repository: createControlCenterRepository(db), siteProjectService: projectService });
   const financialLedgerService = createFinancialLedgerService({
     db,
     auditRepository,
@@ -61,6 +68,8 @@ export function mountSiteBuilderControlPlane({
 
   const mountPath = basePath || "/";
   app.use(mountPath, createSiteProjectsRouter({ service: projectService }));
+  app.use(mountPath, createBookingRouter({ repository: bookingRepository }));
+  app.use(mountPath, createControlCenterRouter({ service: controlCenterService }));
   app.use(
     mountPath,
     createSiteStorageRouter({

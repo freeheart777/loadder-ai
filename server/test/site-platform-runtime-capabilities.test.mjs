@@ -87,11 +87,11 @@ const published = (id) => repository.getPublishedPublic(id);
 
 // --- A) capability context per site type -----------------------------------
 
-test("A: runtime capability context per site type; booking/courses stay unregistered", () => {
+test("A: runtime capability context per site type; registered Booking is distinct from pending courses", () => {
   const expected = {
     [storeId]: ["core", "commerce", "payments", "forms"],
     [businessId]: ["core", "forms", "blog", "people"],
-    [medicalId]: ["core", "forms", "blog"],
+    [medicalId]: ["core", "forms", "blog", "booking"],
   };
   for (const [id, capabilities] of Object.entries(expected)) {
     const context = publishedCapabilityContext(published(id));
@@ -103,10 +103,10 @@ test("A: runtime capability context per site type; booking/courses stay unregist
   assert.equal(draftCapabilityContext(published(storeId).project).source, "draft");
 
   const pending = resolveCapabilities({ siteType: "MEDICAL" }, { websitePlatform: { capabilities: ["booking", "courses", "lead"] } });
-  assert.deepEqual(pending.unregistered, ["booking", "courses"]);
+  assert.deepEqual(pending.unregistered, ["courses"]);
   for (const id of [storeId, businessId, medicalId]) {
     const { capabilities } = publishedCapabilityContext(published(id));
-    assert.ok(!capabilities.includes("booking") && !capabilities.includes("courses"));
+    assert.ok(!capabilities.includes("courses"));
   }
 });
 

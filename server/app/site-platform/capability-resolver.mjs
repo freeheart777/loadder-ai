@@ -7,7 +7,9 @@ import { createWebsitePlatformDefinition } from "../services/website-platform-de
 export const SUPPORTED_CAPABILITIES = Object.freeze(["core", "commerce", "payments", "forms", "blog", "people", "booking", "courses"]);
 
 /** Recognized but not loadable until a later phase ships them. */
-export const PENDING_CAPABILITIES = Object.freeze(["booking", "courses"]);
+// Booking is operationally registered by the canonical booking router. Courses
+// remains intentionally unavailable until it has an equivalent owned domain.
+export const PENDING_CAPABILITIES = Object.freeze(["courses"]);
 
 /** Legacy names written by website-platform-definition / site-types.ts → canonical name. */
 export const LEGACY_CAPABILITY_MAP = Object.freeze({
