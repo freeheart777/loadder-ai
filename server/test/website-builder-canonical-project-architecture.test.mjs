@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-const root = path.resolve(process.cwd(), "..");
+// Tests run from the repository root (including `npm --prefix server test`).
+// Derive the root from this file so invocation cwd cannot accidentally point
+// one level above the checkout and make a real architecture regression look
+// like a missing-file failure.
+const root = path.resolve(new URL("../..", import.meta.url).pathname);
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("website builder keeps one canonical store-project resolver and snapshot", () => {
