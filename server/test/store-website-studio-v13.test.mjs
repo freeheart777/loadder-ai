@@ -15,9 +15,10 @@ const v16Canvas = read("../../src/components/store-studio-v16/StudioCanvas.tsx")
 const v16Inspector = read("../../src/components/store-studio-v16/InspectorPanel.tsx");
 const v16Source = [v16Gate, v16, v16Types, v16Config, v16Canvas, v16Inspector].join("\n");
 
-test("main Store Studio route uses canonical gated V16 and every legacy URL redirects to it", () => {
-  assert.match(app, /path="\/dashboard\/websites" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
-  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites" replace \/>/);
+test("Website Projects is the canonical entry; Store Studio remains canonical gated V16", () => {
+  assert.match(app, /path="\/dashboard\/websites" element=\{<WebsiteProjectsPage \/>\}/);
+  assert.match(app, /path="\/dashboard\/websites\/store" element=\{<StoreWebsiteStudioPageV16 \/>\}/);
+  assert.match(app, /const canonicalBuilder = <Navigate to="\/dashboard\/websites\/store" replace \/>/);
   for (const route of [
     "/dashboard/websites/studio",
     "/site-builder",
