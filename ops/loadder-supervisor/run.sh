@@ -21,7 +21,12 @@ trap cleanup EXIT
 
 for x in gh jq python3; do command -v "$x" >/dev/null || { log "missing dependency: $x"; exit 20; }; done
 "$CODEX" --version >/dev/null || { log "codex unavailable"; exit 21; }
-git -C "$WORKTREE" rev-parse --is-inside-work-tree >/dev/null || { log "invalid worktree: $WORKTREE"; exit 22; }
+GIT_BIN="${GIT_BIN:-/usr/bin/git}"
+if [[ ! -e "$WORKTREE/.git" ]]; then log "invalid worktree path: $WORKTREE (.git missing)"; exit 22; fi
+if ! git_probe="$("$GIT_BIN" -C "$WORKTREE" rev-parse --is-inside-work-tree 2>&1)" || [[ "$git_probe" != "true" ]]; then
+  log "invalid worktree: $WORKTREE; git=$GIT_BIN; probe=$git_probe; uid=$(id -u); home=$HOME; pwd=$PWD"
+  exit 22
+fi
 
 comments="$(gh api --paginate "repos/$REPO/issues/$ISSUE/comments?per_page=100")"
 # Bootstrap ledger from historical successful Local Supervisor reports so v2
