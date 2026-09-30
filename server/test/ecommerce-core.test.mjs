@@ -7,6 +7,7 @@ import { createSiteProjectService } from "../app/services/site-project-service.m
 import { createEcommerceService } from "../app/services/ecommerce-service.mjs";
 import { createEcommerceRouter } from "../app/routes/ecommerce.mjs";
 import { runWithWorkspace } from "../app/tenant-context.mjs";
+import { migration094CommerceTaxonomyMerchandising } from "../db/migrations/094_commerce_taxonomy_merchandising.mjs";
 
 function fixture() {
   const db = createSiteTestDb();
@@ -72,6 +73,43 @@ test("commerce rejects non-store site projects and overselling", () => {
     assert.throws(()=>service.addCartItem(cart.id,{variantId:p.variants[0].id,quantity:2}),(error)=>error.code==="INSUFFICIENT_INVENTORY");
   });
   db.close();
+});
+
+test("taxonomy backfill is idempotent, ignores blanks, and isolates equal text by workspace", () => {
+  const { db, store, other } = fixture();
+  const at="2026-09-30T00:00:00.000Z";
+  db.prepare("INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,category,brand,status,currency,base_price_minor,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'ACTIVE','USD',1,'{}',?,?)").run("legacy-a","ws-1",store.id,"A","a","  Care "," Loadder ",at,at);
+  db.prepare("INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,category,brand,status,currency,base_price_minor,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'ACTIVE','USD',1,'{}',?,?)").run("legacy-b","ws-1",store.id,"B","b","care","loadder",at,at);
+  db.prepare("INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,category,brand,status,currency,base_price_minor,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'ACTIVE','USD',1,'{}',?,?)").run("legacy-c","ws-2",other.id,"C","c","Care","Loadder",at,at);
+  db.prepare("INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,category,brand,status,currency,base_price_minor,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'ACTIVE','USD',1,'{}',?,?)").run("legacy-blank","ws-1",store.id,"Blank","blank","  ",null,at,at);
+  migration094CommerceTaxonomyMerchandising.up(db); migration094CommerceTaxonomyMerchandising.up(db);
+  const products=db.prepare("SELECT id,category_id,brand_id FROM ecommerce_products ORDER BY id").all();
+  assert.equal(products.find((p)=>p.id==="legacy-a").category_id,products.find((p)=>p.id==="legacy-b").category_id);
+  assert.notEqual(products.find((p)=>p.id==="legacy-a").category_id,products.find((p)=>p.id==="legacy-c").category_id);
+  assert.equal(products.find((p)=>p.id==="legacy-blank").category_id,null);
+  assert.equal(db.prepare("SELECT count(*) AS count FROM ecommerce_categories WHERE workspace_id='ws-1'").get().count,1);
+  db.close();
+});
+
+test("canonical taxonomy lifecycle, assignments and merchandising reject cross-workspace records", () => {
+  const { db, store, other, service }=fixture();
+  runWithWorkspace("ws-1",()=>{
+    const category=service.createCategory({name:"Care"}), brand=service.createBrand({name:"Loadder"});
+    const featured=service.createProduct(store.id,{name:"Featured",sku:"F",basePriceMinor:100,inventoryQuantity:1,status:"ACTIVE",featured:true,categoryId:category.id,brandId:brand.id});
+    const sale=service.createProduct(store.id,{name:"Sale",sku:"S",basePriceMinor:100,compareAtPriceMinor:200,inventoryQuantity:1,status:"ACTIVE"});
+    const collection=service.createCollection(store.id,{name:"Launch"}); service.addCollectionProduct(collection.id,featured.id);
+    assert.deepEqual(service.merchandisingProducts(store.id,{source:"featured"}).map((p)=>p.id),[featured.id]);
+    assert.deepEqual(service.merchandisingProducts(store.id,{source:"on_sale"}).map((p)=>p.id),[sale.id]);
+    assert.deepEqual(service.merchandisingProducts(store.id,{source:"collection",collectionId:collection.id}).map((p)=>p.id),[featured.id]);
+    service.archiveCategory(category.id);
+    assert.throws(()=>service.updateProduct(featured.id,{categoryId:category.id}),(error)=>error.code==="CATEGORY_ARCHIVED");
+    assert.throws(()=>service.merchandisingProducts(store.id,{source:"best_sellers"}),(error)=>error.code==="MERCHANDISING_SOURCE_UNAVAILABLE");
+  });
+  runWithWorkspace("ws-2",()=>{
+    const local=service.createProduct(other.id,{name:"Local",sku:"L",basePriceMinor:1,inventoryQuantity:1});
+    const foreign=db.prepare("SELECT id FROM ecommerce_categories WHERE workspace_id='ws-1'").get().id;
+    assert.throws(()=>service.updateProduct(local.id,{categoryId:foreign}),(error)=>error.code==="CATEGORY_NOT_FOUND");
+  }); db.close();
 });
 
 test("commerce product media preserves ordered gallery and variant-specific image", () => {

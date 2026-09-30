@@ -62,6 +62,14 @@ export function createEcommerceService({ db, env = process.env }) {
     if (!row) throw new EcommerceError("Product not found.", "PRODUCT_NOT_FOUND", 404);
     return row;
   };
+  const requireTaxonomy = (table, entity, entityId, { assignable = false } = {}) => {
+    const row = db.prepare(`SELECT * FROM ${table} WHERE id=? AND workspace_id=?`).get(entityId, workspaceId());
+    if (!row) throw new EcommerceError(`${entity} not found.`, `${entity.toUpperCase()}_NOT_FOUND`, 404);
+    if (assignable && row.status !== "ACTIVE") throw new EcommerceError(`Archived ${entity.toLowerCase()} cannot be assigned.`, `${entity.toUpperCase()}_ARCHIVED`, 409);
+    return row;
+  };
+  const taxonomyMap = (row) => ({ id:row.id, name:row.name, slug:row.slug, status:row.status, parentId:row.parent_id || null, createdAt:row.created_at, updatedAt:row.updated_at });
+  const canonicalAssignment = (table, entity, value) => value == null || value === "" ? null : requireTaxonomy(table, entity, value, { assignable:true }).id;
   const requireVariant = (variantId) => {
     const row = db.prepare("SELECT v.*,p.site_project_id,p.name AS product_name,p.base_price_minor,p.currency FROM ecommerce_variants v JOIN ecommerce_products p ON p.id=v.product_id WHERE v.id=? AND v.workspace_id=? AND p.workspace_id=?").get(variantId, workspaceId(), workspaceId());
     if (!row) throw new EcommerceError("Variant not found.", "VARIANT_NOT_FOUND", 404);
@@ -74,7 +82,7 @@ export function createEcommerceService({ db, env = process.env }) {
   };
   const productMap = (row) => ({
     id: row.id, siteProjectId: row.site_project_id, name: row.name, slug: row.slug,
-    description: row.description, category: row.category, brand: row.brand, status: row.status,
+    description: row.description, category: row.category, brand: row.brand, categoryId: row.category_id || null, brandId: row.brand_id || null, status: row.status,
     currency: row.currency, basePriceMinor: row.base_price_minor, compareAtPriceMinor: row.compare_at_price_minor,
     featured: Boolean(row.featured), seoTitle: row.seo_title, seoDescription: row.seo_description,
     metadata: json(row.metadata_json), createdAt: row.created_at, updatedAt: row.updated_at,
@@ -123,6 +131,15 @@ export function createEcommerceService({ db, env = process.env }) {
   });
 
   return Object.freeze({
+    listCategories() { return db.prepare("SELECT * FROM ecommerce_categories WHERE workspace_id=? ORDER BY name COLLATE NOCASE").all(workspaceId()).map(taxonomyMap); },
+    listBrands() { return db.prepare("SELECT * FROM ecommerce_brands WHERE workspace_id=? ORDER BY name COLLATE NOCASE").all(workspaceId()).map(taxonomyMap); },
+    createCategory(input={}) { const name=String(input.name||"").trim(); if(!name) throw new EcommerceError("Category name is required.","CATEGORY_NAME_REQUIRED"); const value=slugify(input.slug||name)||id("category"); const stamp=now(); const record={id:id("category"),workspaceId:workspaceId(),name,normalized:name.toLocaleLowerCase("en-US"),slug:value,status:"ACTIVE",parentId:input.parentId||null}; if(record.parentId) requireTaxonomy("ecommerce_categories","CATEGORY",record.parentId,{assignable:true}); try { db.prepare("INSERT INTO ecommerce_categories(id,workspace_id,name,normalized_name,slug,parent_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?, ?,?)").run(record.id,record.workspaceId,record.name,record.normalized,record.slug,record.parentId,record.status,stamp,stamp); } catch(error) { if(String(error.message).includes("UNIQUE")) throw new EcommerceError("Category name or slug already exists.","DUPLICATE_CATEGORY",409); throw error; } return taxonomyMap(requireTaxonomy("ecommerce_categories","CATEGORY",record.id)); },
+    createBrand(input={}) { const name=String(input.name||"").trim(); if(!name) throw new EcommerceError("Brand name is required.","BRAND_NAME_REQUIRED"); const stamp=now(), record={id:id("brand"),workspaceId:workspaceId(),name,normalized:name.toLocaleLowerCase("en-US"),slug:slugify(input.slug||name)||id("brand"),status:"ACTIVE"}; try { db.prepare("INSERT INTO ecommerce_brands(id,workspace_id,name,normalized_name,slug,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)").run(record.id,record.workspaceId,record.name,record.normalized,record.slug,record.status,stamp,stamp); } catch(error) { if(String(error.message).includes("UNIQUE")) throw new EcommerceError("Brand name or slug already exists.","DUPLICATE_BRAND",409); throw error; } return taxonomyMap(requireTaxonomy("ecommerce_brands","BRAND",record.id)); },
+    archiveCategory(categoryId) { requireTaxonomy("ecommerce_categories","CATEGORY",categoryId); db.prepare("UPDATE ecommerce_categories SET status='ARCHIVED',updated_at=? WHERE id=? AND workspace_id=?").run(now(),categoryId,workspaceId()); return taxonomyMap(requireTaxonomy("ecommerce_categories","CATEGORY",categoryId)); },
+    archiveBrand(brandId) { requireTaxonomy("ecommerce_brands","BRAND",brandId); db.prepare("UPDATE ecommerce_brands SET status='ARCHIVED',updated_at=? WHERE id=? AND workspace_id=?").run(now(),brandId,workspaceId()); return taxonomyMap(requireTaxonomy("ecommerce_brands","BRAND",brandId)); },
+    createCollection(siteProjectId, input={}) { requireSite(siteProjectId); const name=String(input.name||"").trim(); if(!name) throw new EcommerceError("Collection name is required.","COLLECTION_NAME_REQUIRED"); const collection={id:id("collection"),name,slug:slugify(input.slug||name)||id("collection")}; const stamp=now(); try { db.prepare("INSERT INTO ecommerce_collections(id,workspace_id,site_project_id,name,slug,status,created_at,updated_at) VALUES(?,?,?,?,?,'ACTIVE',?,?)").run(collection.id,workspaceId(),siteProjectId,collection.name,collection.slug,stamp,stamp); } catch(error) { if(String(error.message).includes("UNIQUE")) throw new EcommerceError("Collection slug already exists.","DUPLICATE_COLLECTION",409); throw error; } return { ...collection, siteProjectId, status:"ACTIVE" }; },
+    addCollectionProduct(collectionId, productId, position) { const collection=db.prepare("SELECT * FROM ecommerce_collections WHERE id=? AND workspace_id=?").get(collectionId,workspaceId()); if(!collection) throw new EcommerceError("Collection not found.","COLLECTION_NOT_FOUND",404); if(collection.status!=="ACTIVE") throw new EcommerceError("Archived collection cannot be changed.","COLLECTION_ARCHIVED",409); const product=requireProduct(productId); if(product.site_project_id!==collection.site_project_id) throw new EcommerceError("Product belongs to another store.","CROSS_STORE_PRODUCT",409); const next=position == null ? db.prepare("SELECT COALESCE(MAX(position)+1,0) AS position FROM ecommerce_collection_products WHERE workspace_id=? AND collection_id=?").get(workspaceId(),collectionId).position : nonNegativeInt(position,"position"); try { db.prepare("INSERT INTO ecommerce_collection_products(workspace_id,collection_id,product_id,position,created_at) VALUES(?,?,?,?,?)").run(workspaceId(),collectionId,productId,next,now()); } catch(error) { if(String(error.message).includes("UNIQUE")) throw new EcommerceError("Collection membership or position already exists.","DUPLICATE_COLLECTION_MEMBERSHIP",409); throw error; } return { collectionId, productId, position:next }; },
+    merchandisingProducts(siteProjectId, { source="featured", collectionId=null, limit=12 }={}) { requireSite(siteProjectId); const bounded=Math.max(1,Math.min(50,Number(limit)||12)); const active="workspace_id=? AND site_project_id=? AND status='ACTIVE'"; let rows; if(source==="featured") rows=db.prepare(`SELECT * FROM ecommerce_products WHERE ${active} AND featured=1 ORDER BY updated_at DESC,id LIMIT ?`).all(workspaceId(),siteProjectId,bounded); else if(source==="newest") rows=db.prepare(`SELECT * FROM ecommerce_products WHERE ${active} ORDER BY created_at DESC,id LIMIT ?`).all(workspaceId(),siteProjectId,bounded); else if(source==="on_sale") rows=db.prepare(`SELECT * FROM ecommerce_products WHERE ${active} AND compare_at_price_minor IS NOT NULL AND compare_at_price_minor > base_price_minor ORDER BY updated_at DESC,id LIMIT ?`).all(workspaceId(),siteProjectId,bounded); else if(source==="collection") { const collection=db.prepare("SELECT id FROM ecommerce_collections WHERE id=? AND workspace_id=? AND site_project_id=? AND status='ACTIVE'").get(collectionId,workspaceId(),siteProjectId); if(!collection) throw new EcommerceError("Collection not found.","COLLECTION_NOT_FOUND",404); rows=db.prepare("SELECT p.* FROM ecommerce_collection_products m JOIN ecommerce_products p ON p.id=m.product_id WHERE m.workspace_id=? AND m.collection_id=? AND p.workspace_id=? AND p.site_project_id=? AND p.status='ACTIVE' ORDER BY m.position,p.id LIMIT ?").all(workspaceId(),collectionId,workspaceId(),siteProjectId,bounded); } else throw new EcommerceError("Unsupported merchandising source.","MERCHANDISING_SOURCE_UNAVAILABLE",400); return rows.map(productMap); },
     listProducts(siteProjectId) {
       requireSite(siteProjectId);
       const products = db.prepare("SELECT * FROM ecommerce_products WHERE workspace_id=? AND site_project_id=? ORDER BY updated_at DESC").all(workspaceId(), siteProjectId);
@@ -140,6 +157,8 @@ export function createEcommerceService({ db, env = process.env }) {
       const productId = id("prod"), stamp = now();
       const ownerWorkspaceId = workspaceId();
       const productCurrency = currency(input.currency);
+      const categoryId = canonicalAssignment("ecommerce_categories", "CATEGORY", input.categoryId);
+      const brandId = canonicalAssignment("ecommerce_brands", "BRAND", input.brandId);
       const slug = slugify(input.slug || name) || productId.toLowerCase();
       const price = nonNegativeInt(input.basePriceMinor, "basePriceMinor");
       const compareAtPrice = input.compareAtPriceMinor == null ? null : nonNegativeInt(input.compareAtPriceMinor, "compareAtPriceMinor");
@@ -150,8 +169,8 @@ export function createEcommerceService({ db, env = process.env }) {
       const variantId = id("var");
       const variantPrice = input.variantPriceMinor == null ? null : nonNegativeInt(input.variantPriceMinor, "variantPriceMinor");
       const insert = db.transaction(() => {
-        db.prepare(`INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,description,category,brand,status,currency,base_price_minor,compare_at_price_minor,featured,seo_title,seo_description,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-          .run(productId,ownerWorkspaceId,siteProjectId,name,slug,String(input.description||""),input.category||null,input.brand||null,input.status||"DRAFT",productCurrency,price,compareAtPrice,input.featured?1:0,input.seoTitle||null,input.seoDescription||null,JSON.stringify(metadata),stamp,stamp);
+        db.prepare(`INSERT INTO ecommerce_products(id,workspace_id,site_project_id,name,slug,description,category,brand,category_id,brand_id,status,currency,base_price_minor,compare_at_price_minor,featured,seo_title,seo_description,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(productId,ownerWorkspaceId,siteProjectId,name,slug,String(input.description||""),input.category||null,input.brand||null,categoryId,brandId,input.status||"DRAFT",productCurrency,price,compareAtPrice,input.featured?1:0,input.seoTitle||null,input.seoDescription||null,JSON.stringify(metadata),stamp,stamp);
         db.prepare(`INSERT INTO ecommerce_variants(id,workspace_id,product_id,sku,title,price_minor,inventory_quantity,inventory_policy,options_json,image_url,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(variantId,ownerWorkspaceId,productId,sku,String(input.variantTitle||"Default"),variantPrice,inventoryQuantity,input.inventoryPolicy||"DENY",JSON.stringify(input.options||{}),imageUrl,1,stamp,stamp);
       });
@@ -166,6 +185,8 @@ export function createEcommerceService({ db, env = process.env }) {
         description: input.description === undefined ? p.description : String(input.description),
         category: input.category === undefined ? p.category : input.category || null,
         brand: input.brand === undefined ? p.brand : input.brand || null,
+        categoryId: input.categoryId === undefined ? p.category_id : canonicalAssignment("ecommerce_categories", "CATEGORY", input.categoryId),
+        brandId: input.brandId === undefined ? p.brand_id : canonicalAssignment("ecommerce_brands", "BRAND", input.brandId),
         status: input.status === undefined ? p.status : input.status,
         currency: input.currency === undefined ? p.currency : currency(input.currency),
         basePrice: input.basePriceMinor === undefined ? p.base_price_minor : nonNegativeInt(input.basePriceMinor,"basePriceMinor"),
@@ -176,8 +197,8 @@ export function createEcommerceService({ db, env = process.env }) {
         metadata: input.metadata === undefined ? p.metadata_json : JSON.stringify(productMetadata(input.metadata, "{}", { allowLocal: env.NODE_ENV !== "production" })),
       };
       if (!next.name || !next.slug) throw new EcommerceError("Product name and slug are required.", "INVALID_PRODUCT");
-      db.prepare(`UPDATE ecommerce_products SET name=?,slug=?,description=?,category=?,brand=?,status=?,currency=?,base_price_minor=?,compare_at_price_minor=?,featured=?,seo_title=?,seo_description=?,metadata_json=?,updated_at=? WHERE id=? AND workspace_id=?`)
-        .run(next.name,next.slug,next.description,next.category,next.brand,next.status,next.currency,next.basePrice,next.compareAt,next.featured,next.seoTitle,next.seoDescription,next.metadata,now(),productId,workspaceId());
+      db.prepare(`UPDATE ecommerce_products SET name=?,slug=?,description=?,category=?,brand=?,category_id=?,brand_id=?,status=?,currency=?,base_price_minor=?,compare_at_price_minor=?,featured=?,seo_title=?,seo_description=?,metadata_json=?,updated_at=? WHERE id=? AND workspace_id=?`)
+        .run(next.name,next.slug,next.description,next.category,next.brand,next.categoryId,next.brandId,next.status,next.currency,next.basePrice,next.compareAt,next.featured,next.seoTitle,next.seoDescription,next.metadata,now(),productId,workspaceId());
       return this.getProduct(productId);
     },
     addVariant(productId, input = {}) {
