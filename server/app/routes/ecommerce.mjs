@@ -43,11 +43,18 @@ export function createEcommerceRouter({ service, financialLedgerService = null, 
   router.get("/commerce/categories", (req, res) => run(res, () => ({ categories: service.listCategories() })));
   router.post("/commerce/categories", (req, res) => run(res, () => ({ category: service.createCategory(req.body || {}) }), 201));
   router.post("/commerce/categories/:categoryId/archive", (req, res) => run(res, () => ({ category: service.archiveCategory(req.params.categoryId) })));
+  router.post("/commerce/categories/:categoryId/reactivate", (req, res) => run(res, () => ({ category: service.reactivateCategory(req.params.categoryId) })));
   router.get("/commerce/brands", (req, res) => run(res, () => ({ brands: service.listBrands() })));
   router.post("/commerce/brands", (req, res) => run(res, () => ({ brand: service.createBrand(req.body || {}) }), 201));
   router.post("/commerce/brands/:brandId/archive", (req, res) => run(res, () => ({ brand: service.archiveBrand(req.params.brandId) })));
+  router.post("/commerce/brands/:brandId/reactivate", (req, res) => run(res, () => ({ brand: service.reactivateBrand(req.params.brandId) })));
   router.post("/stores/:siteProjectId/collections", (req, res) => run(res, () => ({ collection: service.createCollection(req.params.siteProjectId, req.body || {}) }), 201));
+  router.get("/stores/:siteProjectId/collections", (req, res) => run(res, () => ({ collections: service.listCollections(req.params.siteProjectId) })));
+  router.post("/commerce/collections/:collectionId/archive", (req, res) => run(res, () => ({ collection: service.archiveCollection(req.params.collectionId) })));
+  router.post("/commerce/collections/:collectionId/reactivate", (req, res) => run(res, () => ({ collection: service.reactivateCollection(req.params.collectionId) })));
   router.post("/commerce/collections/:collectionId/products", (req, res) => run(res, () => ({ membership: service.addCollectionProduct(req.params.collectionId, req.body?.productId, req.body?.position) }), 201));
+  router.delete("/commerce/collections/:collectionId/products/:productId", (req, res) => run(res, () => ({ membership: service.removeCollectionProduct(req.params.collectionId, req.params.productId) })));
+  router.patch("/commerce/collections/:collectionId/products/:productId", (req, res) => run(res, () => ({ membership: service.reorderCollectionProduct(req.params.collectionId, req.params.productId, req.body?.position) })));
   router.get("/stores/:siteProjectId/merchandising-products", (req, res) => run(res, () => ({ products: service.merchandisingProducts(req.params.siteProjectId, req.query || {}) })));
   router.post("/commerce/products/:productId/variants", (req, res) => run(res, () => ({ variant: service.addVariant(req.params.productId, req.body || {}) }), 201));
   router.patch("/commerce/variants/:variantId", (req, res) => run(res, () => ({ variant: service.updateVariant(req.params.variantId, req.body || {}) })));

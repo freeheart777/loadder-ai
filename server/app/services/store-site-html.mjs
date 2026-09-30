@@ -23,16 +23,20 @@ const isVariantPurchasable = (variant) => Boolean(variant?.active ?? true)
   && (variant?.inventoryPolicy !== "DENY" || Number(variant?.inventoryQuantity || 0) > 0);
 
 /** The same source selection StudioCanvas/config.ts productsForSection() applies on the client. */
-function productsForSection(products, settings) {
+function productsForSection(products, settings, canonicalProducts = null) {
+  // Featured/newest/on-sale/manual-collection are resolved by Commerce at
+  // request time.  The V16 document keeps only the source reference.
+  if (canonicalProducts) return canonicalProducts;
   if (settings.source === "manual") {
     const ids = Array.isArray(settings.productIds) ? settings.productIds : [];
     const order = new Map(ids.map((id, index) => [id, index]));
     return products.filter((product) => order.has(product.id)).sort((a, b) => (order.get(a.id) || 0) - (order.get(b.id) || 0));
   }
   if (settings.source === "featured") return products.filter((product) => product.featured);
-  if (settings.source === "discounted") return products.filter((product) => Number(product.compareAtPriceMinor || 0) > product.basePriceMinor);
-  if (settings.source === "latest") return [...products].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-  return products;
+  if (settings.source === "discounted" || settings.source === "on_sale") return products.filter((product) => Number(product.compareAtPriceMinor || 0) > product.basePriceMinor);
+  if (settings.source === "latest" || settings.source === "newest") return [...products].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  // There is deliberately no best-seller fallback without order evidence.
+  return settings.source === "bestselling" ? [] : products;
 }
 
 function productCardHtml(product, settings, overrides) {
@@ -73,10 +77,10 @@ function itemGridHtml(section) {
 // are never emitted.
 const spacerHtml = (section) => `<div style="height:${num(section.spacingTop, 0) + num(section.spacingBottom, 0)}px"></div>`;
 
-const productsHtml = (section, { open, close, products, commerce }) => {
+const productsHtml = (section, { open, close, products, merchandisingProducts, commerce }) => {
   const settings = section.productSettings || {};
   const cap = Math.max(1, Math.min(12, num(section.visibleProductCount, 12)));
-  const shown = productsForSection(products, settings).slice(0, cap);
+  const shown = productsForSection(products, settings, merchandisingProducts?.[section.id]).slice(0, cap);
   return `${open}${saleLineHtml(section)}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
     shown.length ? `<div class="product-grid">${shown.map((product) => productCardHtml(product, settings, commerce.productOverrides || {})).join("")}</div>` : `<div class="empty-products">هنوز محصولی در این بخش نیست.</div>`
   }${close}`;
@@ -104,11 +108,11 @@ const SECTION_RENDERERS = new Map([
 /** Section types with a dedicated store renderer (read-only; for agreement tests). */
 export const STORE_SECTION_TYPES = Object.freeze([...SECTION_RENDERERS.keys()]);
 
-function sectionHtml(section, products, commerce) {
+function sectionHtml(section, products, merchandisingProducts, commerce) {
   const style = `background:${color(section.backgroundColor, "#ffffff")};color:${color(section.textColor, "#0f172a")};padding-top:${num(section.spacingTop, 28)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
   const open = `<section data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
   const close = `</div></section>`;
-  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, products, commerce });
+  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, products, merchandisingProducts, commerce });
 }
 
 /**
@@ -116,7 +120,7 @@ function sectionHtml(section, products, commerce) {
  * `products` is the live catalog for this store (ecommerceService.listProducts output).
  * Returns null for any non-root slug, since a STORE site has exactly one page.
  */
-export function renderStoreSite(project, version, content, products, { slug = "", basePath = "" } = {}) {
+export function renderStoreSite(project, version, content, productData, { slug = "", basePath = "" } = {}) {
   if (slug) return null;
 
   const presentation = projectPublicStorePresentation(content).storeBuilderV16 || {};
@@ -126,6 +130,9 @@ export function renderStoreSite(project, version, content, products, { slug = ""
   const seo = presentation.seo || {};
   const commerce = presentation.commerce || {};
   const sections = (presentation.sections || []).filter((section) => section.enabled !== false);
+  // Keep the old array argument readable for direct renderer consumers.
+  const products = Array.isArray(productData) ? productData : (productData?.products || []);
+  const merchandisingProducts = Array.isArray(productData) ? {} : (productData?.merchandisingProducts || {});
 
   const siteName = header.storeName || project?.name || "";
   const title = seo.title || siteName;
@@ -169,7 +176,7 @@ export function renderStoreSite(project, version, content, products, { slug = ""
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<title>${escape(title)}</title>${description ? `<meta name="description" content="${escape(description)}">` : ""}`
     + `<meta name="generator" content="Loadder Site Builder"><style>${css}</style></head><body data-site-kind="STORE" data-published-version="${escape(version?.version ?? "draft")}">`
-    + `<header class="site"><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span></div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section, products, commerce)).join("")}</main>`
+    + `<header class="site"><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span></div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section, products, merchandisingProducts, commerce)).join("")}</main>`
     + `<footer class="site"><div class="wrap foot"><b>${escape(siteName)}</b><span>نسخه ${escape(version?.version ?? "draft")} · منتشرشده با Loadder</span></div></footer>`
     + `</body></html>`;
 }

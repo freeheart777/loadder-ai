@@ -53,22 +53,40 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
   const ecommerceFor = () => (ecommerce ??= createEcommerceService ? createEcommerceService() : null);
   // The live catalog, fetched only when the runtime capability decision needs it
   // (STORE only) — a BUSINESS project never touches ecommerce data.
-  const productsFor = (project) => {
+  const productsFor = (project, content = null) => {
     if (!commerceEnabled(project)) return [];
     try {
       const service = ecommerceFor();
       if (!service) return [];
-      return runWithWorkspace(project.workspaceId, () => service.listProducts(project.id));
+      return runWithWorkspace(project.workspaceId, () => {
+        const products = service.listProducts(project.id);
+        const merchandisingProducts = {};
+        const sections = content?.storeBuilderV16?.sections;
+        if (Array.isArray(sections)) for (const section of sections) {
+          const settings = section?.type === "products" ? section.productSettings : null;
+          if (!settings || !["featured", "newest", "on_sale", "collection"].includes(settings.source)) continue;
+          if (settings.source === "collection" && !settings.collectionId) { merchandisingProducts[section.id] = []; continue; }
+          try { merchandisingProducts[section.id] = service.merchandisingProducts(project.id, { source: settings.source, collectionId: settings.collectionId || null, limit: Math.max(1, Math.min(12, Number(section.visibleProductCount) || 12)) }); }
+          catch { merchandisingProducts[section.id] = []; }
+        }
+        return { products, merchandisingProducts };
+      });
     } catch (error) { console.error("Public storefront catalog error:", error); return []; }
   };
   const sendPublished = (req, res, published, page = {}) => {
     if (!published) return res.status(404).send("Site not found");
-    const html = renderPublishedSite(published.project, published.version, published.assets, page, productsFor(published.project));
+    const runtimeProducts = productsFor(published.project, published.version.content);
+    const html = renderPublishedSite(published.project, published.version, published.assets, page, runtimeProducts);
     // A slug that resolves to no published page is a 404, never a silent Home.
     if (html === null) return res.status(404).send("Page not found");
-    const etag = `W/\"site-${published.version.id}-${page.slug || ""}\"`;
+    // Store V16 product sections resolve live Commerce truth. Include that
+    // projection in the validator and force revalidation, so a catalog change
+    // can never be hidden behind a published-site snapshot cache entry.
+    const commerceRevision = commerceEnabled(published.project) ? crypto.createHash("sha256").update(JSON.stringify(runtimeProducts)).digest("hex").slice(0, 16) : "static";
+    const etag = `W/\"site-${published.version.id}-${page.slug || ""}-${commerceRevision}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
-    return res.set({ "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(html);
+    const cacheControl = commerceEnabled(published.project) ? "no-cache" : "public, max-age=60, stale-while-revalidate=300";
+    return res.set({ "Cache-Control": cacheControl, ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(html);
   };
   const sendPreview = (req, res, preview) => {
     if (!preview) return res.status(404).send("Preview not found");
@@ -76,7 +94,7 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const draftVersion = { version: "draft", content: preview.project.content };
     const page = { slug: typeof req.query.page === "string" ? req.query.page : "", basePath: `/preview/sites/${preview.project.id}` };
-    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, page, productsFor(preview.project)) || "Page not found");
+    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, page, productsFor(preview.project, preview.project.content)) || "Page not found");
   };
   router.get("/preview/sites/:id", (req, res) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";

@@ -395,8 +395,11 @@ export function productsForSection(products: Product[], settings: ProductSetting
     return products.filter((product) => order.has(product.id)).sort((a, b) => (order.get(a.id) || 0) - (order.get(b.id) || 0));
   }
   if (settings.source === "featured") return products.filter((product) => product.featured);
-  if (settings.source === "discounted") return products.filter((product) => Number(product.compareAtPriceMinor || 0) > product.basePriceMinor);
-  if (settings.source === "latest") return [...products].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  // Legacy values remain readable; V16 writes canonical on_sale/newest values.
+  if (settings.source === "discounted" || settings.source === "on_sale") return products.filter((product) => Number(product.compareAtPriceMinor || 0) > product.basePriceMinor);
+  if (settings.source === "latest" || settings.source === "newest") return [...products].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  // Best sellers deliberately has no eligible-order evidence contract yet.
+  if (settings.source === "bestselling") return [];
   return products;
 }
 

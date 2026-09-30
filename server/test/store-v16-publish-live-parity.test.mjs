@@ -34,6 +34,27 @@ test("V16 product presentation cannot override authoritative catalog money", () 
   assert.doesNotMatch(config, /imageUrl: override\.imageUrl/);
 });
 
+test("V16 merchandising persists references and resolves supported sources from canonical Commerce", () => {
+  const inspector = source("src/components/store-studio-v16/InspectorPanel.tsx");
+  const studio = source("src/pages/StoreWebsiteStudioPageV16Core.tsx");
+  const publicRoutes = source("server/app/routes/public-sites.mjs");
+  const renderer = source("server/app/services/store-site-html.mjs");
+  assert.match(inspector, /value="featured"/);
+  assert.match(inspector, /value="newest"/);
+  assert.match(inspector, /value="on_sale"/);
+  assert.match(inspector, /value="collection"/);
+  assert.match(inspector, /value="manual"/);
+  assert.match(inspector, /collections=\{collections\}/);
+  assert.match(inspector, /کالکشن دستی/);
+  assert.doesNotMatch(inspector, /Best selling|پرفروش‌ها/);
+  assert.match(studio, /source \+ optional collectionId, never copied catalog records/);
+  assert.match(studio, /setMerchandisingProducts\(\{\}\)/);
+  assert.match(publicRoutes, /service\.merchandisingProducts\(project\.id/);
+  assert.match(publicRoutes, /commerceRevision/);
+  assert.match(publicRoutes, /cacheControl = commerceEnabled\(published\.project\) \? "no-cache"/);
+  assert.match(renderer, /merchandisingProducts\?\.\[section\.id\]/);
+});
+
 test("publication and public availability share authoritative transactional policies", () => {
   const repository=source("server/app/repositories/site-project-repository.mjs");
   const ecommerce=source("server/app/services/ecommerce-service.mjs");

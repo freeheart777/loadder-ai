@@ -16,6 +16,7 @@ import { invalidateActiveStoreProject } from "../lib/activeStoreProject";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
 type Project = { id: string; name?: string; siteType?: string; status?: string; content: Record<string, any> };
+type Collection = { id: string; name: string; status: string };
 type ProductDraft = {
   name: string;
   basePriceMinor: string;
@@ -195,6 +196,8 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const commerce = isCommerceSite(siteKind);
   const [project, setProject] = useState<Project | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [merchandisingProducts, setMerchandisingProducts] = useState<Record<string, Product[]>>({});
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   // These come from the Site Projects API, which resolves the persisted
   // Website Platform document on the server. They are deliberately not
@@ -274,6 +277,8 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         if (commerce) {
           const catalog = await read(await apiFetch(`/api/stores/${selected.id}/products`, { signal: c.signal }));
           setProducts(catalog.products || []);
+          const collectionResult = await read(await apiFetch(`/api/stores/${selected.id}/collections`, { signal: c.signal }));
+          setCollections(collectionResult.collections || []);
         }
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
@@ -284,6 +289,36 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     })();
     return () => c.abort();
   }, [commerce, forceCreate, requestedProjectId, showPreviewOnOpen, siteKind]);
+
+  // Dynamic section sources are resolved by the canonical Commerce query. The
+  // resulting products are transient render data; draft content retains only
+  // source + optional collectionId, never copied catalog records.
+  useEffect(() => {
+    if (!commerce || !project) { setMerchandisingProducts({}); return; }
+    const controller = new AbortController();
+    const sections = config.sections.filter((section) => section.type === "products" && section.productSettings && ["featured", "newest", "on_sale", "collection"].includes(section.productSettings.source));
+    // Never leave a previous source's products visible while a source switch
+    // resolves (or when its canonical query fails).
+    setMerchandisingProducts({});
+    void Promise.all(sections.map(async (section) => {
+      const settings = section.productSettings!;
+      const params = new URLSearchParams({ source: settings.source, limit: String(Math.max(1, Math.min(12, Number(section.visibleProductCount) || 12)))});
+      if (settings.source === "collection" && settings.collectionId) params.set("collectionId", settings.collectionId);
+      if (settings.source === "collection" && !settings.collectionId) return [section.id, []] as const;
+      const data = await read(await apiFetch(`/api/stores/${project.id}/merchandising-products?${params}`, { signal: controller.signal }));
+      return [section.id, data.products || []] as const;
+    })).then((entries) => { if (!controller.signal.aborted) setMerchandisingProducts(Object.fromEntries(entries)); }).catch((error) => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "دریافت محصولات منتخب ناموفق بود."); });
+    return () => controller.abort();
+  }, [commerce, project?.id, config.sections]);
+
+  useEffect(() => {
+    if (!commerce || !project) return;
+    const controller = new AbortController();
+    void apiFetch(`/api/stores/${project.id}/collections`, { signal: controller.signal }).then(read)
+      .then((data) => { if (!controller.signal.aborted) setCollections(data.collections || []); })
+      .catch(() => { if (!controller.signal.aborted) setCollections([]); });
+    return () => controller.abort();
+  }, [commerce, project?.id]);
 
   const actions = useMemo<StudioActions>(() => ({
     select: (selectedElement) => {
@@ -522,7 +557,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   function addDiscountSection() {
     const section = newSection("products");
     section.title = "تخفیف‌های ویژه";
-    section.productSettings = { ...defaultProductSettings, source: "discounted", showPromotionBadge: true, showCompareAt: true };
+    section.productSettings = { ...defaultProductSettings, source: "on_sale", showPromotionBadge: true, showCompareAt: true };
     setConfig((c) => ({ ...withActivePageSections(c, [...activePageOf(c).sections, section]), selectedElement: { type: "section", id: section.id } }));
   }
 
@@ -690,7 +725,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   ].filter((link): link is { id: string; to: string; label: string } => Boolean(link));
   const publishedUrl = project?.status === "PUBLISHED" ? `${commerce ? "/store" : "/site"}/${project.id}` : "";
   const inspectorProps = {
-    config: canvasConfig, products, assets, actions, moveSection, duplicateSection, deleteSection, addSection,
+    config: canvasConfig, products, collections, assets, actions, moveSection, duplicateSection, deleteSection, addSection,
     askLoadder: project ? { projectId: project.id, onApplied: onAskLoadderApplied } : undefined,
   };
   const pickerSection = pickerSectionId ? config.sections.find((s) => s.id === pickerSectionId) : null;
@@ -733,7 +768,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
           <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
         </div>
-        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
+        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
       <aside className={`order-1 min-h-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
@@ -746,7 +781,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       </button>
     </div>
 
-    {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p>{!commerce && <div className="mt-2 flex flex-wrap items-center gap-2">{previewTokenUrl ? <a href={previewTokenUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100">بازکردن لینک خصوصی پیش‌نمایش</a> : <button type="button" disabled={busy || hasUnsavedChanges === false && !project} onClick={() => void createPreviewLink()} className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100 disabled:opacity-40">ساخت لینک خصوصی پیش‌نمایش</button>}{hasUnsavedChanges && <span className="text-[9px] text-amber-200">برای ساخت لینک، تغییرات ذخیره می‌شوند.</span>}</div>}</div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
+    {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p>{!commerce && <div className="mt-2 flex flex-wrap items-center gap-2">{previewTokenUrl ? <a href={previewTokenUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100">بازکردن لینک خصوصی پیش‌نمایش</a> : <button type="button" disabled={busy || hasUnsavedChanges === false && !project} onClick={() => void createPreviewLink()} className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100 disabled:opacity-40">ساخت لینک خصوصی پیش‌نمایش</button>}{hasUnsavedChanges && <span className="text-[9px] text-amber-200">برای ساخت لینک، تغییرات ذخیره می‌شوند.</span>}</div>}</div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
 
     {templatePickerOpen && <div className="fixed inset-0 z-[105] grid place-items-center bg-slate-950/75 p-4"><section className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#0d1622] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black tracking-[.16em] text-emerald-300">TEMPLATES</p><h2 className="mt-1 text-lg font-black">شروع از یک طرح آماده</h2><p className="mt-2 text-xs leading-6 text-white/45">قالب انتخابی روی پیش‌نویس فعلی اعمال می‌شود؛ قبل از ذخیره آن را بررسی کنید.</p></div><button type="button" aria-label="بستن قالب‌ها" onClick={() => setTemplatePickerOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><X /></button></div><div className="mt-5 grid gap-3 md:grid-cols-2">{templateOptions.map((template) => <button key={template.id} type="button" onClick={() => { setConfig(createConfigFromTemplate(template)); setTemplatePickerOpen(false); setInspectorOpen(true); setTab("context"); setMessage(`قالب «${template.label}» روی پیش‌نویس آماده شد؛ برای ثبت نهایی ذخیره کنید.`); }} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.03] text-right transition hover:border-emerald-400/50 hover:bg-emerald-400/10"><div className="p-3"><TemplatePreview template={template}/></div><span className="block border-t border-white/10 p-4"><b className="block text-sm">{template.label}</b><span className="mt-1 block text-[10px] font-bold text-emerald-200">{templateExperience(template).useCases}</span><span className="mt-2 block text-xs leading-6 text-white/45">{templateExperience(template).recommendation}</span><span className="mt-3 block text-[10px] text-white/35">شامل: {template.sections.slice(0, 4).map((section) => section.title).join(" · ")}</span><span className="mt-4 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">انتخاب این قالب</span></span></button>)}</div></section></div>}
 

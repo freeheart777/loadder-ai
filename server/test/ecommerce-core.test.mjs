@@ -112,6 +112,34 @@ test("canonical taxonomy lifecycle, assignments and merchandising reject cross-w
   }); db.close();
 });
 
+test("commerce taxonomy management supports lifecycle and ordered manual collection membership", () => {
+  const { db, store, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const category = service.createCategory({ name:"Accessories" });
+    const brand = service.createBrand({ name:"Northwind" });
+    const first = service.createProduct(store.id, { name:"First", sku:"MANUAL-1", basePriceMinor:100, categoryId:category.id, brandId:brand.id });
+    const second = service.createProduct(store.id, { name:"Second", sku:"MANUAL-2", basePriceMinor:100 });
+    assert.equal(service.getProduct(first.id).categoryId, category.id);
+    assert.equal(service.getProduct(first.id).brandId, brand.id);
+    assert.equal(service.archiveBrand(brand.id).status, "ARCHIVED");
+    assert.equal(service.reactivateBrand(brand.id).status, "ACTIVE");
+    assert.equal(service.archiveCategory(category.id).status, "ARCHIVED");
+    assert.equal(service.reactivateCategory(category.id).status, "ACTIVE");
+
+    const collection = service.createCollection(store.id, { name:"Homepage picks" });
+    service.addCollectionProduct(collection.id, first.id);
+    service.addCollectionProduct(collection.id, second.id);
+    assert.deepEqual(service.listCollections(store.id)[0].productIds, [first.id, second.id]);
+    service.reorderCollectionProduct(collection.id, second.id, 0);
+    assert.deepEqual(service.listCollections(store.id)[0].productIds, [second.id, first.id]);
+    service.removeCollectionProduct(collection.id, first.id);
+    assert.deepEqual(service.listCollections(store.id)[0].productIds, [second.id]);
+    assert.equal(service.archiveCollection(collection.id).status, "ARCHIVED");
+    assert.equal(service.reactivateCollection(collection.id).status, "ACTIVE");
+  });
+  db.close();
+});
+
 test("commerce product media preserves ordered gallery and variant-specific image", () => {
   const { db, store, service } = fixture();
   runWithWorkspace("ws-1", () => {
