@@ -1,0 +1,39 @@
+Spec: Website Platform recovery
+Platform: Loadder Website Platform
+Purpose:
+  Recover the accepted Site Builder journey on the persistent roadmap branch without creating a second renderer, commerce runtime, or booking domain.
+Owns:
+  - Site Project selection, starter application, draft revision, preview, publish, and public presentation boundaries.
+  - Capability-aware Website Studio navigation and canonical manager deep links.
+Can modify:
+  - src/pages/StoreWebsiteStudioPageV16Core.tsx
+  - src/components/store-studio-v16/
+  - server/app/site-platform/
+  - server/app/services/site-project-service.mjs
+  - server/app/routes/site-projects.mjs
+  - server/app/routes/public-sites.mjs
+  - focused Website Platform tests and isolated E2E.
+Must:
+  - Keep /dashboard/websites as the Site Project entry and preserve coexistence of STORE and BUSINESS projects.
+  - Preserve six starters: Medical, Legal, Corporate, Education, Ecommerce, and Hybrid; application persists through the ordinary draft path.
+  - Preserve pages[] as the canonical static page model; Home has root slug and dynamic application routes are not pages[].
+  - Make mode access reflect persisted resolved capabilities, not frontend guesses.
+  - Treat Booking as a canonical external operational domain: Website may expose an enabled integration/deep link but never stores services, providers, availability, or appointments.
+  - Keep Save, Preview, and Publish truthful: preview reads draft, published public projection reads only the active publish snapshot, and projects remain isolated.
+  - Keep Commerce products, variants, inventory, carts, orders, and payments in canonical Commerce; Website only presents them.
+  - Remove unconfigured commercial promises from public presentation.
+Must not:
+  - Create V17, a second Studio, a second public renderer, copied Commerce data, or a Website booking runtime.
+  - Publish draft changes implicitly or expose draft changes through a public route.
+Done when:
+  - Focused tests and isolated browser flows prove Site Project coexistence, starters, draft/save/reload/preview/publish isolation, public navigation, capabilities, and mobile overflow.
+Scenario: Medical booking integration
+  Given a Medical Site Project whose persisted capability includes booking
+  When the merchant opens the Studio
+  Then Booking is available only as a canonical Booking Studio integration
+  And no booking operational records are written by Website.
+Scenario: Draft isolation
+  Given a published Site Project
+  When its draft is changed and saved without publishing
+  Then Preview renders the draft
+  And the public route continues to render the published snapshot.

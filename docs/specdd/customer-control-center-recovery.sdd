@@ -1,0 +1,27 @@
+Spec: Customer Control Center recovery
+Platform: Loadder Customer Control Center
+Purpose:
+  Recover a narrow, read-only, workspace-scoped customer dashboard that links to canonical operational products.
+Owns:
+  - GET /api/control-center/summary and its dashboard presentation.
+  - Capability-aware links and truthful empty-state summaries.
+Can modify:
+  - server/app/routes/control-center.mjs
+  - server/app/services/control-center-service.mjs
+  - server/app/repositories/control-center-repository.mjs
+  - src/pages/DashboardPage.tsx
+  - focused Control Center tests and isolated E2E.
+Must:
+  - Scope every summary record to the authenticated workspace.
+  - Be read-only and link to existing canonical Website, Commerce, Booking, Content, Customers, Leads, Campaigns, and Analytics surfaces only when available.
+  - Derive enabled actions from persisted resolved capability state.
+  - Return zero/empty values honestly for a new workspace; never fabricate orders, revenue, leads, or campaigns.
+  - Remain usable at 390px without material horizontal overflow.
+Must not:
+  - Duplicate operational persistence, bypass canonical authorization, or infer Booking/Content availability solely in the frontend.
+Done when:
+  - Focused service/route/UI tests and isolated browser acceptance prove enabled, booking-disabled, empty-workspace, and mobile scenarios.
+Scenario: Empty workspace
+  Given an authenticated workspace with no projects or operational records
+  When it requests the Control Center summary
+  Then the response contains truthful zero counts and no enabled capability action.
