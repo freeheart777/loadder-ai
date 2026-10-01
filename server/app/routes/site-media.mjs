@@ -1,9 +1,11 @@
 import express from "express";
+import { requireWorkspaceId } from "../tenant-context.mjs";
+import { isWorkspaceOperator } from "../workspace-authorization.mjs";
 import { SiteProjectError } from "../services/site-project-service.mjs";
 import { SiteMediaError } from "../services/site-media-service.mjs";
 import { SiteMediaStorageError } from "../services/site-media-storage-adapter.mjs";
 
-export function createSiteMediaRouter({ service }) {
+export function createSiteMediaRouter({ service, db = null }) {
   const router = express.Router();
   const handle = (error, res) => {
     if (error instanceof SiteProjectError || error instanceof SiteMediaError || error instanceof SiteMediaStorageError) {
@@ -45,6 +47,11 @@ export function createSiteMediaRouter({ service }) {
   // Student Portal reads stay behind the ordinary authenticated workspace
   // boundary mounted by server/index.mjs. The browser never receives a raw
   // storage key or a public URL for these resources.
+  // Operator preview only; students use the enrolment-gated public route.
+  const operatorOnly = (req, res, next) => db && isWorkspaceOperator(db, requireWorkspaceId(), req.user?.id)
+    ? next()
+    : res.status(403).json({ success: false, code: "LEARNING_OPERATOR_REQUIRED", message: "Workspace owner or admin access is required." });
+  router.use("/site-projects/:id/learning-resources", operatorOnly);
   router.get("/site-projects/:id/learning-resources", (req, res) => {
     try { return res.json({ success: true, resources: service.listLearningResources(req.params.id) }); }
     catch (error) { return handle(error, res); }

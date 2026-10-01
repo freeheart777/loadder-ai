@@ -11,6 +11,12 @@ import { projectPublicStorePresentation } from "../services/store-public-present
 import { createSiteLeadService } from "../services/site-lead-service.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
 import { createPublicBusinessAppRouter } from "../business-builder/public-app-router.mjs";
+import { createPublicEducationRouter } from "./public-education.mjs";
+import { createLearningAccessService } from "../services/learning-access-service.mjs";
+import { createSiteMediaService } from "../services/site-media-service.mjs";
+import { createSiteMediaRepository } from "../repositories/site-media-repository.mjs";
+import { createSiteMediaStorageAdapter } from "../services/site-media-storage-adapter.mjs";
+import { createSiteProjectService } from "../services/site-project-service.mjs";
 import { CART_CAPABILITY_HEADER, ORDER_CAPABILITY_HEADER, createPublicCapability, matchesPublicCapability } from "../services/public-commerce-capability.mjs";
 import { createPaymentAttemptService } from "../commerce/payment-attempt-service.mjs";
 import { paymentAdapters } from "../commerce/payment-adapters.mjs";
@@ -64,7 +70,11 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   // (e.g. on the site project or workspace), resolve it here and return { channel, address }.
   function resolveMerchantNotificationRecipient(_store) { return null; }
 
-  if(process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true") router.use(createPublicBusinessAppRouter({db}));
+  if(process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"){
+    router.use(createPublicBusinessAppRouter({db}));
+    const mediaService=createSiteMediaService({repository:createSiteMediaRepository(db),siteProjectService:createSiteProjectService({repository:createSiteProjectRepository(db)}),storage:createSiteMediaStorageAdapter()});
+    router.use(createPublicEducationRouter({db,accessService:createLearningAccessService({db,mediaService})}));
+  }
   router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"}));
   const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`},products);if(html===null)return res.status(404).send("Page not found");res.set({"Cache-Control":"public, max-age=60, stale-while-revalidate=300","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin"});return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
   router.get("/sites/:id/:slug/:detail",(req,res)=>sendLegacySite(req,res,req.params.slug,req.params.detail));

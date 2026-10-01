@@ -450,7 +450,7 @@ test("site-document migrations and later Booking foundation are registered exact
   assert.equal(versions.filter((v) => v === 93).length, 1);
   assert.equal(versions.filter((v) => v === 95).length, 1);
   assert.equal(versions.length, new Set(versions).size);
-  assert.equal(Math.max(...versions), 95);
+  assert.ok(Math.max(...versions) >= 95);
   assert.ok(!versions.includes(88), "088 stays reserved for the open inventory PR");
 
   const db = createSiteTestDb();

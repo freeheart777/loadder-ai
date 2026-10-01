@@ -17,6 +17,8 @@ import { createSupabaseStorageService } from "./storage/supabase-storage-service
 import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
 import { createSiteMediaRouter } from "./routes/site-media.mjs";
+import { createLearningEnrollmentsRouter } from "./routes/learning-enrollments.mjs";
+import { createLearningAccessService } from "./services/learning-access-service.mjs";
 import { createDesignCopilotRouter } from "./routes/design-copilot.mjs";
 import { createEcommerceRouter } from "./routes/ecommerce.mjs";
 import { createBookingRepository } from "./repositories/booking-repository.mjs";
@@ -77,7 +79,8 @@ export function mountSiteBuilderControlPlane({
       siteService: projectService,
     })
   );
-  app.use(mountPath, createSiteMediaRouter({ service: mediaService }));
+  app.use(mountPath, createSiteMediaRouter({ service: mediaService, db }));
+  app.use(mountPath, createLearningEnrollmentsRouter({ service: createLearningAccessService({ db, mediaService }), db }));
   app.use(
     mountPath,
     createDesignCopilotRouter({ service: designCopilotService })
