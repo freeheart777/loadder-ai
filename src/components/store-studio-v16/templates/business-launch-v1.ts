@@ -76,8 +76,8 @@ const educationCards = (id: string, type: "services" | "team", title: string, na
 
 const education: WebsiteTemplate = {
   id: "education-center-v1", label: "مرکز آموزشی", description: "دوره‌ها، مدرسان، تجربه دانش‌پذیران و ثبت‌نام.", siteKind: "BUSINESS", siteType: "EDUCATION",
-  design: { primaryColor: "#4338ca", secondaryColor: "#e0e7ff" }, header: { storeName: "آموزشگاه شما" },
-  hero: { layout: "centered", eyebrow: "آموزش کاربردی، قدم‌به‌قدم", title: "مهارتی که در عمل به کار می‌آید", subtitle: "دوره‌های عملی با مسیر یادگیری روشن و همراهی مدرس در هر مرحله.", ctaLabel: "درخواست ثبت‌نام", ctaHref: "#contact-main", imageUrl: templatePhoto("education/hero"), backgroundColor: "#312e81", overlayOpacity: 60 },
+  design: { primaryColor: "#a98242", secondaryColor: "#e9ddc4", backgroundColor: "#242321", textColor: "#f5f0e5", surfaceColor: "#f5f0e5" }, header: { storeName: "آموزشگاه موسیقی شما", backgroundColor: "#242321", textColor: "#f5f0e5", sticky: true },
+  hero: { layout: "centered", eyebrow: "آموزش موسیقی، با تمرین و همراهی", title: "صدای خودتان را پیدا کنید", subtitle: "دوره‌ها، کارگاه‌ها و کلاس‌های موسیقی با مسیر یادگیری روشن و قابل ویرایش.", ctaLabel: "رزرو کلاس", ctaHref: "/booking", imageUrl: templatePhoto("education/hero"), backgroundColor: "#242321", textColor: "#f5f0e5", overlayOpacity: 60 },
   sections: [
     educationCards("courses-main", "services", "دوره‌های آموزشی", "دوره‌ها", [
       ["دوره مقدماتی", "شروع اصولی و کاربردی", "آشنایی با مفاهیم پایه و تمرین عملی از جلسه اول."],

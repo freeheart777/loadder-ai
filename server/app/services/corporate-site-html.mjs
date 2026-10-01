@@ -28,7 +28,11 @@ const CORPORATE_TYPES = new Set(["about", "services", "portfolio", "team", "text
 
 /** True when this published project is a V16 corporate site. */
 export function isCorporateV16(project, content) {
-  if (String(project?.siteType || "").toUpperCase() !== "BUSINESS") return false;
+  // V16 is the shared presentation document for every non-store business
+  // starter.  Education used to fall through to the legacy generic renderer,
+  // which meant its persisted V16 draft/publish document was not the public
+  // truth.  Keep the renderer shared; verticals only contribute data/theme.
+  if (["STORE", "ECOMMERCE"].includes(String(project?.siteType || "").toUpperCase())) return false;
   const v16 = content?.storeBuilderV16;
   if (!v16 || typeof v16 !== "object") return false;
   const everySection = [
@@ -115,6 +119,7 @@ export function renderCorporateSite(project, version, content, { slug = "", base
   const seo = page.seo || {};
 
   const siteName = header.storeName || project?.name || "";
+  const education = String(project?.siteType || "").toUpperCase() === "EDUCATION";
   // Per-page canonical SEO, falling back only to values the site already has.
   const title = seo.title || page.title || siteSeo.title || siteName;
   const description = seo.description || siteSeo.description || (page.isHome ? hero.subtitle : "") || "";
@@ -124,7 +129,7 @@ export function renderCorporateSite(project, version, content, { slug = "", base
   const footer = presentation.footer || {};
   const navItems = nav.enabled === false ? [] : pageNavigationFor(pages, basePath);
 
-  const css = `*{box-sizing:border-box}body{margin:0;background:${color(design.backgroundColor, "#f8fafc")};color:${color(design.textColor, "#0f172a")};font-family:${escape(design.fontFamily || "Vazirmatn")},system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.8}`
+  const css = `*{box-sizing:border-box}body{margin:0;background:${color(design.backgroundColor, education ? "#242321" : "#f8fafc")};color:${color(design.textColor, education ? "#f5f0e5" : "#0f172a")};font-family:${escape(design.fontFamily || "Vazirmatn")},system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.8}`
     + `.wrap{width:min(${width}px,100%);margin:auto;padding:0 16px}`
     + `header.site{background:${color(header.backgroundColor, "#ffffff")};color:${color(header.textColor, "#0f172a")};position:${header.sticky ? "sticky" : "static"};top:0;z-index:20;border-bottom:1px solid rgba(0,0,0,.06)}`
     + `.bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;min-height:64px}`
@@ -151,13 +156,13 @@ export function renderCorporateSite(project, version, content, { slug = "", base
   const heroHtml = (hero.enabled === false || !page.isHome) ? "" : `<section class="hero"><div class="wrap hero-inner"><div>${
     hero.eyebrow ? `<span class="eyebrow" style="color:inherit;opacity:.75">${escape(hero.eyebrow)}</span>` : ""
   }<h1>${escape(hero.title || siteName)}</h1>${hero.subtitle ? `<p>${escape(hero.subtitle)}</p>` : ""}${
-    hero.ctaLabel ? `<a class="hero-cta" href="${escape(String(hero.ctaHref || "#"))}">${escape(hero.ctaLabel)}</a>` : ""
+    hero.ctaLabel ? `<a class="hero-cta" href="${escape(education ? `${basePath}/booking` : String(hero.ctaHref || "#"))}">${escape(hero.ctaLabel)}</a>` : ""
   }</div>${url(hero.imageUrl) ? `<div class="hero-media"><img src="${escape(url(hero.imageUrl))}" alt="${escape(hero.title || siteName)}"></div>` : ""}</div></section>`;
 
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<title>${escape(title)}</title>${description ? `<meta name="description" content="${escape(description)}">` : ""}`
     + `<meta name="generator" content="Loadder Site Builder"><style>${css}</style></head><body data-site-kind="BUSINESS" data-published-version="${escape(version?.version ?? "draft")}" data-page-slug="${escape(page.slug)}" data-page-id="${escape(page.id)}">`
-    + `<header class="site"><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>`
+    + `<header class="site"${education ? ' data-education-public="true"' : ""}><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>`
     + `${navItems.length ? `<nav class="menu">${navItems.map((item) => `<a href="${escape(item.href)}">${escape(item.label)}</a>`).join("")}</nav>` : ""}`
     + `${nav.enabled === false ? "" : `<a class="nav-cta" href="${escape(String(nav.ctaHref || "#"))}">${escape(nav.ctaLabel || "تماس با ما")}</a>`}`
     + `</div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section)).join("")}</main>`

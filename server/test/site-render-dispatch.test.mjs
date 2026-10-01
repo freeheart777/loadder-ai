@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { CORPORATE_SECTION_TYPES } from "../app/services/corporate-site-html.mjs";
+import { CORPORATE_SECTION_TYPES, isCorporateV16, renderCorporateSite } from "../app/services/corporate-site-html.mjs";
 import { STORE_SECTION_TYPES } from "../app/services/store-site-html.mjs";
 import { siteRegistry } from "../app/site-platform/capabilities.mjs";
 import { normalizeSiteSections } from "../app/site-platform/section-runtime.mjs";
@@ -62,4 +62,13 @@ test("renderers stay independent of site-platform", () => {
       for (const [key, value] of Object.entries(section)) assert.notEqual(typeof value, "function", `${section.type}.${key} is metadata, not a render function`);
     }
   }
+});
+
+test("Education uses the shared V16 public renderer and its CTA enters canonical site booking", () => {
+  const project = { id: "education-1", siteType: "EDUCATION", name: "آموزشگاه" };
+  const content = { storeBuilderV16: { header: { storeName: "آموزشگاه" }, hero: { title: "موسیقی", ctaLabel: "رزرو کلاس" }, sections: [{ id: "courses", type: "services", enabled: true, title: "دوره‌ها", items: [] }] } };
+  assert.equal(isCorporateV16(project, content), true);
+  const html = renderCorporateSite(project, { version: 1, content }, content, { basePath: "/sites/education-1" });
+  assert.match(html, /data-education-public="true"/);
+  assert.match(html, /href="\/sites\/education-1\/booking"/);
 });
