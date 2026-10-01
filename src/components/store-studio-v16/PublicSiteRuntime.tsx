@@ -80,7 +80,7 @@ export default function PublicSiteRuntime() {
     tag.setAttribute("content", page?.seo.description || config.seo.description || (page?.isHome ? config.hero.subtitle : "") || "");
   }, [config, meta, page]);
 
-  const submitLead = async (input: { name: string; phone: string; email: string; company: string; message: string }) => {
+  const submitLead = async (input: { name: string; phone: string; email: string; company: string; message: string; website?: string }) => {
     const response = await apiFetch(`/api/auth/site/${siteProjectId}/leads`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

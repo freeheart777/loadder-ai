@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, Heart, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
+import { safePublicHref } from "./linkPolicy";
 import { defaultProductSettings, formatMoney, productView, productsForSection } from "./config";
 import { isCommerceSite, sectionAnchor, siteTypeDefinition } from "./site-types";
 import { navigationPages } from "./pages";
@@ -10,7 +11,7 @@ export type RuntimeCartItem = { id: string; productName: string; variantTitle?: 
 export type RuntimeCart = { currency: string; items: RuntimeCartItem[]; subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number };
 export type CheckoutInput = { fullName: string; phone: string; email?: string; shippingAddress?: { province?: string; city?: string; address?: string; postalCode?: string; notes?: string } };
 export type StorefrontRuntimeAdapter = { openStorefront: () => void; openCollection: () => void; openProduct: (product: Product) => void; openCart: () => void; addProduct: (product: Product) => void | Promise<void>; cartCount?: number; cart?: RuntimeCart | null; checkout?: (input: CheckoutInput) => Promise<{ orderId: string; totalMinor: number; currency: string }> };
-type CanvasProps = { config: StudioConfig; products: Product[]; merchandisingProducts?: Record<string, Product[]>; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; onLeadSubmit?: (input: { name: string; phone: string; email: string; company: string; message: string }) => Promise<void>; pageBasePath?: string; };
+type CanvasProps = { config: StudioConfig; products: Product[]; merchandisingProducts?: Record<string, Product[]>; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; onLeadSubmit?: (input: { name: string; phone: string; email: string; company: string; message: string; website?: string }) => Promise<void>; pageBasePath?: string; };
 
 function InlineMediaControl({ target, onUpload, busy, label = "تغییر تصویر", compact = false }: { target: InlineMediaTarget; onUpload?: CanvasProps["onImageUpload"]; busy?: boolean; label?: string; compact?: boolean }) {
   if (!onUpload) return null;
@@ -122,6 +123,8 @@ function CheckoutForm({ adapter, onRuntimePage }: { adapter: StorefrontRuntimeAd
   const [form, setForm] = useState({ fullName: "", phone: "", email: "", address: "", city: "", province: "", postalCode: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Hidden from people, visible to form-filling bots. Never shown, never focusable.
+  const [honeypot, setHoneypot] = useState("");
   const field = (key: keyof typeof form) => ({ value: form[key], onChange: (event: React.ChangeEvent<HTMLInputElement>) => setForm((current) => ({ ...current, [key]: event.target.value })) });
   return <div className="min-h-[650px] bg-slate-50 p-8 text-slate-900"><div className="mx-auto max-w-xl rounded-3xl border bg-white p-7 shadow-sm"><h2 className="text-2xl font-black">تسویه حساب</h2><p className="mt-2 text-xs text-slate-400">اطلاعات ارسال و پرداخت</p>
     <form data-checkout-form="real" noValidate onSubmit={async (event) => {
@@ -200,7 +203,7 @@ function CorporateHeader(props: CanvasProps) {
       {config.nav.enabled && !mobile && <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-bold opacity-80">
         {items.map((entry) => <a key={entry.id} href={entry.href} onClick={interactive ? (event) => event.preventDefault() : undefined}>{entry.label}</a>)}
       </nav>}
-      {config.nav.enabled && <a href={config.nav.ctaHref} onClick={interactive ? (event) => event.preventDefault() : undefined} className="mr-auto inline-flex min-h-10 items-center px-4 text-xs font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{config.nav.ctaLabel}</a>}
+      {config.nav.enabled && <AuthorLink href={config.nav.ctaHref} interactive={interactive} className="mr-auto inline-flex min-h-10 items-center px-4 text-xs font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{config.nav.ctaLabel}</AuthorLink>}
     </div>
     {config.nav.enabled && mobile && <nav className="flex gap-4 overflow-x-auto border-t border-black/5 px-4 py-2 text-[11px] font-bold opacity-80">
       {items.map((entry) => <a key={entry.id} href={entry.href} className="whitespace-nowrap" onClick={interactive ? (event) => event.preventDefault() : undefined}>{entry.label}</a>)}
@@ -233,10 +236,19 @@ function ItemCard({ item, section, config, variant }: { item: SectionItem; secti
   </article>;
 }
 
+/** An author-supplied link. Rejected targets render as text, never rewritten. */
+function AuthorLink({ href, interactive, className, style, children }: { href?: string; interactive: boolean; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  const safe = safePublicHref(href);
+  if (!safe) return <span className={className} style={style} data-link-rejected="true">{children}</span>;
+  return <a href={safe} onClick={interactive ? (event) => event.preventDefault() : undefined} className={className} style={style}>{children}</a>;
+}
+
 function ContactForm({ section, config, onSubmit }: { section: SectionConfig; config: StudioConfig; onSubmit?: CanvasProps["onLeadSubmit"] }) {
   const [form, setForm] = useState({ name: "", phone: "", email: "", company: "", message: "" });
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const [error, setError] = useState("");
+  // Hidden from people, visible to form-filling bots. Never shown, never focusable.
+  const [honeypot, setHoneypot] = useState("");
   const field = (key: keyof typeof form) => ({ value: form[key], onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((current) => ({ ...current, [key]: event.target.value })) });
   const input = "min-h-12 w-full rounded-xl border border-black/10 bg-white px-4 text-sm outline-none focus:border-violet-400";
   if (state === "done") return <p role="status" data-lead-state="submitted" className="rounded-2xl bg-emerald-50 p-5 text-sm font-bold text-emerald-700">{section.contact?.successMessage}</p>;
@@ -244,7 +256,7 @@ function ContactForm({ section, config, onSubmit }: { section: SectionConfig; co
     event.preventDefault();
     if (!onSubmit) return;
     setState("busy"); setError("");
-    try { await onSubmit(form); setState("done"); }
+    try { await onSubmit({ ...form, website: honeypot }); setState("done"); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "ارسال ناموفق بود."); setState("error"); }
   }}>
     <div className="grid gap-3 sm:grid-cols-2">
@@ -253,6 +265,7 @@ function ContactForm({ section, config, onSubmit }: { section: SectionConfig; co
       <input className={input} name="email" type="email" placeholder="ایمیل (اختیاری)" aria-label="ایمیل" {...field("email")} />
       <input className={input} name="company" placeholder="نام سازمان (اختیاری)" aria-label="نام سازمان" {...field("company")} />
     </div>
+    <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" data-honeypot="true" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
     <textarea className={`${input} min-h-28 py-3`} name="message" placeholder="شرح درخواست شما" aria-label="شرح درخواست" {...field("message")} />
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{error}</p>}
     <button type="submit" disabled={state === "busy" || !onSubmit} className="min-h-12 px-6 text-sm font-black text-white disabled:opacity-60" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>
@@ -297,7 +310,7 @@ function CorporateSection({ section, props }: { section: SectionConfig; props: C
     return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
       <div className="flex flex-wrap items-center justify-between gap-5 p-8" style={{ background: section.backgroundColor, color: section.textColor, borderRadius: config.design.cardRadius }}>
         <div><h2 className="text-xl font-black sm:text-2xl">{section.title}</h2><p className="mt-2 text-sm opacity-80">{section.subtitle}</p></div>
-        <a href={section.ctaHref || "#contact-main"} onClick={props.interactive !== false ? (event) => event.preventDefault() : undefined} className="inline-flex min-h-12 items-center bg-white px-6 text-sm font-black" style={{ color: section.backgroundColor, borderRadius: config.design.buttonRadius }}>{section.ctaLabel}</a>
+        <AuthorLink href={section.ctaHref || "#contact-main"} interactive={props.interactive !== false} className="inline-flex min-h-12 items-center bg-white px-6 text-sm font-black" style={{ color: section.backgroundColor, borderRadius: config.design.buttonRadius }}>{section.ctaLabel}</AuthorLink>
       </div>
     </section>;
   }

@@ -1,3 +1,4 @@
+import { previewSiteHeaders, publishedSiteHeaders } from "../services/public-site-headers.mjs";
 import crypto from "node:crypto";
 import express from "express";
 import { isCorporateV16, renderCorporateSite } from "../services/corporate-site-html.mjs";
@@ -86,7 +87,7 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     const etag = `W/\"site-${published.version.id}-${page.slug || ""}-${commerceRevision}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const cacheControl = commerceEnabled(published.project) ? "no-cache" : "public, max-age=60, stale-while-revalidate=300";
-    return res.set({ "Cache-Control": cacheControl, ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; media-src 'self' https:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(html);
+    return res.set(publishedSiteHeaders({ "Cache-Control": cacheControl, ETag: etag })).type("html").send(html);
   };
   const sendPreview = (req, res, preview) => {
     if (!preview) return res.status(404).send("Preview not found");
@@ -94,7 +95,7 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const draftVersion = { version: "draft", content: preview.project.content };
     const page = { slug: typeof req.query.page === "string" ? req.query.page : "", detailSlug: typeof req.query.detail === "string" ? req.query.detail : "", basePath: `/preview/sites/${preview.project.id}` };
-    return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; media-src 'self' https:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, page, productsFor(preview.project, preview.project.content)) || "Page not found");
+    return res.set(previewSiteHeaders({ ETag: etag })).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, page, productsFor(preview.project, preview.project.content)) || "Page not found");
   };
   router.get("/preview/sites/:id", (req, res) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";

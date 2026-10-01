@@ -1,3 +1,4 @@
+import { publishedSiteHeaders } from "./public-site-headers.mjs";
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[char]);
 
 const normalizeContent = (content) => content && typeof content === "object" && !Array.isArray(content) ? content : {};
@@ -25,5 +26,5 @@ export function sendPublishedSite(res, payload) {
   if (!html) return res.status(404).json({ success: false, message: "Published site not found." });
   const etag = `W/\"${Buffer.from(`${payload.version.id}:${payload.version.version}`).toString("base64url")}\"`;
   if (res.req.headers["if-none-match"] === etag) return res.status(304).end();
-  return res.status(200).set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60, stale-while-revalidate=300", ETag: etag, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; media-src 'self' https:; style-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" }).send(html);
+  return res.status(200).set(publishedSiteHeaders({ "Content-Type": "text/html; charset=utf-8", ETag: etag })).send(html);
 }

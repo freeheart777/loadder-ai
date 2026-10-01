@@ -1,4 +1,5 @@
 import { projectPublicStorePresentation } from "./store-public-presentation.mjs";
+import { safePublicHref, safePublicImageUrl } from "./public-link-policy.mjs";
 import { findPageBySlug, navigationPages, normalizeSlug, readPages } from "./site-page-model.mjs";
 
 // A published corporate site has exactly one truth: the V16 document, read
@@ -9,7 +10,15 @@ import { findPageBySlug, navigationPages, normalizeSlug, readPages } from "./sit
 
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 const mediaUrl = (value) => (typeof value === "string" && /^https:\/\//i.test(value) ? value : "");
-const url = (value) => (typeof value === "string" && /^(https:\/\/|data:image\/)/i.test(value) ? value : "");
+const url = (value) => safePublicImageUrl(value) || "";
+// A rejected author link is published as plain text, never rewritten into a
+// different-but-valid target.
+const link = (href, label, className) => {
+  const safe = safePublicHref(href);
+  return safe
+    ? `<a class="${className}" href="${escape(safe)}">${escape(label)}</a>`
+    : `<span class="${className}" data-link-rejected="true">${escape(label)}</span>`;
+};
 const color = (value, fallback) => (typeof value === "string" && /^#[0-9a-f]{3,8}$/i.test(value) ? value : fallback);
 const num = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 
@@ -60,7 +69,7 @@ const splitHtml = (section, { open, close, head }) => {
 
 const cardsHtml = (section, { open, close, head, columns, itemHref }) => `${open}${head}<div class="grid" style="--cols:${columns}">${itemsHtml(section, section.type !== "services", itemHref)}</div>${close}`;
 
-const ctaHtml = (section, { open, close }) => `${open}<div class="cta"><div><h2>${escape(section.title)}</h2>${section.subtitle ? `<p>${escape(section.subtitle)}</p>` : ""}</div>${section.ctaLabel ? `<a class="cta-btn" href="${escape(String(section.ctaHref || "#"))}">${escape(section.ctaLabel)}</a>` : ""}</div>${close}`;
+const ctaHtml = (section, { open, close }) => `${open}<div class="cta"><div><h2>${escape(section.title)}</h2>${section.subtitle ? `<p>${escape(section.subtitle)}</p>` : ""}</div>${section.ctaLabel ? link(section.ctaHref || "#", section.ctaLabel, "cta-btn") : ""}</div>${close}`;
 
 const contactHtml = (section, { open, close, head }) => {
   const rows = [["تلفن", section.contact?.phone], ["ایمیل", section.contact?.email], ["نشانی", section.contact?.address]]
@@ -195,7 +204,7 @@ export function renderCorporateSite(project, version, content, { slug = "", deta
   const heroHtml = (hero.enabled === false || !page.isHome || detail) ? "" : `<section class="hero"><div class="wrap hero-inner"><div>${
     hero.eyebrow ? `<span class="eyebrow" style="color:inherit;opacity:.75">${escape(hero.eyebrow)}</span>` : ""
   }<h1>${escape(hero.title || siteName)}</h1>${hero.subtitle ? `<p>${escape(hero.subtitle)}</p>` : ""}${
-    hero.ctaLabel ? `<a class="hero-cta" href="${escape(education ? `${basePath}/booking` : String(hero.ctaHref || "#"))}">${escape(hero.ctaLabel)}</a>` : ""
+    hero.ctaLabel ? link(education ? `${basePath}/booking` : (hero.ctaHref || "#"), hero.ctaLabel, "hero-cta") : ""
   }</div>${url(hero.imageUrl) ? `<div class="hero-media"><img src="${escape(url(hero.imageUrl))}" alt="${escape(hero.title || siteName)}"></div>` : ""}</div></section>`;
 
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
@@ -203,7 +212,7 @@ export function renderCorporateSite(project, version, content, { slug = "", deta
     + `<meta name="generator" content="Loadder Site Builder"><style>${css}</style></head><body data-site-kind="BUSINESS" data-published-version="${escape(version?.version ?? "draft")}" data-page-slug="${escape(page.slug)}" data-page-id="${escape(page.id)}">`
     + `<header class="site"${education ? ' data-education-public="true"' : ""}><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>`
     + `${navItems.length ? `<nav class="menu">${navItems.map((item) => `<a href="${escape(item.href)}">${escape(item.label)}</a>`).join("")}</nav>` : ""}`
-    + `${nav.enabled === false ? "" : `<a class="nav-cta" href="${escape(String(nav.ctaHref || "#"))}">${escape(nav.ctaLabel || "تماس با ما")}</a>`}`
+    + `${nav.enabled === false ? "" : link(nav.ctaHref || "#", nav.ctaLabel || "تماس با ما", "nav-cta")}`
     + `</div></header>${heroHtml}<main>${detail ? `<article class="wrap detail"><a class="back" href="${escape(`${basePath}/${page.slug}`)}">بازگشت به ${escape(page.title)}</a><p class="eyebrow">${escape(detail.section.title || page.title)}</p><h1>${escape(detail.item.title)}</h1>${detail.item.subtitle ? `<p class="lead">${escape(detail.item.subtitle)}</p>` : ""}${url(detail.item.imageUrl) && !(detail.page?.slug === "performances" && mediaUrl(detail.item.videoUrl)) ? `<img src="${escape(url(detail.item.imageUrl))}" alt="${escape(detail.item.title)}" loading="lazy">` : ""}${detailVideoHtml(detail)}${detail.item.body ? `<p class="copy">${escape(detail.item.body)}</p>` : ""}</article>` : sections.map((section) => sectionHtml(section, { education, itemHref })).join("")}</main>`
     + `${footer.enabled === false ? "" : `<footer class="site"><div class="wrap foot"><b>${escape(siteName)}</b><span>${escape(footer.text || "")}</span></div></footer>`}`
     + `</body></html>`;

@@ -11,6 +11,7 @@ import { projectPublicStorePresentation } from "../services/store-public-present
 import { createSiteLeadService } from "../services/site-lead-service.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
 import { createPublicBusinessAppRouter } from "../business-builder/public-app-router.mjs";
+import { publishedSiteHeaders } from "../services/public-site-headers.mjs";
 import { resolveBookingIdentity } from "../services/booking-identity.mjs";
 import { createPublicEducationRouter } from "./public-education.mjs";
 import { createLearningAccessService } from "../services/learning-access-service.mjs";
@@ -76,7 +77,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
     router.use(createPublicEducationRouter({db,bookingRepository,accessService:createLearningAccessService({db,mediaService})}));
   }
   router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"}));
-  const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`},products);if(html===null)return res.status(404).send("Page not found");res.set({"Cache-Control":"public, max-age=60, stale-while-revalidate=300","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin"});return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
+  const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`},products);if(html===null)return res.status(404).send("Page not found");res.set(publishedSiteHeaders());return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
   router.get("/sites/:id/:slug/:detail",(req,res)=>sendLegacySite(req,res,req.params.slug,req.params.detail));
   router.get("/sites/:id/:slug",(req,res)=>sendLegacySite(req,res,req.params.slug));
   router.get("/sites/:id",(req,res)=>sendLegacySite(req,res,""));
