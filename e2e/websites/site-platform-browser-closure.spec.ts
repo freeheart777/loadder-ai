@@ -81,6 +81,12 @@ test("Medical customer entry persists Booking capability and Booking Studio mana
     const detail = await expectOk(await api.get(`/api/site-projects/${medical.id}`));
     expect(detail.capabilities).toContain("booking");
     expect(medical.siteType).toBe("MEDICAL");
+    // The starter choice is project truth. Returning to the Studio must not
+    // reopen a second template/type picker or let UI state choose a new type.
+    await page.reload();
+    await expect(page.locator("[data-persisted-site-type]")).toContainText("کلینیک و پزشک");
+    await expect(page.getByRole("button", { name: "قالب‌ها", exact: true })).toHaveCount(0);
+    await expect(page.locator("[data-create-another-site]").first()).toHaveAttribute("href", "/dashboard/websites");
 
     await desktopManager(page, "booking").click();
     await expect(page).toHaveURL(/\/dashboard\/booking$/);
@@ -106,6 +112,22 @@ test("Medical customer entry persists Booking capability and Booking Studio mana
     expect(booking.availability).toHaveLength(1);
 
     await expectMobileBookingStudioFromManager(page, medical.id);
+  } finally { await context.close(); await api.dispose(); }
+});
+
+test("Ecommerce starter reopens in the canonical Store Studio without a second type choice", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const { api, context } = await signIn(browser, "Ecommerce Starter E2E");
+  const page = await context.newPage();
+  try {
+    const ecommerce = await createFromCustomerEntry(page, "Loadder Commerce Modern V1");
+    expect(ecommerce.siteType).toBe("ECOMMERCE");
+    const detail = await expectOk(await api.get(`/api/site-projects/${ecommerce.id}`));
+    expect(detail.capabilities).toEqual(expect.arrayContaining(["commerce", "payments"]));
+    await expect(page).toHaveURL(new RegExp(`/dashboard/websites/store\\?project=${ecommerce.id}`));
+    await page.reload();
+    await expect(page.locator("[data-persisted-site-type]")).toContainText("فروشگاه اینترنتی");
+    await expect(page.getByRole("button", { name: "قالب‌ها", exact: true })).toHaveCount(0);
   } finally { await context.close(); await api.dispose(); }
 });
 

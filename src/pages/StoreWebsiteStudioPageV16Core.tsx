@@ -161,6 +161,16 @@ function templateExperience(template: WebsiteTemplate) {
   return details[template.id] || { useCases: "وب‌سایت حرفه‌ای", recommendation: template.description };
 }
 
+const siteTypeLabel = (siteType: string | undefined) => ({
+  MEDICAL: "کلینیک و پزشک",
+  LEGAL: "موسسه حقوقی",
+  CORPORATE: "شرکت حرفه‌ای",
+  EDUCATION: "مرکز آموزشی",
+  ECOMMERCE: "فروشگاه اینترنتی",
+  HYBRID: "کسب‌وکار ترکیبی",
+  STORE: "فروشگاه اینترنتی",
+}[String(siteType || "").toUpperCase()] || "وب‌سایت");
+
 function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelectTemplate, creating, message, onCreate, onCreateBlank }: { commerce: boolean; templates: readonly WebsiteTemplate[]; selectedTemplateId: string | null; onSelectTemplate: (id: string) => void; creating: boolean; message: string; onCreate: () => void; onCreateBlank: () => void }) {
   return <main dir="rtl" className="grid min-h-screen place-items-center bg-[#070b12] px-4 text-white">
     <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#0d1622] p-7 shadow-2xl">
@@ -213,7 +223,6 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [creating, setCreating] = useState(false);
   const templateOptions = templatesForSiteKind(siteKind);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(templateOptions[0]?.id ?? null);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pickerSectionId, setPickerSectionId] = useState<string | null>(null);
   const [createProductOpen, setCreateProductOpen] = useState(false);
@@ -748,6 +757,8 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       <Link to="/dashboard" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10"><ArrowRight /></Link>
       <div className="min-w-36"><div className="text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO · V16</div><h1 className="font-black">{project?.name || (commerce ? "فروشگاه شما" : "وب‌سایت شما")}</h1><p className={`mt-1 flex items-center gap-1 text-[10px] ${hasUnsavedChanges ? "text-amber-200" : "text-white/35"}`}><CursorClick />{hasUnsavedChanges ? "تغییرات ذخیره‌نشده" : "همه تغییرات ذخیره شده"}</p></div>
       <Link to="/dashboard/websites" className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/65 hover:bg-white/[.05] xl:flex">سایت‌های من</Link>
+      <Link to="/dashboard/websites" data-create-another-site className="hidden min-h-10 items-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 hover:bg-emerald-400/20 md:flex">ساخت سایت دیگر</Link>
+      <span data-persisted-site-type className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/55 lg:flex">نوع سایت: {siteTypeLabel(project?.siteType)}</span>
       {managerLinks.map((link) => <Link key={link.id} to={link.to} data-site-manager={link.id} className="hidden min-h-10 items-center rounded-xl border border-sky-300/20 bg-sky-400/10 px-3 text-[10px] font-bold text-sky-100 hover:bg-sky-400/20 lg:flex">{link.label}</Link>)}
       {publishedUrl && <a href={publishedUrl} target="_blank" rel="noreferrer" className="hidden min-h-10 items-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 lg:flex">آدرس عمومی <ArrowRight size={13} className="rotate-[-45deg]"/></a>}
       <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} />
@@ -760,7 +771,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         </nav>}
         <div className="sticky top-2 z-40 mx-auto mb-3 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-white/15 bg-[#111827]/92 p-1.5 shadow-xl backdrop-blur">
           <span className="px-3 py-2 text-[10px] font-bold text-emerald-200">عکس‌ها: مستقیم روی خود تصویر</span>
-          <button onClick={() => setTemplatePickerOpen(true)} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">قالب‌ها</button>
+          <Link to="/dashboard/websites" data-create-another-site className="rounded-xl px-3 py-2 text-[11px] font-bold text-emerald-200 hover:bg-white/10">ساخت سایت دیگر</Link>
           <button onClick={() => { setTab("sections"); setInspectorOpen(true); }} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> افزودن بخش</button>
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
           <button onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>
@@ -778,8 +789,6 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     </div>
 
     {previewOpen && <div data-draft-preview className="fixed inset-0 z-[100] overflow-auto bg-slate-950/95 p-5"><div className="mx-auto mb-3 flex max-w-[1240px] flex-wrap items-center justify-between gap-3"><div><b>پیش‌نمایش پیش‌نویس</b><p className="mt-1 text-[10px] text-white/45">این نسخه هنوز عمومی نشده است.</p>{!commerce && <div className="mt-2 flex flex-wrap items-center gap-2">{previewTokenUrl ? <a href={previewTokenUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100">بازکردن لینک خصوصی پیش‌نمایش</a> : <button type="button" disabled={busy || hasUnsavedChanges === false && !project} onClick={() => void createPreviewLink()} className="rounded-lg bg-violet-400/15 px-3 py-2 text-[10px] font-bold text-violet-100 disabled:opacity-40">ساخت لینک خصوصی پیش‌نمایش</button>}{hasUnsavedChanges && <span className="text-[9px] text-amber-200">برای ساخت لینک، تغییرات ذخیره می‌شوند.</span>}</div>}</div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-white/10 p-1 text-[10px]">{([['desktop','دسکتاپ'],['tablet','تبلت'],['mobile','موبایل']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setDevice(value)} className={`rounded-lg px-3 py-2 ${device === value ? "bg-white text-slate-950" : "text-white/60"}`}>{label}</button>)}</div><button onClick={() => setPreviewOpen(false)} aria-label="بستن پیش‌نمایش" className="grid h-11 w-11 place-items-center rounded-xl bg-white/10"><X /></button></div></div><StudioCanvas config={{ ...config, activePage: "storefront" }} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={() => undefined} interactive={false} /></div>}
-
-    {templatePickerOpen && <div className="fixed inset-0 z-[105] grid place-items-center bg-slate-950/75 p-4"><section className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#0d1622] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black tracking-[.16em] text-emerald-300">TEMPLATES</p><h2 className="mt-1 text-lg font-black">شروع از یک طرح آماده</h2><p className="mt-2 text-xs leading-6 text-white/45">قالب انتخابی روی پیش‌نویس فعلی اعمال می‌شود؛ قبل از ذخیره آن را بررسی کنید.</p></div><button type="button" aria-label="بستن قالب‌ها" onClick={() => setTemplatePickerOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><X /></button></div><div className="mt-5 grid gap-3 md:grid-cols-2">{templateOptions.map((template) => <button key={template.id} type="button" onClick={() => { setConfig(createConfigFromTemplate(template)); setTemplatePickerOpen(false); setInspectorOpen(true); setTab("context"); setMessage(`قالب «${template.label}» روی پیش‌نویس آماده شد؛ برای ثبت نهایی ذخیره کنید.`); }} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.03] text-right transition hover:border-emerald-400/50 hover:bg-emerald-400/10"><div className="p-3"><TemplatePreview template={template}/></div><span className="block border-t border-white/10 p-4"><b className="block text-sm">{template.label}</b><span className="mt-1 block text-[10px] font-bold text-emerald-200">{templateExperience(template).useCases}</span><span className="mt-2 block text-xs leading-6 text-white/45">{templateExperience(template).recommendation}</span><span className="mt-3 block text-[10px] text-white/35">شامل: {template.sections.slice(0, 4).map((section) => section.title).join(" · ")}</span><span className="mt-4 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">انتخاب این قالب</span></span></button>)}</div></section></div>}
 
     {pickerSectionId && <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-4">
       <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-[#0d1622] shadow-2xl">
