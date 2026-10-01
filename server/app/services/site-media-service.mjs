@@ -1,7 +1,10 @@
 import { requireWorkspaceId } from "../tenant-context.mjs";
 
-const ASSET_TYPES = new Set(["logo", "hero", "banner", "product", "gallery", "favicon"]);
-const MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"]);
+const ASSET_TYPES = new Set(["logo", "hero", "banner", "product", "gallery", "favicon", "document", "audio", "video"]);
+const MIME_TYPES = new Set([
+  "image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml",
+  "application/pdf", "audio/mpeg", "audio/ogg", "audio/wav", "audio/x-wav", "video/mp4", "video/webm",
+]);
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 export class SiteMediaError extends Error {
@@ -118,11 +121,37 @@ export function createSiteMediaService({ repository, siteProjectService, storage
     return repository.listByProject(siteProjectId).map(expose);
   }
 
+  // Learning resources are deliberately a projection of the canonical media
+  // library. There is no Website-side course, enrolment, CMS, or duplicate
+  // file table.  An active workspace member may read only resources explicitly
+  // marked private by that same workspace/project.
+  function listLearningResources(siteProjectId) {
+    siteProjectService.get(siteProjectId);
+    return repository.listByProject(siteProjectId)
+      .filter((asset) => asset.metadata?.visibility === "workspace" && ["document", "audio", "video"].includes(asset.assetType))
+      .map((asset) => ({
+        id: asset.id,
+        assetType: asset.assetType,
+        mimeType: asset.mimeType,
+        sizeBytes: asset.sizeBytes,
+        title: typeof asset.metadata?.title === "string" ? asset.metadata.title : (typeof asset.metadata?.name === "string" ? asset.metadata.name : "منبع آموزشی"),
+        contentCandidateId: typeof asset.metadata?.contentCandidateId === "string" ? asset.metadata.contentCandidateId : null,
+        createdAt: asset.createdAt,
+      }));
+  }
+
+  async function readLearningResource(siteProjectId, mediaId) {
+    siteProjectService.get(siteProjectId);
+    const asset = repository.getPrivateLearningResource(siteProjectId, mediaId);
+    if (!asset) throw new SiteMediaError("Learning resource not found.", 404, "LEARNING_RESOURCE_NOT_FOUND");
+    return { asset, object: await storage.readLocalAsset(Buffer.from(asset.storageKey, "utf8").toString("base64url")) };
+  }
+
   function remove(siteProjectId, mediaId) {
     siteProjectService.get(siteProjectId);
     if (!repository.get(siteProjectId, mediaId)) throw new SiteMediaError("Media asset not found.", 404, "SITE_MEDIA_NOT_FOUND");
     return repository.remove(siteProjectId, mediaId);
   }
 
-  return Object.freeze({ createUpload, directUpload, acceptLocalUpload, readLocalAsset, completeUpload, list, remove });
+  return Object.freeze({ createUpload, directUpload, acceptLocalUpload, readLocalAsset, completeUpload, list, listLearningResources, readLearningResource, remove });
 }

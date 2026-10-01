@@ -46,3 +46,31 @@ test("media upload is scoped to the owning workspace and project", async () => {
   assert.throws(() => runWithWorkspace("ws-2", () => mediaService.list(project.id)), (error) => error.code === "SITE_PROJECT_NOT_FOUND");
   db.close();
 });
+
+test("private learning resources use the canonical media library and fail closed outside their workspace", async () => {
+  const db = createSiteTestDb();
+  const projectService = createSiteProjectService({ repository: createSiteProjectRepository(db), now: () => new Date("2026-10-02T00:00:00.000Z") });
+  const objects = new Map();
+  const storage = {
+    publicAssetUrl: (key) => `https://cdn.example/${key}`,
+    async readLocalAsset(encodedKey) {
+      const key = Buffer.from(encodedKey, "base64url").toString("utf8");
+      return objects.get(key) || Promise.reject(Object.assign(new Error("not found"), { code: "SITE_MEDIA_NOT_FOUND" }));
+    },
+  };
+  const mediaService = createSiteMediaService({ repository: createSiteMediaRepository(db), siteProjectService: projectService, storage });
+  const project = runWithWorkspace("ws-1", () => projectService.create({ name: "Academy", siteType: "EDUCATION", content: {} }));
+  const key = `ws-1/${project.id}/document/lesson.pdf`;
+  objects.set(key, { body: Buffer.from("%PDF-test"), fileName: "lesson.pdf", mimeType: "application/pdf" });
+  const resource = runWithWorkspace("ws-1", () => mediaService.completeUpload(project.id, {
+    assetType: "document", storageKey: key, mimeType: "application/pdf", sizeBytes: 9,
+    metadata: { visibility: "workspace", title: "جزوهٔ درس", contentCandidateId: "canonical-content-id" },
+  }));
+  const listed = runWithWorkspace("ws-1", () => mediaService.listLearningResources(project.id));
+  assert.deepEqual(listed.map((item) => ({ id: item.id, title: item.title, assetType: item.assetType })), [{ id: resource.id, title: "جزوهٔ درس", assetType: "document" }]);
+  const downloaded = await runWithWorkspace("ws-1", () => mediaService.readLearningResource(project.id, resource.id));
+  assert.equal(downloaded.object.body.toString(), "%PDF-test");
+  await assert.rejects(() => runWithWorkspace("ws-1", () => mediaService.readLearningResource(project.id, "missing")), (error) => error.code === "LEARNING_RESOURCE_NOT_FOUND");
+  assert.throws(() => runWithWorkspace("ws-2", () => mediaService.listLearningResources(project.id)), (error) => error.code === "SITE_PROJECT_NOT_FOUND");
+  db.close();
+});

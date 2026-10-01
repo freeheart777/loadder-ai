@@ -29,6 +29,14 @@ export function createSiteMediaRepository(db) {
       .get(mediaId, requireWorkspaceId(), siteProjectId));
   }
 
+  // Never resolve a private learning resource from a caller supplied storage
+  // path.  The project id is first checked by the Site Project service and
+  // this lookup is still constrained by the active workspace.
+  function getPrivateLearningResource(siteProjectId, mediaId) {
+    const row = get(siteProjectId, mediaId);
+    return row && row.metadata?.visibility === "workspace" && ["document", "audio", "video"].includes(row.assetType) ? row : null;
+  }
+
   function findByStorageKey(siteProjectId, storageKey) {
     return mapRow(db.prepare(`SELECT * FROM site_media_assets WHERE workspace_id=? AND site_project_id=? AND storage_key=? ORDER BY created_at DESC LIMIT 1`)
       .get(requireWorkspaceId(), siteProjectId, storageKey));
@@ -51,5 +59,5 @@ export function createSiteMediaRepository(db) {
       .run(mediaId, requireWorkspaceId(), siteProjectId).changes > 0;
   }
 
-  return Object.freeze({ listByProject, get, findByStorageKey, create, remove });
+  return Object.freeze({ listByProject, get, getPrivateLearningResource, findByStorageKey, create, remove });
 }

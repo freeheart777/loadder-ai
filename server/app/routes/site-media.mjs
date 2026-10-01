@@ -42,6 +42,23 @@ export function createSiteMediaRouter({ service }) {
     catch (error) { return handle(error, res); }
   });
 
+  // Student Portal reads stay behind the ordinary authenticated workspace
+  // boundary mounted by server/index.mjs. The browser never receives a raw
+  // storage key or a public URL for these resources.
+  router.get("/site-projects/:id/learning-resources", (req, res) => {
+    try { return res.json({ success: true, resources: service.listLearningResources(req.params.id) }); }
+    catch (error) { return handle(error, res); }
+  });
+
+  router.get("/site-projects/:id/learning-resources/:mediaId/download", async (req, res) => {
+    try {
+      const { asset, object } = await service.readLearningResource(req.params.id, req.params.mediaId);
+      res.type(asset.mimeType || object.mimeType || "application/octet-stream");
+      res.set({ "Cache-Control": "private, no-store", "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(asset.metadata?.name || object.fileName || "resource")}` });
+      return res.send(object.body);
+    } catch (error) { return handle(error, res); }
+  });
+
   // Canonical browser upload: one authenticated request from the UI to Loadder.
   router.post("/site-projects/:id/media/upload", express.raw({ type: () => true, limit: "25mb" }), async (req, res) => {
     try {
