@@ -8,6 +8,7 @@ import { findPageBySlug, navigationPages, normalizeSlug, readPages } from "./sit
 // different content for the same published version.
 
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+const mediaUrl = (value) => (typeof value === "string" && /^https:\/\//i.test(value) ? value : "");
 const url = (value) => (typeof value === "string" && /^(https:\/\/|data:image\/)/i.test(value) ? value : "");
 const color = (value, fallback) => (typeof value === "string" && /^#[0-9a-f]{3,8}$/i.test(value) ? value : fallback);
 const num = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
@@ -96,7 +97,7 @@ function sectionHtml(section, { education = false, itemHref = null } = {}) {
   return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, head, columns, itemHref });
 }
 
-const EDUCATION_DETAIL_PAGES = new Set(["courses", "teachers", "magazine"]);
+const EDUCATION_DETAIL_PAGES = new Set(["courses", "teachers", "magazine", "performances"]);
 const itemSlug = (item) => normalizeSlug(item?.slug || item?.title);
 
 /** Resolve a presentation-only Education detail from the published V16 page.
@@ -108,10 +109,20 @@ export function findEducationDetail(page, detailSlug) {
   if (!wanted) return null;
   for (const section of page.sections || []) {
     for (const item of section?.items || []) {
-      if (itemSlug(item) === wanted) return { section, item, slug: wanted };
+      if (itemSlug(item) === wanted) return { page, section, item, slug: wanted };
     }
   }
   return null;
+}
+
+/** Native video for a published Education detail. Only an https address stored
+ * on the item is played; without one the page says so instead of faking a player. */
+function detailVideoHtml(detail) {
+  if (detail.page?.slug !== "performances") return "";
+  const src = mediaUrl(detail.item.videoUrl);
+  if (!src) return `<p class="video-state" data-video-state="unavailable">ویدئوی این اجرا هنوز منتشر نشده است.</p>`;
+  const poster = url(detail.item.imageUrl);
+  return `<figure class="video"><video controls playsinline preload="metadata" data-performance-video="true"${poster ? ` poster="${escape(poster)}"` : ""} src="${escape(src)}">این مرورگر پخش ویدئو را پشتیبانی نمی‌کند.</video></figure>`;
 }
 
 /**
@@ -173,6 +184,7 @@ export function renderCorporateSite(project, version, content, { slug = "", deta
     + `.thumb{aspect-ratio:4/3;background:#f1f5f9}.thumb img{width:100%;height:100%;object-fit:cover;display:block}`
     + `.card-body{padding:18px}.card-body b{display:block}.card-body span{display:block;font-size:13px;opacity:.6;margin-top:4px}.card-body p{font-size:13px;opacity:.72;margin:10px 0 0}`
     + `.detail-link{display:inline-flex;margin-top:14px;color:${primary};font-size:13px;font-weight:800;text-decoration:none}.detail{padding:54px 0;max-width:760px}.detail h1{font-size:clamp(30px,5vw,48px);line-height:1.25;margin:8px 0 18px}.detail .lead{font-size:18px;opacity:.75}.detail .copy{font-size:16px;white-space:pre-wrap}.detail img{width:100%;max-height:520px;object-fit:cover;border-radius:${num(design.cardRadius, 18)}px;margin:24px 0}.back{display:inline-flex;color:${primary};font-weight:800;text-decoration:none}`
+    + (detail?.page?.slug === "performances" ? `.video{margin:24px 0}.video video{display:block;width:100%;max-height:520px;border-radius:${num(design.cardRadius, 18)}px;background:#000}.video-state{margin:24px 0;padding:18px;border:1px dashed rgba(245,240,229,.3);border-radius:14px;opacity:.8}` : "")
     + `.cta{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;padding:28px;border-radius:${num(design.cardRadius, 18)}px;background:inherit}`
     + `.cta h2{margin:0}.cta p{margin:6px 0 0;opacity:.8}.cta-btn{background:#fff;color:#111827;border-radius:${num(design.buttonRadius, 12)}px;padding:12px 22px;font-weight:800;text-decoration:none}`
     + `footer.site{background:${color(footer.backgroundColor, "#0f172a")};color:${color(footer.textColor, "#e2e8f0")}}`
@@ -192,7 +204,7 @@ export function renderCorporateSite(project, version, content, { slug = "", deta
     + `<header class="site"${education ? ' data-education-public="true"' : ""}><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>`
     + `${navItems.length ? `<nav class="menu">${navItems.map((item) => `<a href="${escape(item.href)}">${escape(item.label)}</a>`).join("")}</nav>` : ""}`
     + `${nav.enabled === false ? "" : `<a class="nav-cta" href="${escape(String(nav.ctaHref || "#"))}">${escape(nav.ctaLabel || "تماس با ما")}</a>`}`
-    + `</div></header>${heroHtml}<main>${detail ? `<article class="wrap detail"><a class="back" href="${escape(`${basePath}/${page.slug}`)}">بازگشت به ${escape(page.title)}</a><p class="eyebrow">${escape(detail.section.title || page.title)}</p><h1>${escape(detail.item.title)}</h1>${detail.item.subtitle ? `<p class="lead">${escape(detail.item.subtitle)}</p>` : ""}${url(detail.item.imageUrl) ? `<img src="${escape(url(detail.item.imageUrl))}" alt="${escape(detail.item.title)}" loading="lazy">` : ""}${detail.item.body ? `<p class="copy">${escape(detail.item.body)}</p>` : ""}</article>` : sections.map((section) => sectionHtml(section, { education, itemHref })).join("")}</main>`
+    + `</div></header>${heroHtml}<main>${detail ? `<article class="wrap detail"><a class="back" href="${escape(`${basePath}/${page.slug}`)}">بازگشت به ${escape(page.title)}</a><p class="eyebrow">${escape(detail.section.title || page.title)}</p><h1>${escape(detail.item.title)}</h1>${detail.item.subtitle ? `<p class="lead">${escape(detail.item.subtitle)}</p>` : ""}${url(detail.item.imageUrl) && !(detail.page?.slug === "performances" && mediaUrl(detail.item.videoUrl)) ? `<img src="${escape(url(detail.item.imageUrl))}" alt="${escape(detail.item.title)}" loading="lazy">` : ""}${detailVideoHtml(detail)}${detail.item.body ? `<p class="copy">${escape(detail.item.body)}</p>` : ""}</article>` : sections.map((section) => sectionHtml(section, { education, itemHref })).join("")}</main>`
     + `${footer.enabled === false ? "" : `<footer class="site"><div class="wrap foot"><b>${escape(siteName)}</b><span>${escape(footer.text || "")}</span></div></footer>`}`
     + `</body></html>`;
 }

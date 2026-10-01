@@ -32,7 +32,13 @@ const requireSize = (value) => {
 };
 
 export function createSiteMediaService({ repository, siteProjectService, storage, now = () => new Date() }) {
-  const expose = (asset) => asset ? ({ ...asset, url: storage.publicAssetUrl(asset.storageKey) }) : null;
+  // Private learning resources never get a public URL, and the storage key is
+  // dropped with it, so a bucket that happens to be public cannot leak them.
+  const expose = (asset) => {
+    if (!asset) return null;
+    if (asset.metadata?.visibility === "workspace") { const { storageKey: _key, ...rest } = asset; return { ...rest, url: null }; }
+    return { ...asset, url: storage.publicAssetUrl(asset.storageKey) };
+  };
 
   async function createUpload(siteProjectId, input = {}) {
     const project = siteProjectService.get(siteProjectId);

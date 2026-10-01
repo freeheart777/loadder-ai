@@ -56,7 +56,23 @@ export function createLearningAccessService({ db, mediaService, now = () => new 
 
   function listEnrollments(siteProjectId) {
     mediaService.listLearningResources(siteProjectId);
-    return db.prepare("SELECT * FROM site_learning_enrollments WHERE workspace_id=? AND site_project_id=? ORDER BY created_at DESC").all(requireWorkspaceId(), siteProjectId).map(present);
+    return db.prepare(`SELECT e.*,u.email AS student_email,u.display_name AS student_name,p.name AS auth_project_name
+      FROM site_learning_enrollments e
+      JOIN business_builder_app_users u ON u.id=e.app_user_id AND u.workspace_id=e.workspace_id
+      JOIN business_builder_projects p ON p.id=e.auth_project_id AND p.workspace_id=e.workspace_id
+      WHERE e.workspace_id=? AND e.site_project_id=? ORDER BY e.created_at DESC`).all(requireWorkspaceId(), siteProjectId)
+      .map((row) => ({ ...present(row), student: { email: row.student_email, displayName: row.student_name || null }, authProjectName: row.auth_project_name }));
+  }
+
+  // Existing active customer app users that are not yet actively enrolled.
+  function listCandidates(siteProjectId) {
+    mediaService.listLearningResources(siteProjectId);
+    return db.prepare(`SELECT u.id AS appUserId,u.project_id AS authProjectId,u.email,u.display_name AS displayName,p.name AS authProjectName
+      FROM business_builder_app_users u
+      JOIN business_builder_projects p ON p.id=u.project_id AND p.workspace_id=u.workspace_id AND p.status<>'archived'
+      WHERE u.workspace_id=? AND u.role='customer' AND u.status='active'
+        AND NOT EXISTS(SELECT 1 FROM site_learning_enrollments e WHERE e.workspace_id=u.workspace_id AND e.site_project_id=? AND e.auth_project_id=u.project_id AND e.app_user_id=u.id AND e.status='active')
+      ORDER BY u.email LIMIT 200`).all(requireWorkspaceId(), siteProjectId);
   }
 
   function listResourcesFor(siteProjectId, principal) {
@@ -69,5 +85,5 @@ export function createLearningAccessService({ db, mediaService, now = () => new 
     return mediaService.readLearningResource(siteProjectId, mediaId);
   }
 
-  return Object.freeze({ enroll, revoke, listEnrollments, listResourcesFor, readResourceFor });
+  return Object.freeze({ enroll, revoke, listEnrollments, listCandidates, listResourcesFor, readResourceFor });
 }

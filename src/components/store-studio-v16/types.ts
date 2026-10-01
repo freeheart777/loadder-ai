@@ -44,7 +44,7 @@ export type HeroConfig = { enabled: boolean; layout: "centered" | "split" | "bac
 /** Website stores only a source reference. Products remain canonical Commerce data. */
 export type ProductSettings = { source: "featured" | "newest" | "on_sale" | "collection" | "manual" | "latest" | "discounted" | "bestselling"; collectionId?: string | null; productIds: string[]; columnsDesktop: number; columnsTablet: number; columnsMobile: number; imageRatio: "square" | "portrait" | "landscape" | "auto"; cardStyle: "vertical" | "compact" | "horizontal" | "minimal"; showBrand: boolean; showPrice: boolean; showCompareAt: boolean; showStock: boolean; showPromotionBadge: boolean; showCartButton: boolean };
 /** A repeatable entry inside a services / team / portfolio section. */
-export type SectionItem = { id: string; title: string; subtitle?: string; body?: string; imageUrl?: string; meta?: string; href?: string };
+export type SectionItem = { id: string; title: string; subtitle?: string; body?: string; imageUrl?: string; videoUrl?: string; meta?: string; href?: string };
 export type ContactConfig = { formEnabled: boolean; submitLabel: string; successMessage: string; phone?: string; email?: string; address?: string; mapUrl?: string };
 export type SeoConfig = { title: string; description: string };
 /** A page owns its address, its sections, its SEO and its navigation visibility.

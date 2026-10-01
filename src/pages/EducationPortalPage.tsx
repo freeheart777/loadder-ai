@@ -5,6 +5,21 @@ import { apiFetch } from "../lib/api";
 type Resource = { id: string; title: string; assetType: "document" | "audio" | "video"; mimeType: string; sizeBytes: number };
 type View = "loading" | "ready" | "signin" | "not-enrolled" | "error";
 
+// An invite is single-use: share one exchange per token so a re-run of the
+// effect (StrictMode, remount) cannot consume it twice.
+const exchanges = new Map<string, Promise<string | null>>();
+function exchangeInvite(projectId: string, invite: string) {
+  const key = `${projectId}:${invite}`;
+  let pending = exchanges.get(key);
+  if (!pending) {
+    pending = apiFetch(`/api/auth/public/apps/${encodeURIComponent(projectId)}/invite/exchange`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: invite }) })
+      .then(async (response) => { const body = await response.json().catch(() => ({})); return response.ok && body.session?.token ? String(body.session.token) : null; })
+      .catch(() => null);
+    exchanges.set(key, pending);
+  }
+  return pending;
+}
+
 const typeLabel: Record<Resource["assetType"], string> = { document: "جزوه و سند", audio: "فایل صوتی", video: "ویدئوی آموزشی" };
 
 // Student Portal: authenticated by the existing app-user session, authorized by
@@ -31,10 +46,9 @@ export default function EducationPortalPage() {
       try {
         const invite = params.get("invite");
         if (invite) {
-          const exchange = await apiFetch(`/api/auth/public/apps/${encodeURIComponent(projectId)}/invite/exchange`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: invite }), signal: controller.signal });
-          const body = await exchange.json().catch(() => ({}));
-          if (!exchange.ok || !body.session?.token) throw Object.assign(new Error("دعوت معتبر نیست یا قبلاً استفاده شده است."), { view: "signin" });
-          try { sessionStorage.setItem(tokenKey, body.session.token); } catch { /* storage unavailable */ }
+          const sessionToken = await exchangeInvite(projectId, invite);
+          if (!sessionToken) throw Object.assign(new Error("دعوت معتبر نیست یا قبلاً استفاده شده است."), { view: "signin" });
+          try { sessionStorage.setItem(tokenKey, sessionToken); } catch { /* storage unavailable */ }
           params.delete("invite"); setParams(params, { replace: true });
         }
         if (!token()) { setView("signin"); return; }

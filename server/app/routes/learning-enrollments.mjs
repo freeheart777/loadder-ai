@@ -21,6 +21,9 @@ export function createLearningEnrollmentsRouter({ service, db }) {
   router.get("/site-projects/:id/learning-enrollments", (req, res) => {
     try { return res.json({ success: true, enrollments: service.listEnrollments(req.params.id) }); } catch (error) { return handle(error, res); }
   });
+  router.get("/site-projects/:id/learning-enrollments/candidates", (req, res) => {
+    try { return res.json({ success: true, candidates: service.listCandidates(req.params.id) }); } catch (error) { return handle(error, res); }
+  });
   router.post("/site-projects/:id/learning-enrollments", (req, res) => {
     try {
       const { authProjectId, appUserId } = req.body || {};

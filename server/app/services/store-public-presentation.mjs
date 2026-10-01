@@ -17,7 +17,7 @@ const projectProductSettings = (value) => { const source = object(value); return
   source:string(source.source),productIds:Array.isArray(source.productIds)?source.productIds.filter((item)=>typeof item==="string").slice(0,100):undefined,columnsDesktop:number(source.columnsDesktop),columnsTablet:number(source.columnsTablet),columnsMobile:number(source.columnsMobile),imageRatio:string(source.imageRatio),cardStyle:string(source.cardStyle),showBrand:boolean(source.showBrand),showPrice:boolean(source.showPrice),showCompareAt:boolean(source.showCompareAt),showStock:boolean(source.showStock),showPromotionBadge:boolean(source.showPromotionBadge),showCartButton:boolean(source.showCartButton),
 }); };
 const projectSectionItems = (value) => Array.isArray(value) ? value.slice(0,60).map((entry,index)=>{const source=object(entry);return compact({
-  id:string(source.id)||`public-item-${index+1}`,title:string(source.title),subtitle:string(source.subtitle),body:string(source.body),imageUrl:string(source.imageUrl),meta:string(source.meta),href:string(source.href),
+  id:string(source.id)||`public-item-${index+1}`,title:string(source.title),subtitle:string(source.subtitle),body:string(source.body),imageUrl:string(source.imageUrl),meta:string(source.meta),href:string(source.href),...(string(source.videoUrl)?{videoUrl:string(source.videoUrl)}:{}),
 });}) : undefined;
 const projectContact = (value) => { const source=object(value); return compact({
   formEnabled:boolean(source.formEnabled),submitLabel:string(source.submitLabel),successMessage:string(source.successMessage),phone:string(source.phone),email:string(source.email),address:string(source.address),mapUrl:string(source.mapUrl),

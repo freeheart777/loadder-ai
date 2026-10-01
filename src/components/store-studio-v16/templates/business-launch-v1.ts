@@ -71,7 +71,7 @@ const legal: WebsiteTemplate = {
 };
 // Education: default copy and bundled stock photos (hero, instructor portraits).
 // All text and images stay editable; course cards and text sections carry no images.
-const educationCards = (id: string, type: "services" | "team", title: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][]) =>
+const educationCards = (id: string, type: "services" | "team" | "portfolio", title: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][]) =>
   ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
 
 const educationPage = (id: string, title: string, slug: string, sections: SectionConfig[]): PageConfig => ({
@@ -137,7 +137,9 @@ const education: WebsiteTemplate = {
       ]),
     ]),
     educationPage("page-performances", "اجراها", "performances", [
-      story("performances-directory", "اجراها", "", "ویدئو و برنامه‌ها", "ویدئو یا اجرای ضبط‌شده را تنها پس از افزودن رسانه معتبر منتشر کنید."),
+      educationCards("performances-directory", "portfolio", "اجراها", "اجراها", [
+        ["اجرای نمونه", "ویدئو و برنامه‌ها", "این کارت نمونه است؛ پوستر و نشانی ویدئوی معتبر اجرای خودتان را پیش از انتشار اضافه کنید. تا آن زمان صفحهٔ جزئیات هیچ پخش‌کننده‌ای نشان نمی‌دهد."],
+      ]),
     ]),
     educationPage("page-magazine", "مجله", "magazine", [
       educationCards("magazine-directory", "services", "مجله آموزشی", "", [

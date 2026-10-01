@@ -138,3 +138,25 @@ test("only workspace operators manage enrolments or preview learning resources",
     } finally { await new Promise((resolve) => server.close(resolve)); }
   } finally { await f.close(); f.db.close(); }
 });
+
+test("private resources get no public url or storage key in the media library, and candidates are real customers", async () => {
+  const f = await fixture();
+  try {
+    const mediaService = createSiteMediaService({ repository: createSiteMediaRepository(f.db), siteProjectService: createSiteProjectService({ repository: createSiteProjectRepository(f.db) }), storage: { publicAssetUrl: (key) => `https://cdn.example/${key}` } });
+    const listed = runWithWorkspace("ws-1", () => mediaService.list(f.site.id));
+    const text = JSON.stringify(listed);
+    for (const key of Object.values(f.keys)) assert.equal(text.includes(key), false);
+    const privateAssets = listed.filter((asset) => ["document", "audio", "video"].includes(asset.assetType));
+    assert.equal(privateAssets.length, 3);
+    for (const asset of privateAssets) { assert.equal(asset.url, null); assert.equal("storageKey" in asset, false); }
+    assert.match(listed.find((asset) => asset.assetType === "logo").url, /^https:\/\/cdn\.example\//);
+
+    const candidates = runWithWorkspace("ws-1", () => f.access.listCandidates(f.site.id));
+    assert.deepEqual(candidates.map((entry) => entry.email).sort(), ["outsider@x.test"], "enrolled students and staff are not candidates; other workspaces never appear");
+    const enrollments = runWithWorkspace("ws-1", () => f.access.listEnrollments(f.site.id));
+    assert.equal(enrollments.length, 1);
+    assert.equal(enrollments[0].student.email, "student@x.test");
+    assert.equal(enrollments[0].authProjectName, "Students");
+    assert.throws(() => runWithWorkspace("ws-2", () => f.access.listCandidates(f.site.id)), (e) => e.code === "SITE_PROJECT_NOT_FOUND");
+  } finally { await f.close(); f.db.close(); }
+});
