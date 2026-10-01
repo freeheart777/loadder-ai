@@ -1,0 +1,55 @@
+Spec: Customer Booking journey foundation
+Platform: Loadder Booking
+Purpose:
+  Define the canonical, customer-readable Booking journey foundation used by
+  Medical, Legal, and Education sites without introducing a second Booking
+  runtime or allowing Website to own operational booking data.
+Owns:
+  - Customer Booking projections for services, eligible providers, modalities,
+    recurring availability slots, review, appointment creation, and confirmation.
+  - Server-authoritative service/provider/slot ownership, capacity, and booking
+    reference rules within canonical Booking tables.
+Can modify:
+  - server/app/repositories/booking-repository.mjs
+  - server/app/routes/booking.mjs
+  - server/db/migrations/095_booking_customer_journey_foundation.mjs
+  - focused Booking API/domain tests
+Must:
+  - Use the existing booking_services, booking_providers,
+    booking_provider_services, booking_availability, and booking_appointments
+    records as the operational source of truth.
+  - Scope every read and mutation to the server-resolved workspace. Browser
+    input must never select a workspace.
+  - Allow the configurable sequence Service/Course -> Provider -> Modality ->
+    Availability -> Customer -> Review -> Confirmation, omitting modalities
+    when a service has none configured.
+  - Limit providers to active providers associated with the selected active
+    service.
+  - Materialize slot state from canonical recurring availability and active
+    appointments. A cancelled availability is never bookable; capacity produces
+    available, limited, or full states truthfully.
+  - Reject an inactive, foreign, unassociated, stale, full, or cancelled slot
+    at appointment creation. Slot claims run atomically against canonical
+    appointment persistence.
+  - Persist a stable opaque booking reference on the canonical appointment and
+    allow workspace-scoped confirmation readback by that reference.
+  - Preserve existing Booking Studio reads and appointment records.
+Must not:
+  - Create Booking V2, duplicate services/providers/availability/appointments,
+    seed operational booking data, or make Website snapshots own Booking data.
+  - Implement customer React stepper UX, GEO (#254), or Commerce changes.
+Done when:
+  - Focused tests prove service/provider eligibility, tenant isolation,
+    availability state, full/cancelled rejection, atomic stale/concurrent
+    rejection, persisted appointment/reference readback, and existing Studio
+    compatibility.
+Scenario: Customer claim fails closed
+  Given a customer has read an available slot
+  When the slot becomes full or cancelled before confirmation
+  Then the canonical appointment write returns a conflict
+  And no extra appointment is persisted.
+Scenario: Refresh-safe confirmation
+  Given a customer appointment was accepted
+  When confirmation is fetched later with its reference in the same workspace
+  Then the persisted service, provider, customer, slot, status, and reference
+  are returned from canonical Booking data.
