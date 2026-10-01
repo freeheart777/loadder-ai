@@ -117,6 +117,10 @@ test.describe.serial("canonical public Cart → Checkout → Order journey", () 
         basePriceMinor: 45_000_000,
         inventoryQuantity: 10,
         status: "ACTIVE",
+        // The default V16 section resolves the canonical Featured source. The
+        // cart journey needs a product eligible for that source, rather than
+        // relying on an invalid fallback from Featured to all active products.
+        featured: true,
         sku: `E2E-${identity}`,
       },
     }));

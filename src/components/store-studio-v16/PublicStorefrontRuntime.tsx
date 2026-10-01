@@ -6,7 +6,7 @@ import type { DeviceMode, Product, Selection } from "./types";
 import { addPublicCartItem, checkoutPublicCart, getPublicCart, type PublicCart, type PublicCheckoutInput } from "../../lib/publicCart";
 import { apiFetch } from "../../lib/api";
 
-type StorefrontMeta = { store: { id: string; name: string }; presentation: Record<string, unknown>; publishedVersion: { id: string; version: number; publishedAt: string } };
+type StorefrontMeta = { store: { id: string; name: string }; presentation: Record<string, unknown>; merchandisingProducts?: Record<string, Product[]>; publishedVersion: { id: string; version: number; publishedAt: string } };
 const read = async (response: Response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || "فروشگاه در دسترس نیست."); return data; };
 const deviceForWidth = (width: number): DeviceMode => width < 640 ? "mobile" : width < 1024 ? "tablet" : "desktop";
 
@@ -59,5 +59,5 @@ export default function PublicStorefrontRuntime({ page }: { page: "storefront" |
       return { orderId: order.id, totalMinor: order.totalMinor, currency: order.currency };
     },
   };
-  return <main data-published-version-id={meta.publishedVersion.id} data-published-version={meta.publishedVersion.version}><StudioCanvas config={{ ...config, activePage: page }} products={products} device={device} selected={selected} select={setSelected} interactive={false} runtimePage={page} runtimeAdapter={adapter} />{notice && <div role="status" className="fixed bottom-5 left-5 z-50 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-2xl">{notice}</div>}</main>;
+  return <main data-published-version-id={meta.publishedVersion.id} data-published-version={meta.publishedVersion.version}><StudioCanvas config={{ ...config, activePage: page }} products={products} merchandisingProducts={meta.merchandisingProducts || {}} device={device} selected={selected} select={setSelected} interactive={false} runtimePage={page} runtimeAdapter={adapter} />{notice && <div role="status" className="fixed bottom-5 left-5 z-50 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-2xl">{notice}</div>}</main>;
 }

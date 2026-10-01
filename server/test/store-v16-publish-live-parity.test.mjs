@@ -38,6 +38,7 @@ test("V16 merchandising persists references and resolves supported sources from 
   const inspector = source("src/components/store-studio-v16/InspectorPanel.tsx");
   const studio = source("src/pages/StoreWebsiteStudioPageV16Core.tsx");
   const publicRoutes = source("server/app/routes/public-sites.mjs");
+  const auth = source("server/app/routes/auth.mjs");
   const renderer = source("server/app/services/store-site-html.mjs");
   assert.match(inspector, /value="featured"/);
   assert.match(inspector, /value="newest"/);
@@ -52,6 +53,9 @@ test("V16 merchandising persists references and resolves supported sources from 
   assert.match(publicRoutes, /service\.merchandisingProducts\(project\.id/);
   assert.match(publicRoutes, /commerceRevision/);
   assert.match(publicRoutes, /cacheControl = commerceEnabled\(published\.project\) \? "no-cache"/);
+  assert.match(auth, /function publicMerchandising\(store\)/);
+  assert.match(auth, /merchandisingProducts:publicMerchandising\(store\)/);
+  assert.match(source("src\/components\/store-studio-v16\/PublicStorefrontRuntime.tsx"), /merchandisingProducts=\{meta\.merchandisingProducts \|\| \{\}\}/);
   assert.match(renderer, /merchandisingProducts\?\.\[section\.id\]/);
 });
 
