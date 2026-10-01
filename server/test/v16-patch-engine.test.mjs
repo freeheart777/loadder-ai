@@ -444,12 +444,13 @@ test("STORE and Corporate documents survive the tracked path unchanged", () => {
   db.close();
 });
 
-test("site-document migrations through 093 are registered exactly once with no collision", () => {
+test("site-document migrations and later Booking foundation are registered exactly once with no collision", () => {
   const versions = migrations.map((m) => m.version);
   assert.equal(versions.filter((v) => v === 91).length, 1);
   assert.equal(versions.filter((v) => v === 93).length, 1);
+  assert.equal(versions.filter((v) => v === 95).length, 1);
   assert.equal(versions.length, new Set(versions).size);
-  assert.equal(Math.max(...versions), 93);
+  assert.equal(Math.max(...versions), 95);
   assert.ok(!versions.includes(88), "088 stays reserved for the open inventory PR");
 
   const db = createSiteTestDb();
