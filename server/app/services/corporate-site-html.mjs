@@ -86,9 +86,9 @@ const SECTION_RENDERERS = new Map([
 /** Section types with a dedicated corporate renderer (read-only; for agreement tests). */
 export const CORPORATE_SECTION_TYPES = Object.freeze([...SECTION_RENDERERS.keys()]);
 
-function sectionHtml(section) {
+function sectionHtml(section, { education = false } = {}) {
   const id = anchorOf(section);
-  const style = `background:${color(section.backgroundColor, "#ffffff")};color:${color(section.textColor, "#0f172a")};padding-top:${num(section.spacingTop, 32)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
+  const style = `background:${color(section.backgroundColor, education ? "#2e2c28" : "#ffffff")};color:${color(section.textColor, education ? "#f5f0e5" : "#0f172a")};padding-top:${num(section.spacingTop, 32)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
   const head = `<div class="head">${section.subtitle ? `<span class="eyebrow">${escape(section.subtitle)}</span>` : ""}<h2>${escape(section.title)}</h2></div>`;
   const columns = Math.min(4, Math.max(1, num(section.columns, 3)));
   const open = `<section id="${escape(id)}" data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
@@ -165,7 +165,7 @@ export function renderCorporateSite(project, version, content, { slug = "", base
     + `<header class="site"${education ? ' data-education-public="true"' : ""}><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>`
     + `${navItems.length ? `<nav class="menu">${navItems.map((item) => `<a href="${escape(item.href)}">${escape(item.label)}</a>`).join("")}</nav>` : ""}`
     + `${nav.enabled === false ? "" : `<a class="nav-cta" href="${escape(String(nav.ctaHref || "#"))}">${escape(nav.ctaLabel || "تماس با ما")}</a>`}`
-    + `</div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section)).join("")}</main>`
+    + `</div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section, { education })).join("")}</main>`
     + `${footer.enabled === false ? "" : `<footer class="site"><div class="wrap foot"><b>${escape(siteName)}</b><span>${escape(footer.text || "")}</span></div></footer>`}`
     + `</body></html>`;
 }

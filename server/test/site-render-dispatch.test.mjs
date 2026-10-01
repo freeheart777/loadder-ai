@@ -72,3 +72,24 @@ test("Education uses the shared V16 public renderer and its CTA enters canonical
   assert.match(html, /data-education-public="true"/);
   assert.match(html, /href="\/sites\/education-1\/booking"/);
 });
+
+test("Education public static routes resolve from the persisted V16 pages collection", () => {
+  const project = { id: "education-routes", siteType: "EDUCATION", name: "آموزشگاه" };
+  const pages = [
+    { id: "home", title: "خانه", slug: "", sections: [] },
+    { id: "courses", title: "دوره‌ها", slug: "courses", sections: [{ id: "courses-directory", type: "services", enabled: true, title: "دوره‌های آموزشی", items: [] }] },
+    { id: "teachers", title: "مدرسان", slug: "teachers", sections: [{ id: "teachers-directory", type: "team", enabled: true, title: "مدرسان", items: [] }] },
+    { id: "children", title: "موسیقی کودک", slug: "children", sections: [{ id: "children-music", type: "text", enabled: true, title: "موسیقی کودک" }] },
+    { id: "workshops", title: "کارگاه‌ها", slug: "workshops", sections: [{ id: "workshops-directory", type: "services", enabled: true, title: "کارگاه‌ها", items: [] }] },
+    { id: "performances", title: "اجراها", slug: "performances", sections: [{ id: "performances-directory", type: "text", enabled: true, title: "اجراها" }] },
+    { id: "magazine", title: "مجله", slug: "magazine", sections: [{ id: "magazine-directory", type: "text", enabled: true, title: "مجله" }] },
+  ];
+  const content = { storeBuilderV16: { header: { storeName: "آموزشگاه" }, pages, sections: pages[0].sections } };
+  for (const [index, page] of pages.entries()) {
+    const html = renderCorporateSite(project, { version: 1, content }, content, { slug: page.slug, basePath: "/sites/education-routes" });
+    // Public projection intentionally does not expose mutable editor IDs.
+    assert.match(html, new RegExp(`data-page-id="page-${index + 1}"`));
+    assert.match(html, new RegExp(`>${page.title}<`));
+  }
+  assert.equal(renderCorporateSite(project, { version: 1, content }, content, { slug: "not-a-page" }), null);
+});

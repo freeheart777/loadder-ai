@@ -38,6 +38,7 @@ export function createConfigFromTemplate(template: WebsiteTemplate): StudioConfi
       seo: template.seo,
       commerce: template.commerce,
       sections: template.sections,
+      pages: template.pages,
     },
   });
   return restoreConfig(content, template.siteKind);

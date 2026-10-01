@@ -1,4 +1,4 @@
-import type { CommerceConfig, DesignConfig, FooterConfig, HeaderConfig, HeroConfig, NavConfig, SectionConfig, SeoConfig, SiteKind } from "../types";
+import type { CommerceConfig, DesignConfig, FooterConfig, HeaderConfig, HeroConfig, NavConfig, PageConfig, SectionConfig, SeoConfig, SiteKind } from "../types";
 
 /**
  * An immutable seed for a new site's StudioConfig. A template is plain data —
@@ -22,4 +22,6 @@ export type WebsiteTemplate = {
   seo?: Partial<SeoConfig>;
   commerce?: Partial<CommerceConfig>;
   sections: SectionConfig[];
+  /** Optional persisted static pages. Home remains the first/root page. */
+  pages?: PageConfig[];
 };

@@ -1,4 +1,4 @@
-import type { SectionConfig } from "../types";
+import type { PageConfig, SectionConfig } from "../types";
 import type { WebsiteTemplate } from "./types";
 
 const item = (id: string, title: string, subtitle: string) => ({ id, title, subtitle, body: "", imageUrl: "", meta: "" });
@@ -74,6 +74,17 @@ const legal: WebsiteTemplate = {
 const educationCards = (id: string, type: "services" | "team", title: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][]) =>
   ({ ...cards(id, type, title, navLabel, []), items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })) });
 
+const educationPage = (id: string, title: string, slug: string, sections: SectionConfig[]): PageConfig => ({
+  id,
+  title,
+  slug,
+  isHome: false,
+  showInNav: true,
+  navLabel: title,
+  seo: { title, description: "" },
+  sections,
+});
+
 const education: WebsiteTemplate = {
   id: "education-center-v1", label: "مرکز آموزشی", description: "دوره‌ها، مدرسان، تجربه دانش‌پذیران و ثبت‌نام.", siteKind: "BUSINESS", siteType: "EDUCATION",
   design: { primaryColor: "#a98242", secondaryColor: "#e9ddc4", backgroundColor: "#242321", textColor: "#f5f0e5", surfaceColor: "#f5f0e5" }, header: { storeName: "آموزشگاه موسیقی شما", backgroundColor: "#242321", textColor: "#f5f0e5", sticky: true },
@@ -91,6 +102,46 @@ const education: WebsiteTemplate = {
     story("features-main", "چرا این مرکز آموزشی", "ویژگی‌ها", "یادگیری عملی با مسیر روشن", "آموزش پروژه‌محور، تمرین در هر جلسه و امکان رفع اشکال با مدرس؛ تا آنچه یاد می‌گیرید در عمل به کار بیاید."),
     story("testimonials-main", "تجربه دانش‌پذیران", "تجربه‌ها", "داستان‌های یادگیری", "تجربه دانش‌پذیران را پس از دریافت اجازه آن‌ها در این بخش منتشر کنید."),
     { ...contact("ثبت‌نام و مشاوره"), subtitle: "دوره مورد نظر و شماره تماس خود را بنویسید تا برای راهنمایی و ثبت‌نام با شما تماس بگیریم." },
+  ],
+  // These are ordinary V16 static pages, persisted with the draft. They are
+  // presentation only: course/provider/booking truth remains in its canonical
+  // domain and is never copied into the website document.
+  pages: [
+    {
+      id: "page-home", title: "خانه", slug: "", isHome: true, showInNav: true, navLabel: "خانه",
+      seo: { title: "آموزشگاه موسیقی", description: "آموزش موسیقی، دوره‌ها و کارگاه‌های قابل ویرایش." },
+      sections: [
+        story("education-intro", "یادگیری موسیقی، قدم‌به‌قدم", "", "مسیر روشن برای تمرین", "برنامه آموزشی، تمرین و همراهی مدرس را متناسب با نیاز هنرجو معرفی کنید."),
+        story("education-note", "برای شروع آماده‌اید؟", "", "رزرو از مسیر رسمی", "برای انتخاب زمان مناسب، از دکمه رزرو کلاس استفاده کنید."),
+      ],
+    },
+    educationPage("page-courses", "دوره‌ها", "courses", [
+      educationCards("courses-directory", "services", "دوره‌های آموزشی", "", [
+        ["دوره مقدماتی", "شروع اصولی و کاربردی", "جزئیات هدف، پیش‌نیاز و برنامه تمرین این دوره را اینجا وارد کنید."],
+        ["دوره پیشرفته", "پروژه‌محور و تخصصی", "توضیح مسیر یادگیری و خروجی مورد انتظار دوره را به‌روز کنید."],
+        ["کارگاه عملی", "تمرین در کنار مدرس", "زمان و موضوع کارگاه را پس از نهایی شدن برنامه منتشر کنید."],
+      ]),
+    ]),
+    educationPage("page-teachers", "مدرسان", "teachers", [
+      educationCards("teachers-directory", "team", "مدرسان", "", [
+        ["مدرس دوره", "حوزه تدریس", "معرفی، تخصص و شیوه تدریس مدرس را اینجا وارد کنید.", templatePhoto("education/instructor-1")],
+        ["مدرس دوره", "حوزه تدریس", "معرفی، تخصص و شیوه تدریس مدرس را اینجا وارد کنید.", templatePhoto("education/instructor-2")],
+      ]),
+    ]),
+    educationPage("page-children", "موسیقی کودک", "children", [
+      story("children-music", "موسیقی کودک", "", "آشنایی، بازی و تمرین", "برنامه مناسب سن، روش آموزش و شرایط همراهی خانواده را با اطلاعات تأییدشده خودتان تکمیل کنید."),
+    ]),
+    educationPage("page-workshops", "کارگاه‌ها", "workshops", [
+      educationCards("workshops-directory", "services", "کارگاه‌ها و رویدادها", "", [
+        ["کارگاه عملی", "زمان و ظرفیت پس از تأیید منتشر می‌شود", "تا وقتی ظرفیت و ثبت‌نام در دامنه عملیاتی پشتیبانی نمی‌شود، این کارت هیچ وعده ثبت‌نامی نمی‌دهد."],
+      ]),
+    ]),
+    educationPage("page-performances", "اجراها", "performances", [
+      story("performances-directory", "اجراها", "", "ویدئو و برنامه‌ها", "ویدئو یا اجرای ضبط‌شده را تنها پس از افزودن رسانه معتبر منتشر کنید."),
+    ]),
+    educationPage("page-magazine", "مجله", "magazine", [
+      story("magazine-directory", "مجله آموزشی", "", "یادداشت‌ها و تجربه‌ها", "مقاله‌ها و راهنماهای تأییدشده آموزشگاه را از استودیوی محتوا منتشر کنید."),
+    ]),
   ],
 };
 // Corporate: default copy and bundled stock photos (hero, about, projects).
