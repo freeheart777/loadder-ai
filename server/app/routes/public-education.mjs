@@ -1,10 +1,11 @@
 import express from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import { runWithWorkspace } from "../tenant-context.mjs";
+import { requireWorkspaceId, runWithWorkspace } from "../tenant-context.mjs";
 import { LoadderAppUserAuth } from "../business-builder/app-user-auth.mjs";
 import { SiteProjectError } from "../services/site-project-service.mjs";
 import { SiteMediaError } from "../services/site-media-service.mjs";
 import { SiteMediaStorageError } from "../services/site-media-storage-adapter.mjs";
+import { bookingScopeForSite } from "../services/booking-scope.mjs";
 import { LearningAccessError } from "../services/learning-access-service.mjs";
 
 const limited = (limit) => rateLimit({
@@ -48,7 +49,8 @@ export function createPublicEducationRouter({ db, accessService, bookingReposito
   // name/contact matching, and no cancel/reschedule (the Booking contract has none for customers).
   router.get(`${base}/appointments`, limited(120), (req, res) => withStudent(req, res, (principal) => {
     accessService.listResourcesFor(req.params.siteProjectId, principal); // enrolment gate
-    const now = Date.now(), all = bookingRepository.listAppointmentsForIdentity({ authProjectId: principal.projectId, appUserId: principal.id });
+    const site = db.prepare("SELECT id, site_type AS siteType FROM site_projects WHERE id=? AND workspace_id=?").get(req.params.siteProjectId, requireWorkspaceId());
+    const now = Date.now(), all = bookingRepository.listAppointmentsForIdentity({ authProjectId: principal.projectId, appUserId: principal.id, scope: bookingScopeForSite(site) });
     const upcoming = all.filter((item) => Date.parse(item.startsAt) >= now && ["PENDING", "CONFIRMED"].includes(item.status));
     const past = all.filter((item) => !upcoming.includes(item)).reverse();
     return res.json({ success: true, upcoming, past });

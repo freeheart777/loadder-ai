@@ -15,6 +15,8 @@ import { migration095BookingCustomerJourneyFoundation } from "./095_booking_cust
 import { migration096LearningMediaAssetTypes } from "./096_learning_media_asset_types.mjs";
 import { migration097SiteLearningEnrollments } from "./097_site_learning_enrollments.mjs";
 import { migration098BookingAppointmentIdentityLink } from "./098_booking_appointment_identity_link.mjs";
+import { migration099BookingSiteScope } from "./099_booking_site_scope.mjs";
+import { migration100SensitiveAccessEvents } from "./100_sensitive_access_events.mjs";
 import { migration002TenantDomainData } from "./002_tenant_domain_data.mjs";
 import { migration003TenantRelationshipGuards } from "./003_tenant_relationship_guards.mjs";
 import { migration004WorkspaceManagementAudit } from "./004_workspace_management_audit.mjs";
@@ -194,4 +196,6 @@ export const migrations = [
   migration096LearningMediaAssetTypes,
   migration097SiteLearningEnrollments,
   migration098BookingAppointmentIdentityLink,
+  migration099BookingSiteScope,
+  migration100SensitiveAccessEvents,
 ];

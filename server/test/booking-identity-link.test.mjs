@@ -14,6 +14,7 @@ import { resolveBookingIdentity } from "../app/services/booking-identity.mjs";
 import { createPublicEducationRouter } from "../app/routes/public-education.mjs";
 import { LoadderAppUserAuth } from "../app/business-builder/app-user-auth.mjs";
 import { migration098BookingAppointmentIdentityLink } from "../db/migrations/098_booking_appointment_identity_link.mjs";
+import { migration099BookingSiteScope } from "../db/migrations/099_booking_site_scope.mjs";
 
 const future = (() => { const d = new Date(Date.now() + 14 * 86400000); return d.toISOString().slice(0, 10); })();
 const weekday = new Date(`${future}T00:00:00.000Z`).getUTCDay();
@@ -46,8 +47,9 @@ test("pre-migration appointments stay valid, unlinked and unclaimed", () => {
   db.prepare("INSERT INTO booking_provider_services(workspace_id,provider_id,service_id,created_at) VALUES('ws-1','p1','s1',?)").run(at);
   db.prepare("INSERT INTO booking_appointments(id,workspace_id,service_id,provider_id,customer_name,starts_at,status,created_at,updated_at) VALUES('old','ws-1','s1','p1','نام یکسان','2026-01-02T10:00:00.000Z','CONFIRMED',?,?)").run(at, at);
   migration098BookingAppointmentIdentityLink.up(db);
+  migration099BookingSiteScope.up(db);
   const row = db.prepare("SELECT * FROM booking_appointments WHERE id='old'").get();
-  assert.equal(row.status, "CONFIRMED"); assert.equal(row.app_user_id, null); assert.equal(row.auth_project_id, null);
+  assert.equal(row.status, "CONFIRMED"); assert.equal(row.app_user_id, null); assert.equal(row.auth_project_id, null); assert.equal(row.site_project_id, null);
   assert.equal(runWithWorkspace("ws-1", () => createBookingRepository(db).listAppointments()).length, 1, "admin read still sees it");
   assert.equal(db.pragma("integrity_check", { simple: true }), "ok");
   db.close();
