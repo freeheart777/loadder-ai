@@ -68,3 +68,7 @@ Not in the original PR 1.2 scope (core, commerce, payments), but required: the e
 - Manifest v2 is metadata, not commerce authority. A manifest records `siteType` at publish time; the runtime follows the project's current `siteType`. `commerceEnabled()` therefore re-resolves from the current `siteType` (STORE-only rule), so a store changed to BUSINESS after publishing loads no catalog even though its manifest lists commerce.
 
 Why: one audited entry point for capability decisions, renderers that cannot drift from the byte-identical baselines, and no change to the STORE-only commerce rule without a separate ADR. All four rules are enforced by the agreement test in `server/test/site-platform-registry.test.mjs`.
+
+## 2026-10-02 — Medical/NAVA Phase 0 locked (ADR-005)
+
+Patient identity = existing app-user + mobile OTP (identifier table, no passwords, simulator only outside production, production fails closed). Medical documents get a dedicated private primitive, never `site_media_assets`. Booking becomes site-scoped via nullable `site_project_id` (MEDICAL strict, other types legacy-compatible; no Booking V2, no backfill). PR #246 is audited and ported selectively (link policy, public headers + `media-src`, lead honeypot), never merged; PR #52 is visual reference only. Full record, migrations 099–105 and execution order: `docs/architecture/ADR-005-medical-vertical-phase0.md`. Why: one platform, no duplicate auth/Booking/media; medical data needs stronger treatment than Education files.
