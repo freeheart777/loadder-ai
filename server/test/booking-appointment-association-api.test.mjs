@@ -69,3 +69,31 @@ test("Booking API denies a workspace without a persisted Booking capability", as
     db.close();
   }
 });
+
+test("customer Booking API projects and claims canonical slots without trusting client workspace", async () => {
+  const db = createSiteTestDb(), repository = createBookingRepository(db);
+  let service, provider;
+  runWithWorkspace("ws-1", () => {
+    service = repository.createService({ name: "ویزیت", durationMinutes: 30, modalities: ["ONLINE"] });
+    provider = repository.createProvider({ name: "دکتر" });
+    repository.associate(provider.id, service.id);
+    repository.addAvailability({ providerId: provider.id, weekday: 1, startsAt: "09:00", endsAt: "09:30" });
+  });
+  const app = express(); app.use(express.json()); app.use((req, _res, next) => runWithWorkspace("ws-1", next));
+  app.use("/api", createBookingRouter({ repository, siteProjectService: { list: () => [{ siteType: "MEDICAL" }] } }));
+  const server = app.listen(0, "127.0.0.1"); await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}/api/booking/customer`;
+  try {
+    const services = await (await fetch(`${base}/services`)).json();
+    assert.equal(services.services[0].id, service.id);
+    const providers = await (await fetch(`${base}/services/${service.id}/providers`)).json();
+    assert.deepEqual(providers.providers.map((entry) => entry.id), [provider.id]);
+    const slots = await (await fetch(`${base}/slots?serviceId=${service.id}&providerId=${provider.id}&date=2026-10-05`)).json();
+    assert.equal(slots.slots[0].state, "available");
+    const created = await fetch(`${base}/appointments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ serviceId: service.id, providerId: provider.id, date: "2026-10-05", startsAt: "09:00", customerName: "مریم", modality: "ONLINE", workspaceId: "ws-2" }) });
+    assert.equal(created.status, 201); const body = await created.json();
+    const confirmation = await (await fetch(`${base}/confirmations/${body.confirmation.reference}`)).json();
+    assert.equal(confirmation.confirmation.appointmentId, body.appointment.id);
+    assert.equal(runWithWorkspace("ws-2", () => repository.listAppointments().length), 0);
+  } finally { await new Promise((resolve) => server.close(resolve)); db.close(); }
+});
