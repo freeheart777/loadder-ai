@@ -18,7 +18,7 @@ const siteTypeOf = (project) => String(project?.siteType || "").toUpperCase();
 /** Which renderer renderPublishedSite would pick (isCorporateV16, then isStoreV16, else legacy). */
 export function sectionWalkMode(project, content) {
   const v16 = content?.storeBuilderV16;
-  if (siteTypeOf(project) === "BUSINESS" && v16 && typeof v16 === "object") {
+  if (!["STORE", "ECOMMERCE"].includes(siteTypeOf(project)) && v16 && typeof v16 === "object") {
     const every = [
       ...(Array.isArray(v16.sections) ? v16.sections : []),
       ...(Array.isArray(v16.pages) ? v16.pages.flatMap((page) => (Array.isArray(page?.sections) ? page.sections : [])) : []),

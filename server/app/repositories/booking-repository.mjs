@@ -30,17 +30,17 @@ export function createBookingRepository(db) {
     if (!availability) return null;
     const slotStartsAt = isoFor(date, startsAt), booked = db.prepare("SELECT count(*) AS count FROM booking_appointments WHERE workspace_id=? AND provider_id=? AND starts_at=? AND status IN ('PENDING','CONFIRMED')").get(ws(), providerId, slotStartsAt).count;
     const state = availability.status === "CANCELLED" ? "cancelled" : booked >= availability.capacity ? "full" : booked > 0 ? "limited" : "available";
-    return { id: `${availability.id}:${date}:${startsAt}`, availabilityId: availability.id, serviceId, providerId, startsAt: slotStartsAt, endsAt: isoFor(date, availability.ends_at), state, capacity: availability.capacity, remainingCapacity: Math.max(0, availability.capacity - booked), modalityOptions: modalities(selectedService.modalities_json), price: presentService(selectedService).price };
+    return { id: `${availability.id}:${date}:${startsAt}`, availabilityId: availability.id, serviceId, providerId, startsAt: slotStartsAt, startsAtTime: startsAt, endsAt: isoFor(date, availability.ends_at), state, capacity: availability.capacity, remainingCapacity: Math.max(0, availability.capacity - booked), modalityOptions: modalities(selectedService.modalities_json), price: presentService(selectedService).price };
   };
   const confirmation = (appointment) => appointment && ({ reference: appointment.booking_reference, appointmentId: appointment.id, status: appointment.status, startsAt: appointment.starts_at, service: presentService(service(appointment.service_id)), provider: presentProvider(provider(appointment.provider_id)), modality: appointment.modality || null, customer: { name: appointment.customer_name, contact: appointment.customer_contact || null } });
-  const claim = db.transaction(({ serviceId, providerId, date, startsAt, customerName, customerContact = null, modality = null }) => {
+  const claim = db.transaction(({ serviceId, providerId, date, startsAt, customerName, customerContact = null, modality = null, identity = null }) => {
     const slot = slotFor({ serviceId, providerId, date, startsAt });
     if (!slot) throw new BookingError("BOOKING_SLOT_NOT_FOUND", 404, "The selected slot is not available for this service and provider.");
     if (slot.state === "cancelled") throw new BookingError("BOOKING_SLOT_CANCELLED", 409, "The selected slot has been cancelled.");
     if (slot.state === "full") throw new BookingError("BOOKING_SLOT_FULL", 409, "The selected slot is no longer available.");
     if (modality && !slot.modalityOptions.includes(modality)) throw new BookingError("BOOKING_MODALITY_INVALID", 400, "The selected modality is not available for this service.");
     const reference = `BK-${crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
-    const appointment = map(insert("booking_appointments", { service_id: serviceId, provider_id: providerId, customer_name: customerName, customer_contact: customerContact, starts_at: slot.startsAt, modality, booking_reference: reference, status: "PENDING" }));
+    const appointment = map(insert("booking_appointments", { service_id: serviceId, provider_id: providerId, customer_name: customerName, customer_contact: customerContact, starts_at: slot.startsAt, modality, booking_reference: reference, status: "PENDING", ...(identity ? { app_user_id: identity.appUserId, auth_project_id: identity.authProjectId } : {}) }));
     return { appointment, confirmation: confirmation(appointment) };
   });
   return Object.freeze({
@@ -57,6 +57,12 @@ export function createBookingRepository(db) {
     listCustomerSlots: ({ serviceId, providerId, date }) => { if (!dateOnly(date)) return []; const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay(); return db.prepare("SELECT starts_at FROM booking_availability WHERE workspace_id=? AND provider_id=? AND weekday=? ORDER BY starts_at ASC").all(ws(), providerId, weekday).map(({ starts_at }) => slotFor({ serviceId, providerId, date, startsAt: starts_at })).filter(Boolean); },
     quoteCustomerBooking: ({ serviceId, providerId, date, startsAt, modality = null }) => { const slot = slotFor({ serviceId, providerId, date, startsAt }); if (!slot || (modality && !slot.modalityOptions.includes(modality))) return null; return { slot, service: presentService(service(serviceId)), provider: presentProvider(provider(providerId)), modality }; },
     createCustomerAppointment: claim,
+    // Student-facing projection: only rows explicitly linked to this identity.
+    listAppointmentsForIdentity: ({ authProjectId, appUserId }) => db.prepare("SELECT * FROM booking_appointments WHERE workspace_id=? AND auth_project_id=? AND app_user_id=? ORDER BY starts_at ASC").all(ws(), authProjectId, appUserId).map((row) => ({
+      id: row.id, reference: row.booking_reference || null, status: row.status, startsAt: row.starts_at, modality: row.modality || null,
+      service: service(row.service_id) ? { name: service(row.service_id).name, durationMinutes: service(row.service_id).duration_minutes } : null,
+      provider: provider(row.provider_id) ? { name: provider(row.provider_id).name } : null,
+    })),
     getCustomerConfirmation: (reference) => confirmation(db.prepare("SELECT * FROM booking_appointments WHERE workspace_id=? AND booking_reference=?").get(ws(), reference)),
   });
 }

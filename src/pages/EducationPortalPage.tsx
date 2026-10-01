@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 
 type Resource = { id: string; title: string; assetType: "document" | "audio" | "video"; mimeType: string; sizeBytes: number };
+type Appointment = { id: string; reference: string | null; status: string; startsAt: string; modality: string | null; service: { name: string; durationMinutes: number } | null; provider: { name: string } | null };
 type View = "loading" | "ready" | "signin" | "not-enrolled" | "error";
 
 // An invite is single-use: share one exchange per token so a re-run of the
@@ -20,6 +21,10 @@ function exchangeInvite(projectId: string, invite: string) {
   return pending;
 }
 
+const statusLabel: Record<string, string> = { PENDING: "در انتظار تأیید", CONFIRMED: "تأییدشده", CANCELLED: "لغوشده", COMPLETED: "انجام‌شده" };
+const modalityLabel = (value: string | null) => value === "ONLINE" ? "آنلاین" : value === "IN_PERSON" ? "حضوری" : value || "";
+const when = (iso: string) => new Intl.DateTimeFormat("fa-IR", { dateStyle: "full", timeStyle: "short", timeZone: "UTC" }).format(new Date(iso));
+
 const typeLabel: Record<Resource["assetType"], string> = { document: "جزوه و سند", audio: "فایل صوتی", video: "ویدئوی آموزشی" };
 
 // Student Portal: authenticated by the existing app-user session, authorized by
@@ -32,6 +37,7 @@ export default function EducationPortalPage() {
   const [view, setView] = useState<View>("loading");
   const [resources, setResources] = useState<Resource[]>([]);
   const [message, setMessage] = useState("");
+  const [appointments, setAppointments] = useState<{ upcoming: Appointment[]; past: Appointment[] } | null>(null);
   const [busyId, setBusyId] = useState("");
   const [playing, setPlaying] = useState<{ id: string; url: string } | null>(null);
   const playingUrl = useRef("");
@@ -58,6 +64,9 @@ export default function EducationPortalPage() {
         if (response.status === 403) { setView("not-enrolled"); return; }
         if (!response.ok || !Array.isArray(data.resources)) throw new Error("منابع آموزشی در دسترس نیست.");
         setResources(data.resources); setView("ready");
+        const booked = await authed(base.replace(/\/resources$/, "/appointments"), controller.signal);
+        const bookedData = await booked.json().catch(() => ({}));
+        if (booked.ok && Array.isArray(bookedData.upcoming) && Array.isArray(bookedData.past)) setAppointments({ upcoming: bookedData.upcoming, past: bookedData.past });
       } catch (error) {
         if ((error as Error).name === "AbortError") return;
         setMessage(error instanceof Error ? error.message : "دسترسی ممکن نیست.");
@@ -87,7 +96,7 @@ export default function EducationPortalPage() {
     finally { setBusyId(""); }
   }
 
-  function signOut() { try { sessionStorage.removeItem(tokenKey); } catch { /* ignore */ } setResources([]); setPlaying(null); setView("signin"); }
+  function signOut() { try { sessionStorage.removeItem(tokenKey); } catch { /* ignore */ } setResources([]); setAppointments(null); setPlaying(null); setView("signin"); }
 
   const notice = (text: string, tone: "plain" | "alert" = "plain") => <p role={tone === "alert" ? "alert" : undefined} className={`mt-8 rounded-2xl border p-5 text-sm leading-7 ${tone === "alert" ? "border-rose-300/30 bg-rose-950/30" : "border-[#d9bc83]/25 text-[#f5f0e5]/75"}`}>{text}</p>;
 
@@ -104,6 +113,13 @@ export default function EducationPortalPage() {
       {view === "signin" && notice(message || "برای مشاهدهٔ منابع، از لینک دعوتی که برای شما ارسال شده وارد شوید.")}
       {view === "not-enrolled" && notice("حساب شما در این دوره ثبت‌نام فعال ندارد. برای دسترسی با مسئول آموزشگاه تماس بگیرید.")}
       {view === "error" && notice(message || "منابع آموزشی در دسترس نیست.", "alert")}
+      {view === "ready" && <section data-portal-bookings className="mt-8 rounded-3xl border border-[#d9bc83]/25 bg-[#2d2b27] p-5 sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-black">کلاس‌ها و رزروهای شما</h2><Link to={`/site/${siteProjectId}/booking?app=${encodeURIComponent(projectId)}`} className="inline-flex min-h-11 items-center rounded-xl bg-[#d9bc83] px-4 text-sm font-bold text-[#292721]">رزرو کلاس جدید</Link></div>
+        {!appointments && <p className="mt-4 text-sm text-[#f5f0e5]/60">رزروها در دسترس نیست.</p>}
+        {appointments && !appointments.upcoming.length && !appointments.past.length && <p className="mt-4 text-sm leading-7 text-[#f5f0e5]/65">هنوز رزروی با حساب شما ثبت نشده است. رزروهایی که پیش‌تر بدون ورود ثبت شده‌اند به‌طور خودکار به حساب شما اضافه نمی‌شوند.</p>}
+        {appointments && appointments.upcoming.length > 0 && <div className="mt-4"><h3 className="text-sm font-bold text-[#d9bc83]">کلاس بعدی</h3><ul className="mt-2 space-y-2">{appointments.upcoming.map((item, index) => <li key={item.id} data-appointment={index === 0 ? "next" : "upcoming"} className="rounded-2xl bg-[#f5f0e5] p-4 text-[#292721]"><p className="break-words font-black">{item.service?.name || "کلاس"}</p><p className="mt-1 text-sm">{when(item.startsAt)}</p><p className="mt-1 text-xs text-stone-600">{item.provider?.name ? `مدرس: ${item.provider.name} · ` : ""}{modalityLabel(item.modality) ? `${modalityLabel(item.modality)} · ` : ""}{statusLabel[item.status] || item.status}{item.reference && <> · <bdi dir="ltr">{item.reference}</bdi></>}</p></li>)}</ul></div>}
+        {appointments && appointments.past.length > 0 && <div className="mt-5"><h3 className="text-sm font-bold text-[#d9bc83]">رزروهای گذشته</h3><ul className="mt-2 space-y-2">{appointments.past.map((item) => <li key={item.id} data-appointment="past" className="rounded-2xl border border-[#d9bc83]/25 p-4"><p className="break-words font-bold">{item.service?.name || "کلاس"}</p><p className="mt-1 text-xs text-[#f5f0e5]/70">{when(item.startsAt)} · {statusLabel[item.status] || item.status}</p></li>)}</ul></div>}
+      </section>}
       {view === "ready" && !resources.length && <div className="mt-8 rounded-3xl border border-dashed border-[#d9bc83]/30 p-7 text-sm leading-7 text-[#f5f0e5]/65">هنوز منبع آموزشی‌ای برای شما منتشر نشده است.</div>}
       {view === "ready" && <div className="mt-8 grid gap-4 sm:grid-cols-2">{resources.map((resource) => <article key={resource.id} className="min-w-0 rounded-3xl border border-[#d9bc83]/20 bg-[#f5f0e5] p-5 text-[#292721]">
         <span className="text-xs font-bold text-[#8d6b35]">{typeLabel[resource.assetType]}</span>

@@ -32,3 +32,8 @@ export function draftCapabilityContext(project) {
 export function commerceEnabled(project) {
   return resolveCapabilities({ siteType: project?.siteType }, {}).capabilities.includes("commerce");
 }
+
+/** Whether a public booking journey is available for this project (resolved from its current type and content). */
+export function bookingEnabled(project) {
+  return resolveCapabilities({ siteType: project?.siteType, content: project?.content }).capabilities.includes("booking");
+}

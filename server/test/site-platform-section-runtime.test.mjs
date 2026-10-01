@@ -58,13 +58,18 @@ test("corporate: a document without pages reads as a single Home page", () => {
   assert.deepEqual(model.pages[0].sections.map((s) => s.type), ["core.about", "core.cta"]);
 });
 
+test("every non-store site type walks corporate sections, exactly like the renderer", () => {
+  const content = { storeBuilderV16: { sections: [section("a", "about")] } };
+  for (const siteType of ["MEDICAL", "EDUCATION", "LEGAL", "BUSINESS"]) assert.equal(normalizeSiteSections({ siteType }, content).mode, "corporate", siteType);
+});
+
 test("legacy, pre-V16 and non-rendering documents have no sections", () => {
   const cases = [
     [STORE, { headline: "x" }],
     [STORE, { storeBuilderV16: { sections: [] } }],
     [STORE, { storeBuilderV11: { sections: [section("p", "products")] }, storeBuilderV15: { sections: [section("p", "products")] } }],
     [BUSINESS, { storeBuilderV16: { sections: [section("t", "text"), section("s", "spacer")] } }],
-    [{ siteType: "MEDICAL" }, { storeBuilderV16: { sections: [section("a", "about")] } }],
+    [{ siteType: "ECOMMERCE" }, { storeBuilderV16: { sections: [section("a", "about")] } }],
     [BUSINESS, null],
     [null, undefined],
     [BUSINESS, { storeBuilderV16: "bad" }],

@@ -18,7 +18,7 @@ const INLINE_TYPES = new Set(["audio", "video"]);
 // Student Portal reads. Authenticated by the existing app-user session token
 // (X-Loadder-App-Token); authorized by an active enrolment. Never accepts a
 // storage key and never returns one.
-export function createPublicEducationRouter({ db, accessService }) {
+export function createPublicEducationRouter({ db, accessService, bookingRepository }) {
   const router = express.Router();
   const auth = new LoadderAppUserAuth(db);
   const locate = (projectId) => db.prepare("SELECT id,workspace_id AS workspaceId FROM business_builder_projects WHERE id=? AND status='ready'").get(projectId) || null;
@@ -43,6 +43,16 @@ export function createPublicEducationRouter({ db, accessService }) {
 
   router.get(`${base}/resources`, limited(120), (req, res) => withStudent(req, res, (principal) =>
     res.json({ success: true, resources: accessService.listResourcesFor(req.params.siteProjectId, principal) })));
+
+  // Only appointments explicitly linked to this app user at creation time; no
+  // name/contact matching, and no cancel/reschedule (the Booking contract has none for customers).
+  router.get(`${base}/appointments`, limited(120), (req, res) => withStudent(req, res, (principal) => {
+    accessService.listResourcesFor(req.params.siteProjectId, principal); // enrolment gate
+    const now = Date.now(), all = bookingRepository.listAppointmentsForIdentity({ authProjectId: principal.projectId, appUserId: principal.id });
+    const upcoming = all.filter((item) => Date.parse(item.startsAt) >= now && ["PENDING", "CONFIRMED"].includes(item.status));
+    const past = all.filter((item) => !upcoming.includes(item)).reverse();
+    return res.json({ success: true, upcoming, past });
+  }));
 
   router.get(`${base}/resources/:mediaId/file`, limited(60), (req, res) => withStudent(req, res, async (principal) => {
     const { asset, object } = await accessService.readResourceFor(req.params.siteProjectId, req.params.mediaId, principal);

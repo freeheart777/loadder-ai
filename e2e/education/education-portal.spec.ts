@@ -203,3 +203,68 @@ test("Performance detail: poster + native player, unavailable state, error state
   expect(markup).toContain('data-performance-video="true"');
   await context.close();
 });
+
+test("Authenticated booking links to the student: booking -> confirmation -> Student Portal -> Booking Studio", async ({ browser }) => {
+  const operator = await request.newContext({ baseURL: apiBase, storageState: cookies });
+  const when = new Date(Date.now() + 7 * 86_400_000), date = when.toISOString().slice(0, 10), weekday = when.getUTCDay();
+  const service = (await ok(await operator.post("/api/booking/services", { data: { name: "پیانو مقدماتی", durationMinutes: 45, modalities: ["ONLINE"] } }))).service;
+  const provider = (await ok(await operator.post("/api/booking/providers", { data: { name: "مدرس آزمون" } }))).provider;
+  await ok(await operator.post(`/api/booking/providers/${provider.id}/services/${service.id}`));
+  await ok(await operator.post("/api/booking/availability", { data: { providerId: provider.id, weekday, startsAt: "10:00", endsAt: "11:00", capacity: 5 } }));
+  await ok(await operator.post("/api/booking/availability", { data: { providerId: provider.id, weekday, startsAt: "12:00", endsAt: "13:00", capacity: 5 } }));
+
+  const db = new Database(dbPath);
+  await seedStudent(db, "dave", "dave@example.test"); await seedStudent(db, "erin", "erin@example.test");
+  db.close();
+  for (const key of ["dave", "erin"]) await ok(await operator.post(`/api/site-projects/${siteId}/learning-enrollments`, { data: { authProjectId: authId, appUserId: users[key] } }));
+
+  // Anonymous booking stays possible and is never auto-claimed, even with the same name/contact.
+  const anonymous = await ok(await api.post(`/api/auth/site/${siteId}/booking/appointments`, { data: { serviceId: service.id, providerId: provider.id, date, startsAt: "12:00", customerName: "هنرجوی آزمون", customerContact: "09120000000", modality: "ONLINE" } }));
+  const forged = await api.post(`/api/auth/site/${siteId}/booking/appointments`, { headers: { "X-Loadder-App-Token": "forged", "X-Loadder-App-Project": authId }, data: { serviceId: service.id, providerId: provider.id, date, startsAt: "12:00", customerName: "x", customerContact: "1" } });
+  expect(forged.status()).toBe(401);
+
+  const context = await browser.newContext(), page = await context.newPage();
+  await page.goto(`/learn/${authId}/${siteId}?invite=${invites.dave}`);
+  await expect(page.locator("article")).toHaveCount(3);
+  await expect(page.locator("[data-portal-bookings]")).toContainText("هنوز رزروی با حساب شما ثبت نشده است");
+  await page.getByRole("link", { name: "رزرو کلاس جدید" }).click();
+
+  await page.getByRole("button", { name: /پیانو مقدماتی/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByRole("button", { name: "مدرس آزمون" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByRole("button", { name: "آنلاین" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByLabel("تاریخ").fill(date);
+  await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByLabel("نام هنرجو").fill("هنرجوی آزمون"); await page.getByLabel("شماره تماس").fill("09120000000");
+  await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByRole("button", { name: "تأیید و ثبت" }).click();
+  const reference = (await page.getByRole("heading", { name: /کد پیگیری/ }).innerText()).split(":")[1].trim();
+  expect(reference).toMatch(/^BK-/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow(page);
+  await page.getByRole("link", { name: "بازگشت به پرتال آموزشی" }).click();
+
+  const next = page.locator('[data-appointment="next"]');
+  await expect(next).toContainText("پیانو مقدماتی"); await expect(next).toContainText("مدرس آزمون"); await expect(next).toContainText("آنلاین"); await expect(next).toContainText(reference);
+  await expect(page.locator('[data-appointment]')).toHaveCount(1);
+  await expect(page.locator("main")).not.toContainText(/پرداخت|پیام|حضور و غیاب/);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/education-portal-booking-390.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.screenshot({ path: "test-results/education-portal-booking-desktop.png", fullPage: true });
+
+  // Another enrolled student with no linked booking sees none of it (and not the anonymous one).
+  const erinPage = await (await browser.newContext()).newPage();
+  await erinPage.goto(`/learn/${authId}/${siteId}?invite=${invites.erin}`);
+  await expect(erinPage.locator("[data-portal-bookings]")).toContainText("هنوز رزروی با حساب شما ثبت نشده است");
+  await expect(erinPage.locator("[data-appointment]")).toHaveCount(0);
+  await erinPage.context().close();
+
+  // Booking Studio / admin sees the same canonical appointments; only the authenticated one carries the link.
+  const admin = (await ok(await operator.get("/api/booking"))).appointments as Array<{ booking_reference: string; app_user_id: string | null; customer_name: string }>;
+  expect(admin.find((entry) => entry.booking_reference === reference)?.app_user_id).toBe(users.dave);
+  expect(admin.find((entry) => entry.booking_reference === anonymous.confirmation.reference)?.app_user_id).toBeNull();
+  const adminContext = await browser.newContext({ storageState: cookies }), adminPage = await adminContext.newPage();
+  await adminPage.goto("/dashboard/booking");
+  await expect(adminPage.getByText("هنرجوی آزمون").first()).toBeVisible();
+  await adminContext.close(); await context.close(); await operator.dispose();
+});

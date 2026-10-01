@@ -14,6 +14,7 @@ import { migration094CommerceTaxonomyMerchandising } from "./094_commerce_taxono
 import { migration095BookingCustomerJourneyFoundation } from "./095_booking_customer_journey_foundation.mjs";
 import { migration096LearningMediaAssetTypes } from "./096_learning_media_asset_types.mjs";
 import { migration097SiteLearningEnrollments } from "./097_site_learning_enrollments.mjs";
+import { migration098BookingAppointmentIdentityLink } from "./098_booking_appointment_identity_link.mjs";
 import { migration002TenantDomainData } from "./002_tenant_domain_data.mjs";
 import { migration003TenantRelationshipGuards } from "./003_tenant_relationship_guards.mjs";
 import { migration004WorkspaceManagementAudit } from "./004_workspace_management_audit.mjs";
@@ -192,4 +193,5 @@ export const migrations = [
   migration095BookingCustomerJourneyFoundation,
   migration096LearningMediaAssetTypes,
   migration097SiteLearningEnrollments,
+  migration098BookingAppointmentIdentityLink,
 ];
