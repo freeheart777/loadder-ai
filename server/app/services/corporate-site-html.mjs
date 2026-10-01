@@ -1,5 +1,5 @@
 import { projectPublicStorePresentation } from "./store-public-presentation.mjs";
-import { findPageBySlug, navigationPages, readPages } from "./site-page-model.mjs";
+import { findPageBySlug, navigationPages, normalizeSlug, readPages } from "./site-page-model.mjs";
 
 // A published corporate site has exactly one truth: the V16 document, read
 // through the same public projection that /api/auth/site/:id serves. This
@@ -42,9 +42,9 @@ export function isCorporateV16(project, content) {
   return everySection.some((section) => CORPORATE_TYPES.has(section?.type));
 }
 
-const itemsHtml = (section, withMedia) => (section.items || []).map((item) => `<article class="card">${
+const itemsHtml = (section, withMedia, itemHref = null) => (section.items || []).map((item) => `<article class="card">${
   withMedia ? `<div class="thumb">${url(item.imageUrl) ? `<img src="${escape(url(item.imageUrl))}" alt="${escape(item.title)}" loading="lazy">` : ""}</div>` : ""
-}<div class="card-body"><b>${escape(item.title)}</b>${item.subtitle ? `<span>${escape(item.subtitle)}</span>` : ""}${item.body ? `<p>${escape(item.body)}</p>` : ""}</div></article>`).join("");
+}<div class="card-body"><b>${escape(item.title)}</b>${item.subtitle ? `<span>${escape(item.subtitle)}</span>` : ""}${item.body ? `<p>${escape(item.body)}</p>` : ""}${itemHref?.(item) ? `<a class="detail-link" href="${escape(itemHref(item))}">بیشتر بخوانید</a>` : ""}</div></article>`).join("");
 
 // Section render functions, dispatched by the stored legacy section type
 // (docs/decisions/PR4B-render-boundary.md). Bodies are unchanged from the
@@ -57,7 +57,7 @@ const splitHtml = (section, { open, close, head }) => {
   return `${open}<div class="split">${section.mediaPosition === "start" ? media + copy : copy + media}</div>${close}`;
 };
 
-const cardsHtml = (section, { open, close, head, columns }) => `${open}${head}<div class="grid" style="--cols:${columns}">${itemsHtml(section, section.type !== "services")}</div>${close}`;
+const cardsHtml = (section, { open, close, head, columns, itemHref }) => `${open}${head}<div class="grid" style="--cols:${columns}">${itemsHtml(section, section.type !== "services", itemHref)}</div>${close}`;
 
 const ctaHtml = (section, { open, close }) => `${open}<div class="cta"><div><h2>${escape(section.title)}</h2>${section.subtitle ? `<p>${escape(section.subtitle)}</p>` : ""}</div>${section.ctaLabel ? `<a class="cta-btn" href="${escape(String(section.ctaHref || "#"))}">${escape(section.ctaLabel)}</a>` : ""}</div>${close}`;
 
@@ -86,14 +86,32 @@ const SECTION_RENDERERS = new Map([
 /** Section types with a dedicated corporate renderer (read-only; for agreement tests). */
 export const CORPORATE_SECTION_TYPES = Object.freeze([...SECTION_RENDERERS.keys()]);
 
-function sectionHtml(section, { education = false } = {}) {
+function sectionHtml(section, { education = false, itemHref = null } = {}) {
   const id = anchorOf(section);
   const style = `background:${color(section.backgroundColor, education ? "#2e2c28" : "#ffffff")};color:${color(section.textColor, education ? "#f5f0e5" : "#0f172a")};padding-top:${num(section.spacingTop, 32)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
   const head = `<div class="head">${section.subtitle ? `<span class="eyebrow">${escape(section.subtitle)}</span>` : ""}<h2>${escape(section.title)}</h2></div>`;
   const columns = Math.min(4, Math.max(1, num(section.columns, 3)));
   const open = `<section id="${escape(id)}" data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
   const close = `</div></section>`;
-  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, head, columns });
+  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, head, columns, itemHref });
+}
+
+const EDUCATION_DETAIL_PAGES = new Set(["courses", "teachers", "magazine"]);
+const itemSlug = (item) => normalizeSlug(item?.slug || item?.title);
+
+/** Resolve a presentation-only Education detail from the published V16 page.
+ * This deliberately does not model a course, teacher, or article as Website
+ * operational data: it is an address for an already-published card only. */
+export function findEducationDetail(page, detailSlug) {
+  if (!page || !EDUCATION_DETAIL_PAGES.has(page.slug)) return null;
+  const wanted = normalizeSlug(detailSlug);
+  if (!wanted) return null;
+  for (const section of page.sections || []) {
+    for (const item of section?.items || []) {
+      if (itemSlug(item) === wanted) return { section, item, slug: wanted };
+    }
+  }
+  return null;
 }
 
 /**
@@ -101,7 +119,7 @@ function sectionHtml(section, { education = false } = {}) {
  * Returns null when the requested slug does not resolve to a page, so the
  * caller answers 404 rather than silently serving Home.
  */
-export function renderCorporateSite(project, version, content, { slug = "", basePath = "" } = {}) {
+export function renderCorporateSite(project, version, content, { slug = "", detailSlug = "", basePath = "" } = {}) {
   // The canonical projection — the same function and options the public
   // /api/auth/site/:id payload is built from.
   const presentation = projectPublicStorePresentation(content, { preserveSectionIds: true, includeCommerce: false }).storeBuilderV16 || {};
@@ -128,6 +146,14 @@ export function renderCorporateSite(project, version, content, { slug = "", base
   const nav = presentation.nav || {};
   const footer = presentation.footer || {};
   const navItems = nav.enabled === false ? [] : pageNavigationFor(pages, basePath);
+  const detail = education ? findEducationDetail(page, detailSlug) : null;
+  if (detailSlug && !detail) return null;
+  const itemHref = education && EDUCATION_DETAIL_PAGES.has(page.slug)
+    ? (item) => {
+      const itemAddress = itemSlug(item);
+      return itemAddress ? `${basePath}/${page.slug}/${encodeURIComponent(itemAddress)}` : null;
+    }
+    : null;
 
   const css = `*{box-sizing:border-box}body{margin:0;background:${color(design.backgroundColor, education ? "#242321" : "#f8fafc")};color:${color(design.textColor, education ? "#f5f0e5" : "#0f172a")};font-family:${escape(design.fontFamily || "Vazirmatn")},system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.8}`
     + `.wrap{width:min(${width}px,100%);margin:auto;padding:0 16px}`
@@ -146,6 +172,7 @@ export function renderCorporateSite(project, version, content, { slug = "", base
     + `.card{border:1px solid rgba(0,0,0,.06);background:#fff;border-radius:${num(design.cardRadius, 18)}px;overflow:hidden}`
     + `.thumb{aspect-ratio:4/3;background:#f1f5f9}.thumb img{width:100%;height:100%;object-fit:cover;display:block}`
     + `.card-body{padding:18px}.card-body b{display:block}.card-body span{display:block;font-size:13px;opacity:.6;margin-top:4px}.card-body p{font-size:13px;opacity:.72;margin:10px 0 0}`
+    + `.detail-link{display:inline-flex;margin-top:14px;color:${primary};font-size:13px;font-weight:800;text-decoration:none}.detail{padding:54px 0;max-width:760px}.detail h1{font-size:clamp(30px,5vw,48px);line-height:1.25;margin:8px 0 18px}.detail .lead{font-size:18px;opacity:.75}.detail .copy{font-size:16px;white-space:pre-wrap}.detail img{width:100%;max-height:520px;object-fit:cover;border-radius:${num(design.cardRadius, 18)}px;margin:24px 0}.back{display:inline-flex;color:${primary};font-weight:800;text-decoration:none}`
     + `.cta{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;padding:28px;border-radius:${num(design.cardRadius, 18)}px;background:inherit}`
     + `.cta h2{margin:0}.cta p{margin:6px 0 0;opacity:.8}.cta-btn{background:#fff;color:#111827;border-radius:${num(design.buttonRadius, 12)}px;padding:12px 22px;font-weight:800;text-decoration:none}`
     + `footer.site{background:${color(footer.backgroundColor, "#0f172a")};color:${color(footer.textColor, "#e2e8f0")}}`
@@ -153,7 +180,7 @@ export function renderCorporateSite(project, version, content, { slug = "", base
     + `@media(min-width:760px){.split{grid-template-columns:1fr 1fr}.hero-inner{grid-template-columns:1.05fr .95fr}}`
     + `@media(max-width:640px){.grid{grid-template-columns:1fr}}`;
 
-  const heroHtml = (hero.enabled === false || !page.isHome) ? "" : `<section class="hero"><div class="wrap hero-inner"><div>${
+  const heroHtml = (hero.enabled === false || !page.isHome || detail) ? "" : `<section class="hero"><div class="wrap hero-inner"><div>${
     hero.eyebrow ? `<span class="eyebrow" style="color:inherit;opacity:.75">${escape(hero.eyebrow)}</span>` : ""
   }<h1>${escape(hero.title || siteName)}</h1>${hero.subtitle ? `<p>${escape(hero.subtitle)}</p>` : ""}${
     hero.ctaLabel ? `<a class="hero-cta" href="${escape(education ? `${basePath}/booking` : String(hero.ctaHref || "#"))}">${escape(hero.ctaLabel)}</a>` : ""
@@ -165,7 +192,7 @@ export function renderCorporateSite(project, version, content, { slug = "", base
     + `<header class="site"${education ? ' data-education-public="true"' : ""}><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>`
     + `${navItems.length ? `<nav class="menu">${navItems.map((item) => `<a href="${escape(item.href)}">${escape(item.label)}</a>`).join("")}</nav>` : ""}`
     + `${nav.enabled === false ? "" : `<a class="nav-cta" href="${escape(String(nav.ctaHref || "#"))}">${escape(nav.ctaLabel || "تماس با ما")}</a>`}`
-    + `</div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section, { education })).join("")}</main>`
+    + `</div></header>${heroHtml}<main>${detail ? `<article class="wrap detail"><a class="back" href="${escape(`${basePath}/${page.slug}`)}">بازگشت به ${escape(page.title)}</a><p class="eyebrow">${escape(detail.section.title || page.title)}</p><h1>${escape(detail.item.title)}</h1>${detail.item.subtitle ? `<p class="lead">${escape(detail.item.subtitle)}</p>` : ""}${url(detail.item.imageUrl) ? `<img src="${escape(url(detail.item.imageUrl))}" alt="${escape(detail.item.title)}" loading="lazy">` : ""}${detail.item.body ? `<p class="copy">${escape(detail.item.body)}</p>` : ""}</article>` : sections.map((section) => sectionHtml(section, { education, itemHref })).join("")}</main>`
     + `${footer.enabled === false ? "" : `<footer class="site"><div class="wrap foot"><b>${escape(siteName)}</b><span>${escape(footer.text || "")}</span></div></footer>`}`
     + `</body></html>`;
 }

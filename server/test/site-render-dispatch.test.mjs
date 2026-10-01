@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { CORPORATE_SECTION_TYPES, isCorporateV16, renderCorporateSite } from "../app/services/corporate-site-html.mjs";
+import { CORPORATE_SECTION_TYPES, findEducationDetail, isCorporateV16, renderCorporateSite } from "../app/services/corporate-site-html.mjs";
 import { STORE_SECTION_TYPES } from "../app/services/store-site-html.mjs";
 import { siteRegistry } from "../app/site-platform/capabilities.mjs";
 import { normalizeSiteSections } from "../app/site-platform/section-runtime.mjs";
@@ -92,4 +92,25 @@ test("Education public static routes resolve from the persisted V16 pages collec
     assert.match(html, new RegExp(`>${page.title}<`));
   }
   assert.equal(renderCorporateSite(project, { version: 1, content }, content, { slug: "not-a-page" }), null);
+});
+
+test("Education details are published V16 presentation cards, scoped to their parent page", () => {
+  const project = { id: "education-detail", siteType: "EDUCATION", name: "آموزشگاه" };
+  const pages = [
+    { id: "home", title: "خانه", slug: "", sections: [] },
+    { id: "courses", title: "دوره‌ها", slug: "courses", sections: [{ id: "course-list", type: "services", enabled: true, title: "دوره‌ها", items: [{ id: "course-1", title: "پیانو مقدماتی", subtitle: "شروع", body: "متن دوره" }] }] },
+    { id: "teachers", title: "مدرسان", slug: "teachers", sections: [{ id: "teacher-list", type: "team", enabled: true, title: "مدرسان", items: [{ id: "teacher-1", title: "لیلا محمدی", subtitle: "پیانو", body: "معرفی مدرس" }] }] },
+    { id: "magazine", title: "مجله", slug: "magazine", sections: [{ id: "article-list", type: "services", enabled: true, title: "مجله", items: [{ id: "article-1", title: "تمرین روزانه", subtitle: "راهنما", body: "متن مقاله" }] }] },
+  ];
+  const content = { storeBuilderV16: { header: { storeName: "آموزشگاه" }, pages, sections: pages[0].sections } };
+  assert.equal(findEducationDetail(pages[1], "پیانو-مقدماتی").item.id, "course-1");
+  assert.equal(findEducationDetail(pages[2], "پیانو-مقدماتی"), null, "a detail never crosses its page boundary");
+  const list = renderCorporateSite(project, { version: 3, content }, content, { slug: "courses", basePath: "/sites/education-detail" });
+  assert.ok(list.includes(`/sites/education-detail/courses/${encodeURIComponent("پیانو-مقدماتی")}`));
+  const detail = renderCorporateSite(project, { version: 3, content }, content, { slug: "courses", detailSlug: "پیانو-مقدماتی", basePath: "/sites/education-detail" });
+  assert.match(detail, /data-page-slug="courses"/);
+  assert.match(detail, />پیانو مقدماتی</);
+  assert.match(detail, /متن دوره/);
+  assert.equal(renderCorporateSite(project, { version: 3, content }, content, { slug: "courses", detailSlug: "unknown" }), null);
+  assert.equal(renderCorporateSite(project, { version: 3, content }, content, { slug: "children", detailSlug: "anything" }), null);
 });

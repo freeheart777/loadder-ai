@@ -24,7 +24,7 @@ const read = async (response: Response) => {
 const deviceForWidth = (width: number): DeviceMode => (width < 640 ? "mobile" : width < 1024 ? "tablet" : "desktop");
 
 export default function PublicSiteRuntime() {
-  const { siteProjectId, slug } = useParams();
+  const { siteProjectId, slug, detail: detailSlug } = useParams();
   const [meta, setMeta] = useState<SiteMeta | null>(null);
   const [selected, setSelected] = useState<Selection>({ type: "hero", id: "hero" });
   const [device, setDevice] = useState<DeviceMode>(() => deviceForWidth(window.innerWidth));
@@ -61,6 +61,15 @@ export default function PublicSiteRuntime() {
     () => (page ? { ...site, activePageId: page.id, sections: page.sections } : site),
     [site, page]
   );
+  const detail = useMemo(() => {
+    if (!detailSlug || !page || !["courses", "teachers", "magazine"].includes(page.slug)) return null;
+    const wanted = normalizeSlug(detailSlug);
+    if (!wanted) return undefined;
+    for (const section of page.sections) for (const item of section.items || []) {
+      if (normalizeSlug(item.title) === wanted) return { section, item };
+    }
+    return undefined;
+  }, [detailSlug, page]);
 
   useEffect(() => {
     if (!meta) return;
@@ -81,7 +90,8 @@ export default function PublicSiteRuntime() {
 
   if (message) return <main dir="rtl" className="grid min-h-screen place-items-center bg-slate-50 p-6"><div className="rounded-3xl border bg-white p-8 text-center"><p>{message}</p><Link to="/" className="mt-5 inline-block rounded-xl bg-slate-900 px-5 py-3 text-white">بازگشت</Link></div></main>;
   if (!meta) return <main className="min-h-screen bg-slate-50" aria-label="در حال بارگذاری سایت" />;
-  if (!page) return <main dir="rtl" data-page-missing="true" className="grid min-h-screen place-items-center bg-slate-50 p-6"><div className="rounded-3xl border bg-white p-8 text-center"><h1 className="text-lg font-black">صفحه پیدا نشد</h1><Link to={`/site/${siteProjectId}`} className="mt-5 inline-block rounded-xl bg-slate-900 px-5 py-3 text-white">بازگشت به خانه</Link></div></main>;
+  if (!page || detail === undefined) return <main dir="rtl" data-page-missing="true" className="grid min-h-screen place-items-center bg-slate-50 p-6"><div className="rounded-3xl border bg-white p-8 text-center"><h1 className="text-lg font-black">صفحه پیدا نشد</h1><Link to={`/site/${siteProjectId}`} className="mt-5 inline-block rounded-xl bg-slate-900 px-5 py-3 text-white">بازگشت به خانه</Link></div></main>;
+  if (detail) return <main dir="rtl" data-published-version-id={meta.publishedVersion.id} data-detail-page="true" className="min-h-screen bg-[#242321] px-4 py-8 text-[#f5f0e5] sm:p-12"><article className="mx-auto max-w-3xl"><Link to={`/site/${siteProjectId}/${page.slug}`} className="text-sm font-bold text-[#d9bc83]">بازگشت به {page.title}</Link><p className="mt-10 text-sm text-[#d9bc83]">{detail.section.title || page.title}</p><h1 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">{detail.item.title}</h1>{detail.item.subtitle && <p className="mt-5 text-lg text-[#f5f0e5]/70">{detail.item.subtitle}</p>}{detail.item.imageUrl && <img className="mt-8 max-h-[520px] w-full rounded-3xl object-cover" src={detail.item.imageUrl} alt={detail.item.title}/>} {detail.item.body && <p className="mt-8 whitespace-pre-wrap text-base leading-9 text-[#f5f0e5]/85">{detail.item.body}</p>}</article></main>;
 
   return <main data-published-version-id={meta.publishedVersion.id} data-published-version={meta.publishedVersion.version} data-page-slug={page.slug}>
     <StudioCanvas config={config} products={[]} device={device} selected={selected} select={setSelected} interactive={false} onLeadSubmit={submitLead} pageBasePath={`/site/${siteProjectId}`} />

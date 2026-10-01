@@ -93,7 +93,7 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     const etag = `W/\"preview-${preview.project.id}-${preview.project.updatedAt}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const draftVersion = { version: "draft", content: preview.project.content };
-    const page = { slug: typeof req.query.page === "string" ? req.query.page : "", basePath: `/preview/sites/${preview.project.id}` };
+    const page = { slug: typeof req.query.page === "string" ? req.query.page : "", detailSlug: typeof req.query.detail === "string" ? req.query.detail : "", basePath: `/preview/sites/${preview.project.id}` };
     return res.set({ "Cache-Control": "private, no-store", ETag: etag, "X-Robots-Tag": "noindex, nofollow, noarchive", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" }).type("html").send(renderPublishedSite(preview.project, draftVersion, preview.assets, page, productsFor(preview.project, preview.project.content)) || "Page not found");
   };
   router.get("/preview/sites/:id", (req, res) => {
@@ -105,6 +105,10 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
       return sendPreview(req, res, workspaceId ? runWithWorkspace(workspaceId, () => repository.getPreviewByToken(hashPreviewToken(token), req.params.id)) : null);
     }
     catch (error) { console.error("Preview site error:", error); return res.status(500).send("Unable to render preview"); }
+  });
+  router.get("/sites/:id/:slug/:detail", (req, res) => {
+    try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: req.params.slug, detailSlug: req.params.detail, basePath: `/sites/${req.params.id}` }); }
+    catch (error) { console.error("Public site detail error:", error); return res.status(500).send("Unable to render site"); }
   });
   router.get("/sites/:id/:slug", (req, res) => {
     try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: req.params.slug, basePath: `/sites/${req.params.id}` }); }
