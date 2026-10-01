@@ -77,9 +77,7 @@ function toMinorUnits(amount: number, label: string) {
 }
 
 function withProductInSection(current: StudioConfig, sectionId: string, productId: string, availableProducts: Product[]) {
-  return {
-    ...current,
-    sections: current.sections.map((section) => {
+  return withActivePageSections(current, activePageOf(current).sections.map((section) => {
       if (section.id !== sectionId || section.type !== "products" || !section.productSettings) return section;
       const settings = normalizeManual(section.productSettings, availableProducts);
       return {
@@ -88,8 +86,7 @@ function withProductInSection(current: StudioConfig, sectionId: string, productI
           ? settings
           : { ...settings, productIds: [productId, ...settings.productIds].slice(0, 12) },
       };
-    }),
-  };
+    }));
 }
 
 const SECTION_TITLES: Record<SectionConfig["type"], string> = {
@@ -771,8 +768,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
-      <aside className={`order-1 min-h-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-        <div className="border-b border-white/10 px-4 py-3"><b className="text-xs">تنظیمات عنصر انتخاب‌شده</b><p className="mt-1 text-[10px] text-white/35">برای ویرایش سریع، روی خود سایت کلیک کنید؛ جزئیات اینجا نمایش داده می‌شود.</p></div>
+      <aside data-studio-inspector className={`order-1 min-h-0 min-w-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
         <InspectorPanel {...inspectorProps} tab={tab} onTab={setTab} />
       </aside>
 

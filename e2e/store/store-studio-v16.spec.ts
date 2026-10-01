@@ -56,9 +56,8 @@ async function finishJourney(journey: Journey, testInfo: TestInfo) {
   await journey.api.dispose().catch(() => undefined);
 }
 
-async function openStudio(page: Page) {
-  await page.goto("/dashboard/websites");
-  await expect(page.getByRole("heading", { name: "فروشگاه شما" })).toBeVisible();
+async function openStudio(page: Page, projectId: string) {
+  await page.goto(`/dashboard/websites/store?project=${projectId}`);
   await expect(page.locator('[data-studio-version="16"]')).toBeVisible();
   await expect(page.locator('[data-canvas-interactive="true"]')).toBeVisible();
 }
@@ -68,7 +67,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
   const journey = await createJourney(browser, testInfo);
   try {
     await test.step("authenticated Studio load and Hero persistence", async () => {
-      await openStudio(journey.page);
+      await openStudio(journey.page, journey.projectId);
       await journey.page.getByRole("heading", { name: "خریدی ساده، سریع و مطمئن", exact: true }).click();
       await journey.page.getByLabel("عنوان", { exact: true }).fill("قهرمان فارسی فروشگاه");
       await journey.page.getByLabel("چیدمان", { exact: true }).selectOption("background");
@@ -136,7 +135,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       const versionA = await journey.page.locator("main[data-published-version-id]").getAttribute("data-published-version-id");
       expect(versionA).toBeTruthy();
 
-      await openStudio(journey.page);
+      await openStudio(journey.page, journey.projectId);
       await journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true }).click();
       await journey.page.getByLabel("عنوان", { exact: true }).fill("پیش‌نویس منتشرنشده ب");
       const savedB = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}` && response.request().method() === "PATCH" && response.status() === 200);
@@ -151,7 +150,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       await expect(journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true })).toBeVisible();
       await expect(journey.page.getByText("پیش‌نویس منتشرنشده ب")).toHaveCount(0);
 
-      await openStudio(journey.page);
+      await openStudio(journey.page, journey.projectId);
       const publishedB = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}/publish` && response.status() === 200);
       await journey.page.getByRole("button", { name: "انتشار نسخه", exact: true }).click();
       await publishedB;
@@ -165,7 +164,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       const overflow = await journey.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
       await journey.page.setViewportSize({ width: 1280, height: 900 });
-      await openStudio(journey.page);
+      await openStudio(journey.page, journey.projectId);
     });
 
     await test.step("inline product validation sends no request", async () => {
@@ -191,6 +190,28 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       }));
       expect(overflow.body).toBeLessThanOrEqual(1);
       expect(overflow.document).toBeLessThanOrEqual(1);
+    });
+
+    await test.step("Inspector independently scrolls to Product Section source and final spacing controls", async () => {
+      for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+        await journey.page.setViewportSize(viewport);
+        await openStudio(journey.page, journey.projectId);
+        await journey.page.getByRole("heading", { name: "محصولات منتخب", exact: true }).click();
+        const inspector = journey.page.locator("[data-studio-inspector]");
+        const scrollRegion = journey.page.locator("[data-inspector-scroll-region]");
+        await expect(inspector).toBeVisible();
+        await expect(scrollRegion).toBeVisible();
+        await expect(journey.page.getByLabel("منبع محصولات", { exact: true })).toBeVisible();
+        await expect(journey.page.getByLabel("منبع محصولات", { exact: true }).locator("option")).toHaveText(["منتخب‌ها", "جدیدترین‌ها", "تخفیف‌دارها", "کالکشن دستی", "اسلات‌های دستی"]);
+        await scrollRegion.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+        await expect(journey.page.getByLabel("فاصله پایین", { exact: true })).toBeVisible();
+        await expect(journey.page.getByLabel("فاصله بالا", { exact: true })).toBeVisible();
+        const metrics = await scrollRegion.evaluate((element) => ({ scrollTop: element.scrollTop, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight }));
+        expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+        expect(metrics.scrollTop + metrics.clientHeight).toBeGreaterThanOrEqual(metrics.scrollHeight - 1);
+        const overflow = await journey.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow).toBeLessThanOrEqual(1);
+      }
     });
   } finally {
     await finishJourney(journey, testInfo);

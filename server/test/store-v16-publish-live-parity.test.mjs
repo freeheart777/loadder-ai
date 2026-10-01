@@ -55,6 +55,22 @@ test("V16 merchandising persists references and resolves supported sources from 
   assert.match(renderer, /merchandisingProducts\?\.\[section\.id\]/);
 });
 
+test("V16 product insertion updates the canonical active page while retaining manual slots", () => {
+  const studio = source("src/pages/StoreWebsiteStudioPageV16Core.tsx");
+  assert.match(studio, /withActivePageSections\(current, activePageOf\(current\)\.sections\.map/);
+  assert.match(studio, /normalizeManual\(section\.productSettings, availableProducts\)/);
+});
+
+test("V16 Inspector keeps long element settings independently reachable", () => {
+  const inspector = source("src/components/store-studio-v16/InspectorPanel.tsx");
+  const studio = source("src/pages/StoreWebsiteStudioPageV16Core.tsx");
+  assert.match(studio, /data-studio-inspector/);
+  assert.match(inspector, /data-inspector-scroll-region/);
+  assert.match(inspector, /overflow-x-hidden overflow-y-auto/);
+  assert.match(inspector, /shrink-0 border-b/);
+  assert.match(inspector, /min-h-0 flex-1/);
+});
+
 test("publication and public availability share authoritative transactional policies", () => {
   const repository=source("server/app/repositories/site-project-repository.mjs");
   const ecommerce=source("server/app/services/ecommerce-service.mjs");
