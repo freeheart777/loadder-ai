@@ -16,7 +16,10 @@ const CAPABILITIES_BY_ARCHETYPE = Object.freeze({
   catalog: ["catalog", "lead", "forms", "analytics", "ads", "landing"],
   doctor: ["booking", "lead", "location", "content", "forms", "analytics", "ads", "landing"],
   lawyer: ["booking", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
-  education: ["courses", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
+  // Education uses the same canonical Booking domain as Medical and Legal.
+  // This only exposes the integration; starter creation never seeds booking
+  // services, providers, availability, or appointments.
+  education: ["courses", "booking", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
   hybrid: ["commerce", "catalog", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
   custom: ["forms", "analytics", "landing"],
 });

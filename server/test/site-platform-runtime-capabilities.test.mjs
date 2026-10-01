@@ -56,6 +56,7 @@ const storeId = publish("فروشگاه", "STORE", storeDoc());
 catalog(storeId, "store");
 const businessId = publish("شرکت", "BUSINESS", corporateDoc());
 const medicalId = publish("مطب", "MEDICAL", corporateDoc());
+const educationId = publish("آموزشگاه", "EDUCATION", corporateDoc());
 // Published as STORE (v2 manifest records commerce), later changed to BUSINESS.
 const convertedId = publish("تبدیل‌شده", "STORE", storeDoc());
 catalog(convertedId, "converted");
@@ -92,6 +93,7 @@ test("A: runtime capability context per site type; registered Booking is distinc
     [storeId]: ["core", "commerce", "payments", "forms"],
     [businessId]: ["core", "forms", "blog", "people"],
     [medicalId]: ["core", "forms", "blog", "booking"],
+    [educationId]: ["core", "forms", "blog", "people", "booking"],
   };
   for (const [id, capabilities] of Object.entries(expected)) {
     const context = publishedCapabilityContext(published(id));
@@ -104,10 +106,20 @@ test("A: runtime capability context per site type; registered Booking is distinc
 
   const pending = resolveCapabilities({ siteType: "MEDICAL" }, { websitePlatform: { capabilities: ["booking", "courses", "lead"] } });
   assert.deepEqual(pending.unregistered, ["courses"]);
-  for (const id of [storeId, businessId, medicalId]) {
+  for (const id of [storeId, businessId, medicalId, educationId]) {
     const { capabilities } = publishedCapabilityContext(published(id));
     assert.ok(!capabilities.includes("courses"));
   }
+});
+
+test("A: the SPA public projection resolves published Education without treating it as a STORE", async () => {
+  const response = await fetch(`${base}/api/auth/site/${educationId}`);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.site, { id: educationId, name: "آموزشگاه", siteType: "EDUCATION" });
+  assert.equal(body.publishedVersion.version, 1);
+  assert.equal(body.presentation.storeBuilderV16.hero.title, "خانه");
+  assert.equal((await fetch(`${base}/api/auth/site/${storeId}`)).status, 404, "STORE keeps its canonical commerce projection");
 });
 
 test("A: the commerce decision is STORE-only for every site type", () => {

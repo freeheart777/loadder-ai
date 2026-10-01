@@ -39,6 +39,7 @@ test("approved starters persist their vertical capabilities", () => {
   assert.deepEqual(resolveCapabilities({ siteType: "HYBRID" }, created("HYBRID")).capabilities, ["core", "commerce", "payments", "forms", "blog", "people"]);
   const education = resolveCapabilities({ siteType: "EDUCATION" }, created("EDUCATION"));
   assert.ok(education.capabilities.includes("blog"));
+  assert.ok(education.capabilities.includes("booking"));
   assert.deepEqual(education.unregistered, ["courses"]);
 });
 
