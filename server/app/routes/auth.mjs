@@ -4,7 +4,7 @@ import { AuthError, SESSION_COOKIE_NAME } from "../services/auth-service.mjs";
 import { getSessionToken } from "../middleware/auth.mjs";
 import { db } from "../../db/workspace-database.mjs";
 import { createSiteProjectRepository } from "../repositories/site-project-repository.mjs";
-import { renderPublishedSite } from "./public-sites.mjs";
+import { bookingCatalogFor, renderPublishedSite } from "./public-sites.mjs";
 import { bookingEnabled, commerceEnabled } from "../site-platform/runtime-capabilities.mjs";
 import { createEcommerceService, isVariantPurchasable } from "../services/ecommerce-service.mjs";
 import { projectPublicStorePresentation } from "../services/store-public-presentation.mjs";
@@ -78,7 +78,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
     router.use(createPublicEducationRouter({db,bookingRepository,accessService:createLearningAccessService({db,mediaService})}));
   }
   router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"}));
-  const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`},products);if(html===null)return res.status(404).send("Page not found");res.set(publishedSiteHeaders());return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
+  const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`,category:typeof req.query.category==="string"?req.query.category.slice(0,80):"",bookingCatalog:bookingCatalogFor(bookingRepository,published.project)},products);if(html===null)return res.status(404).send("Page not found");res.set(publishedSiteHeaders());return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
   router.get("/sites/:id/:slug/:detail",(req,res)=>sendLegacySite(req,res,req.params.slug,req.params.detail));
   router.get("/sites/:id/:slug",(req,res)=>sendLegacySite(req,res,req.params.slug));
   router.get("/sites/:id",(req,res)=>sendLegacySite(req,res,""));
@@ -91,6 +91,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   const publicBookingSite=(id)=>{const site=publicSite(id);return site&&bookingEnabled(site)?site:null};
   const publicBooking=(req,res)=>{const site=publicBookingSite(req.params.siteProjectId);if(!site){publicNotFound(res,"BOOKING_NOT_AVAILABLE");return null}return site};
   const bookingText=(value,max=200)=>typeof value==="string"&&value.trim()&&value.trim().length<=max?value.trim():null;
+  router.get("/site/:siteProjectId/booking/catalog",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,services:runWithWorkspace(site.workspaceId,()=>bookingRepository.listCatalog(bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});
   router.get("/site/:siteProjectId/booking/services",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,services:runWithWorkspace(site.workspaceId,()=>bookingRepository.listCustomerServices(bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});
   router.get("/site/:siteProjectId/booking/services/:serviceId/providers",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,providers:runWithWorkspace(site.workspaceId,()=>bookingRepository.listEligibleProviders(req.params.serviceId,bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});
   router.get("/site/:siteProjectId/booking/slots",(req,res)=>{try{const site=publicBooking(req,res),{serviceId,providerId,date}=req.query;if(!site)return;if(!bookingText(serviceId)||!bookingText(providerId)||!bookingText(date,10))return res.status(400).json({success:false,code:"BOOKING_INPUT_INVALID",message:"جزئیات زمان معتبر نیست."});return res.json({success:true,slots:runWithWorkspace(site.workspaceId,()=>bookingRepository.listCustomerSlots({serviceId,providerId,date,scope:bookingScopeForSite(site)}))})}catch(e){return storefrontError(e,res)}});

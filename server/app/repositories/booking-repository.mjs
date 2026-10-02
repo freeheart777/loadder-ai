@@ -91,6 +91,13 @@ export function createBookingRepository(db, { audit = createSensitiveAccessAudit
     listEligibleProviders: (serviceId, scope) => { if (!service(serviceId, scope)?.active) return []; const c = inScope(scope, "p.site_project_id"); return db.prepare(`SELECT p.* FROM booking_providers p JOIN booking_provider_services ps ON ps.provider_id=p.id AND ps.workspace_id=p.workspace_id WHERE p.workspace_id=? AND p.active=1 AND ps.service_id=? AND ${c.sql} ORDER BY p.created_at DESC`).all(ws(), serviceId, ...c.params).map(presentProvider); },
     listCustomerSlots: ({ serviceId, providerId, date, scope }) => { if (!dateOnly(date) || !provider(providerId, scope)) return []; const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay(); return db.prepare("SELECT starts_at FROM booking_availability WHERE workspace_id=? AND provider_id=? AND weekday=? ORDER BY starts_at ASC").all(ws(), providerId, weekday).map(({ starts_at }) => slotFor({ serviceId, providerId, date, startsAt: starts_at, scope })).filter(Boolean); },
     quoteCustomerBooking: ({ serviceId, providerId, date, startsAt, modality = null, scope }) => { const slot = slotFor({ serviceId, providerId, date, startsAt, scope }); if (!slot || (modality && !slot.modalityOptions.includes(modality))) return null; return { slot, service: presentService(anyService(serviceId)), provider: presentProvider(anyProvider(providerId)), modality }; },
+    // Public catalog: every bookable service with the doctors/providers that can deliver it.
+    listCatalog: (scope) => {
+      const c = inScope(scope), cp = inScope(scope, "p.site_project_id");
+      const services = db.prepare(`SELECT * FROM booking_services WHERE workspace_id=? AND active=1 AND ${c.sql} ORDER BY created_at ASC`).all(ws(), ...c.params).map(presentService);
+      const links = db.prepare(`SELECT ps.service_id AS serviceId, p.id AS id, p.name AS name FROM booking_provider_services ps JOIN booking_providers p ON p.id=ps.provider_id AND p.workspace_id=ps.workspace_id WHERE ps.workspace_id=? AND p.active=1 AND ${cp.sql} ORDER BY p.created_at ASC`).all(ws(), ...cp.params);
+      return services.map((entry) => ({ ...entry, providers: links.filter((link) => link.serviceId === entry.id).map(({ id, name }) => ({ id, name })) }));
+    },
     createCustomerAppointment: claim,
     transitionAppointment: transition,
     // Portal projection: only rows explicitly linked to this identity (and in scope).

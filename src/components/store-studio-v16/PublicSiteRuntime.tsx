@@ -6,6 +6,8 @@ import StudioCanvas from "./StudioCanvas";
 import type { DeviceMode, Selection } from "./types";
 import { apiFetch } from "../../lib/api";
 import PerformanceVideo from "../PerformanceVideo";
+import VerticalDetail, { type CatalogService } from "./VerticalDetail";
+import { hasDetailPage, isVerticalSite } from "./detailRegistry";
 
 // The live corporate site is the same V16 canvas the studio renders, fed by the
 // published version instead of the draft. It is a data adapter, not a renderer:
@@ -30,6 +32,7 @@ export default function PublicSiteRuntime() {
   const [selected, setSelected] = useState<Selection>({ type: "hero", id: "hero" });
   const [device, setDevice] = useState<DeviceMode>(() => deviceForWidth(window.innerWidth));
   const [message, setMessage] = useState("");
+  const [catalog, setCatalog] = useState<CatalogService[] | null>(null);
 
   useEffect(() => {
     const onResize = () => setDevice(deviceForWidth(window.innerWidth));
@@ -63,14 +66,22 @@ export default function PublicSiteRuntime() {
     [site, page]
   );
   const detail = useMemo(() => {
-    if (!detailSlug || !page || !["courses", "teachers", "magazine", "performances"].includes(page.slug)) return null;
+    if (!detailSlug || !page || !meta || !hasDetailPage(meta.site.siteType, page.slug)) return null;
     const wanted = normalizeSlug(detailSlug);
     if (!wanted) return undefined;
     for (const section of page.sections) for (const item of section.items || []) {
       if (normalizeSlug(item.title) === wanted) return { section, item };
     }
     return undefined;
-  }, [detailSlug, page]);
+  }, [detailSlug, page, meta]);
+
+  const siteType = meta?.site.siteType, medical = String(siteType || "").toUpperCase() === "MEDICAL", vertical = isVerticalSite(siteType);
+  useEffect(() => {
+    if (!medical || !detail || !siteProjectId) return;
+    let active = true;
+    void apiFetch(`/api/auth/site/${siteProjectId}/booking/catalog`).then((response) => (response.ok ? response.json() : null)).then((data) => { if (active) setCatalog(data?.services ?? null); }).catch(() => { if (active) setCatalog(null); });
+    return () => { active = false; };
+  }, [medical, detail, siteProjectId]);
 
   useEffect(() => {
     if (!meta) return;
@@ -92,9 +103,10 @@ export default function PublicSiteRuntime() {
   if (message) return <main dir="rtl" className="grid min-h-screen place-items-center bg-slate-50 p-6"><div className="rounded-3xl border bg-white p-8 text-center"><p>{message}</p><Link to="/" className="mt-5 inline-block rounded-xl bg-slate-900 px-5 py-3 text-white">بازگشت</Link></div></main>;
   if (!meta) return <main className="min-h-screen bg-slate-50" aria-label="در حال بارگذاری سایت" />;
   if (!page || detail === undefined) return <main dir="rtl" data-page-missing="true" className="grid min-h-screen place-items-center bg-slate-50 p-6"><div className="rounded-3xl border bg-white p-8 text-center"><h1 className="text-lg font-black">صفحه پیدا نشد</h1><Link to={`/site/${siteProjectId}`} className="mt-5 inline-block rounded-xl bg-slate-900 px-5 py-3 text-white">بازگشت به خانه</Link></div></main>;
+  if (detail && medical) return <VerticalDetail siteProjectId={siteProjectId!} siteType={meta.site.siteType} page={page} pages={site.pages} section={detail.section} item={detail.item} catalog={catalog} colors={{ background: config.design.backgroundColor, text: config.design.textColor, primary: config.design.primaryColor, surface: config.design.surfaceColor }} />;
   if (detail) return <main dir="rtl" data-published-version-id={meta.publishedVersion.id} data-detail-page="true" className="min-h-screen bg-[#242321] px-4 py-8 text-[#f5f0e5] sm:p-12"><article className="mx-auto max-w-3xl"><Link to={`/site/${siteProjectId}/${page.slug}`} className="text-sm font-bold text-[#d9bc83]">بازگشت به {page.title}</Link><p className="mt-10 text-sm text-[#d9bc83]">{detail.section.title || page.title}</p><h1 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">{detail.item.title}</h1>{detail.item.subtitle && <p className="mt-5 text-lg text-[#f5f0e5]/70">{detail.item.subtitle}</p>}{detail.item.imageUrl && !(page.slug === "performances" && detail.item.videoUrl) && <img className="mt-8 max-h-[520px] w-full rounded-3xl object-cover" src={detail.item.imageUrl} alt={detail.item.title}/>} {page.slug === "performances" && <PerformanceVideo src={detail.item.videoUrl} poster={detail.item.imageUrl} title={detail.item.title}/>}{detail.item.body && <p className="mt-8 whitespace-pre-wrap text-base leading-9 text-[#f5f0e5]/85">{detail.item.body}</p>}</article></main>;
 
   return <main data-published-version-id={meta.publishedVersion.id} data-published-version={meta.publishedVersion.version} data-page-slug={page.slug}>
-    <StudioCanvas config={config} products={[]} device={device} selected={selected} select={setSelected} interactive={false} onLeadSubmit={submitLead} pageBasePath={`/site/${siteProjectId}`} />
+    <StudioCanvas config={config} products={[]} device={device} selected={selected} select={setSelected} interactive={false} onLeadSubmit={submitLead} pageBasePath={`/site/${siteProjectId}`} bookingHref={vertical ? `/site/${siteProjectId}/booking` : undefined} itemHref={vertical && page && hasDetailPage(siteType, page.slug) ? (_section, item) => { const address = normalizeSlug(item.title); return address ? `/site/${siteProjectId}/${page.slug}/${encodeURIComponent(address)}` : null; } : undefined} />
   </main>;
 }

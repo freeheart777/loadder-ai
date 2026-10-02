@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle, CopySimple, DotsSixVertical, Headset, Heart, ImageSquare, MagnifyingGlass, Package, PencilSimple, Plus, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Star, TextT, Trash, Truck, UserCircle } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
 import { safePublicHref } from "./linkPolicy";
 import { defaultProductSettings, formatMoney, productView, productsForSection } from "./config";
 import { isCommerceSite, sectionAnchor, siteTypeDefinition } from "./site-types";
@@ -11,7 +12,7 @@ export type RuntimeCartItem = { id: string; productName: string; variantTitle?: 
 export type RuntimeCart = { currency: string; items: RuntimeCartItem[]; subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number };
 export type CheckoutInput = { fullName: string; phone: string; email?: string; shippingAddress?: { province?: string; city?: string; address?: string; postalCode?: string; notes?: string } };
 export type StorefrontRuntimeAdapter = { openStorefront: () => void; openCollection: () => void; openProduct: (product: Product) => void; openCart: () => void; addProduct: (product: Product) => void | Promise<void>; cartCount?: number; cart?: RuntimeCart | null; checkout?: (input: CheckoutInput) => Promise<{ orderId: string; totalMinor: number; currency: string }> };
-type CanvasProps = { config: StudioConfig; products: Product[]; merchandisingProducts?: Record<string, Product[]>; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; onLeadSubmit?: (input: { name: string; phone: string; email: string; company: string; message: string; website?: string }) => Promise<void>; pageBasePath?: string; };
+type CanvasProps = { config: StudioConfig; products: Product[]; merchandisingProducts?: Record<string, Product[]>; device: DeviceMode; selected: Selection; select: (selection: Selection) => void; onEditElement?: (selection: Selection) => void; interactive?: boolean; onAddProduct?: (sectionId: string) => void; onReorderProduct?: (sectionId: string, fromId: string, toId: string) => void; onInsertSection?: (index: number, type: SectionConfig["type"]) => void; onReorderSection?: (fromId: string, toId: string) => void; onMoveSection?: (id: string, delta: number) => void; onDuplicateSection?: (id: string) => void; onDeleteSection?: (id: string) => void; onImageUpload?: (target: InlineMediaTarget, file: File) => void | Promise<void>; imageBusy?: boolean; runtimePage?: PageMode; onRuntimePage?: (page: PageMode) => void; runtimeAdapter?: StorefrontRuntimeAdapter; itemHref?: (section: SectionConfig, item: SectionItem) => string | null; bookingHref?: string; onLeadSubmit?: (input: { name: string; phone: string; email: string; company: string; message: string; website?: string }) => Promise<void>; pageBasePath?: string; };
 
 function InlineMediaControl({ target, onUpload, busy, label = "تغییر تصویر", compact = false }: { target: InlineMediaTarget; onUpload?: CanvasProps["onImageUpload"]; busy?: boolean; label?: string; compact?: boolean }) {
   if (!onUpload) return null;
@@ -44,7 +45,9 @@ function Hero(props: CanvasProps) {
     <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-black">{hero.eyebrow || "انتخاب امروز"}</span>
     <h2 className="mt-5 font-black leading-[1.1]" style={{ fontSize: mobile ? 36 : 52 * config.design.headingScale / 100 }}>{hero.title}</h2>
     <p className={`mt-5 text-sm leading-8 opacity-80 ${hero.layout === "centered" ? "mx-auto max-w-2xl" : "max-w-lg"}`}>{hero.subtitle}</p>
-    <button type="button" onClick={!interactive ? openCollection : undefined} className="mt-7 inline-flex min-h-12 items-center gap-2 px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{hero.ctaLabel || "مشاهده محصولات"}<ArrowLeft size={16}/></button>
+    {props.bookingHref && !interactive
+      ? <AuthorLink href={props.bookingHref} interactive={false} className="mt-7 inline-flex min-h-12 items-center gap-2 px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{hero.ctaLabel || "رزرو نوبت"}<ArrowLeft size={16}/></AuthorLink>
+      : <button type="button" onClick={!interactive ? openCollection : undefined} className="mt-7 inline-flex min-h-12 items-center gap-2 px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{hero.ctaLabel || "مشاهده محصولات"}<ArrowLeft size={16}/></button>}
   </div>;
   const mediaControl = interactive && <InlineMediaControl target={{ kind: "hero" }} onUpload={props.onImageUpload} busy={props.imageBusy} label={hero.imageUrl ? "تعویض عکس" : "افزودن عکس"}/>;
   const imageFallback = <div className="grid h-full min-h-72 place-items-center bg-gradient-to-br from-slate-100 to-slate-200 text-center text-slate-400"><div><ShoppingBag size={66} className="mx-auto"/><b className="mt-3 block text-slate-600">تصویر کمپین شما</b><span className="text-xs">از + همین تصویر را اضافه کنید</span></div></div>;
@@ -203,7 +206,7 @@ function CorporateHeader(props: CanvasProps) {
       {config.nav.enabled && !mobile && <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-bold opacity-80">
         {items.map((entry) => <a key={entry.id} href={entry.href} onClick={interactive ? (event) => event.preventDefault() : undefined}>{entry.label}</a>)}
       </nav>}
-      {config.nav.enabled && <AuthorLink href={config.nav.ctaHref} interactive={interactive} className="mr-auto inline-flex min-h-10 items-center px-4 text-xs font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{config.nav.ctaLabel}</AuthorLink>}
+      {config.nav.enabled && <AuthorLink href={config.nav.ctaHref} base={props.pageBasePath} interactive={interactive} className="mr-auto inline-flex min-h-10 items-center px-4 text-xs font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{config.nav.ctaLabel}</AuthorLink>}
     </div>
     {config.nav.enabled && mobile && <nav className="flex gap-4 overflow-x-auto border-t border-black/5 px-4 py-2 text-[11px] font-bold opacity-80">
       {items.map((entry) => <a key={entry.id} href={entry.href} className="whitespace-nowrap" onClick={interactive ? (event) => event.preventDefault() : undefined}>{entry.label}</a>)}
@@ -221,7 +224,21 @@ function CorporateFooter({ config }: { config: StudioConfig }) {
   </footer>;
 }
 
-function ItemCard({ item, section, config, variant }: { item: SectionItem; section: SectionConfig; config: StudioConfig; variant: "service" | "team" | "portfolio" }) {
+/** Directory grid with optional category chips (cards carry their category in `meta`). */
+function CardSection({ section, config, variant, grid, props }: { section: SectionConfig; config: StudioConfig; variant: "service" | "team" | "portfolio"; grid: React.CSSProperties; props: CanvasProps }) {
+  const [category, setCategory] = useState("");
+  const items = section.items || [];
+  const categories = props.itemHref ? [...new Set(items.map((entry) => (entry.meta || "").trim()).filter(Boolean))] : [];
+  const shown = category ? items.filter((entry) => (entry.meta || "").trim() === category) : items;
+  return <>
+    {categories.length > 1 && <nav data-category-chips="true" aria-label="فیلتر" className="mb-5 flex flex-wrap gap-2">
+      {["", ...categories].map((value) => <button key={value || "all"} type="button" aria-pressed={category === value} onClick={() => setCategory(value)} className="rounded-full border px-4 py-1.5 text-xs font-bold" style={category === value ? { background: config.design.primaryColor, borderColor: config.design.primaryColor, color: "#fff" } : { borderColor: "rgba(43,42,39,.18)" }}>{value || "همه"}</button>)}
+    </nav>}
+    <div style={grid}>{shown.map((entry) => <ItemCard key={entry.id} item={entry} section={section} config={config} variant={variant} href={props.itemHref?.(section, entry) ?? null} />)}</div>
+  </>;
+}
+
+function ItemCard({ item, section, config, variant, href }: { item: SectionItem; section: SectionConfig; config: StudioConfig; variant: "service" | "team" | "portfolio"; href?: string | null }) {
   const rounded = { borderRadius: config.design.cardRadius };
   return <article className="overflow-hidden border border-black/5 bg-white" style={rounded}>
     {variant !== "service" && <div className="aspect-[4/3] w-full bg-slate-100">
@@ -232,13 +249,18 @@ function ItemCard({ item, section, config, variant }: { item: SectionItem; secti
       <b className="block text-sm" style={{ color: section.textColor }}>{item.title}</b>
       {item.subtitle && <span className="mt-1 block text-xs opacity-60">{item.subtitle}</span>}
       {item.body && <p className="mt-3 text-xs leading-6 opacity-70">{item.body}</p>}
+      {href && <Link data-detail-link="true" to={href} className="mt-4 inline-flex text-xs font-black" style={{ color: config.design.primaryColor }}>بیشتر بخوانید</Link>}
     </div>
   </article>;
 }
 
 /** An author-supplied link. Rejected targets render as text, never rewritten. */
-function AuthorLink({ href, interactive, className, style, children }: { href?: string; interactive: boolean; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
-  const safe = safePublicHref(href);
+// A site-internal path ("/booking") is resolved against the public page base so
+// it works inside /site/:id as well as on a custom domain.
+const resolveInternal = (href: string | undefined, base?: string) => (base && href && href.startsWith("/") && !href.startsWith("//") && !href.startsWith(base) ? `${base}${href}` : href);
+
+function AuthorLink({ href, base, interactive, className, style, children }: { href?: string; base?: string; interactive: boolean; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  const safe = safePublicHref(resolveInternal(href, base));
   if (!safe) return <span className={className} style={style} data-link-rejected="true">{children}</span>;
   return <a href={safe} onClick={interactive ? (event) => event.preventDefault() : undefined} className={className} style={style}>{children}</a>;
 }
@@ -302,7 +324,7 @@ function CorporateSection({ section, props }: { section: SectionConfig; props: C
     const variant = section.type === "services" ? "service" : section.type === "team" ? "team" : "portfolio";
     return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
       {head}
-      <div style={grid}>{(section.items || []).map((entry) => <ItemCard key={entry.id} item={entry} section={section} config={config} variant={variant} />)}</div>
+      <CardSection section={section} config={config} variant={variant} grid={grid} props={props} />
     </section>;
   }
 
@@ -310,7 +332,7 @@ function CorporateSection({ section, props }: { section: SectionConfig; props: C
     return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
       <div className="flex flex-wrap items-center justify-between gap-5 p-8" style={{ background: section.backgroundColor, color: section.textColor, borderRadius: config.design.cardRadius }}>
         <div><h2 className="text-xl font-black sm:text-2xl">{section.title}</h2><p className="mt-2 text-sm opacity-80">{section.subtitle}</p></div>
-        <AuthorLink href={section.ctaHref || "#contact-main"} interactive={props.interactive !== false} className="inline-flex min-h-12 items-center bg-white px-6 text-sm font-black" style={{ color: section.backgroundColor, borderRadius: config.design.buttonRadius }}>{section.ctaLabel}</AuthorLink>
+        <AuthorLink href={section.ctaHref || "#contact-main"} base={props.pageBasePath} interactive={props.interactive !== false} className="inline-flex min-h-12 items-center bg-white px-6 text-sm font-black" style={{ color: section.backgroundColor, borderRadius: config.design.buttonRadius }}>{section.ctaLabel}</AuthorLink>
       </div>
     </section>;
   }

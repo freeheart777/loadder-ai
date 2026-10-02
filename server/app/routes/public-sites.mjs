@@ -4,7 +4,9 @@ import express from "express";
 import { isCorporateV16, renderCorporateSite } from "../services/corporate-site-html.mjs";
 import { isStoreV16, renderStoreSite } from "../services/store-site-html.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
-import { commerceEnabled } from "../site-platform/runtime-capabilities.mjs";
+import { bookingEnabled, commerceEnabled } from "../site-platform/runtime-capabilities.mjs";
+import { bookingScopeForSite } from "../services/booking-scope.mjs";
+import { environment } from "../config/environment.mjs";
 
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const normalizeHost = (value) => String(value ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
@@ -46,7 +48,23 @@ export const renderPublishedSite = (project, version, assets = [], page = {}, pr
   return project?.siteType === "STORE" ? storefront(project, version, assets, content) : genericSite(project, version, assets, content);
 };
 
-export function createPublicSitesRouter({ repository, ecommerceService = null, createEcommerceService = null }) {
+// Medical details show canonical Booking facts (duration, care modes, price,
+// doctors). Only MEDICAL sites load them; every other site is untouched.
+export const bookingCatalogFor = (bookingRepository, project) => {
+  if (!bookingRepository || String(project?.siteType || "").toUpperCase() !== "MEDICAL" || !bookingEnabled(project)) return null;
+  try { return runWithWorkspace(project.workspaceId, () => bookingRepository.listCatalog(bookingScopeForSite(project))); }
+  catch (error) { console.error("Public booking catalog error:", error); return null; }
+};
+
+// Public pages are static HTML; the interactive booking journey lives in the app.
+const bookingRedirectUrl = (siteId, query) => {
+  const origin = environment.clientOrigins?.[0];
+  if (!origin) return null;
+  const pass = ["service", "provider"].map((key) => typeof query?.[key] === "string" && query[key].length <= 80 ? `${key}=${encodeURIComponent(query[key])}` : null).filter(Boolean).join("&");
+  return `${origin.replace(/\/+$/, "")}/site/${encodeURIComponent(siteId)}/booking${pass ? `?${pass}` : ""}`;
+};
+
+export function createPublicSitesRouter({ repository, ecommerceService = null, createEcommerceService = null, bookingRepository = null }) {
   const router = express.Router();
   // The ecommerce service is created on the first commerce request and reused;
   // a site without commerce never creates it.
@@ -74,8 +92,10 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
       });
     } catch (error) { console.error("Public storefront catalog error:", error); return []; }
   };
-  const sendPublished = (req, res, published, page = {}) => {
+  const sendPublished = (req, res, published, basePage = {}) => {
     if (!published) return res.status(404).send("Site not found");
+    const bookingCatalog = bookingCatalogFor(bookingRepository, published.project);
+    const page = { ...basePage, category: typeof req.query?.category === "string" ? req.query.category.slice(0, 80) : "", bookingCatalog };
     const runtimeProducts = productsFor(published.project, published.version.content);
     const html = renderPublishedSite(published.project, published.version, published.assets, page, runtimeProducts);
     // A slug that resolves to no published page is a 404, never a silent Home.
@@ -84,10 +104,11 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     // projection in the validator and force revalidation, so a catalog change
     // can never be hidden behind a published-site snapshot cache entry.
     const commerceRevision = commerceEnabled(published.project) ? crypto.createHash("sha256").update(JSON.stringify(runtimeProducts)).digest("hex").slice(0, 16) : "static";
-    const etag = `W/\"site-${published.version.id}-${page.slug || ""}-${commerceRevision}\"`;
+    const catalogRevision = bookingCatalog ? crypto.createHash("sha256").update(JSON.stringify(bookingCatalog)).digest("hex").slice(0, 12) : "";
+    const etag = `W/\"site-${published.version.id}-${page.slug || ""}-${commerceRevision}${catalogRevision}-${page.category ? crypto.createHash("sha256").update(page.category).digest("hex").slice(0, 8) : ""}\"`;
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
     const cacheControl = commerceEnabled(published.project) ? "no-cache" : "public, max-age=60, stale-while-revalidate=300";
-    return res.set(publishedSiteHeaders({ "Cache-Control": cacheControl, ETag: etag })).type("html").send(html);
+    return res.set(publishedSiteHeaders({ "Cache-Control": bookingCatalog ? "no-cache" : cacheControl, ETag: etag })).type("html").send(html);
   };
   const sendPreview = (req, res, preview) => {
     if (!preview) return res.status(404).send("Preview not found");
@@ -107,6 +128,10 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     }
     catch (error) { console.error("Preview site error:", error); return res.status(500).send("Unable to render preview"); }
   });
+  router.get("/sites/:id/booking", (req, res) => {
+    const target = bookingRedirectUrl(req.params.id, req.query);
+    return target ? res.redirect(302, target) : res.status(404).send("Booking is served by the app");
+  });
   router.get("/sites/:id/:slug/:detail", (req, res) => {
     try { return sendPublished(req, res, repository.getPublishedPublic(req.params.id), { slug: req.params.slug, detailSlug: req.params.detail, basePath: `/sites/${req.params.id}` }); }
     catch (error) { console.error("Public site detail error:", error); return res.status(500).send("Unable to render site"); }
@@ -125,6 +150,13 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
     try { return sendPublished(req, res, repository.getPublishedPublicByDomain(host), { slug: slug(req), basePath: "" }); }
     catch (error) { console.error("Domain site error:", error); return res.status(500).send("Unable to render site"); }
   };
+  router.get("/booking", (req, res, next) => {
+    const host = normalizeHost(req.headers.host);
+    if (!host || host === "localhost" || host === "127.0.0.1") return next();
+    const published = repository.getPublishedPublicByDomain(host);
+    const target = published ? bookingRedirectUrl(published.project.id, req.query) : null;
+    return target ? res.redirect(302, target) : res.status(404).send("Booking is served by the app");
+  });
   router.get("/", domainHandler(() => ""));
   router.get("/:slug", domainHandler((req) => req.params.slug));
   return router;

@@ -145,13 +145,14 @@ function applyMediaToConfig(current: StudioConfig, target: InlineMediaTarget, ur
 }
 
 function TemplatePreview({ template }: { template: WebsiteTemplate }) {
-  const palette: Record<string, string> = { "medical-practice-v1": "from-teal-800 via-teal-700 to-cyan-500", "legal-firm-v1": "from-stone-950 via-stone-800 to-amber-700", "education-center-v1": "from-indigo-950 via-indigo-700 to-violet-500", "corporate-company-v1": "from-sky-950 via-sky-700 to-cyan-400", "commerce-modern-v1": "from-slate-950 via-violet-700 to-emerald-400" };
+  const palette: Record<string, string> = { "medical-practice-v1": "from-teal-800 via-teal-700 to-cyan-500", "nava-medical-v1": "from-stone-200 via-emerald-100 to-stone-300", "legal-firm-v1": "from-stone-950 via-stone-800 to-amber-700", "education-center-v1": "from-indigo-950 via-indigo-700 to-violet-500", "corporate-company-v1": "from-sky-950 via-sky-700 to-cyan-400", "commerce-modern-v1": "from-slate-950 via-violet-700 to-emerald-400" };
   const labels = template.sections.slice(0, 3).map((section) => section.title);
   return <div aria-hidden="true" className="overflow-hidden rounded-xl border border-white/10 bg-white"><div className={`h-14 bg-gradient-to-bl ${palette[template.id] || "from-slate-800 to-slate-500"} p-3`}><i className="block h-1.5 w-12 rounded bg-white/70"/><i className="mt-2 block h-2 w-2/3 rounded bg-white/90"/></div><div className="grid grid-cols-3 gap-1.5 p-2">{labels.map((label) => <span key={label} className="min-h-9 rounded-md bg-slate-100 p-1 text-[7px] font-bold text-slate-500">{label}</span>)}</div></div>;
 }
 
 function templateExperience(template: WebsiteTemplate) {
   const details: Record<string, { useCases: string; recommendation: string }> = {
+    "nava-medical-v1": { useCases: "کلینیک · پزشکان · مجله", recommendation: "برای کلینیک با پزشکان، خدمات و نوبت‌دهی واقعی" },
     "medical-practice-v1": { useCases: "کلینیک · پزشک · سلامت", recommendation: "برای معرفی پزشک، خدمات و نوبت‌دهی" },
     "legal-firm-v1": { useCases: "موسسه حقوقی · وکیل", recommendation: "برای تخصص‌ها، تیم حقوقی و مشاوره" },
     "education-center-v1": { useCases: "آموزشگاه · دوره‌ها", recommendation: "برای دوره‌ها، مدرسان و ثبت‌نام" },
@@ -206,6 +207,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [collections, setCollections] = useState<Collection[]>([]);
   const [merchandisingProducts, setMerchandisingProducts] = useState<Record<string, Product[]>>({});
   const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [bookingOptions, setBookingOptions] = useState<{ services: { id: string; name: string }[]; providers: { id: string; name: string }[] } | undefined>(undefined);
   // These come from the Site Projects API, which resolves the persisted
   // Website Platform document on the server. They are deliberately not
   // inferred from template labels or the current canvas kind.
@@ -730,8 +732,18 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     capabilities.includes("booking") ? { id: "booking", to: "/dashboard/booking", label: "مدیریت نوبت‌دهی" } : null,
   ].filter((link): link is { id: string; to: string; label: string } => Boolean(link));
   const publishedUrl = project?.status === "PUBLISHED" ? `${commerce ? "/store" : "/site"}/${project.id}` : "";
+  // Vertical sites (Medical/Education) may link cards to canonical Booking records.
+  const projectId = project?.id, projectType = String(project?.siteType || "").toUpperCase();
+  useEffect(() => {
+    if (!projectId || !["MEDICAL", "EDUCATION"].includes(projectType)) { setBookingOptions(undefined); return; }
+    let active = true;
+    void apiFetch(`/api/booking?siteProjectId=${encodeURIComponent(projectId)}`).then((response) => response.ok ? response.json() : null).then((data) => {
+      if (active && data) setBookingOptions({ services: (data.services || []).map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })), providers: (data.providers || []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })) });
+    }).catch(() => { if (active) setBookingOptions(undefined); });
+    return () => { active = false; };
+  }, [projectId, projectType]);
   const inspectorProps = {
-    config: canvasConfig, products, collections, assets, actions, moveSection, duplicateSection, deleteSection, addSection,
+    config: canvasConfig, products, collections, assets, bookingOptions, actions, moveSection, duplicateSection, deleteSection, addSection,
     askLoadder: project ? { projectId: project.id, onApplied: onAskLoadderApplied } : undefined,
   };
   const pickerSection = pickerSectionId ? config.sections.find((s) => s.id === pickerSectionId) : null;

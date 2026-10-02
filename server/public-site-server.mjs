@@ -4,13 +4,14 @@ import { createSiteProjectRepository } from "./app/repositories/site-project-rep
 import { db } from "./db/workspace-database.mjs";
 import { createPublicSitesRouter } from "./app/routes/public-sites.mjs";
 import { createEcommerceService } from "./app/services/ecommerce-service.mjs";
+import { createBookingRepository } from "./app/repositories/booking-repository.mjs";
 
 const app = express();
 const repository = createSiteProjectRepository(db);
 
 app.disable("x-powered-by");
 // Lazy: no ecommerce service at startup; created on the first STORE request.
-app.use(createPublicSitesRouter({ repository, createEcommerceService: () => createEcommerceService({ db }) }));
+app.use(createPublicSitesRouter({ repository, createEcommerceService: () => createEcommerceService({ db }), bookingRepository: createBookingRepository(db) }));
 
 const { publicSitePort: port, publicSiteHost: host, publicSiteBaseUrl } = environment;
 

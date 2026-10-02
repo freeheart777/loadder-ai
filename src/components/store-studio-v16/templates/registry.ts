@@ -2,10 +2,11 @@ import { restoreConfig } from "../config";
 import type { SiteKind, StudioConfig } from "../types";
 import { commerceModernV1 } from "./commerce-modern-v1";
 import { businessLaunchTemplates } from "./business-launch-v1";
+import { navaMedicalV1 } from "./nava-medical-v1";
 import type { WebsiteTemplate } from "./types";
 
 /** The full set of templates a new site can be created from. Adding a template means adding an entry here — no other file changes. */
-export const TEMPLATES: readonly WebsiteTemplate[] = [commerceModernV1, ...businessLaunchTemplates];
+export const TEMPLATES: readonly WebsiteTemplate[] = [commerceModernV1, ...businessLaunchTemplates, navaMedicalV1];
 // The business starter picker intentionally includes Ecommerce: it creates an
 // ECOMMERCE project and then opens its existing canonical Store Studio.
 export const templatesForSiteKind = (siteKind: SiteKind): readonly WebsiteTemplate[] =>
