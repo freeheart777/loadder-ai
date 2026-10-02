@@ -13,6 +13,8 @@ const date = (() => new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0,
 const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
 
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+const EDUCATION_TERMS = ["رزرو کلاس", "دوره", "مدرس", "هنرجو"];
+const expectNoEducationTerms = async (page: Page) => { const text = await page.locator("main").innerText(); for (const term of EDUCATION_TERMS) expect(text, `Medical booking must not show "${term}"`).not.toContain(term); };
 const spa = (path = "") => `/site/${siteId}${path}`;
 
 test.describe.configure({ mode: "serial" });
@@ -98,19 +100,22 @@ test("complete anonymous Medical booking from a service CTA, site-scoped, withou
   await page.locator("article", { hasText: "خدمت نمونه یک" }).getByRole("link", { name: "بیشتر بخوانید" }).click();
   await page.locator("[data-booking-cta]").click();
   await expect(page).toHaveURL(new RegExp(`/booking\\?service=${serviceA}`));
-  await expect(page.getByRole("heading", { name: "مدرس" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "پزشک", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "دکتر آزمون الف" })).toBeVisible();
   await expect(page.getByText("دکتر آزمون ب")).toHaveCount(0);
   await page.getByRole("button", { name: "دکتر آزمون الف" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
-  await expect(page.getByRole("heading", { name: "نوع کلاس" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "شیوه مراجعه" })).toBeVisible();
   await expect(page.getByRole("button", { name: "ویدئویی" })).toBeVisible();
   await expect(page.getByRole("button", { name: "حضوری" }), "this doctor does not offer in-person").toHaveCount(0);
   await page.getByRole("button", { name: "ویدئویی" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("تاریخ").fill(date);
   await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
-  await page.getByLabel("نام هنرجو").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09120000000");
+  await page.getByLabel("نام بیمار").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09120000000");
   await page.getByRole("button", { name: "ادامه" }).click();
+  await expect(page.getByRole("heading", { name: "بازبینی و تأیید" })).toBeVisible();
   await page.getByRole("button", { name: "تأیید و ثبت" }).click();
+  await expect(page.getByText("نوبت شما ثبت شد")).toBeVisible();
+  await expectNoEducationTerms(page);
   const reference = (await page.getByRole("heading", { name: /کد پیگیری/ }).innerText()).split(":")[1].trim();
   expect(reference).toMatch(/^BK-/);
   await noOverflow(page);
@@ -138,7 +143,7 @@ test("doctors: profile shows only their services; CTA preselects doctor and thei
   await noOverflow(page);
   await page.screenshot({ path: "test-results/medical-doctor-profile-390.png", fullPage: true });
   await page.locator("[data-booking-cta]").click();
-  await expect(page.getByRole("heading", { name: "نوع کلاس" }), "doctor and their only service are already known").toBeVisible();
+  await expect(page.getByRole("heading", { name: "شیوه مراجعه" }), "doctor and their only service are already known").toBeVisible();
   await context.close();
 });
 
@@ -190,7 +195,7 @@ test("patient signs in with mobile + OTP, books with that identity, and signs ou
   await page.getByRole("button", { name: "ویدئویی" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("تاریخ").fill(date);
   await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
-  await page.getByLabel("نام هنرجو").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09123456789");
+  await page.getByLabel("نام بیمار").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09123456789");
   await page.getByRole("button", { name: "ادامه" }).click(); await page.getByRole("button", { name: "تأیید و ثبت" }).click();
   const reference = (await page.getByRole("heading", { name: /کد پیگیری/ }).innerText()).split(":")[1].trim();
   const appointments = (await ok(await api.get(`/api/booking?siteProjectId=${siteId}`))).appointments as Array<{ booking_reference: string; app_user_id: string | null; auth_project_id: string | null; customer_name: string }>;
@@ -508,4 +513,45 @@ test("online consultation contract: confirmed remote visit, doctor-entered link,
   await expect(patientPage.locator("[data-join-link]")).toHaveCount(0);
   await expect(patientPage.locator("[data-consultation]")).toContainText("مشاوره انجام شد");
   await doctorContext.close(); await patientContext.close(); await anon.dispose();
+});
+
+test("Medical booking uses medical vocabulary, never Education terms, and is truthful when empty", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } }), page = await context.newPage();
+  await page.goto(spa("/booking"));
+  await expect(page.getByRole("heading", { name: "رزرو نوبت", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "خدمت / تخصص" })).toBeVisible();
+  await expect(page.getByText("ویزیت آزمون الف")).toBeVisible();
+  await expectNoEducationTerms(page);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/medical-booking-service-390.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.screenshot({ path: "test-results/medical-booking-service-desktop.png", fullPage: true });
+
+  // A second Medical site with no Booking data shows an honest empty state: no Education samples, no other site's services.
+  const empty = (await ok(await api.post("/api/site-projects", { data: { name: "مرکز خالی", siteType: "MEDICAL", content: {} } }))).project.id;
+  await ok(await api.post(`/api/site-projects/${empty}/publish`));
+  await page.goto(`/site/${empty}/booking`);
+  await expect(page.locator("[data-booking-empty]")).toContainText("هنوز خدمتی برای رزرو نوبت ثبت نشده است");
+  await expect(page.getByText("ویزیت آزمون الف")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "ادامه" })).toHaveCount(0);
+  await expectNoEducationTerms(page);
+  await noOverflow(page);
+  await context.close();
+});
+
+test("Education booking keeps its class/course vocabulary", async ({ browser }) => {
+  const edu = (await ok(await api.post("/api/site-projects", { data: { name: "آموزشگاه آزمون", siteType: "EDUCATION", content: {} } }))).project.id;
+  await ok(await api.post(`/api/site-projects/${edu}/publish`));
+  const service = (await ok(await api.post("/api/booking/services", { data: { siteProjectId: edu, name: "پیانو مقدماتی", durationMinutes: 45, modalities: ["ONLINE"] } }))).service.id;
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } }), page = await context.newPage();
+  await page.goto(`/site/${edu}/booking`);
+  await expect(page.getByRole("heading", { name: "رزرو کلاس", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "دوره", exact: true })).toBeVisible();
+  await expect(page.getByText("پیانو مقدماتی")).toBeVisible();
+  expect(service).toBeTruthy();
+  const text = await page.locator("main").innerText();
+  for (const term of ["پزشک", "بیمار", "رزرو نوبت"]) expect(text).not.toContain(term);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/education-booking-390.png", fullPage: true });
+  await context.close();
 });
