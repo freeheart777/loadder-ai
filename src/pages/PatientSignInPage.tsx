@@ -26,7 +26,7 @@ export default function PatientSignInPage() {
   const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [devCode, setDevCode] = useState("");
-  const next = (() => { const raw = params.get("next") || ""; return raw.startsWith(`/site/${siteProjectId}`) && !raw.startsWith("//") ? raw : `/site/${siteProjectId}/booking`; })();
+  const next = (() => { const raw = params.get("next") || ""; return raw.startsWith(`/site/${siteProjectId}/`) && !raw.startsWith("//") && !raw.includes("..") ? raw : `/site/${siteProjectId}/patient/portal`; })();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -114,7 +114,8 @@ export default function PatientSignInPage() {
         </form>}
         {phase === "signed-in" && session && <div data-sign-in-state="signed-in" className="mt-6 grid gap-3">
           <p className="text-sm">{session.displayName ? `${session.displayName}، ` : ""}با موفقیت وارد شده‌اید.</p>
-          <Link to={`/site/${siteProjectId}/booking`} className={`${primary} grid place-items-center`}>رزرو نوبت</Link>
+          <Link data-sign-in-portal to={`/site/${siteProjectId}/patient/portal`} className={`${primary} grid place-items-center`}>نوبت‌های من</Link>
+          <Link to={`/site/${siteProjectId}/booking`} className="min-h-11 rounded-xl border border-[#2b2a27]/20 text-sm font-bold grid place-items-center">رزرو نوبت</Link>
           <button type="button" onClick={signOut} className="min-h-11 rounded-xl border border-[#2b2a27]/20 text-sm font-bold">خروج</button>
         </div>}
         {message && phase !== "error" && <p role="alert" className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{message}</p>}

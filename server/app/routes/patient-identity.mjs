@@ -2,6 +2,8 @@ import express from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { requireWorkspaceId, runWithWorkspace } from "../tenant-context.mjs";
 import { isWorkspaceOperator } from "../workspace-authorization.mjs";
+import { bookingScopeForSite } from "../services/booking-scope.mjs";
+import { splitAppointmentTimeline } from "../services/appointment-timeline.mjs";
 import { PatientIdentityError } from "../services/patient-identity-service.mjs";
 
 const limited = (limit) => rateLimit({
@@ -13,7 +15,7 @@ const tokenOf = (req) => String(req.get("X-Loadder-App-Token") || "").trim();
 const NO_STORE = { "Cache-Control": "no-store" };
 
 // Public, site-scoped patient sign-in. Same answer for known and unknown mobiles.
-export function createPatientIdentityRouter({ service, siteLookup }) {
+export function createPatientIdentityRouter({ service, siteLookup, bookingRepository = null }) {
   const router = express.Router();
   const base = "/site/:siteProjectId/patient";
   const run = (handler) => async (req, res) => {
@@ -42,6 +44,15 @@ export function createPatientIdentityRouter({ service, siteLookup }) {
   router.get(`${base}/me`, limited(120), run((req, res) => {
     const principal = service.resolve(req.params.siteProjectId, tokenOf(req));
     return principal ? res.json({ success: true, patient: { id: principal.id, displayName: principal.displayName || null } }) : res.status(401).json({ success: false, code: "PATIENT_AUTH_REQUIRED" });
+  }));
+  // The patient's own appointments only: rows linked to this identity (migration 098)
+  // within this site's scope. No name/contact matching, so an anonymous booking is never shown.
+  router.get(`${base}/appointments`, limited(120), run((req, res, site) => {
+    const principal = service.resolve(req.params.siteProjectId, tokenOf(req));
+    if (!principal) return res.status(401).json({ success: false, code: "PATIENT_AUTH_REQUIRED" });
+    if (!bookingRepository) return res.status(404).json({ success: false, code: "BOOKING_NOT_AVAILABLE" });
+    const all = bookingRepository.listAppointmentsForIdentity({ authProjectId: principal.authProjectId, appUserId: principal.id, scope: bookingScopeForSite(site) });
+    return res.json({ success: true, ...splitAppointmentTimeline(all) });
   }));
   router.post(`${base}/logout`, limited(60), run((req, res) => res.json({ success: true, signedOut: service.signOut({ siteProjectId: req.params.siteProjectId, token: tokenOf(req) }) })));
   return router;

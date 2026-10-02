@@ -196,7 +196,33 @@ test("patient signs in with mobile + OTP, books with that identity, and signs ou
   const anonymousSameName = appointments.filter((entry) => entry.customer_name === "بیمار آزمون" && entry.booking_reference !== reference);
   expect(anonymousSameName.every((entry) => entry.app_user_id === null), "an earlier anonymous booking with the same name stays unclaimed").toBe(true);
 
-  await page.goto(spa("/patient"));
+  // Patient portal: this patient's own appointment, same record the operator sees.
+  await page.getByRole("link", { name: "مشاهدهٔ در نوبت‌های من" }).click();
+  await expect(page).toHaveURL(new RegExp("/patient/portal$"));
+  const next = page.locator('[data-appointment="next"]');
+  await expect(next).toContainText("ویزیت آزمون الف"); await expect(next).toContainText("دکتر آزمون الف"); await expect(next).toContainText("ویدئویی"); await expect(next).toContainText(reference); await expect(next).toContainText("در انتظار تأیید");
+  await expect(page.locator("[data-appointment]"), "the earlier anonymous booking with the same name is not claimed").toHaveCount(1);
+  await expect(page.locator("main")).not.toContainText(/پرداخت|پیام|مدارک|لغو نوبت|تغییر زمان/);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/medical-patient-portal-390.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/medical-patient-portal-desktop.png", fullPage: true });
+
+  // Another patient sees none of it.
+  const other = await browser.newContext({ viewport: { width: 390, height: 844 } }), otherPage = await other.newPage();
+  await otherPage.goto(spa("/patient/portal"));
+  await expect(otherPage, "no session redirects to sign-in").toHaveURL(new RegExp("/patient\\?next="));
+  await otherPage.getByLabel("شمارهٔ موبایل").fill("09129998888");
+  await otherPage.getByRole("button", { name: "ارسال کد" }).click();
+  await otherPage.getByLabel("کد تأیید").fill((await otherPage.locator("[data-dev-otp] bdi").innerText()).trim());
+  await otherPage.getByRole("button", { name: "تأیید و ورود" }).click();
+  await expect(otherPage.locator("[data-patient-portal]")).toBeVisible();
+  await expect(otherPage.locator("[data-portal-empty]")).toBeVisible();
+  await expect(otherPage.locator("[data-appointment]")).toHaveCount(0);
+  await other.close();
+
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "خروج" }).click();
   await expect(page.getByLabel("شمارهٔ موبایل")).toBeVisible();
   const stored = await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("loadder-")));
