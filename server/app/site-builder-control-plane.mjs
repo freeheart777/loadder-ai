@@ -18,6 +18,9 @@ import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
 import { createSiteMediaRouter } from "./routes/site-media.mjs";
 import { createLearningEnrollmentsRouter } from "./routes/learning-enrollments.mjs";
+import { createMedicalControlCenterRouter } from "./routes/medical-control-center.mjs";
+import { createMedicalControlCenterService } from "./services/medical-control-center-service.mjs";
+import { getMessagingStatus } from "../services/messaging.mjs";
 import { createMedicalDocumentAdminRouter } from "./routes/medical-documents.mjs";
 import { createMedicalDocumentService } from "./services/medical-document-service.mjs";
 import { createMedicalStorage } from "./services/medical-document-storage.mjs";
@@ -88,7 +91,22 @@ export function mountSiteBuilderControlPlane({
   );
   app.use(mountPath, createSiteMediaRouter({ service: mediaService, db }));
   app.use(mountPath, createPatientIdentityAdminRouter({ service: createPatientIdentityService({ db, hashSecret: environment.authHashSecret, deliver: smsOtpDelivery, deliveryConfigured: () => otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }) }), db }));
-  app.use(mountPath, createMedicalDocumentAdminRouter({ service: createMedicalDocumentService({ db, storage: createMedicalStorage({ nodeEnv: environment.nodeEnv }), nodeEnv: environment.nodeEnv }), db }));
+  const medicalStorage = createMedicalStorage({ nodeEnv: environment.nodeEnv });
+  const medicalDocumentService = createMedicalDocumentService({ db, storage: medicalStorage, nodeEnv: environment.nodeEnv });
+  app.use(mountPath, createMedicalDocumentAdminRouter({ service: medicalDocumentService, db }));
+  app.use(mountPath, createMedicalControlCenterRouter({
+    db,
+    service: createMedicalControlCenterService({ db, readiness: () => {
+      const sms = getMessagingStatus().sms;
+      return {
+        otpDelivery: { configured: otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }), provider: sms.provider, simulator: sms.provider === "simulator" },
+        // Production-ready means a real scanner AND production-grade private storage. Neither
+        // exists yet, so this is false in every environment, development included.
+        documents: { productionReady: false, scannerConfigured: false, storage: medicalStorage.kind, runnable: medicalDocumentService.productionReady() },
+        environment: environment.nodeEnv,
+      };
+    } }),
+  }));
   app.use(mountPath, createLearningEnrollmentsRouter({ service: createLearningAccessService({ db, mediaService }), db }));
   app.use(
     mountPath,

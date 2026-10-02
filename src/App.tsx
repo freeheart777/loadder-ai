@@ -22,6 +22,7 @@ const DoctorPortalPage = lazy(() => import("./pages/DoctorPortalPage"));
 const PatientPortalPage = lazy(() => import("./pages/PatientPortalPage"));
 const PatientSignInPage = lazy(() => import("./pages/PatientSignInPage"));
 const EducationPortalPage = lazy(() => import("./pages/EducationPortalPage"));
+const MedicalControlCenterPage = lazy(() => import("./pages/MedicalControlCenterPage"));
 const EducationControlCenterPage = lazy(() => import("./pages/EducationControlCenterPage"));
 const BookingStudioPage = lazy(() => import("./pages/BookingStudioPage"));
 const CorporateWebsiteStudioPage = lazy(() => import("./pages/CorporateWebsiteStudioPage"));
@@ -138,6 +139,7 @@ export default function App() {
               <Route path="/dashboard/business-builder/apps/:projectId" element={<GeneratedBusinessAppPage />} />
 
               <Route path="/dashboard/websites" element={<WebsiteProjectsPage />} />
+              <Route path="/dashboard/websites/:siteProjectId/medical" element={<MedicalControlCenterPage />} />
               <Route path="/dashboard/websites/:siteProjectId/education" element={<EducationControlCenterPage />} />
               <Route path="/dashboard/websites/store" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/booking" element={<BookingStudioPage />} />

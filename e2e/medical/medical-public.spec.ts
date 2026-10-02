@@ -356,3 +356,97 @@ test("private documents: patient uploads, doctor of that appointment reads, othe
   expect((await anon.get(`${pub}/doctor/documents/${documents[0].id}/file`, { headers: docA })).status()).toBe(404);
   await context.close(); await anon.dispose();
 });
+
+test("Medical Control Center: real counts, every tab on canonical data, no fabricated modules", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const PDF = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+  const pub = `/api/auth/site/${siteId}`;
+  // A second patient with a document, created through the public API.
+  const anon = await request.newContext({ baseURL: apiBase });
+  const otp = await ok(await anon.post(`${pub}/patient/otp`, { data: { mobile: "09128880002" } }));
+  const signed = await ok(await anon.post(`${pub}/patient/verify`, { data: { mobile: "09128880002", code: otp.developmentOtp, name: "بیمار فایل" } }));
+  const identity = { "X-Loadder-App-Token": signed.session.token, "X-Loadder-App-Project": signed.authProjectId };
+  const booked = await ok(await anon.post(`${pub}/booking/appointments`, { headers: identity, data: { serviceId: serviceA, providerId: providerA, date, startsAt: "12:00", customerName: "بیمار فایل", customerContact: "09128880002", modality: "VIDEO" } }));
+  const up = await anon.post(`${pub}/patient/appointments/${booked.appointment.id}/documents`, { headers: { ...identity, "Content-Type": "application/pdf", "X-Document-Title": encodeURIComponent("پرونده"), "X-Document-Filename": "a.pdf" }, data: PDF });
+  expect(up.status()).toBe(201);
+
+  const context = await browser.newContext({ storageState: await api.storageState(), viewport: { width: 390, height: 844 } }), page = await context.newPage();
+  const tab = (key: string) => page.locator(`[data-tab="${key}"]`);
+  await page.goto(`/dashboard/websites/${siteId}/medical`);
+  await expect(page.getByRole("heading", { name: "مرکز درمانی نوا" })).toBeVisible();
+  await expect(page.locator("[data-tab]")).toHaveCount(9);
+  await expect(page.locator("main")).not.toContainText(/پرداخت‌ها|پیام‌ها/);
+
+  // Dashboard numbers equal the canonical API counts.
+  const summary = (await ok(await api.get(`/api/site-projects/${siteId}/medical/summary`))).summary;
+  expect(summary.patients).toBeGreaterThanOrEqual(2); expect(summary.documents).toBeGreaterThanOrEqual(1);
+  await expect(page.locator('[data-stat="بیماران"]')).toContainText(summary.patients.toLocaleString("fa-IR"));
+  await expect(page.locator('[data-stat="پزشکان"]')).toContainText(summary.providers.toLocaleString("fa-IR"));
+  await expect(page.locator('[data-stat="مدارک فعال"]')).toContainText(summary.documents.toLocaleString("fa-IR"));
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/medical-control-center-390.png", fullPage: true });
+
+  await tab("patients").click();
+  await expect(page.locator("[data-patient]").first()).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(".invalid");
+  await expect(page.locator("[data-patient]").filter({ hasText: "09128880002" }), "numbers are masked").toHaveCount(0);
+  await noOverflow(page);
+
+  await tab("doctors").click();
+  await expect(page.locator("[data-doctor]").filter({ hasText: "دکتر آزمون الف" })).toContainText("ورود فعال");
+  await page.getByLabel("نام پزشک").fill("دکتر پنل");
+  await page.getByRole("button", { name: "افزودن پزشک" }).click();
+  const fresh = page.locator("article").filter({ hasText: "دکتر پنل" });
+  await fresh.getByLabel("موبایل دکتر پنل").fill("09127770003");
+  await fresh.getByRole("button", { name: "تعریف ورود" }).click();
+  await expect(page.locator("[data-doctor]").filter({ hasText: "دکتر پنل" })).toContainText("ورود فعال");
+  await page.locator("article").filter({ hasText: "دکتر پنل" }).getByRole("button", { name: "لغو دسترسی" }).click();
+  await expect(page.locator("[data-doctor]").filter({ hasText: "دکتر پنل" })).toContainText("ورود لغوشده");
+  await noOverflow(page);
+
+  await tab("services").click();
+  await page.getByLabel("نام خدمت").fill("خدمت پنل");
+  await page.getByRole("button", { name: "افزودن خدمت" }).click();
+  await expect(page.locator("[data-service]").filter({ hasText: "خدمت پنل" })).toContainText("حضوری");
+  await page.getByLabel("پزشک", { exact: true }).selectOption({ label: "دکتر پنل" });
+  await page.getByLabel("خدمت", { exact: true }).selectOption({ label: "خدمت پنل" });
+  await page.getByRole("button", { name: "اتصال پزشک به خدمت" }).click();
+  await expect(page.getByRole("status")).toContainText("متصل شد");
+  await noOverflow(page);
+
+  await tab("schedules").click();
+  await page.getByLabel("پزشک زمان").selectOption({ label: "دکتر پنل" });
+  await page.getByRole("button", { name: "افزودن زمان" }).click();
+  await expect(page.locator("[data-slot]").filter({ hasText: "09:00–10:00" }).first()).toBeVisible();
+
+  await tab("appointments").click();
+  await expect(page.locator("[data-appointment-row]").first()).toBeVisible();
+  const pending = page.locator("article").filter({ hasText: "بیمار فایل" });
+  await pending.getByRole("button", { name: "تأیید" }).click();
+  await expect(page.locator("article").filter({ hasText: "بیمار فایل" })).toContainText("تأییدشده");
+  await noOverflow(page);
+
+  await tab("content").click();
+  await expect(page.locator("[data-site-status]")).toContainText("منتشرشده");
+
+  await tab("files").click();
+  await expect(page.locator("[data-file]").first()).toContainText("application/pdf");
+  await expect(page.locator("main")).not.toContainText("پرونده");
+  const row = page.locator("article").filter({ hasText: "بدون اسکن" }).first();
+  await row.getByRole("button", { name: "باز کردن" }).click();
+  await expect(page.getByRole("alert")).toContainText("دلیل دسترسی");
+  await row.getByLabel("دلیل دسترسی").fill("پیگیری درخواست پشتیبانی بیمار");
+  const [download] = await Promise.all([page.waitForEvent("download"), row.getByRole("button", { name: "باز کردن" }).click()]);
+  expect(fs.readFileSync((await download.path())!).equals(PDF)).toBe(true);
+  await noOverflow(page);
+
+  await tab("settings").click();
+  await expect(page.locator("[data-otp-state]")).toContainText("شبیه‌ساز");
+  await expect(page.locator("[data-documents-state]")).toContainText("آمادهٔ تولید نیست");
+  await expect(page.locator("[data-settings]")).toContainText("فعال");
+  await page.screenshot({ path: "test-results/medical-control-center-settings-390.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/medical-control-center-desktop.png", fullPage: true });
+  await context.close(); await anon.dispose();
+});
