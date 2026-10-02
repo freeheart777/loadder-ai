@@ -1,3 +1,4 @@
+import { formatAppointmentWhen } from "../lib/appointmentTime";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -12,7 +13,7 @@ type Slot = { id: string; weekday: number; startsAt: string; endsAt: string; cap
 const STATUS: Record<string, string> = { PENDING: "در انتظار تأیید", CONFIRMED: "تأییدشده", CANCELLED: "لغوشده", COMPLETED: "انجام‌شده" };
 const MODE: Record<string, string> = { IN_PERSON: "حضوری", VIDEO: "ویدئویی", AUDIO: "صوتی", TEXT: "متنی", ONLINE: "آنلاین" };
 const DAYS = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
-const when = (iso: string) => new Intl.DateTimeFormat("fa-IR", { dateStyle: "full", timeStyle: "short", timeZone: "UTC" }).format(new Date(iso));
+const when = (iso: string) => formatAppointmentWhen(iso, "full");
 const field = "min-h-11 w-full rounded-xl border border-[#2b2a27]/20 bg-white px-3 text-sm text-[#2b2a27]";
 const primary = "min-h-11 rounded-xl bg-[#5f7560] px-5 text-sm font-black text-white disabled:opacity-50";
 

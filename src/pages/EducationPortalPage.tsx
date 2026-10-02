@@ -1,3 +1,4 @@
+import { formatAppointmentWhen } from "../lib/appointmentTime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/api";
@@ -23,7 +24,7 @@ function exchangeInvite(projectId: string, invite: string) {
 
 const statusLabel: Record<string, string> = { PENDING: "در انتظار تأیید", CONFIRMED: "تأییدشده", CANCELLED: "لغوشده", COMPLETED: "انجام‌شده" };
 const modalityLabel = (value: string | null) => value === "ONLINE" ? "آنلاین" : value === "IN_PERSON" ? "حضوری" : value || "";
-const when = (iso: string) => new Intl.DateTimeFormat("fa-IR", { dateStyle: "full", timeStyle: "short", timeZone: "UTC" }).format(new Date(iso));
+const when = (iso: string) => formatAppointmentWhen(iso, "full");
 
 const typeLabel: Record<Resource["assetType"], string> = { document: "جزوه و سند", audio: "فایل صوتی", video: "ویدئوی آموزشی" };
 

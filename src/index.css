@@ -127,6 +127,26 @@ textarea::placeholder {
   color: rgba(255, 255, 255, 0.3);
 }
 
+/* Light public surfaces (Booking, patient sign-in). The dark-theme defaults above
+   would render white text on these white fields, so light surfaces opt in with
+   data-light-form and set --form-accent for the focus ring. Scoped on purpose. */
+[data-light-form] input,
+[data-light-form] textarea,
+[data-light-form] select {
+  color: #2b2a27;
+  caret-color: var(--form-accent, #2b2a27);
+}
+
+[data-light-form] input::placeholder,
+[data-light-form] textarea::placeholder {
+  color: rgba(43, 42, 39, 0.55);
+}
+
+[data-light-form] :is(input, textarea, select, button, a):focus-visible {
+  outline: 2px solid var(--form-accent, #2b2a27);
+  outline-offset: 2px;
+}
+
 .input {
   width: 100%;
   min-height: 44px;

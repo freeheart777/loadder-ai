@@ -1,3 +1,4 @@
+import { formatAppointmentWhen } from "../lib/appointmentTime";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../lib/api";
@@ -9,7 +10,7 @@ type Appointment = { id: string; reference: string | null; status: string; start
 
 const STATUS: Record<string, string> = { PENDING: "در انتظار تأیید", CONFIRMED: "تأییدشده", CANCELLED: "لغوشده", COMPLETED: "انجام‌شده" };
 const MODE: Record<string, string> = { IN_PERSON: "حضوری", VIDEO: "ویدئویی", AUDIO: "صوتی", TEXT: "متنی", ONLINE: "آنلاین" };
-const when = (iso: string) => new Intl.DateTimeFormat("fa-IR", { dateStyle: "full", timeStyle: "short", timeZone: "UTC" }).format(new Date(iso));
+const when = (iso: string) => formatAppointmentWhen(iso);
 
 // Patient Portal: the signed-in patient's own appointments, nothing else. Payments,
 // messages, documents and cancel/reschedule are deliberately absent: no canonical
@@ -38,7 +39,7 @@ export default function PatientPortalPage() {
 
   if (!session) return <Navigate to={`/site/${siteProjectId}/patient?next=${encodeURIComponent(`/site/${siteProjectId}/patient/portal`)}`} replace />;
 
-  const meta = (item: Appointment) => [item.provider?.name && `دکتر/ارائه‌دهنده: ${item.provider.name}`, item.modality && (MODE[item.modality] || item.modality), STATUS[item.status] || item.status].filter(Boolean).join(" · ");
+  const meta = (item: Appointment) => [item.provider?.name && `پزشک: ${item.provider.name}`, item.modality && (MODE[item.modality] || item.modality), STATUS[item.status] || item.status].filter(Boolean).join(" · ");
   const [next, ...later] = data.upcoming;
 
   async function signOut() {

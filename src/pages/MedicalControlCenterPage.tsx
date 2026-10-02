@@ -1,3 +1,4 @@
+import { formatAppointmentWhen } from "../lib/appointmentTime";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -12,7 +13,7 @@ const DAYS = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنب
 const MODES: [string, string][] = [["IN_PERSON", "حضوری"], ["VIDEO", "ویدئویی"], ["AUDIO", "صوتی"], ["TEXT", "متنی"]];
 const modeLabel = (mode: string) => MODES.find(([key]) => key === mode)?.[1] || mode;
 const STATUS: Record<string, string> = { PENDING: "در انتظار تأیید", CONFIRMED: "تأییدشده", CANCELLED: "لغوشده", COMPLETED: "انجام‌شده" };
-const when = (iso: string) => new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(iso));
+const when = (iso: string) => formatAppointmentWhen(iso, "medium");
 const fa = (value: number) => value.toLocaleString("fa-IR");
 const input = "min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-[#2b2a27]";
 const button = "min-h-11 rounded-xl bg-[#2b2a27] px-4 text-sm font-bold text-white disabled:opacity-40";

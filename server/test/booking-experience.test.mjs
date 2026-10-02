@@ -10,7 +10,7 @@ test("MEDICAL vocabulary is medical and never uses Education terms", () => {
   const x = bookingExperienceFor("MEDICAL");
   assert.equal(x.kind, "MEDICAL");
   assert.equal(x.title, "رزرو نوبت");
-  assert.deepEqual(x.stepLabels, ["خدمت / تخصص", "پزشک", "شیوه مراجعه", "تاریخ و ساعت", "اطلاعات بیمار", "بازبینی و تأیید", "نوبت شما ثبت شد"]);
+  assert.deepEqual(x.stepLabels, ["خدمت / تخصص", "پزشک", "شیوه مراجعه", "تاریخ و ساعت", "اطلاعات بیمار", "بازبینی", "تأیید نوبت"]);
   for (const text of strings(x)) for (const term of EDUCATION_TERMS) assert.ok(!text.includes(term), `"${text}" contains "${term}"`);
 });
 

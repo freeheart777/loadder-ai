@@ -71,7 +71,7 @@ export default function BookingStudioPage() {
   const submitProvider = async (event: FormEvent) => { event.preventDefault(); if (await post("/api/booking/providers", { name: providerName })) setProviderName(""); };
   const submitAssociation = async (event: FormEvent) => { event.preventDefault(); if (providerId && serviceId) await post(`/api/booking/providers/${providerId}/services/${serviceId}`); };
   const submitAvailability = async (event: FormEvent) => { event.preventDefault(); if (providerId) await post("/api/booking/availability", { providerId, weekday: Number(weekday), startsAt, endsAt }); };
-  const submitAppointment = async (event: FormEvent) => { event.preventDefault(); if (providerId && serviceId && customerName && appointmentAt && associated.has(`${providerId}:${serviceId}`) && await post("/api/booking/appointments", { providerId, serviceId, customerName, startsAt: new Date(appointmentAt).toISOString() })) { setCustomerName(""); setAppointmentAt(""); } };
+  const submitAppointment = async (event: FormEvent) => { event.preventDefault(); if (providerId && serviceId && customerName && appointmentAt && associated.has(`${providerId}:${serviceId}`) && await post("/api/booking/appointments", { providerId, serviceId, customerName, startsAt: `${appointmentAt.slice(0, 16)}:00.000Z` })) { setCustomerName(""); setAppointmentAt(""); } };
 
   return <main dir="rtl" className="min-h-screen overflow-x-hidden bg-[#090b10] p-3 text-white sm:p-6">
     <div className="mx-auto max-w-7xl">

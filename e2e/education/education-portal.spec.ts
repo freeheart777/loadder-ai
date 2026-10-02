@@ -235,10 +235,15 @@ test("Authenticated booking links to the student: booking -> confirmation -> Stu
   await page.getByLabel("تاریخ").fill(date);
   await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("نام هنرجو").fill("هنرجوی آزمون"); await page.getByLabel("شماره تماس").fill("09120000000");
+  // Typed text must be readable on the white fields (it was white-on-white through the global dark-theme input rule).
+  const inputContrast = await page.evaluate(() => { const lum = (c: string) => { const [r, g, b] = (c.match(/[\d.]+/g) || []).map(Number).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; return [...document.querySelectorAll("main input")].map((el) => 1.05 / (lum(getComputedStyle(el).color) + 0.05)); });
+  expect(inputContrast.length).toBeGreaterThan(0); for (const ratio of inputContrast) expect(ratio).toBeGreaterThanOrEqual(4.5);
   await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByRole("button", { name: "تأیید و ثبت" }).click();
   const reference = (await page.getByRole("heading", { name: /کد پیگیری/ }).innerText()).split(":")[1].trim();
   expect(reference).toMatch(/^BK-/);
+  // Same intended wall-clock time as the slot that was picked, never shifted by the viewer's zone.
+  await expect(page.locator("[data-appointment-when]")).toContainText("ساعت ۱۰:۰۰");
   await page.setViewportSize({ width: 390, height: 844 });
   await noOverflow(page);
   await page.getByRole("link", { name: "بازگشت به پرتال آموزشی" }).click();

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import { clearPatientSession, patientHeaders, readPatientSession, savePatientSession, type PatientSession } from "../lib/patientSession";
@@ -89,7 +89,7 @@ export default function PatientSignInPage() {
     clearPatientSession(siteProjectId); setSession(null); setMobile(""); setCode(""); setPhase("mobile");
   }
 
-  return <main dir="rtl" data-patient-sign-in className="min-h-screen bg-[#f7f3ea] px-4 py-8 text-[#2b2a27] sm:p-12">
+  return <main dir="rtl" data-patient-sign-in data-light-form style={{ "--form-accent": "#5f7560" } as CSSProperties} className="min-h-screen bg-[#f7f3ea] px-4 py-8 text-[#2b2a27] sm:p-12">
     <section className="mx-auto max-w-md">
       <Link to={`/site/${siteProjectId}`} className="text-sm font-bold text-[#5f7560]">بازگشت به سایت</Link>
       <div className="mt-6 rounded-[2rem] border border-[#2b2a27]/10 bg-[#fffdf8] p-6 sm:p-9">

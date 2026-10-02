@@ -109,10 +109,10 @@ test("complete anonymous Medical booking from a service CTA, site-scoped, withou
   await expect(page.getByRole("button", { name: "حضوری" }), "this doctor does not offer in-person").toHaveCount(0);
   await page.getByRole("button", { name: "ویدئویی" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("تاریخ").fill(date);
-  await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByRole("button", { name: /^۱۰:۰۰/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("نام بیمار").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09120000000");
   await page.getByRole("button", { name: "ادامه" }).click();
-  await expect(page.getByRole("heading", { name: "بازبینی و تأیید" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "بازبینی", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "تأیید و ثبت" }).click();
   await expect(page.getByText("نوبت شما ثبت شد")).toBeVisible();
   await expectNoEducationTerms(page);
@@ -194,7 +194,7 @@ test("patient signs in with mobile + OTP, books with that identity, and signs ou
   await page.getByRole("button", { name: "دکتر آزمون الف" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByRole("button", { name: "ویدئویی" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("تاریخ").fill(date);
-  await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByRole("button", { name: /^۱۰:۰۰/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("نام بیمار").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09123456789");
   await page.getByRole("button", { name: "ادامه" }).click(); await page.getByRole("button", { name: "تأیید و ثبت" }).click();
   const reference = (await page.getByRole("heading", { name: /کد پیگیری/ }).innerText()).split(":")[1].trim();
@@ -553,5 +553,119 @@ test("Education booking keeps its class/course vocabulary", async ({ browser }) 
   for (const term of ["پزشک", "بیمار", "رزرو نوبت"]) expect(text).not.toContain(term);
   await noOverflow(page);
   await page.screenshot({ path: "test-results/education-booking-390.png", fullPage: true });
+  await context.close();
+});
+
+// Measured, not eyeballed: foreground vs the effective background actually painted behind it.
+const readability = (page: Page, selector: string) => page.evaluate((sel) => {
+  const parse = (c: string) => (c.match(/[\d.]+/g) || []).map(Number);
+  const lum = ([r, g, b]: number[]) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const ratio = (a: number[], b: number[]) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+  const backdrop = (el: Element) => { for (let e: Element | null = el; e; e = e.parentElement) { const c = parse(getComputedStyle(e).backgroundColor); if (c.length === 3 || (c.length === 4 && c[3] > 0.95)) return c.slice(0, 3); } return [255, 255, 255]; };
+  const blend = (fg: number[], bg: number[]) => { const a = fg.length === 4 ? fg[3] : 1; return [0, 1, 2].map((i) => fg[i] * a + bg[i] * (1 - a)); };
+  return [...document.querySelectorAll(sel)].filter((el) => (el as HTMLElement).offsetParent).map((el) => {
+    const bg = backdrop(el), own = parse(getComputedStyle(el).backgroundColor), paint = own.length === 3 || (own.length === 4 && own[3] > 0.95) ? own.slice(0, 3) : bg;
+    const text = ratio(blend(parse(getComputedStyle(el).color), paint), paint);
+    const holder = (el as HTMLInputElement).placeholder ? ratio(blend(parse(getComputedStyle(el, "::placeholder").color), paint), paint) : null;
+    return { text, holder };
+  });
+}, selector);
+const expectReadable = async (page: Page, selector: string, label: string) => {
+  await page.locator(selector).first().waitFor();
+  const found = await readability(page, selector);
+  expect(found.length, `${label}: inputs present`).toBeGreaterThan(0);
+  for (const r of found) { expect(r.text, `${label}: typed text contrast`).toBeGreaterThanOrEqual(4.5); if (r.holder !== null) { expect(r.holder, `${label}: placeholder readable`).toBeGreaterThanOrEqual(3); expect(r.holder, `${label}: placeholder secondary`).toBeLessThan(r.text); } }
+};
+const expectFocusRing = async (page: Page, locator: ReturnType<Page["locator"]>) => {
+  await locator.focus();
+  const outline = await locator.evaluate((el) => { const c = getComputedStyle(el); return { style: c.outlineStyle, width: parseFloat(c.outlineWidth), color: c.outlineColor }; });
+  expect(outline.style).not.toBe("none"); expect(outline.width).toBeGreaterThanOrEqual(2); expect(outline.color, "Medical focus uses the sage accent").toBe("rgb(95, 117, 96)");
+};
+
+let window14 = false;
+for (const [zone, viewport, mobile] of [["Asia/Tehran", { width: 1280, height: 800 }, "09125550001"], ["America/Los_Angeles", { width: 390, height: 844 }, "09125550002"]] as const) {
+  test(`Medical booking: one canonical appointment time on every surface (viewer zone ${zone}, ${viewport.width}px)`, async ({ browser }) => {
+    test.setTimeout(120_000);
+    const tag = viewport.width === 390 ? "m390" : "desktop";
+    // One real 14:00 window shared by both viewer-zone runs.
+    if (!window14) { window14 = true; await ok(await api.post("/api/booking/availability", { data: { siteProjectId: siteId, providerId: providerA, weekday, startsAt: "14:00", endsAt: "15:00", capacity: 5 } })); }
+    const context = await browser.newContext({ viewport, timezoneId: zone, locale: "fa-IR" }), page = await context.newPage();
+
+    // Sign-in inputs are readable and focus-visible.
+    await page.goto(spa("/patient"));
+    await expectReadable(page, "main input", "patient sign-in");
+    await expectFocusRing(page, page.getByLabel("شمارهٔ موبایل"));
+    await page.getByLabel("شمارهٔ موبایل").fill(mobile); await page.getByRole("button", { name: "ارسال کد" }).click();
+    await page.getByLabel("کد تأیید").waitFor();
+    await page.getByLabel("کد تأیید").fill((await page.locator("[data-dev-otp] bdi").innerText()).trim()); await page.getByLabel("نام").fill("نگار احمدی");
+    await page.getByRole("button", { name: "تأیید و ورود" }).click(); await page.locator('[data-sign-in-state="signed-in"]').waitFor();
+
+    await page.goto(spa("/booking"));
+    await expect(page.locator("[data-booking-site-name]")).toHaveText("مرکز درمانی نوا");
+    await expect(page.locator("[data-booking-header]").getByRole("link", { name: "بازگشت به سایت" })).toBeVisible();
+    // Stable stepper: the length is known up front and does not change after choosing a service.
+    const steps = viewport.width === 390 ? page.locator("[data-step-progress]") : page.locator('[data-stepper="desktop"] li');
+    if (viewport.width === 390) { await expect(page.locator('[data-stepper="desktop"]')).toBeHidden(); await expect(steps).toHaveText("مرحله ۱ از ۷"); } else await expect(steps).toHaveCount(7);
+    await page.getByRole("button", { name: /ویزیت آزمون الف/ }).click();
+    if (viewport.width === 390) await expect(steps).toHaveText("مرحله ۱ از ۷"); else await expect(steps).toHaveCount(7);
+    await expect(page.getByRole("button", { name: /ویزیت آزمون الف/ })).toContainText("۴۵ دقیقه · ۱٬۲۰۰٬۰۰۰ تومان");
+    await page.screenshot({ path: `test-results/medical-quality-${tag}-1-service.png`, fullPage: true });
+    await page.getByRole("button", { name: "ادامه" }).click();
+    await page.getByRole("button", { name: "دکتر آزمون الف" }).click(); await page.screenshot({ path: `test-results/medical-quality-${tag}-2-doctor.png`, fullPage: true });
+    await page.getByRole("button", { name: "ادامه" }).click();
+    await page.getByRole("button", { name: "ویدئویی" }).click(); await page.screenshot({ path: `test-results/medical-quality-${tag}-3-mode.png`, fullPage: true });
+    await page.getByRole("button", { name: "ادامه" }).click();
+    await expect(page.locator('label[for="booking-date"]')).toBeVisible();
+    await page.getByLabel("تاریخ مراجعه").fill(date);
+    await expectReadable(page, "main input", "booking date");
+    await expect(page.locator("[data-booking-date-fa]")).not.toBeEmpty();
+    await page.getByRole("button", { name: /^۱۴:۰۰/ }).click(); await page.screenshot({ path: `test-results/medical-quality-${tag}-4-slot.png`, fullPage: true });
+    await page.getByRole("button", { name: "ادامه" }).click();
+    await page.getByLabel("نام بیمار").fill("نگار احمدی"); await page.getByLabel("شماره تماس").fill(mobile);
+    await expectReadable(page, "main input", "patient details"); await expectFocusRing(page, page.getByLabel("نام بیمار"));
+    await page.screenshot({ path: `test-results/medical-quality-${tag}-5-patient.png`, fullPage: true });
+    await page.getByRole("button", { name: "ادامه" }).click();
+
+    // Review completeness, in Persian, with the price named and no raw currency code.
+    const review = page.locator("[data-booking-review]");
+    for (const text of ["ویزیت آزمون الف", "دکتر آزمون الف", "ویدئویی", "۱۴:۰۰", "نگار احمدی", "۱٬۲۰۰٬۰۰۰ تومان"]) await expect(review).toContainText(text);
+    await expect(review).not.toContainText("IRT"); await expect(review).not.toContainText(/[0-9]/);
+    await page.screenshot({ path: `test-results/medical-quality-${tag}-6-review.png`, fullPage: true });
+    await page.getByRole("button", { name: "تأیید و ثبت" }).click();
+
+    // The same wall-clock time everywhere, regardless of the viewer's own time zone.
+    const when = page.locator("[data-appointment-when]"); await expect(when).toContainText("ساعت ۱۴:۰۰");
+    expect(await when.innerText()).not.toMatch(/[0-9]|:\d\d:\d\d|،\s*$/);
+    const reference = (await page.getByRole("heading", { name: /کد پیگیری/ }).innerText()).split(":")[1].trim();
+    await expect(page.locator("[data-booking-header]")).toBeVisible();
+    await noOverflow(page); await page.screenshot({ path: `test-results/medical-quality-${tag}-7-confirmation.png`, fullPage: true });
+    const stored = (await ok(await api.get(`/api/booking?siteProjectId=${siteId}`))).appointments as Array<{ booking_reference: string; starts_at: string }>;
+    expect(stored.find((a) => a.booking_reference === reference)?.starts_at, "persisted canonical instant").toBe(`${date}T14:00:00.000Z`);
+    await page.locator("[data-patient-portal-link]").click();
+    await expect(page.locator("[data-appointment]", { hasText: reference })).toContainText("۱۴:۰۰");
+    await expect(page.locator("main")).not.toContainText("ارائه‌دهنده");
+    await noOverflow(page); await page.screenshot({ path: `test-results/medical-quality-${tag}-8-portal.png`, fullPage: true });
+
+    // Operator Control Center renders the same time for the same appointment.
+    const operator = await browser.newContext({ storageState: await api.storageState(), viewport, timezoneId: zone }), admin = await operator.newPage();
+    await admin.goto(`/dashboard/websites/${siteId}/medical`); await admin.locator('[data-tab="appointments"]').click();
+    await expect(admin.locator("[data-appointment-row]", { hasText: "نگار احمدی" }).first()).toContainText("۱۴:۰۰");
+    await operator.close(); await context.close();
+  });
+}
+
+test("Medical booking: empty catalog offers a clear route back, sign-in/booking spacing and 44px primary targets", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } }), page = await context.newPage();
+  const empty = (await ok(await api.post("/api/site-projects", { data: { name: "مرکز بدون خدمت", siteType: "MEDICAL", content: {} } }))).project.id;
+  await ok(await api.post(`/api/site-projects/${empty}/publish`));
+  await page.goto(`/site/${empty}/booking`);
+  const back = page.locator("[data-booking-empty]").getByRole("link", { name: "بازگشت به سایت" });
+  await expect(back).toBeVisible(); expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44 - 1);
+  await page.screenshot({ path: "test-results/medical-quality-m390-empty.png", fullPage: true });
+  await page.goto(spa("/booking"));
+  await page.getByRole("button", { name: /ویزیت آزمون الف/ }).click();
+  const gap = await page.evaluate(() => { const card = [...document.querySelectorAll("button[aria-pressed]")].pop()!.getBoundingClientRect(), next = [...document.querySelectorAll("button")].find((b) => b.textContent === "ادامه")!.getBoundingClientRect(); return next.top - card.bottom; });
+  expect(gap, "action row is separated from the last card").toBeGreaterThanOrEqual(24);
+  expect((await page.getByRole("button", { name: "ادامه" }).boundingBox())!.height).toBeGreaterThanOrEqual(43);
   await context.close();
 });
