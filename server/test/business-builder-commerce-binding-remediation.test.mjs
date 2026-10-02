@@ -8,7 +8,7 @@ function setup({withAudit=true}={}){
   const db=new Database(":memory:");
   db.exec(`
     CREATE TABLE site_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,name TEXT NOT NULL,slug TEXT NOT NULL,status TEXT NOT NULL,site_type TEXT NOT NULL);
-    CREATE TABLE business_builder_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,name TEXT NOT NULL,status TEXT NOT NULL,active_version_id TEXT,updated_at TEXT NOT NULL);
+    CREATE TABLE business_builder_projects(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,name TEXT NOT NULL,status TEXT NOT NULL,active_version_id TEXT,updated_at TEXT NOT NULL,kind TEXT);
     CREATE TABLE business_builder_commerce_bindings(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_project_id TEXT NOT NULL,business_builder_project_id TEXT NOT NULL,status TEXT NOT NULL,created_by TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(workspace_id,site_project_id));
     CREATE TABLE business_builder_commerce_outbox(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,site_project_id TEXT NOT NULL,business_builder_project_id TEXT NOT NULL,status TEXT NOT NULL,created_at TEXT NOT NULL);
   `);

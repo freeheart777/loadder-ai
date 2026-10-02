@@ -18,6 +18,10 @@ import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
 import { createSiteMediaRouter } from "./routes/site-media.mjs";
 import { createLearningEnrollmentsRouter } from "./routes/learning-enrollments.mjs";
+import { createPatientIdentityAdminRouter } from "./routes/patient-identity.mjs";
+import { createPatientIdentityService } from "./services/patient-identity-service.mjs";
+import { otpDeliveryConfigured, smsOtpDelivery } from "./services/patient-otp-delivery.mjs";
+import { environment } from "./config/environment.mjs";
 import { createLearningAccessService } from "./services/learning-access-service.mjs";
 import { createDesignCopilotRouter } from "./routes/design-copilot.mjs";
 import { createEcommerceRouter } from "./routes/ecommerce.mjs";
@@ -80,6 +84,7 @@ export function mountSiteBuilderControlPlane({
     })
   );
   app.use(mountPath, createSiteMediaRouter({ service: mediaService, db }));
+  app.use(mountPath, createPatientIdentityAdminRouter({ service: createPatientIdentityService({ db, hashSecret: environment.authHashSecret, deliver: smsOtpDelivery, deliveryConfigured: () => otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }) }), db }));
   app.use(mountPath, createLearningEnrollmentsRouter({ service: createLearningAccessService({ db, mediaService }), db }));
   app.use(
     mountPath,

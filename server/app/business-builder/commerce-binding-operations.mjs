@@ -9,7 +9,7 @@ export class CommerceBindingOperations{
 
   targets({limit=100}={}){
     const workspaceId=requireWorkspaceId(),bounded=Math.min(Math.max(Number(limit)||100,1),200);
-    return this.db.prepare(`SELECT id,name,status,active_version_id,updated_at FROM business_builder_projects WHERE workspace_id=? AND status<>'archived' ORDER BY CASE WHEN active_version_id IS NOT NULL THEN 0 ELSE 1 END,updated_at DESC LIMIT ?`).all(workspaceId,bounded).map(row=>({id:row.id,name:row.name,status:row.status,activeVersionId:row.active_version_id||null,eligible:Boolean(row.active_version_id)}));
+    return this.db.prepare(`SELECT id,name,status,active_version_id,updated_at FROM business_builder_projects WHERE workspace_id=? AND kind IS NULL AND status<>'archived' ORDER BY CASE WHEN active_version_id IS NOT NULL THEN 0 ELSE 1 END,updated_at DESC LIMIT ?`).all(workspaceId,bounded).map(row=>({id:row.id,name:row.name,status:row.status,activeVersionId:row.active_version_id||null,eligible:Boolean(row.active_version_id)}));
   }
 
   getStore(siteProjectId){

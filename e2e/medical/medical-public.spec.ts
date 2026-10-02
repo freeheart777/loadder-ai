@@ -45,6 +45,7 @@ test.beforeAll(async () => {
   const content = { storeBuilderV16: { design: tpl.design, header: tpl.header, hero: tpl.hero, nav: tpl.nav, footer: tpl.footer, seo: tpl.seo, sections: tpl.sections, pages: [{ id: "page-home", title: "خانه", slug: "", isHome: true, showInNav: true, navLabel: "خانه", seo: { title: "خانه", description: "" }, sections: tpl.sections }, ...tpl.pages] } };
   await ok(await api.patch(`/api/site-projects/${siteId}`, { data: { content, idempotencyKey: `med-${Date.now()}` } }));
   await ok(await api.post(`/api/site-projects/${siteId}/publish`));
+  await ok(await api.post(`/api/site-projects/${siteId}/patient-identity`));
 });
 test.afterAll(async () => { await api?.dispose().catch(() => undefined); });
 
@@ -157,4 +158,48 @@ test("magazine article and clinic page; SSR page mirrors chips, facts and bookin
   const html = await detail.text();
   expect(html).toContain("<dt>مدت</dt><dd>۴۵ دقیقه</dd>");
   expect(html).toContain(`booking?service=${serviceA}`);
+});
+
+test("patient signs in with mobile + OTP, books with that identity, and signs out", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } }), page = await context.newPage();
+  await page.goto(spa("/patient"));
+  await expect(page.getByRole("heading", { name: "ورود با شمارهٔ موبایل" })).toBeVisible();
+  await noOverflow(page);
+  await page.getByLabel("شمارهٔ موبایل").fill("۰۹۱۲۳۴۵۶۷۸۹");
+  await page.getByRole("button", { name: "ارسال کد" }).click();
+  await expect(page.getByLabel("کد تأیید")).toBeVisible();
+  await expect(page.getByRole("button", { name: /ارسال مجدد/ }), "resend is throttled by the server cooldown").toBeDisabled();
+  const devCode = (await page.locator("[data-dev-otp] bdi").innerText()).trim();
+  expect(devCode).toMatch(/^\d{6}$/);
+  await page.getByLabel("کد تأیید").fill(devCode === "000000" ? "111111" : "000000");
+  await page.getByLabel("نام").fill("بیمار آزمون");
+  await page.getByRole("button", { name: "تأیید و ورود" }).click();
+  await expect(page.getByRole("alert")).toContainText("کد معتبر نیست یا منقضی شده است");
+  await page.getByLabel("کد تأیید").fill(devCode);
+  await page.getByRole("button", { name: "تأیید و ورود" }).click();
+  await expect(page.locator('[data-sign-in-state="signed-in"]')).toContainText("بیمار آزمون");
+  await page.screenshot({ path: "test-results/medical-patient-signed-in-390.png", fullPage: true });
+
+  // The session carries into Booking: the appointment is linked to this patient, not matched by name.
+  await page.getByRole("link", { name: "رزرو نوبت" }).click();
+  await page.getByRole("button", { name: /ویزیت آزمون الف/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByRole("button", { name: "دکتر آزمون الف" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByRole("button", { name: "ویدئویی" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByLabel("تاریخ").fill(date);
+  await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await page.getByLabel("نام هنرجو").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09123456789");
+  await page.getByRole("button", { name: "ادامه" }).click(); await page.getByRole("button", { name: "تأیید و ثبت" }).click();
+  const reference = (await page.getByRole("heading", { name: /کد پیگیری/ }).innerText()).split(":")[1].trim();
+  const appointments = (await ok(await api.get(`/api/booking?siteProjectId=${siteId}`))).appointments as Array<{ booking_reference: string; app_user_id: string | null; auth_project_id: string | null; customer_name: string }>;
+  const linked = appointments.find((entry) => entry.booking_reference === reference)!;
+  expect(linked.app_user_id).toBeTruthy(); expect(linked.auth_project_id).toBeTruthy();
+  const anonymousSameName = appointments.filter((entry) => entry.customer_name === "بیمار آزمون" && entry.booking_reference !== reference);
+  expect(anonymousSameName.every((entry) => entry.app_user_id === null), "an earlier anonymous booking with the same name stays unclaimed").toBe(true);
+
+  await page.goto(spa("/patient"));
+  await page.getByRole("button", { name: "خروج" }).click();
+  await expect(page.getByLabel("شمارهٔ موبایل")).toBeVisible();
+  const stored = await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("loadder-")));
+  expect(stored).toHaveLength(0);
+  await context.close();
 });

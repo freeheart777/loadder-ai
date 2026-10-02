@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/api";
+import { patientHeaders, readPatientSession } from "../lib/patientSession";
 
 type Service={id:string;name:string;durationMinutes:number;modalities:string[];price?:{amount:number;currency:string}|null};
 type Provider={id:string;name:string}; type Slot={startsAt:string;startsAtTime:string;state:"available"|"limited"|"full"|"cancelled";remainingCapacity:number;modalityOptions:string[]};
@@ -9,7 +10,7 @@ const today=()=>new Date().toISOString().slice(0,10);
 const labels=["دوره","مدرس","نوع کلاس","زمان","اطلاعات هنرجو","بازبینی","تأیید"];
 const MODE_LABELS:Record<string,string>={ONLINE:"آنلاین",IN_PERSON:"حضوری",VIDEO:"ویدئویی",AUDIO:"صوتی",TEXT:"متنی"};const modalityLabel=(m:string)=>MODE_LABELS[m]||m;
 export default function PublicBookingPage(){
-  const {siteProjectId}=useParams(); const [query]=useSearchParams(); const appProject=query.get("app")||""; const identityHeaders=():Record<string,string>=>{try{const token=sessionStorage.getItem(`loadder-public-app-token:${appProject}`);return appProject&&token?{"X-Loadder-App-Token":token,"X-Loadder-App-Project":appProject}:{}}catch{return {}}}; const base=`/api/auth/site/${siteProjectId}/booking`;
+  const {siteProjectId}=useParams(); const [query]=useSearchParams(); const appProject=query.get("app")||""; const identityHeaders=():Record<string,string>=>{const patient=readPatientSession(siteProjectId||"");if(patient)return patientHeaders(patient);try{const token=sessionStorage.getItem(`loadder-public-app-token:${appProject}`);return appProject&&token?{"X-Loadder-App-Token":token,"X-Loadder-App-Project":appProject}:{}}catch{return {}}}; const base=`/api/auth/site/${siteProjectId}/booking`;
   const [services,setServices]=useState<Service[]>([]),[providers,setProviders]=useState<Provider[]>([]),[slots,setSlots]=useState<Slot[]>([]),[service,setService]=useState<Service|null>(null),[provider,setProvider]=useState<Provider|null>(null),[modality,setModality]=useState(""),[date,setDate]=useState(today()),[slot,setSlot]=useState<Slot|null>(null),[name,setName]=useState(""),[contact,setContact]=useState(""),[step,setStep]=useState(0),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[confirmation,setConfirmation]=useState<any>(null);
   const [catalog,setCatalog]=useState<{id:string;providers:{id:string;modalities:string[]}[]}[]>([]);
   useEffect(()=>{void apiFetch(`${base}/catalog`).then(read).then(d=>setCatalog(d.services||[])).catch(()=>setCatalog([]))},[base]);

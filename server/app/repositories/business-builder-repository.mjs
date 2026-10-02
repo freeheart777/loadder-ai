@@ -25,7 +25,7 @@ export function createBusinessBuilderRepository(db) {
   const workspaceId = () => requireWorkspaceId();
 
   function listProjects() {
-    return db.prepare("SELECT * FROM business_builder_projects WHERE workspace_id = ? ORDER BY updated_at DESC").all(workspaceId()).map(mapProject);
+    return db.prepare("SELECT * FROM business_builder_projects WHERE workspace_id = ? AND kind IS NULL ORDER BY updated_at DESC").all(workspaceId()).map(mapProject);
   }
   function getProject(id) {
     return mapProject(db.prepare("SELECT * FROM business_builder_projects WHERE id = ? AND workspace_id = ?").get(id, workspaceId()));
