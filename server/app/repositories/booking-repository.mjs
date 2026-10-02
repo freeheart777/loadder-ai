@@ -8,8 +8,22 @@ export class BookingError extends Error {
     super(message); this.code = code; this.status = status;
   }
 }
+// Canonical care modes. TEXT is storable but not publicly bookable: an
+// asynchronous text consultation does not exist yet (Phase 7), so it is never
+// offered as if it did. ONLINE is the legacy generic mode and stays supported.
+export const CARE_MODES = Object.freeze(["IN_PERSON", "VIDEO", "AUDIO", "TEXT", "ONLINE"]);
+export const PUBLIC_BOOKABLE_MODES = Object.freeze(["IN_PERSON", "VIDEO", "AUDIO", "ONLINE"]);
 const map = (row) => row && ({ ...row, active: row.active === 1 });
 const modalities = (value) => { try { const parsed = JSON.parse(value || "[]"); return Array.isArray(parsed) ? parsed : []; } catch { return []; } };
+// service modes (public) intersected with the provider's optional restriction.
+const effectiveModes = (serviceRow, linkRow) => {
+  const serviceModes = modalities(serviceRow.modalities_json).filter((mode) => PUBLIC_BOOKABLE_MODES.includes(mode));
+  if (linkRow?.modalities_json == null) return serviceModes;
+  const allowed = modalities(linkRow.modalities_json);
+  return serviceModes.filter((mode) => allowed.includes(mode));
+};
+// A service that declares modes but has none left for this provider is not bookable with them.
+const bookableWith = (serviceRow, linkRow) => modalities(serviceRow.modalities_json).length === 0 || effectiveModes(serviceRow, linkRow).length > 0;
 const dateOnly = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 const timeOnly = (value) => typeof value === "string" && /^\d{2}:\d{2}$/.test(value) ? value : null;
 const isoFor = (date, time) => new Date(`${date}T${time}:00.000Z`).toISOString();
@@ -34,18 +48,19 @@ export function createBookingRepository(db, { audit = createSensitiveAccessAudit
   const provider = (id, scope) => scoped("booking_providers", id, scope);
   const anyService = (id) => db.prepare("SELECT * FROM booking_services WHERE id=? AND workspace_id=?").get(id, ws());
   const anyProvider = (id) => db.prepare("SELECT * FROM booking_providers WHERE id=? AND workspace_id=?").get(id, ws());
-  const presentService = (row) => ({ id: row.id, name: row.name, durationMinutes: row.duration_minutes, modalities: modalities(row.modalities_json), price: row.price_amount == null ? null : { amount: row.price_amount, currency: row.price_currency || null } });
+  const presentService = (row) => ({ id: row.id, name: row.name, durationMinutes: row.duration_minutes, modalities: modalities(row.modalities_json).filter((mode) => PUBLIC_BOOKABLE_MODES.includes(mode)), price: row.price_amount == null ? null : { amount: row.price_amount, currency: row.price_currency || null } });
   const presentProvider = (row) => ({ id: row.id, name: row.name });
   const slotFor = ({ serviceId, providerId, date, startsAt, scope }) => {
     const selectedService = service(serviceId, scope), selectedProvider = provider(providerId, scope);
     if (!selectedService?.active || !selectedProvider?.active || !dateOnly(date) || !timeOnly(startsAt)) return null;
-    if (!db.prepare("SELECT 1 FROM booking_provider_services WHERE workspace_id=? AND provider_id=? AND service_id=?").get(ws(), providerId, serviceId)) return null;
+    const link = db.prepare("SELECT * FROM booking_provider_services WHERE workspace_id=? AND provider_id=? AND service_id=?").get(ws(), providerId, serviceId);
+    if (!link || !bookableWith(selectedService, link)) return null;
     const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
     const availability = db.prepare("SELECT * FROM booking_availability WHERE workspace_id=? AND provider_id=? AND weekday=? AND starts_at=? ORDER BY created_at DESC LIMIT 1").get(ws(), providerId, weekday, startsAt);
     if (!availability) return null;
     const slotStartsAt = isoFor(date, startsAt), booked = db.prepare("SELECT count(*) AS count FROM booking_appointments WHERE workspace_id=? AND provider_id=? AND starts_at=? AND status IN ('PENDING','CONFIRMED')").get(ws(), providerId, slotStartsAt).count;
     const state = availability.status === "CANCELLED" ? "cancelled" : booked >= availability.capacity ? "full" : booked > 0 ? "limited" : "available";
-    return { id: `${availability.id}:${date}:${startsAt}`, availabilityId: availability.id, serviceId, providerId, startsAt: slotStartsAt, startsAtTime: startsAt, endsAt: isoFor(date, availability.ends_at), state, capacity: availability.capacity, remainingCapacity: Math.max(0, availability.capacity - booked), modalityOptions: modalities(selectedService.modalities_json), price: presentService(selectedService).price, siteProjectId: selectedService.site_project_id || null };
+    return { id: `${availability.id}:${date}:${startsAt}`, availabilityId: availability.id, serviceId, providerId, startsAt: slotStartsAt, startsAtTime: startsAt, endsAt: isoFor(date, availability.ends_at), state, capacity: availability.capacity, remainingCapacity: Math.max(0, availability.capacity - booked), modalityOptions: effectiveModes(selectedService, link), price: presentService(selectedService).price, siteProjectId: selectedService.site_project_id || null };
   };
   // Strict (Medical) sites never echo the patient's contact back by reference.
   const confirmation = (appointment, scope) => !appointment ? null : ({ reference: appointment.booking_reference, appointmentId: appointment.id, status: appointment.status, startsAt: appointment.starts_at, service: presentService(anyService(appointment.service_id)), provider: presentProvider(anyProvider(appointment.provider_id)), modality: appointment.modality || null, customer: { name: appointment.customer_name, contact: normalizeScope(scope).kind === "strict" ? null : (appointment.customer_contact || null) } });
@@ -71,7 +86,7 @@ export function createBookingRepository(db, { audit = createSensitiveAccessAudit
   });
   return Object.freeze({
     listServices: (scope) => list("booking_services", scope), listProviders: (scope) => list("booking_providers", scope), listAppointments: (scope) => list("booking_appointments", scope),
-    listAssociations: (scope) => { const c = inScope(scope, "p.site_project_id"); return db.prepare(`SELECT ps.provider_id AS providerId, ps.service_id AS serviceId, ps.created_at AS createdAt FROM booking_provider_services ps JOIN booking_providers p ON p.id=ps.provider_id AND p.workspace_id=ps.workspace_id WHERE ps.workspace_id=? AND ${c.sql} ORDER BY ps.created_at DESC`).all(ws(), ...c.params); },
+    listAssociations: (scope) => { const c = inScope(scope, "p.site_project_id"); return db.prepare(`SELECT ps.provider_id AS providerId, ps.service_id AS serviceId, ps.modalities_json AS modalities, ps.created_at AS createdAt FROM booking_provider_services ps JOIN booking_providers p ON p.id=ps.provider_id AND p.workspace_id=ps.workspace_id WHERE ps.workspace_id=? AND ${c.sql} ORDER BY ps.created_at DESC`).all(ws(), ...c.params).map((row) => ({ ...row, modalities: row.modalities == null ? null : modalities(row.modalities) })); },
     createService: ({ name, durationMinutes, modalities: inputModalities = [], priceAmount = null, priceCurrency = null, scope }) => map(insert("booking_services", { name, duration_minutes: durationMinutes, modalities_json: JSON.stringify(inputModalities), price_amount: priceAmount, price_currency: priceCurrency, active: 1, ...siteStamp(scope) })),
     createProvider: ({ name, scope }) => map(insert("booking_providers", { name, active: 1, ...siteStamp(scope) })),
     associate(providerId, serviceId, scope) {
@@ -87,16 +102,29 @@ export function createBookingRepository(db, { audit = createSensitiveAccessAudit
       if (!selectedService || !owns("booking_providers", providerId, scope) || !db.prepare("SELECT 1 FROM booking_provider_services WHERE workspace_id=? AND provider_id=? AND service_id=?").get(ws(), providerId, serviceId)) return null;
       return map(insert("booking_appointments", { service_id: serviceId, provider_id: providerId, customer_name: customerName, starts_at: startsAt, status: "PENDING", ...(selectedService.site_project_id ? { site_project_id: selectedService.site_project_id } : {}) }));
     },
-    listCustomerServices: (scope) => { const c = inScope(scope); return db.prepare(`SELECT * FROM booking_services WHERE workspace_id=? AND active=1 AND ${c.sql} ORDER BY created_at DESC`).all(ws(), ...c.params).map(presentService); },
-    listEligibleProviders: (serviceId, scope) => { if (!service(serviceId, scope)?.active) return []; const c = inScope(scope, "p.site_project_id"); return db.prepare(`SELECT p.* FROM booking_providers p JOIN booking_provider_services ps ON ps.provider_id=p.id AND ps.workspace_id=p.workspace_id WHERE p.workspace_id=? AND p.active=1 AND ps.service_id=? AND ${c.sql} ORDER BY p.created_at DESC`).all(ws(), serviceId, ...c.params).map(presentProvider); },
+    listCustomerServices: (scope) => { const c = inScope(scope); return db.prepare(`SELECT * FROM booking_services WHERE workspace_id=? AND active=1 AND ${c.sql} ORDER BY created_at DESC`).all(ws(), ...c.params).filter((row) => bookableWith(row, null)).map(presentService); },
+    listEligibleProviders: (serviceId, scope) => { const selected = service(serviceId, scope); if (!selected?.active) return []; const c = inScope(scope, "p.site_project_id"); return db.prepare(`SELECT p.*, ps.modalities_json AS link_modalities FROM booking_providers p JOIN booking_provider_services ps ON ps.provider_id=p.id AND ps.workspace_id=p.workspace_id WHERE p.workspace_id=? AND p.active=1 AND ps.service_id=? AND ${c.sql} ORDER BY p.created_at DESC, p.rowid DESC`).all(ws(), serviceId, ...c.params).filter((row) => bookableWith(selected, { modalities_json: row.link_modalities })).map(presentProvider); },
     listCustomerSlots: ({ serviceId, providerId, date, scope }) => { if (!dateOnly(date) || !provider(providerId, scope)) return []; const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay(); return db.prepare("SELECT starts_at FROM booking_availability WHERE workspace_id=? AND provider_id=? AND weekday=? ORDER BY starts_at ASC").all(ws(), providerId, weekday).map(({ starts_at }) => slotFor({ serviceId, providerId, date, startsAt: starts_at, scope })).filter(Boolean); },
     quoteCustomerBooking: ({ serviceId, providerId, date, startsAt, modality = null, scope }) => { const slot = slotFor({ serviceId, providerId, date, startsAt, scope }); if (!slot || (modality && !slot.modalityOptions.includes(modality))) return null; return { slot, service: presentService(anyService(serviceId)), provider: presentProvider(anyProvider(providerId)), modality }; },
     // Public catalog: every bookable service with the doctors/providers that can deliver it.
     listCatalog: (scope) => {
       const c = inScope(scope), cp = inScope(scope, "p.site_project_id");
-      const services = db.prepare(`SELECT * FROM booking_services WHERE workspace_id=? AND active=1 AND ${c.sql} ORDER BY created_at ASC`).all(ws(), ...c.params).map(presentService);
-      const links = db.prepare(`SELECT ps.service_id AS serviceId, p.id AS id, p.name AS name FROM booking_provider_services ps JOIN booking_providers p ON p.id=ps.provider_id AND p.workspace_id=ps.workspace_id WHERE ps.workspace_id=? AND p.active=1 AND ${cp.sql} ORDER BY p.created_at ASC`).all(ws(), ...cp.params);
-      return services.map((entry) => ({ ...entry, providers: links.filter((link) => link.serviceId === entry.id).map(({ id, name }) => ({ id, name })) }));
+      const rows = db.prepare(`SELECT * FROM booking_services WHERE workspace_id=? AND active=1 AND ${c.sql} ORDER BY created_at ASC`).all(ws(), ...c.params).filter((row) => bookableWith(row, null));
+      const links = db.prepare(`SELECT ps.service_id AS serviceId, ps.modalities_json AS linkModalities, p.id AS id, p.name AS name FROM booking_provider_services ps JOIN booking_providers p ON p.id=ps.provider_id AND p.workspace_id=ps.workspace_id WHERE ps.workspace_id=? AND p.active=1 AND ${cp.sql} ORDER BY p.created_at ASC, p.rowid ASC`).all(ws(), ...cp.params);
+      return rows.map((row) => ({ ...presentService(row), providers: links.filter((link) => link.serviceId === row.id && bookableWith(row, { modalities_json: link.linkModalities })).map((link) => ({ id: link.id, name: link.name, modalities: effectiveModes(row, { modalities_json: link.linkModalities }) })) }));
+    },
+    // Restrict (never extend) the care modes one provider offers for one service.
+    // `null` clears the restriction; the service always decides which modes exist.
+    setProviderServiceModalities({ providerId, serviceId, modalities: next, scope }) {
+      const selectedService = service(serviceId, scope);
+      if (!selectedService || !provider(providerId, scope)) return null;
+      if (next !== null) {
+        if (!Array.isArray(next) || next.some((mode) => !CARE_MODES.includes(mode))) throw new BookingError("BOOKING_MODALITY_INVALID", 400, "Unsupported care mode.");
+        const offered = modalities(selectedService.modalities_json);
+        if (next.some((mode) => !offered.includes(mode))) throw new BookingError("BOOKING_MODALITY_NOT_OFFERED", 409, "A provider cannot offer a mode the service does not.");
+      }
+      const changed = db.prepare("UPDATE booking_provider_services SET modalities_json=? WHERE workspace_id=? AND provider_id=? AND service_id=?").run(next === null ? null : JSON.stringify([...new Set(next)]), ws(), providerId, serviceId).changes;
+      return changed === 1 ? { providerId, serviceId, modalities: next === null ? null : [...new Set(next)] } : null;
     },
     createCustomerAppointment: claim,
     transitionAppointment: transition,

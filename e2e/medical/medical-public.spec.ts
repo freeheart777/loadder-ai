@@ -31,6 +31,8 @@ test.beforeAll(async () => {
   providerB = (await post("/api/booking/providers", { name: "دکتر آزمون ب" })).provider.id;
   await post(`/api/booking/providers/${providerA}/services/${serviceA}`, {});
   await post(`/api/booking/providers/${providerB}/services/${serviceB}`, {});
+  // Dr. A offers only video for this service, although the service also allows in-person.
+  await ok(await api.put(`/api/booking/providers/${providerA}/services/${serviceA}/modalities`, { data: { siteProjectId: siteId, modalities: ["VIDEO"] } }));
   await post("/api/booking/availability", { providerId: providerA, weekday, startsAt: "10:00", endsAt: "11:00", capacity: 3 });
 
   // The NAVA starter, with its sample cards linked to the real Booking records.
@@ -98,7 +100,8 @@ test("complete anonymous Medical booking from a service CTA, site-scoped, withou
   await page.getByRole("button", { name: "دکتر آزمون الف" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await expect(page.getByRole("heading", { name: "نوع کلاس" })).toBeVisible();
   await expect(page.getByRole("button", { name: "ویدئویی" })).toBeVisible();
-  await page.getByRole("button", { name: "حضوری" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
+  await expect(page.getByRole("button", { name: "حضوری" }), "this doctor does not offer in-person").toHaveCount(0);
+  await page.getByRole("button", { name: "ویدئویی" }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("تاریخ").fill(date);
   await page.getByRole("button", { name: /^10:00/ }).click(); await page.getByRole("button", { name: "ادامه" }).click();
   await page.getByLabel("نام هنرجو").fill("بیمار آزمون"); await page.getByLabel("شماره تماس").fill("09120000000");
@@ -111,6 +114,7 @@ test("complete anonymous Medical booking from a service CTA, site-scoped, withou
   expect(confirmation.confirmation.customer.contact, "a Medical confirmation never returns the patient's phone").toBeNull();
   const scoped = (await ok(await api.get(`/api/booking?siteProjectId=${siteId}`))).appointments as Array<{ booking_reference: string; site_project_id: string }>;
   expect(scoped.find((a) => a.booking_reference === reference)?.site_project_id).toBe(siteId);
+  expect((scoped.find((a) => a.booking_reference === reference) as { modality?: string }).modality).toBe("VIDEO");
   const legacy = (await ok(await api.get("/api/booking"))).appointments as unknown[];
   expect(legacy, "the legacy operator view never sees Medical appointments").toHaveLength(0);
   await context.close();
@@ -125,6 +129,8 @@ test("doctors: profile shows only their services; CTA preselects doctor and thei
   const services = page.locator('[data-booking-facts="services"]');
   await expect(services.getByRole("link", { name: "خدمت نمونه یک" })).toBeVisible();
   await expect(services.getByText("خدمت نمونه دو")).toHaveCount(0);
+  await expect(services).toContainText("ویدئویی");
+  await expect(services, "the doctor's own modes, not the whole service's").not.toContainText("حضوری");
   await noOverflow(page);
   await page.screenshot({ path: "test-results/medical-doctor-profile-390.png", fullPage: true });
   await page.locator("[data-booking-cta]").click();

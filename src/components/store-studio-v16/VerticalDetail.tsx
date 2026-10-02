@@ -3,7 +3,7 @@ import { hasDetailPage } from "./detailRegistry";
 import { normalizeSlug } from "./pages";
 import type { PageConfig, SectionConfig, SectionItem } from "./types";
 
-export type CatalogService = { id: string; name: string; durationMinutes: number; modalities: string[]; price: { amount: number; currency: string | null } | null; providers: { id: string; name: string }[] };
+export type CatalogService = { id: string; name: string; durationMinutes: number; modalities: string[]; price: { amount: number; currency: string | null } | null; providers: { id: string; name: string; modalities?: string[] }[] };
 
 const MODE_LABELS: Record<string, string> = { IN_PERSON: "حضوری", VIDEO: "ویدئویی", AUDIO: "صوتی", TEXT: "متنی", ONLINE: "آنلاین" };
 const modeLabel = (mode: string) => MODE_LABELS[mode] || mode;
@@ -37,7 +37,7 @@ export default function VerticalDetail({ siteProjectId, siteType, page, pages, s
   const offered = item.bookingProviderId ? (catalog || []).filter((entry) => entry.providers.some((provider) => provider.id === item.bookingProviderId)) : [];
   const query = [item.bookingServiceId && `service=${encodeURIComponent(item.bookingServiceId)}`, item.bookingProviderId && `provider=${encodeURIComponent(item.bookingProviderId)}`].filter(Boolean).join("&");
   const rows: [string, string][] = service ? [["مدت", `${fa(service.durationMinutes)} دقیقه`], ...(service.modalities.length ? [["شیوه‌های مراجعه", service.modalities.map(modeLabel).join("، ")] as [string, string]] : []), ...(service.price ? [["هزینه", `${fa(service.price.amount)} ${service.price.currency || ""}`.trim()] as [string, string]] : [])] : [];
-  const modes = [...new Set(offered.flatMap((entry) => entry.modalities))];
+  const modes = [...new Set(offered.flatMap((entry) => entry.providers.find((provider) => provider.id === item.bookingProviderId)?.modalities ?? entry.modalities))];
   return <main dir="rtl" data-detail-page="true" data-vertical="medical" className="min-h-screen px-4 py-8 sm:p-12" style={{ background: colors.background, color: colors.text }}>
     <article className="mx-auto max-w-3xl">
       <Link to={`${base}/${page.slug}`} className="text-sm font-bold" style={{ color: colors.primary }}>بازگشت به {page.title}</Link>

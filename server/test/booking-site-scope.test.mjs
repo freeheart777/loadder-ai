@@ -11,6 +11,7 @@ import { createBookingRouter } from "../app/routes/booking.mjs";
 import { LEGACY_BOOKING_SCOPE, bookingScopeForSite } from "../app/services/booking-scope.mjs";
 import { createSensitiveAccessAudit, sanitizeAuditMetadata } from "../app/services/sensitive-access-audit.mjs";
 import { migration099BookingSiteScope } from "../db/migrations/099_booking_site_scope.mjs";
+import { migration101BookingProviderServiceModalities } from "../db/migrations/101_booking_provider_service_modalities.mjs";
 
 const future = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
 const weekday = new Date(`${future}T00:00:00.000Z`).getUTCDay();
@@ -43,6 +44,7 @@ test("migration 099 keeps legacy rows valid and unscoped", () => {
   db.prepare("INSERT INTO booking_provider_services(workspace_id,provider_id,service_id,created_at) VALUES('ws-1','p','s',?)").run(at);
   db.prepare("INSERT INTO booking_appointments(id,workspace_id,service_id,provider_id,customer_name,starts_at,status,created_at,updated_at) VALUES('a','ws-1','s','p','x','2026-01-02T10:00:00.000Z','CONFIRMED',?,?)").run(at, at);
   migration099BookingSiteScope.up(db);
+  migration101BookingProviderServiceModalities.up(db);
   for (const table of ["booking_services", "booking_providers", "booking_appointments"]) assert.equal(db.prepare(`SELECT site_project_id FROM ${table}`).get().site_project_id, null, table);
   const repo = createBookingRepository(db);
   runWithWorkspace("ws-1", () => { assert.equal(repo.listAppointments().length, 1); assert.equal(repo.listServices().length, 1); assert.equal(repo.listAssociations().length, 1); });

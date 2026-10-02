@@ -167,7 +167,7 @@ function bookingFactsHtml(detail, { catalog, pages, basePath, siteType }) {
   if (providerId) {
     const offered = catalog.filter((entry) => entry.providers.some((provider) => provider.id === providerId));
     if (!offered.length) return "";
-    const modes = [...new Set(offered.flatMap((entry) => entry.modalities || []))];
+    const modes = [...new Set(offered.flatMap((entry) => entry.providers.find((provider) => provider.id === providerId)?.modalities ?? entry.modalities ?? []))];
     return `${modes.length ? `<dl class="facts"><div><dt>شیوه‌های مراجعه</dt><dd>${escape(modes.map(modeLabel).join("، "))}</dd></div></dl>` : ""}<h2 class="sub">خدمات این پزشک</h2><ul class="related">${offered.map((entry) => `<li>${linkTo(cardFor("bookingServiceId", entry.id), entry.name)}</li>`).join("")}</ul>`;
   }
   return "";
