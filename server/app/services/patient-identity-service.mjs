@@ -63,7 +63,17 @@ export function createPatientIdentityService({
   }
   const status = (siteProjectId) => { const binding = bindingFor(siteProjectId); return { enabled: Boolean(binding), authProjectId: binding?.authProjectId || null }; };
 
-  async function requestOtp({ siteProjectId, mobile: rawMobile }) {
+  // The active doctor identity for a mobile on this site, if any (never created by sign-in).
+  function doctorFor(binding, siteProjectId, mobile) {
+    const workspaceId = requireWorkspaceId();
+    return db.prepare(`SELECT i.id AS identifierId, u.id AS userId, u.status AS userStatus, l.provider_id AS providerId
+      FROM app_user_identifiers i
+      JOIN business_builder_app_users u ON u.id=i.app_user_id AND u.workspace_id=i.workspace_id AND u.role='employee'
+      JOIN booking_provider_identities l ON l.app_user_id=u.id AND l.workspace_id=i.workspace_id AND l.site_project_id=? AND l.status='active'
+      WHERE i.workspace_id=? AND i.project_id=? AND i.kind='mobile' AND i.value_normalized=? AND i.status='active'`).get(siteProjectId, workspaceId, binding.authProjectId, mobile) || null;
+  }
+
+  async function requestOtp({ siteProjectId, mobile: rawMobile, audience = "patient" }) {
     const binding = requireBinding(siteProjectId), workspaceId = requireWorkspaceId();
     if (!deliveryConfigured()) {
       audit.record({ siteProjectId, actor: { kind: "system" }, action: "patient.otp.delivery_unavailable", resourceType: "patient_identity", metadata: {} });
@@ -71,6 +81,11 @@ export function createPatientIdentityService({
     }
     const mobile = normalizeMobile(rawMobile);
     if (!mobile) throw new PatientIdentityError("PATIENT_MOBILE_INVALID", 400, "Enter a valid mobile number.");
+    // Doctors are never self-created: for an unknown mobile nothing is sent, yet the answer
+    // is identical, so neither enumeration nor SMS pumping is possible through this door.
+    if (audience === "doctor" && !doctorFor(binding, siteProjectId, mobile)) {
+      return { expiresAt: iso(new Date(now().getTime() + otpTtlMs)), resendAfterSeconds: Math.ceil(resendCooldownMs / 1000) };
+    }
     const at = now(), since = iso(new Date(at.getTime() - windowMs));
     const recent = db.prepare("SELECT created_at FROM app_user_otp_challenges WHERE workspace_id=? AND project_id=? AND kind='mobile' AND value_normalized=? AND created_at>=? ORDER BY created_at DESC").all(workspaceId, binding.authProjectId, mobile, since);
     const last = recent[0] ? Date.parse(recent[0].created_at) : 0;
@@ -91,7 +106,7 @@ export function createPatientIdentityService({
     return { expiresAt, resendAfterSeconds: Math.ceil(resendCooldownMs / 1000), ...(exposeDevelopmentCode ? { developmentOtp: code } : {}) };
   }
 
-  function verifyOtp({ siteProjectId, mobile: rawMobile, code: rawCode, name }) {
+  function verifyOtp({ siteProjectId, mobile: rawMobile, code: rawCode, name, audience = "patient" }) {
     const binding = requireBinding(siteProjectId), workspaceId = requireWorkspaceId();
     const invalid = (reason) => {
       audit.record({ siteProjectId, actor: { kind: "system" }, action: "patient.otp.verify_failed", resourceType: "patient_identity", metadata: { reason } });
@@ -115,6 +130,14 @@ export function createPatientIdentityService({
     return db.transaction(() => {
       const identifier = db.prepare("SELECT * FROM app_user_identifiers WHERE workspace_id=? AND project_id=? AND kind='mobile' AND value_normalized=?").get(workspaceId, binding.authProjectId, mobile);
       let userId, created = false;
+      if (audience === "doctor") {
+        const doctor = doctorFor(binding, siteProjectId, mobile);
+        if (!doctor || doctor.userStatus !== "active") throw invalid("unavailable");
+        db.prepare("UPDATE app_user_identifiers SET verified_at=COALESCE(verified_at,?),updated_at=? WHERE id=?").run(iso(at), iso(at), doctor.identifierId);
+        const session = auth.createSession(doctor.userId, { ttlMs: sessionTtlMs });
+        audit.record({ siteProjectId, actor: { kind: "app_user", id: doctor.userId }, action: "doctor.signed_in", resourceType: "doctor_identity", resourceId: doctor.userId, metadata: { mobile: maskMobile(mobile) } });
+        return { session: { token: session.token, expiresAt: session.expiresAt }, authProjectId: binding.authProjectId, doctor: { id: doctor.userId, providerId: doctor.providerId, displayName: session.user.displayName || null } };
+      }
       if (identifier) {
         const user = auth.getUser(identifier.app_user_id);
         if (!user || user.status !== "active" || user.role !== "customer" || identifier.status !== "active") throw invalid("unavailable");
@@ -137,15 +160,68 @@ export function createPatientIdentityService({
     return principal && principal.role === "customer" ? { ...principal, authProjectId: binding.authProjectId } : null;
   }
 
+  function resolveDoctor(siteProjectId, token) {
+    const binding = bindingFor(siteProjectId);
+    if (!binding || !token) return null;
+    const principal = auth.resolve(token, binding.authProjectId);
+    if (!principal || principal.role !== "employee") return null;
+    const link = db.prepare("SELECT provider_id FROM booking_provider_identities WHERE workspace_id=? AND site_project_id=? AND app_user_id=? AND status='active'").get(requireWorkspaceId(), siteProjectId, principal.id);
+    return link ? { ...principal, authProjectId: binding.authProjectId, providerId: link.provider_id, siteProjectId } : null;
+  }
+
+  // Operator action: give a site-scoped provider (a doctor) a sign-in identity.
+  function linkDoctor({ siteProjectId, providerId, mobile: rawMobile, displayName, actorUserId = null }) {
+    const binding = bindingFor(siteProjectId), workspaceId = requireWorkspaceId();
+    if (!binding) throw new PatientIdentityError("IDENTITY_NOT_ENABLED", 409, "Enable patient identity for this site first.");
+    const provider = db.prepare("SELECT id,name FROM booking_providers WHERE id=? AND workspace_id=? AND site_project_id=?").get(providerId, workspaceId, siteProjectId);
+    if (!provider) throw new PatientIdentityError("DOCTOR_PROVIDER_NOT_FOUND", 404, "Provider not found for this site.");
+    const mobile = normalizeMobile(rawMobile);
+    if (!mobile) throw new PatientIdentityError("PATIENT_MOBILE_INVALID", 400, "Enter a valid mobile number.");
+    if (db.prepare("SELECT 1 FROM booking_provider_identities WHERE provider_id=?").get(providerId)) throw new PatientIdentityError("DOCTOR_IDENTITY_EXISTS", 409, "This provider already has an identity.");
+    if (db.prepare("SELECT 1 FROM app_user_identifiers WHERE workspace_id=? AND project_id=? AND kind='mobile' AND value_normalized=?").get(workspaceId, binding.authProjectId, mobile)) throw new PatientIdentityError("IDENTIFIER_IN_USE", 409, "This mobile already belongs to an account.");
+    return db.transaction(() => {
+      const at = iso(), user = auth.createUser({ projectId: binding.authProjectId, email: `doctor-${crypto.randomUUID()}@staff.invalid`, displayName: cleanName(displayName) || provider.name, role: "employee" });
+      db.prepare("INSERT INTO app_user_identifiers(id,workspace_id,project_id,app_user_id,kind,value_normalized,is_primary,verified_at,status,created_at,updated_at) VALUES(?,?,?,?,'mobile',?,1,NULL,'active',?,?)").run(crypto.randomUUID(), workspaceId, binding.authProjectId, user.id, mobile, at, at);
+      const linkId = crypto.randomUUID();
+      db.prepare("INSERT INTO booking_provider_identities(id,workspace_id,site_project_id,provider_id,auth_project_id,app_user_id,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,'active',?,?,?)").run(linkId, workspaceId, siteProjectId, providerId, binding.authProjectId, user.id, actorUserId, at, at);
+      audit.record({ siteProjectId, actor: actorUserId ? { kind: "operator", id: actorUserId } : { kind: "system" }, action: "doctor.identity.linked", resourceType: "booking_provider", resourceId: providerId, metadata: { mobile: maskMobile(mobile) } });
+      return { id: linkId, providerId, status: "active", mobile: maskMobile(mobile) };
+    })();
+  }
+
+  function unlinkDoctor({ siteProjectId, providerId, actorUserId = null }) {
+    const workspaceId = requireWorkspaceId();
+    const link = db.prepare("SELECT * FROM booking_provider_identities WHERE workspace_id=? AND site_project_id=? AND provider_id=?").get(workspaceId, siteProjectId, providerId);
+    if (!link) throw new PatientIdentityError("DOCTOR_IDENTITY_NOT_FOUND", 404, "Doctor identity not found.");
+    db.transaction(() => {
+      db.prepare("UPDATE booking_provider_identities SET status='disabled',updated_at=? WHERE id=?").run(iso(), link.id);
+      db.prepare("UPDATE app_user_identifiers SET status='disabled',updated_at=? WHERE workspace_id=? AND app_user_id=?").run(iso(), workspaceId, link.app_user_id);
+      auth.setStatus(link.app_user_id, "disabled");
+      audit.record({ siteProjectId, actor: actorUserId ? { kind: "operator", id: actorUserId } : { kind: "system" }, action: "doctor.identity.unlinked", resourceType: "booking_provider", resourceId: providerId, metadata: {} });
+    })();
+    return { providerId, status: "disabled" };
+  }
+
+  function listDoctors(siteProjectId) {
+    return db.prepare(`SELECT l.id,l.provider_id AS providerId,l.status,p.name AS providerName,i.value_normalized AS mobile
+      FROM booking_provider_identities l JOIN booking_providers p ON p.id=l.provider_id AND p.workspace_id=l.workspace_id
+      LEFT JOIN app_user_identifiers i ON i.app_user_id=l.app_user_id AND i.kind='mobile'
+      WHERE l.workspace_id=? AND l.site_project_id=? ORDER BY l.created_at ASC`).all(requireWorkspaceId(), siteProjectId).map((row) => ({ ...row, mobile: row.mobile ? maskMobile(row.mobile) : null }));
+  }
+
   function signOut({ siteProjectId, token }) {
     const binding = bindingFor(siteProjectId);
     if (!binding || !token) return false;
     const principal = auth.resolve(token, binding.authProjectId);
     if (!principal) return false;
     db.prepare("UPDATE business_builder_app_sessions SET revoked_at=? WHERE workspace_id=? AND project_id=? AND token_hash=? AND revoked_at IS NULL").run(iso(), requireWorkspaceId(), binding.authProjectId, sha256(token));
-    audit.record({ siteProjectId, actor: { kind: "app_user", id: principal.id }, action: "patient.signed_out", resourceType: "patient_identity", resourceId: principal.id, metadata: {} });
+    audit.record({ siteProjectId, actor: { kind: "app_user", id: principal.id }, action: principal.role === "employee" ? "doctor.signed_out" : "patient.signed_out", resourceType: principal.role === "employee" ? "doctor_identity" : "patient_identity", resourceId: principal.id, metadata: {} });
     return true;
   }
 
-  return Object.freeze({ enableForSite, status, requestOtp, verifyOtp, resolve, signOut });
+  // Evidence for a sensitive read/change made by a signed-in doctor or patient.
+  const recordAccess = ({ siteProjectId, principal, action, resourceType, resourceId = null, metadata = {} }) =>
+    audit.record({ siteProjectId, actor: { kind: "app_user", id: principal.id }, action, resourceType, resourceId, metadata });
+
+  return Object.freeze({ recordAccess, enableForSite, status, requestOtp, verifyOtp, resolve, resolveDoctor, linkDoctor, unlinkDoctor, listDoctors, signOut });
 }

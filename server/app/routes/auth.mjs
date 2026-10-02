@@ -12,7 +12,7 @@ import { createSiteLeadService } from "../services/site-lead-service.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
 import { createPublicBusinessAppRouter } from "../business-builder/public-app-router.mjs";
 import { publishedSiteHeaders } from "../services/public-site-headers.mjs";
-import { createPatientIdentityRouter } from "./patient-identity.mjs";
+import { createDoctorPortalRouter, createPatientIdentityRouter } from "./patient-identity.mjs";
 import { createPatientIdentityService } from "../services/patient-identity-service.mjs";
 import { otpDeliveryConfigured, smsOtpDelivery } from "../services/patient-otp-delivery.mjs";
 import { environment } from "../config/environment.mjs";
@@ -97,6 +97,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   const bookingText=(value,max=200)=>typeof value==="string"&&value.trim()&&value.trim().length<=max?value.trim():null;
   const patientIdentityService=createPatientIdentityService({db,hashSecret:environment.authHashSecret,deliver:smsOtpDelivery,deliveryConfigured:()=>otpDeliveryConfigured({nodeEnv}),exposeDevelopmentCode:nodeEnv!=="production"&&exposeDevelopmentOtp});
   router.use(createPatientIdentityRouter({service:patientIdentityService,siteLookup:publicSite,bookingRepository}));
+  router.use(createDoctorPortalRouter({service:patientIdentityService,siteLookup:publicSite,bookingRepository}));
   router.get("/site/:siteProjectId/booking/catalog",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,services:runWithWorkspace(site.workspaceId,()=>bookingRepository.listCatalog(bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});
   router.get("/site/:siteProjectId/booking/services",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,services:runWithWorkspace(site.workspaceId,()=>bookingRepository.listCustomerServices(bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});
   router.get("/site/:siteProjectId/booking/services/:serviceId/providers",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,providers:runWithWorkspace(site.workspaceId,()=>bookingRepository.listEligibleProviders(req.params.serviceId,bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});

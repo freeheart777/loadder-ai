@@ -18,6 +18,7 @@ const ExperienceShell = import.meta.env.DEV
 const StoreWebsiteStudioPageV16 = lazy(() => import("./pages/StoreWebsiteStudioPageV16"));
 const WebsiteProjectsPage = lazy(() => import("./pages/WebsiteProjectsPage"));
 const PublicBookingPage = lazy(() => import("./pages/PublicBookingPage"));
+const DoctorPortalPage = lazy(() => import("./pages/DoctorPortalPage"));
 const PatientPortalPage = lazy(() => import("./pages/PatientPortalPage"));
 const PatientSignInPage = lazy(() => import("./pages/PatientSignInPage"));
 const EducationPortalPage = lazy(() => import("./pages/EducationPortalPage"));
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="/site/:siteProjectId" element={<PublicCorporateSitePage />} />
             <Route path="/site/:siteProjectId/booking" element={<PublicBookingPage />} />
             <Route path="/site/:siteProjectId/patient" element={<PatientSignInPage />} />
+            <Route path="/site/:siteProjectId/doctor" element={<DoctorPortalPage />} />
             <Route path="/site/:siteProjectId/patient/portal" element={<PatientPortalPage />} />
             <Route path="/site/:siteProjectId/:slug/:detail" element={<PublicCorporateSitePage />} />
             <Route path="/site/:siteProjectId/:slug" element={<PublicCorporateSitePage />} />

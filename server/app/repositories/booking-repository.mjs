@@ -74,9 +74,9 @@ export function createBookingRepository(db, { audit = createSensitiveAccessAudit
     const appointment = map(insert("booking_appointments", { service_id: serviceId, provider_id: providerId, customer_name: customerName, customer_contact: customerContact, starts_at: slot.startsAt, modality, booking_reference: reference, status: "PENDING", ...(slot.siteProjectId ? { site_project_id: slot.siteProjectId } : {}), ...(identity ? { app_user_id: identity.appUserId, auth_project_id: identity.authProjectId } : {}) }));
     return { appointment, confirmation: confirmation(appointment, scope) };
   });
-  const transition = db.transaction(({ id, to, reason = null, actor, scope = LEGACY_BOOKING_SCOPE }) => {
+  const transition = db.transaction(({ id, to, reason = null, actor, scope = LEGACY_BOOKING_SCOPE, providerId = null }) => {
     const row = scoped("booking_appointments", id, scope);
-    if (!row) throw new BookingError("BOOKING_APPOINTMENT_NOT_FOUND", 404, "Appointment not found.");
+    if (!row || (providerId && row.provider_id !== providerId)) throw new BookingError("BOOKING_APPOINTMENT_NOT_FOUND", 404, "Appointment not found.");
     if (!(APPOINTMENT_TRANSITIONS[row.status] || []).includes(to)) throw new BookingError("BOOKING_STATUS_TRANSITION_INVALID", 409, `An appointment cannot move from ${row.status} to ${to}.`);
     if (to === "COMPLETED" && Date.parse(row.starts_at) > clock().getTime()) throw new BookingError("BOOKING_APPOINTMENT_NOT_STARTED", 409, "An appointment cannot be completed before it starts.");
     const changed = db.prepare("UPDATE booking_appointments SET status=?,updated_at=? WHERE id=? AND workspace_id=? AND status=?").run(to, now(), id, ws(), row.status).changes;
@@ -125,6 +125,19 @@ export function createBookingRepository(db, { audit = createSensitiveAccessAudit
       }
       const changed = db.prepare("UPDATE booking_provider_services SET modalities_json=? WHERE workspace_id=? AND provider_id=? AND service_id=?").run(next === null ? null : JSON.stringify([...new Set(next)]), ws(), providerId, serviceId).changes;
       return changed === 1 ? { providerId, serviceId, modalities: next === null ? null : [...new Set(next)] } : null;
+    },
+    // Doctor-facing reads: only this provider's own appointments, with the patient
+    // identity the doctor needs for them (and nothing for anyone else's).
+    listAppointmentsForProvider: ({ providerId, scope }) => { const c = inScope(scope); return db.prepare(`SELECT * FROM booking_appointments WHERE workspace_id=? AND provider_id=? AND ${c.sql} ORDER BY starts_at ASC`).all(ws(), providerId, ...c.params).map((row) => ({
+      id: row.id, reference: row.booking_reference || null, status: row.status, startsAt: row.starts_at, modality: row.modality || null,
+      patient: { name: row.customer_name, contact: row.customer_contact || null, linked: Boolean(row.app_user_id) },
+      service: anyService(row.service_id) ? { name: anyService(row.service_id).name, durationMinutes: anyService(row.service_id).duration_minutes } : null,
+    })); },
+    listAvailabilityForProvider: ({ providerId, scope }) => { if (!provider(providerId, scope)) return []; return db.prepare("SELECT id,weekday,starts_at AS startsAt,ends_at AS endsAt,capacity,status FROM booking_availability WHERE workspace_id=? AND provider_id=? ORDER BY weekday ASC, starts_at ASC").all(ws(), providerId); },
+    setAvailabilityStatus({ id, providerId, status, scope }) {
+      if (!["ACTIVE", "CANCELLED"].includes(status) || !provider(providerId, scope)) return null;
+      const changed = db.prepare("UPDATE booking_availability SET status=? WHERE id=? AND workspace_id=? AND provider_id=?").run(status, id, ws(), providerId).changes;
+      return changed === 1 ? db.prepare("SELECT id,weekday,starts_at AS startsAt,ends_at AS endsAt,capacity,status FROM booking_availability WHERE id=? AND workspace_id=?").get(id, ws()) : null;
     },
     createCustomerAppointment: claim,
     transitionAppointment: transition,

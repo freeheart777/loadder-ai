@@ -229,3 +229,54 @@ test("patient signs in with mobile + OTP, books with that identity, and signs ou
   expect(stored).toHaveLength(0);
   await context.close();
 });
+
+test("doctor portal: own appointments and schedule only, confirm, availability, other doctor sees nothing", async ({ browser }) => {
+  const doctors = [["09127770001", providerA], ["09127770002", providerB]] as const;
+  for (const [mobile, providerId] of doctors) await ok(await api.post(`/api/site-projects/${siteId}/doctor-identities`, { data: { providerId, mobile, displayName: providerId === providerA ? "دکتر آزمون الف" : "دکتر آزمون ب" } }));
+  const signIn = async (mobile: string) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } }), page = await context.newPage();
+    await page.goto(spa("/doctor"));
+    await page.getByLabel("شمارهٔ موبایل پزشک").fill(mobile);
+    await page.getByRole("button", { name: "ارسال کد" }).click();
+    await page.getByLabel("کد تأیید پزشک").fill((await page.locator("[data-dev-otp] bdi").innerText()).trim());
+    await page.getByRole("button", { name: "تأیید و ورود" }).click();
+    await expect(page.getByRole("button", { name: "خروج" })).toBeVisible();
+    return { context, page };
+  };
+  // An unknown number is told nothing different and gets no account.
+  const stranger = await browser.newContext(), strangerPage = await stranger.newPage();
+  await strangerPage.goto(spa("/doctor"));
+  await strangerPage.getByLabel("شمارهٔ موبایل پزشک").fill("09120001111");
+  await strangerPage.getByRole("button", { name: "ارسال کد" }).click();
+  await expect(strangerPage.locator("[data-dev-otp]")).toHaveCount(0);
+  await strangerPage.getByLabel("کد تأیید پزشک").fill("123456");
+  await strangerPage.getByRole("button", { name: "تأیید و ورود" }).click();
+  await expect(strangerPage.getByRole("alert")).toContainText("کد معتبر نیست");
+  await stranger.close();
+
+  const a = await signIn("09127770001");
+  await expect(a.page.locator('[data-appointment="upcoming"]').first()).toContainText("بیمار آزمون");
+  const count = await a.page.locator('[data-appointment="upcoming"]').count();
+  expect(count).toBeGreaterThanOrEqual(2);
+  await expect(a.page.locator("main")).not.toContainText("دکتر آزمون ب");
+  await noOverflow(a.page);
+  await a.page.screenshot({ path: "test-results/medical-doctor-portal-390.png", fullPage: true });
+  await a.page.getByRole("button", { name: "تأیید نوبت" }).first().click();
+  await expect(a.page.locator('[data-appointment="upcoming"]').filter({ hasText: "تأییدشده" })).toHaveCount(1);
+  // own availability: add and cancel
+  await a.page.getByLabel("روز هفته").selectOption("3");
+  await a.page.getByRole("button", { name: "افزودن زمان" }).click();
+  const added = a.page.locator("[data-slot]").filter({ hasText: "چهارشنبه" });
+  await expect(added).toHaveCount(1);
+  await added.getByRole("button", { name: "لغو" }).click();
+  await expect(a.page.locator('[data-slot="CANCELLED"]')).toHaveCount(1);
+  const confirmed = ((await ok(await api.get(`/api/booking?siteProjectId=${siteId}`))).appointments as Array<{ provider_id: string; status: string }>).filter((x) => x.provider_id === providerA && x.status === "CONFIRMED");
+  expect(confirmed, "the operator sees the doctor's confirmation on the same canonical record").toHaveLength(1);
+  await a.context.close();
+
+  const b = await signIn("09127770002");
+  await expect(b.page.locator("[data-doctor-empty]")).toBeVisible();
+  await expect(b.page.locator("[data-appointment]")).toHaveCount(0);
+  await expect(b.page.locator("main")).not.toContainText("بیمار آزمون");
+  await b.context.close();
+});
