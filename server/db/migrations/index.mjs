@@ -21,6 +21,7 @@ import { migration101BookingProviderServiceModalities } from "./101_booking_prov
 import { migration102PatientIdentity } from "./102_patient_identity.mjs";
 import { migration103BookingProviderIdentity } from "./103_booking_provider_identity.mjs";
 import { migration104MedicalDocuments } from "./104_medical_documents.mjs";
+import { migration105Consultations } from "./105_consultations.mjs";
 import { migration002TenantDomainData } from "./002_tenant_domain_data.mjs";
 import { migration003TenantRelationshipGuards } from "./003_tenant_relationship_guards.mjs";
 import { migration004WorkspaceManagementAudit } from "./004_workspace_management_audit.mjs";
@@ -206,4 +207,5 @@ export const migrations = [
   migration102PatientIdentity,
   migration103BookingProviderIdentity,
   migration104MedicalDocuments,
+  migration105Consultations,
 ];

@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import AppointmentDocuments from "../components/medical/AppointmentDocuments";
+import ConsultationPanel from "../components/medical/ConsultationPanel";
 
 type Session = { token: string; expiresAt: string; displayName: string | null };
 type Appointment = { id: string; reference: string | null; status: string; startsAt: string; modality: string | null; patient: { name: string; contact: string | null; linked: boolean }; service: { name: string; durationMinutes: number } | null };
@@ -89,6 +90,7 @@ export default function DoctorPortalPage() {
         <section className="mt-8"><h2 className="text-sm font-black text-[#a98242]">نوبت‌های پیش‌رو</h2>
           {!data.upcoming.length && <p data-doctor-empty className="mt-2 rounded-2xl border border-dashed border-[#2b2a27]/25 p-4 text-sm">نوبت پیش‌رویی برای شما ثبت نشده است.</p>}
           <ul className="mt-2 space-y-2">{data.upcoming.map((item) => <li key={item.id} data-appointment="upcoming" className="rounded-2xl border border-[#2b2a27]/10 bg-[#fffdf8] p-4"><p className="break-words font-black">{item.patient.name}{item.patient.contact ? <bdi dir="ltr" className="mr-2 text-xs font-normal opacity-70">{item.patient.contact}</bdi> : null}</p><p className="mt-1 text-sm">{item.service?.name} · {when(item.startsAt)}</p><p className="mt-1 text-xs opacity-70">{[item.modality && (MODE[item.modality] || item.modality), STATUS[item.status] || item.status, item.reference].filter(Boolean).join(" · ")}</p>
+            {["VIDEO", "AUDIO"].includes(item.modality || "") && item.status === "CONFIRMED" && <ConsultationPanel siteProjectId={siteProjectId} appointmentId={item.id} token={session.token} mode="doctor" />}
             <AppointmentDocuments siteProjectId={siteProjectId} appointmentId={item.id} token={session.token} mode="doctor" />
             <div className="mt-3 flex gap-2">{item.status === "PENDING" && <button type="button" onClick={() => act(`/appointments/${item.id}/status`, "POST", { status: "CONFIRMED" })} className={primary}>تأیید نوبت</button>}{item.status === "CONFIRMED" && started(item) && <button type="button" onClick={() => act(`/appointments/${item.id}/status`, "POST", { status: "COMPLETED" })} className={primary}>ثبت انجام</button>}</div></li>)}</ul></section>
         {data.past.length > 0 && <section className="mt-8"><h2 className="text-sm font-black text-[#a98242]">سابقه</h2><ul className="mt-2 space-y-2">{data.past.map((item) => <li key={item.id} data-appointment="past" className="rounded-2xl border border-[#2b2a27]/10 p-4 text-sm"><b>{item.patient.name}</b> · {when(item.startsAt)} · {STATUS[item.status] || item.status}</li>)}</ul></section>}

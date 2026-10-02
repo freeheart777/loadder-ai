@@ -12,6 +12,8 @@ import { createSiteLeadService } from "../services/site-lead-service.mjs";
 import { runWithWorkspace } from "../tenant-context.mjs";
 import { createPublicBusinessAppRouter } from "../business-builder/public-app-router.mjs";
 import { publishedSiteHeaders } from "../services/public-site-headers.mjs";
+import { createConsultationRouter } from "./consultations.mjs";
+import { createConsultationService } from "../services/consultation-service.mjs";
 import { createMedicalDocumentRouter } from "./medical-documents.mjs";
 import { createMedicalDocumentService } from "../services/medical-document-service.mjs";
 import { createMedicalStorage } from "../services/medical-document-storage.mjs";
@@ -102,6 +104,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   const patientIdentityService=createPatientIdentityService({db,hashSecret:environment.authHashSecret,deliver:smsOtpDelivery,deliveryConfigured:()=>otpDeliveryConfigured({nodeEnv}),exposeDevelopmentCode:nodeEnv!=="production"&&exposeDevelopmentOtp});
   router.use(createPatientIdentityRouter({service:patientIdentityService,siteLookup:publicSite,bookingRepository}));
   router.use(createDoctorPortalRouter({service:patientIdentityService,siteLookup:publicSite,bookingRepository}));
+  router.use(createConsultationRouter({service:createConsultationService({db}),identity:patientIdentityService,siteLookup:publicSite}));
   router.use(createMedicalDocumentRouter({service:medicalDocumentService,identity:patientIdentityService,siteLookup:publicSite}));
   router.get("/site/:siteProjectId/booking/catalog",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,services:runWithWorkspace(site.workspaceId,()=>bookingRepository.listCatalog(bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});
   router.get("/site/:siteProjectId/booking/services",(req,res)=>{try{const site=publicBooking(req,res);if(!site)return;return res.json({success:true,services:runWithWorkspace(site.workspaceId,()=>bookingRepository.listCustomerServices(bookingScopeForSite(site)))})}catch(e){return storefrontError(e,res)}});

@@ -18,6 +18,8 @@ import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
 import { createSiteMediaRouter } from "./routes/site-media.mjs";
 import { createLearningEnrollmentsRouter } from "./routes/learning-enrollments.mjs";
+import { createConsultationAdminRouter } from "./routes/consultations.mjs";
+import { createConsultationService } from "./services/consultation-service.mjs";
 import { createMedicalControlCenterRouter } from "./routes/medical-control-center.mjs";
 import { createMedicalControlCenterService } from "./services/medical-control-center-service.mjs";
 import { getMessagingStatus } from "../services/messaging.mjs";
@@ -94,6 +96,7 @@ export function mountSiteBuilderControlPlane({
   const medicalStorage = createMedicalStorage({ nodeEnv: environment.nodeEnv });
   const medicalDocumentService = createMedicalDocumentService({ db, storage: medicalStorage, nodeEnv: environment.nodeEnv });
   app.use(mountPath, createMedicalDocumentAdminRouter({ service: medicalDocumentService, db }));
+  app.use(mountPath, createConsultationAdminRouter({ service: createConsultationService({ db }), db }));
   app.use(mountPath, createMedicalControlCenterRouter({
     db,
     service: createMedicalControlCenterService({ db, readiness: () => {

@@ -81,6 +81,12 @@ export function createBookingRepository(db, { audit = createSensitiveAccessAudit
     if (to === "COMPLETED" && Date.parse(row.starts_at) > clock().getTime()) throw new BookingError("BOOKING_APPOINTMENT_NOT_STARTED", 409, "An appointment cannot be completed before it starts.");
     const changed = db.prepare("UPDATE booking_appointments SET status=?,updated_at=? WHERE id=? AND workspace_id=? AND status=?").run(to, now(), id, ws(), row.status).changes;
     if (changed !== 1) throw new BookingError("BOOKING_STATUS_CONFLICT", 409, "The appointment changed; reload and retry.");
+    // Remote appointments carry a consultation record: created when the appointment is
+    // confirmed, closed when it is cancelled. The record never invents a join URL.
+    if (to === "CONFIRMED" && ["VIDEO", "AUDIO"].includes(row.modality) && row.site_project_id) {
+      db.prepare("INSERT OR IGNORE INTO consultations(id,workspace_id,site_project_id,appointment_id,provider_id,modality,state,created_at,updated_at) VALUES(?,?,?,?,?,?,'scheduled',?,?)").run(crypto.randomUUID(), ws(), row.site_project_id, row.id, row.provider_id, row.modality, now(), now());
+    }
+    if (to === "CANCELLED") db.prepare("UPDATE consultations SET state='cancelled',updated_at=? WHERE workspace_id=? AND appointment_id=? AND state IN('scheduled','in_progress')").run(now(), ws(), row.id);
     audit.record({ siteProjectId: row.site_project_id || null, actor, action: "booking.appointment.status_changed", resourceType: "booking_appointment", resourceId: id, metadata: { from: row.status, to, reason: reason ? String(reason).slice(0, 200) : null } });
     return map(db.prepare("SELECT * FROM booking_appointments WHERE id=? AND workspace_id=?").get(id, ws()));
   });

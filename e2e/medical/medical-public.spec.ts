@@ -450,3 +450,62 @@ test("Medical Control Center: real counts, every tab on canonical data, no fabri
   await page.screenshot({ path: "test-results/medical-control-center-desktop.png", fullPage: true });
   await context.close(); await anon.dispose();
 });
+
+test("online consultation contract: confirmed remote visit, doctor-entered link, patient sees it only when due, lifecycle", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const pub = `/api/auth/site/${siteId}`;
+  const soon = new Date(Date.now() + 10 * 60_000), iso = soon.toISOString(), when = iso.slice(0, 10), startsAt = iso.slice(11, 16);
+  const endsAt = startsAt >= "23:30" ? "23:59" : new Date(soon.getTime() + 30 * 60_000).toISOString().slice(11, 16);
+  await ok(await api.post("/api/booking/availability", { data: { siteProjectId: siteId, providerId: providerA, weekday: soon.getUTCDay(), startsAt, endsAt, capacity: 3 } }));
+  const anon = await request.newContext({ baseURL: apiBase });
+  const patientToken = async (mobile: string, name: string) => {
+    const otp = await ok(await anon.post(`${pub}/patient/otp`, { data: { mobile } }));
+    const signed = await ok(await anon.post(`${pub}/patient/verify`, { data: { mobile, code: otp.developmentOtp, name } }));
+    return { signed, headers: { "X-Loadder-App-Token": signed.session.token, "X-Loadder-App-Project": signed.authProjectId } };
+  };
+  const p = await patientToken("09128880003", "بیمار مشاوره");
+  const booked = await ok(await anon.post(`${pub}/booking/appointments`, { headers: p.headers, data: { serviceId: serviceA, providerId: providerA, date: when, startsAt, customerName: "بیمار مشاوره", customerContact: "09128880003", modality: "VIDEO" } }));
+  const appointmentId = booked.appointment.id as string;
+  expect((await anon.get(`${pub}/patient/appointments/${appointmentId}/consultation`, { headers: p.headers })).status(), "no consultation before confirmation").toBe(404);
+
+  const LINK = "https://meet.example.org/room/e2e-consultation";
+  const doctorContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await doctorContext.addInitScript(([id, session]) => { sessionStorage.setItem(`loadder-doctor:${id}`, JSON.stringify(session)); }, [siteId, doctorSessions["09127770001"]] as const);
+  const doctorPage = await doctorContext.newPage();
+  await doctorPage.goto(spa("/doctor"));
+  const item = doctorPage.locator('[data-appointment="upcoming"]').filter({ hasText: "بیمار مشاوره" });
+  await item.getByRole("button", { name: "تأیید نوبت" }).click();
+  const panel = doctorPage.locator('[data-appointment="upcoming"]').filter({ hasText: "بیمار مشاوره" }).locator("[data-consultation]");
+  await expect(panel).toContainText("مشاورهٔ آنلاین برنامه‌ریزی شده");
+  await panel.getByLabel("پیوند جلسه").fill("http://insecure.example/x");
+  await panel.getByRole("button", { name: "ثبت پیوند" }).click();
+  await expect(panel.getByRole("alert")).toContainText("نشانی https معتبر");
+  await panel.getByLabel("پیوند جلسه").fill(LINK);
+  await panel.getByRole("button", { name: "ثبت پیوند" }).click();
+  await expect(panel.getByRole("button", { name: "حذف پیوند" })).toBeVisible();
+  await noOverflow(doctorPage);
+  await doctorPage.screenshot({ path: "test-results/medical-consultation-doctor-390.png", fullPage: true });
+
+  // The patient sees the link, now inside the 15-minute window; another patient cannot reach the consultation.
+  const patientContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await patientContext.addInitScript(([id, session]) => { sessionStorage.setItem(`loadder-patient:${id}`, JSON.stringify(session)); }, [siteId, { token: p.signed.session.token, authProjectId: p.signed.authProjectId, expiresAt: p.signed.session.expiresAt, displayName: "بیمار مشاوره" }] as const);
+  const patientPage = await patientContext.newPage();
+  await patientPage.goto(spa("/patient/portal"));
+  const join = patientPage.locator("[data-join-link]");
+  await expect(join).toHaveAttribute("href", LINK);
+  await expect(join).toHaveAttribute("target", "_blank"); await expect(join).toHaveAttribute("rel", /noopener/);
+  await noOverflow(patientPage);
+  await patientPage.screenshot({ path: "test-results/medical-consultation-patient-390.png", fullPage: true });
+  const stranger = await patientToken("09128880004", "غریبه");
+  expect((await anon.get(`${pub}/patient/appointments/${appointmentId}/consultation`, { headers: stranger.headers })).status()).toBe(404);
+
+  // Lifecycle: start (inside the window), complete. No provider, no generated URL anywhere.
+  await panel.getByRole("button", { name: "شروع مشاوره" }).click();
+  await expect(panel).toContainText("مشاوره در جریان است");
+  await panel.getByRole("button", { name: "پایان مشاوره" }).click();
+  await expect(panel).toContainText("مشاوره انجام شد");
+  await patientPage.reload();
+  await expect(patientPage.locator("[data-join-link]")).toHaveCount(0);
+  await expect(patientPage.locator("[data-consultation]")).toContainText("مشاوره انجام شد");
+  await doctorContext.close(); await patientContext.close(); await anon.dispose();
+});
