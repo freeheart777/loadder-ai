@@ -82,12 +82,16 @@ test.afterAll(async () => { await api?.dispose().catch(() => undefined); });
 
 test("Control Center: real counts, enrol an existing customer, upload private files, revoke", async ({ browser }) => {
   const context = await operatorContext(browser), page = await context.newPage();
+  const cc = (module = "") => `/dashboard/websites/${siteId}/control${module ? `/${module}` : ""}`;
   await page.goto(`/dashboard/websites/${siteId}/education`);
+  await expect(page, "the old per-vertical address lands on the one Control Center route").toHaveURL(new RegExp(`${cc()}$`));
   await expect(page.getByRole("heading", { name: "آموزشگاه آزمون" })).toBeVisible();
-  await expect(page.getByText("هنوز دانشجویی ثبت‌نام نشده است.")).toBeVisible();
-  await expect(page.getByText("هنوز منبع خصوصی‌ای بارگذاری نشده است.")).toBeVisible();
-  await expect(page.getByText(/هنوز خدمتی در استودیوی نوبت‌دهی تعریف نشده است|قابلیت نوبت‌دهی برای این Workspace فعال نیست/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "نمای کلی" })).toBeVisible();
+  await page.goto(cc("people")); await expect(page.getByText("هنوز دانشجویی ثبت‌نام نشده است.")).toBeVisible();
+  await page.goto(cc("files")); await expect(page.getByText("هنوز منبع خصوصی‌ای بارگذاری نشده است.")).toBeVisible();
+  await page.goto(cc("services")); await expect(page.getByText(/هنوز دوره‌ای تعریف نشده است|این بخش فقط برای مالک یا مدیر Workspace/)).toBeVisible();
 
+  await page.goto(cc("people"));
   await page.getByLabel("کاربر مشتری").selectOption({ label: "alice · alice@example.test (Students)" });
   await page.getByRole("button", { name: "ثبت‌نام دانشجو" }).click();
   await expect(page.locator('[data-enrollment-status="active"]')).toContainText("alice@example.test");
@@ -95,6 +99,7 @@ test("Control Center: real counts, enrol an existing customer, upload private fi
   await page.getByRole("button", { name: "ثبت‌نام دانشجو" }).click();
   await expect(page.locator('[data-enrollment-status="active"]')).toHaveCount(2);
 
+  await page.goto(cc("files"));
   const uploads: [string, string, Buffer, string][] = [["جزوه جلسه یک", "lesson.pdf", PDF, "application/pdf"], ["تمرین صوتی", "practice.mp3", MP3, "audio/mpeg"], ["ویدئوی آموزشی", "lesson.webm", fs.readFileSync(videoFixture), "video/webm"]];
   for (const [title, name, buffer, mimeType] of uploads) {
     await page.getByLabel("عنوان منبع").fill(title);
@@ -102,15 +107,73 @@ test("Control Center: real counts, enrol an existing customer, upload private fi
     await page.getByRole("button", { name: "بارگذاری خصوصی" }).click();
     await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
   }
+  await page.goto(cc());
   await expect(page.getByRole("heading", { name: "نمای کلی" })).toBeVisible();
+  await expect(page.locator('[data-stat="دانشجوی فعال"]')).toContainText("۲");
+  await expect(page.locator('[data-stat="منبع آموزشی"]')).toContainText("۳");
   await expect(page.locator("main")).not.toContainText(/درآمد|حضور و غیاب|پیام جدید/);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await noOverflow(page);
   await page.screenshot({ path: "test-results/education-control-center-390.png", fullPage: true });
 
+  await page.goto(cc("people"));
   await page.locator('[data-enrollment-status="active"]', { hasText: "carol@example.test" }).getByRole("button", { name: "لغو دسترسی" }).click();
   await expect(page.locator('[data-enrollment-status="revoked"]')).toContainText("carol@example.test");
+  await context.close();
+});
+
+test("Control Center: Education sidebar vocabulary, Booking management on canonical records, website connection", async ({ browser }) => {
+  const EDUCATION_NAV = ["نمای کلی", "محتوا", "دانشجویان", "مدرس‌ها", "دوره‌ها", "برنامهٔ مدرس‌ها", "رزروها", "منابع آموزشی"];
+  const context = await operatorContext(browser), page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`/dashboard/websites/${siteId}/control`);
+  await expect(page.locator('[data-cc-kind="EDUCATION"]')).toBeVisible();
+  const side = (await page.locator("[data-cc-sidebar]").boundingBox())!;
+  expect(side.x + side.width, "sidebar hugs the right edge").toBeGreaterThanOrEqual(1280 - 1);
+  expect(await page.locator("[data-cc-sidebar] [data-tab]").allInnerTexts()).toEqual(EDUCATION_NAV);
+  const nav = await page.locator("[data-cc-sidebar]").innerText();
+  for (const term of ["بیمار", "پزشک", "نوبت‌ها", "درمان", "پرداخت‌ها", "پیام‌ها", "تحلیل"]) expect(nav, `no "${term}" in the Education navigation`).not.toContain(term);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/control-center-education-desktop.png", fullPage: true });
+
+  // Website connection, both directions.
+  await expect(page.locator('[data-cc-action="view-website"]')).toHaveAttribute("href", `/site/${siteId}`);
+  await page.locator('[data-cc-action="edit-website"]').click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/websites/corporate\\?project=${siteId}`));
+  await expect(page.locator("[data-studio-control-center]")).toBeVisible({ timeout: 20_000 });
+  await page.locator("[data-studio-control-center]").click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/websites/${siteId}/control$`));
+
+  // Booking management: create a course and a teacher through the Control Center; they are canonical Booking records.
+  await page.goto(`/dashboard/websites/${siteId}/control/providers`);
+  await expect(page.getByRole("heading", { name: "مدرس‌ها" })).toBeVisible();
+  await page.getByLabel("نام مدرس").fill("مدرس کنترل"); await page.getByRole("button", { name: "افزودن مدرس" }).click();
+  await expect(page.locator("[data-provider]").filter({ hasText: "مدرس کنترل" })).toBeVisible();
+  await page.goto(`/dashboard/websites/${siteId}/control/services`);
+  await page.getByLabel("نام دوره").fill("دوره کنترل"); await page.getByRole("button", { name: "افزودن دوره" }).click();
+  await expect(page.locator("[data-service]").filter({ hasText: "دوره کنترل" })).toBeVisible();
+  await page.getByLabel("مدرس", { exact: true }).selectOption({ label: "مدرس کنترل" });
+  await page.getByLabel("دوره", { exact: true }).selectOption({ label: "دوره کنترل" });
+  await page.getByRole("button", { name: "اتصال مدرس به دوره" }).click();
+  await expect(page.getByRole("status")).toContainText("متصل شد");
+  const stored = await ok(await api.get(`/api/booking?siteProjectId=${siteId}`));
+  expect(stored.services.find((x: { name: string }) => x.name === "دوره کنترل")?.site_project_id).toBe(siteId);
+  expect(stored.providers.find((x: { name: string }) => x.name === "مدرس کنترل")?.site_project_id).toBe(siteId);
+  // The public Education booking reads the very same records.
+  const catalog = await ok(await api.get(`/api/auth/site/${siteId}/booking/services`));
+  expect(catalog.services.map((x: { name: string }) => x.name)).toContain("دوره کنترل");
+  await page.goto(`/dashboard/websites/${siteId}/control/appointments`);
+  await expect(page.getByRole("heading", { name: "رزروها" })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/بیمار|پزشک/);
+
+  // 390px: compact bar + menu, no overflow.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("[data-cc-sidebar]")).toBeHidden();
+  await page.locator("[data-cc-menu-button]").click();
+  await expect(page.locator("[data-cc-menu] [data-tab]")).toHaveCount(8);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/control-center-education-390-menu.png", fullPage: true });
   await context.close();
 });
 

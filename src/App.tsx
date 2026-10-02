@@ -22,8 +22,8 @@ const DoctorPortalPage = lazy(() => import("./pages/DoctorPortalPage"));
 const PatientPortalPage = lazy(() => import("./pages/PatientPortalPage"));
 const PatientSignInPage = lazy(() => import("./pages/PatientSignInPage"));
 const EducationPortalPage = lazy(() => import("./pages/EducationPortalPage"));
-const MedicalControlCenterPage = lazy(() => import("./pages/MedicalControlCenterPage"));
-const EducationControlCenterPage = lazy(() => import("./pages/EducationControlCenterPage"));
+const ControlCenterPage = lazy(() => import("./pages/ControlCenterPage"));
+const LegacyControlCenterRedirect = lazy(() => import("./pages/ControlCenterPage").then((m) => ({ default: m.LegacyControlCenterRedirect })));
 const BookingStudioPage = lazy(() => import("./pages/BookingStudioPage"));
 const CorporateWebsiteStudioPage = lazy(() => import("./pages/CorporateWebsiteStudioPage"));
 const PublicCorporateSitePage = lazy(() => import("./pages/PublicCorporateSitePage"));
@@ -139,10 +139,13 @@ export default function App() {
               <Route path="/dashboard/business-builder/apps/:projectId" element={<GeneratedBusinessAppPage />} />
 
               <Route path="/dashboard/websites" element={<WebsiteProjectsPage />} />
-              <Route path="/dashboard/websites/:siteProjectId/medical" element={<MedicalControlCenterPage />} />
-              <Route path="/dashboard/websites/:siteProjectId/education" element={<EducationControlCenterPage />} />
+              <Route path="/dashboard/websites/:siteProjectId/control" element={<ControlCenterPage />} />
+              <Route path="/dashboard/websites/:siteProjectId/control/:module" element={<ControlCenterPage />} />
+              <Route path="/dashboard/websites/:siteProjectId/medical" element={<LegacyControlCenterRedirect />} />
+              <Route path="/dashboard/websites/:siteProjectId/education" element={<LegacyControlCenterRedirect />} />
               <Route path="/dashboard/websites/store" element={<StoreWebsiteStudioPageV16 />} />
               <Route path="/dashboard/booking" element={<BookingStudioPage />} />
+              <Route path="/dashboard/booking/:module" element={<BookingStudioPage />} />
               <Route path="/dashboard/websites/corporate" element={<CorporateWebsiteStudioPage />} />
               <Route path="/dashboard/websites/setup" element={<StoreSetupWizardPage />} />
               <Route path="/dashboard/websites/admin" element={<StoreAdminDashboardPage />} />

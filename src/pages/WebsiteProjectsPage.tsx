@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Globe, Plus, Storefront } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../lib/api";
+import { controlCenterPath, websiteStudioPath } from "../components/control-center/modules";
 
 type SiteProject = {
   id: string;
@@ -17,10 +18,8 @@ async function read(response: Response) {
   return data;
 }
 
-// Ecommerce starters use the existing Store Studio and public storefront;
-// they are not a second business-site renderer.
 const isStore = (project: SiteProject) => ["STORE", "ECOMMERCE"].includes(String(project.siteType || "").toUpperCase());
-const studioPath = (project: SiteProject) => `${isStore(project) ? "/dashboard/websites/store" : "/dashboard/websites/corporate"}?project=${encodeURIComponent(project.id)}`;
+const studioPath = (project: SiteProject) => websiteStudioPath(project.id, project.siteType);
 
 /** The one workspace-scoped entry point for every Site Project. */
 export default function WebsiteProjectsPage() {
@@ -61,8 +60,7 @@ export default function WebsiteProjectsPage() {
       {state === "ready" && projects.length > 0 && <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {projects.map((project) => <article key={project.id} className="min-w-0 rounded-3xl border border-white/10 bg-[#0d1622] p-5 transition hover:border-emerald-300/35">
           <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-base font-black">{project.name || "سایت بدون نام"}</h2><p className="mt-2 flex items-center gap-2 text-xs text-white/45">{isStore(project) ? <Storefront size={16} /> : <Globe size={16} />}{isStore(project) ? "فروشگاه" : "وب‌سایت"}</p></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${project.status === "PUBLISHED" ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-300/15 text-amber-100"}`}>{project.status === "PUBLISHED" ? "منتشرشده" : "پیش‌نویس"}</span></div>
-          {String(project.siteType || "").toUpperCase() === "MEDICAL" && <Link to={`/dashboard/websites/${encodeURIComponent(project.id)}/medical`} className="mt-5 ml-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950">مرکز مدیریت درمانی</Link>}
-          {String(project.siteType || "").toUpperCase() === "EDUCATION" && <Link to={`/dashboard/websites/${encodeURIComponent(project.id)}/education`} className="mt-5 ml-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950">مرکز مدیریت آموزش</Link>}
+          <Link to={controlCenterPath(project.id)} data-open-control-center className="mt-5 ml-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950">مرکز کنترل</Link>
           <Link to={studioPath(project)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm font-bold text-white hover:bg-white/[.06]">باز کردن ویرایشگر <ArrowRight size={16} /></Link>
         </article>)}
       </div>}

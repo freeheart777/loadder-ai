@@ -234,14 +234,15 @@ function CardSection({ section, config, variant, grid, props }: { section: Secti
     {categories.length > 1 && <nav data-category-chips="true" aria-label="فیلتر" className="mb-5 flex flex-wrap gap-2">
       {["", ...categories].map((value) => <button key={value || "all"} type="button" aria-pressed={category === value} onClick={() => setCategory(value)} className="rounded-full border px-4 py-1.5 text-xs font-bold" style={category === value ? { background: config.design.primaryColor, borderColor: config.design.primaryColor, color: "#fff" } : { borderColor: "rgba(43,42,39,.18)" }}>{value || "همه"}</button>)}
     </nav>}
-    <div style={grid}>{shown.map((entry) => <ItemCard key={entry.id} item={entry} section={section} config={config} variant={variant} href={props.itemHref?.(section, entry) ?? null} />)}</div>
+    <div style={grid}>{shown.map((entry) => <ItemCard key={entry.id} item={entry} section={section} config={config} variant={variant} href={props.itemHref?.(section, entry) ?? null} hideEmptyMedia={props.interactive === false} />)}</div>
   </>;
 }
 
-function ItemCard({ item, section, config, variant, href }: { item: SectionItem; section: SectionConfig; config: StudioConfig; variant: "service" | "team" | "portfolio"; href?: string | null }) {
+// A published site never shows an empty gray image slot; the editor keeps it as the place to add a photo.
+function ItemCard({ item, section, config, variant, href, hideEmptyMedia = false }: { item: SectionItem; section: SectionConfig; config: StudioConfig; variant: "service" | "team" | "portfolio"; href?: string | null; hideEmptyMedia?: boolean }) {
   const rounded = { borderRadius: config.design.cardRadius };
   return <article className="overflow-hidden border border-black/5 bg-white" style={rounded}>
-    {variant !== "service" && <div className="aspect-[4/3] w-full bg-slate-100">
+    {variant !== "service" && !(hideEmptyMedia && !item.imageUrl) && <div className="aspect-[4/3] w-full bg-slate-100">
       {item.imageUrl ? <img src={item.imageUrl} alt={item.title} loading="lazy" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-slate-300">{variant === "team" ? <UserCircle size={44} /> : <ImageSquare size={44} />}</div>}
     </div>}
     <div className="p-5">
@@ -314,9 +315,9 @@ function CorporateSection({ section, props }: { section: SectionConfig; props: C
     </div>;
     const copy = <div>{head}<p className="text-sm leading-8 opacity-75">{section.body}</p></div>;
     return <section id={sectionAnchor(section)} className="mx-auto px-4 sm:px-5" style={{ ...shell, ...pad }}>
-      <div className={props.device === "mobile" ? "grid gap-6" : "grid gap-8 md:grid-cols-2"}>
+      {props.interactive === false && !section.imageUrl ? <div className="max-w-3xl">{copy}</div> : <div className={props.device === "mobile" ? "grid gap-6" : "grid gap-8 md:grid-cols-2"}>
         {section.mediaPosition === "start" ? <>{media}{copy}</> : <>{copy}{media}</>}
-      </div>
+      </div>}
     </section>;
   }
 

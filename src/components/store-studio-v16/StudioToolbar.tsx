@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import {
   Desktop,
   DeviceMobile,
@@ -25,7 +26,7 @@ const pages = [
   ["success", "سفارش موفق"],
 ] as const;
 
-export default function StudioToolbar({ device, page, status, dirty = false, busy, onDevice, onPage, onPreview, onSave, onPublish }: {
+export default function StudioToolbar({ device, page, status, dirty = false, busy, onDevice, onPage, onPreview, onSave, onPublish, controlCenterHref }: {
   device: DeviceMode;
   page: PageMode;
   busy: boolean;
@@ -36,6 +37,8 @@ export default function StudioToolbar({ device, page, status, dirty = false, bus
   onPreview: () => void;
   onSave: () => void;
   onPublish: () => void;
+  /** Build -> Operate: the same SiteProject's Control Center. */
+  controlCenterHref?: string;
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2.5">
@@ -60,6 +63,7 @@ export default function StudioToolbar({ device, page, status, dirty = false, bus
       </nav>
 
       <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/[.025] p-1"><button type="button" className="flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-black text-white/70 transition hover:bg-white/[.07] hover:text-white" onClick={onPreview}><Eye size={18} /><span className="hidden sm:inline">پیش‌نمایش</span></button><button type="button" disabled={busy} onClick={onSave} className="flex min-h-10 items-center gap-2 rounded-xl bg-emerald-400 px-3 text-xs font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-40"><FloppyDisk size={18} weight="fill" />{busy ? "در حال ذخیره…" : "ذخیره"}</button></div>
+      {controlCenterHref && <Link to={controlCenterHref} data-studio-control-center className="flex min-h-11 items-center rounded-2xl border border-white/10 bg-white/[.04] px-4 text-xs font-black text-white/80 transition hover:bg-white/[.08]">مرکز کنترل</Link>}
       <button type="button" disabled={busy} onClick={onPublish} className="flex min-h-11 items-center gap-2 rounded-2xl bg-violet-500 px-4 text-xs font-black text-white shadow-[0_10px_28px_rgba(139,92,246,.18)] transition hover:bg-violet-400 disabled:opacity-40"><RocketLaunch size={18} weight="fill" />{busy ? "در حال انتشار…" : status === "PUBLISHED" ? "انتشار نسخه جدید" : "انتشار"}</button>
     </div>
   );

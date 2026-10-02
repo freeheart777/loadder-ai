@@ -16,6 +16,8 @@ const noOverflow = async (page: Page) => expect(await page.evaluate(() => docume
 const EDUCATION_TERMS = ["رزرو کلاس", "دوره", "مدرس", "هنرجو"];
 const expectNoEducationTerms = async (page: Page) => { const text = await page.locator("main").innerText(); for (const term of EDUCATION_TERMS) expect(text, `Medical booking must not show "${term}"`).not.toContain(term); };
 const spa = (path = "") => `/site/${siteId}${path}`;
+// A published site must never show an empty gray image slot (the editor keeps it as the place to add a photo).
+const noEmptyMedia = async (page: Page) => expect(await page.evaluate(() => [...document.querySelectorAll(".bg-slate-100")].filter((el) => !el.querySelector("img")).length), "empty image placeholders on the public page").toBe(0);
 
 test.describe.configure({ mode: "serial" });
 
@@ -61,12 +63,12 @@ test("public NAVA pages render from the canonical V16 document at desktop and 39
     await expect(page.getByText("سلامت شما، با توجه و زمان کافی")).toBeVisible();
     await expect(page.locator('a[href$="/booking"]').first()).toBeVisible();
     for (const text of ["تخصص‌ها و خدمات", "پزشکان", "چرا این مرکز", "امکانات مرکز", "مسیر مراجعه", "تماس و نشانی"]) await expect(page.getByRole("heading", { name: text }).first()).toBeVisible();
-    await noOverflow(page);
+    await noOverflow(page); await noEmptyMedia(page);
     await page.screenshot({ path: `test-results/medical-home-${name}.png`, fullPage: true });
     for (const [slug, heading] of [["services", "همهٔ خدمات"], ["doctors", "همهٔ پزشکان"], ["clinic", "دربارهٔ مرکز"], ["magazine", "مجلهٔ سلامت"]] as const) {
       await page.goto(spa(`/${slug}`));
       await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
-      await noOverflow(page);
+      await noOverflow(page); await noEmptyMedia(page);
     }
     await context.close();
   }
@@ -376,8 +378,10 @@ test("Medical Control Center: real counts, every tab on canonical data, no fabri
   expect(up.status()).toBe(201);
 
   const context = await browser.newContext({ storageState: await api.storageState(), viewport: { width: 390, height: 844 } }), page = await context.newPage();
-  const tab = (key: string) => page.locator(`[data-tab="${key}"]`);
+  // One shell: desktop shows the sidebar; at 390px the same links live in the menu sheet.
+  const tab = async (key: string) => { const link = page.locator(`[data-tab="${key}"]:visible`); if (!(await link.count())) await page.locator("[data-cc-menu-button]").click(); await link.click(); };
   await page.goto(`/dashboard/websites/${siteId}/medical`);
+  await expect(page, "the old per-vertical address lands on the one Control Center route").toHaveURL(new RegExp(`/dashboard/websites/${siteId}/control$`));
   await expect(page.getByRole("heading", { name: "مرکز درمانی نوا" })).toBeVisible();
   await expect(page.locator("[data-tab]")).toHaveCount(9);
   await expect(page.locator("main")).not.toContainText(/پرداخت‌ها|پیام‌ها/);
@@ -391,25 +395,25 @@ test("Medical Control Center: real counts, every tab on canonical data, no fabri
   await noOverflow(page);
   await page.screenshot({ path: "test-results/medical-control-center-390.png", fullPage: true });
 
-  await tab("patients").click();
+  await tab("people");
   await expect(page.locator("[data-patient]").first()).toBeVisible();
   await expect(page.locator("main")).not.toContainText(".invalid");
   await expect(page.locator("[data-patient]").filter({ hasText: "09128880002" }), "numbers are masked").toHaveCount(0);
   await noOverflow(page);
 
-  await tab("doctors").click();
-  await expect(page.locator("[data-doctor]").filter({ hasText: "دکتر آزمون الف" })).toContainText("ورود فعال");
+  await tab("providers");
+  await expect(page.locator("[data-provider]").filter({ hasText: "دکتر آزمون الف" })).toContainText("ورود فعال");
   await page.getByLabel("نام پزشک").fill("دکتر پنل");
   await page.getByRole("button", { name: "افزودن پزشک" }).click();
   const fresh = page.locator("article").filter({ hasText: "دکتر پنل" });
   await fresh.getByLabel("موبایل دکتر پنل").fill("09127770003");
   await fresh.getByRole("button", { name: "تعریف ورود" }).click();
-  await expect(page.locator("[data-doctor]").filter({ hasText: "دکتر پنل" })).toContainText("ورود فعال");
+  await expect(page.locator("[data-provider]").filter({ hasText: "دکتر پنل" })).toContainText("ورود فعال");
   await page.locator("article").filter({ hasText: "دکتر پنل" }).getByRole("button", { name: "لغو دسترسی" }).click();
-  await expect(page.locator("[data-doctor]").filter({ hasText: "دکتر پنل" })).toContainText("ورود لغوشده");
+  await expect(page.locator("[data-provider]").filter({ hasText: "دکتر پنل" })).toContainText("ورود لغوشده");
   await noOverflow(page);
 
-  await tab("services").click();
+  await tab("services");
   await page.getByLabel("نام خدمت").fill("خدمت پنل");
   await page.getByRole("button", { name: "افزودن خدمت" }).click();
   await expect(page.locator("[data-service]").filter({ hasText: "خدمت پنل" })).toContainText("حضوری");
@@ -419,22 +423,22 @@ test("Medical Control Center: real counts, every tab on canonical data, no fabri
   await expect(page.getByRole("status")).toContainText("متصل شد");
   await noOverflow(page);
 
-  await tab("schedules").click();
+  await tab("schedules");
   await page.getByLabel("پزشک زمان").selectOption({ label: "دکتر پنل" });
   await page.getByRole("button", { name: "افزودن زمان" }).click();
   await expect(page.locator("[data-slot]").filter({ hasText: "09:00–10:00" }).first()).toBeVisible();
 
-  await tab("appointments").click();
+  await tab("appointments");
   await expect(page.locator("[data-appointment-row]").first()).toBeVisible();
   const pending = page.locator("article").filter({ hasText: "بیمار فایل" });
   await pending.getByRole("button", { name: "تأیید" }).click();
   await expect(page.locator("article").filter({ hasText: "بیمار فایل" })).toContainText("تأییدشده");
   await noOverflow(page);
 
-  await tab("content").click();
+  await tab("content");
   await expect(page.locator("[data-site-status]")).toContainText("منتشرشده");
 
-  await tab("files").click();
+  await tab("files");
   await expect(page.locator("[data-file]").first()).toContainText("application/pdf");
   await expect(page.locator("main")).not.toContainText("پرونده");
   const row = page.locator("article").filter({ hasText: "بدون اسکن" }).first();
@@ -445,7 +449,7 @@ test("Medical Control Center: real counts, every tab on canonical data, no fabri
   expect(fs.readFileSync((await download.path())!).equals(PDF)).toBe(true);
   await noOverflow(page);
 
-  await tab("settings").click();
+  await tab("settings");
   await expect(page.locator("[data-otp-state]")).toContainText("شبیه‌ساز");
   await expect(page.locator("[data-documents-state]")).toContainText("آمادهٔ تولید نیست");
   await expect(page.locator("[data-settings]")).toContainText("فعال");
@@ -648,7 +652,7 @@ for (const [zone, viewport, mobile] of [["Asia/Tehran", { width: 1280, height: 8
 
     // Operator Control Center renders the same time for the same appointment.
     const operator = await browser.newContext({ storageState: await api.storageState(), viewport, timezoneId: zone }), admin = await operator.newPage();
-    await admin.goto(`/dashboard/websites/${siteId}/medical`); await admin.locator('[data-tab="appointments"]').click();
+    await admin.goto(`/dashboard/websites/${siteId}/control/appointments`);
     await expect(admin.locator("[data-appointment-row]", { hasText: "نگار احمدی" }).first()).toContainText("۱۴:۰۰");
     await operator.close(); await context.close();
   });
@@ -667,5 +671,88 @@ test("Medical booking: empty catalog offers a clear route back, sign-in/booking 
   const gap = await page.evaluate(() => { const card = [...document.querySelectorAll("button[aria-pressed]")].pop()!.getBoundingClientRect(), next = [...document.querySelectorAll("button")].find((b) => b.textContent === "ادامه")!.getBoundingClientRect(); return next.top - card.bottom; });
   expect(gap, "action row is separated from the last card").toBeGreaterThanOrEqual(24);
   expect((await page.getByRole("button", { name: "ادامه" }).boundingBox())!.height).toBeGreaterThanOrEqual(43);
+  await context.close();
+});
+
+test("Control Center: one shell, capability-driven Medical sidebar on the right, Build <-> Operate links, 390px menu", async ({ browser }) => {
+  const MEDICAL_NAV = ["نمای کلی", "محتوا", "بیماران", "پزشکان", "خدمات", "برنامهٔ پزشکان", "نوبت‌ها", "فایل‌ها", "تنظیمات"];
+  const context = await browser.newContext({ storageState: await api.storageState(), viewport: { width: 1280, height: 800 } }), page = await context.newPage();
+  await page.goto(`/dashboard/websites/${siteId}/control`);
+  await expect(page.locator('[data-cc-kind="MEDICAL"]')).toBeVisible();
+  // Desktop: the persistent navigation sits on the RIGHT (RTL) and lists exactly the Medical capabilities, in Medical words.
+  const side = (await page.locator("[data-cc-sidebar]").boundingBox())!;
+  expect(side.x + side.width, "sidebar hugs the right edge").toBeGreaterThanOrEqual(1280 - 1);
+  expect(side.x, "sidebar is on the right half").toBeGreaterThan(640);
+  expect(await page.locator("[data-cc-sidebar] [data-tab]").allInnerTexts()).toEqual(MEDICAL_NAV);
+  await expect(page.locator("[data-cc-sidebar] [data-cc-group]")).toHaveCount(5);
+  const nav = await page.locator("[data-cc-sidebar]").innerText();
+  for (const term of ["دانشجو", "مدرس", "دوره", "رزرو", "پرداخت‌ها", "پیام‌ها", "تحلیل"]) expect(nav, `no "${term}" in the Medical navigation`).not.toContain(term);
+  await expect(page.locator("[data-cc-mobilebar]")).toBeHidden();
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/control-center-medical-desktop.png", fullPage: true });
+
+  // Operate -> Build: edit, and view (a real link to the public site).
+  await expect(page.locator('[data-cc-action="view-website"]')).toHaveAttribute("href", `/site/${siteId}`);
+  await expect(page.locator('[data-cc-action="view-website"]')).toHaveAttribute("target", "_blank");
+  await page.locator('[data-cc-action="edit-website"]').click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/websites/corporate\\?project=${siteId}`));
+  // Build -> Operate: the Studio toolbar links back to the same project's Control Center.
+  const back = page.locator("[data-studio-control-center]");
+  await expect(back).toBeVisible({ timeout: 20_000 });
+  await back.click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/websites/${siteId}/control$`));
+
+  // My sites: one entry to the Control Center for every project type.
+  await page.goto("/dashboard/websites");
+  await page.locator("article", { hasText: "مرکز درمانی نوا" }).first().locator("[data-open-control-center]").click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/websites/${siteId}/control$`));
+
+  // 390px: the sidebar becomes a compact bar + menu sheet; same links, no overflow, usable targets.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("[data-cc-sidebar]")).toBeHidden();
+  await expect(page.locator("[data-cc-mobilebar]")).toBeVisible();
+  const menu = page.locator("[data-cc-menu-button]");
+  expect((await menu.boundingBox())!.height).toBeGreaterThanOrEqual(43);
+  await menu.click();
+  await expect(page.locator("[data-cc-menu] [data-tab]")).toHaveCount(9);
+  for (const link of await page.locator("[data-cc-menu] [data-tab]").all()) expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(43);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/control-center-medical-390-menu.png", fullPage: true });
+  await page.locator('[data-cc-menu] [data-tab="appointments"]').click();
+  await expect(page.locator("[data-cc-menu]"), "the sheet closes on navigation").toHaveCount(0);
+  await expect(page).toHaveURL(/\/control\/appointments$/);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/control-center-medical-390-appointments.png", fullPage: true });
+  await context.close();
+});
+
+test("Control Center: Medical modules are truthful when there is no data, and the Booking they edit is the canonical one", async ({ browser }) => {
+  const empty = (await ok(await api.post("/api/site-projects", { data: { name: "مرکز بدون داده", siteType: "MEDICAL", content: {} } }))).project.id;
+  const context = await browser.newContext({ storageState: await api.storageState(), viewport: { width: 390, height: 844 } }), page = await context.newPage();
+  const openTab = async (key: string) => { await page.locator("[data-cc-menu-button]").click(); await page.locator(`[data-cc-menu] [data-tab="${key}"]`).click(); };
+  await page.goto(`/dashboard/websites/${empty}/control`);
+  for (const label of ["بیماران", "پزشکان", "خدمات", "نوبت‌ها", "مدارک فعال"]) await expect(page.locator(`[data-stat="${label}"]`).first()).toBeAttached().catch(() => undefined);
+  await expect(page.locator('[data-stat="بیماران"]')).toContainText("۰");
+  await expect(page.locator('[data-stat="خدمات"]')).toContainText("۰");
+  await expect(page.getByText("هنوز نوبتی ثبت نشده است")).toBeVisible();
+  await openTab("providers"); await expect(page.getByText("هنوز پزشکی تعریف نشده است.")).toBeVisible();
+  await openTab("services"); await expect(page.getByText("هنوز خدمتی تعریف نشده است.")).toBeVisible();
+  await openTab("appointments"); await expect(page.getByText("نوبتی برای نمایش وجود ندارد.")).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/دانشجو|مدرس|دوره/);
+  await noOverflow(page);
+
+  // Create through the Control Center UI: it lands in the canonical, site-scoped Booking records.
+  await openTab("providers");
+  await page.getByLabel("نام پزشک").fill("دکتر صادق"); await page.getByRole("button", { name: "افزودن پزشک" }).click();
+  await expect(page.locator("[data-provider]").filter({ hasText: "دکتر صادق" })).toBeVisible();
+  await openTab("services");
+  await page.getByLabel("نام خدمت").fill("ویزیت صادق"); await page.getByRole("button", { name: "افزودن خدمت" }).click();
+  await expect(page.locator("[data-service]").filter({ hasText: "ویزیت صادق" })).toBeVisible();
+  const stored = await ok(await api.get(`/api/booking?siteProjectId=${empty}`));
+  expect(stored.providers.map((p: { name: string; site_project_id: string }) => [p.name, p.site_project_id])).toEqual([["دکتر صادق", empty]]);
+  expect(stored.services.map((x: { name: string; site_project_id: string }) => [x.name, x.site_project_id])).toEqual([["ویزیت صادق", empty]]);
+  // Strict Medical scope: nothing leaks into the legacy/other-site views.
+  expect((await ok(await api.get("/api/booking"))).services.some((x: { name: string }) => x.name === "ویزیت صادق")).toBe(false);
+  expect((await ok(await api.get(`/api/booking?siteProjectId=${siteId}`))).services.some((x: { name: string }) => x.name === "ویزیت صادق")).toBe(false);
   await context.close();
 });

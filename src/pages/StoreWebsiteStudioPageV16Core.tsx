@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
+import { controlCenterPath } from "../components/control-center/modules";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
 import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
@@ -773,7 +774,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       <span data-persisted-site-type className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/55 lg:flex">نوع سایت: {siteTypeLabel(project?.siteType)}</span>
       {managerLinks.map((link) => <Link key={link.id} to={link.to} data-site-manager={link.id} className="hidden min-h-10 items-center rounded-xl border border-sky-300/20 bg-sky-400/10 px-3 text-[10px] font-bold text-sky-100 hover:bg-sky-400/20 lg:flex">{link.label}</Link>)}
       {publishedUrl && <a href={publishedUrl} target="_blank" rel="noreferrer" className="hidden min-h-10 items-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 lg:flex">آدرس عمومی <ArrowRight size={13} className="rotate-[-45deg]"/></a>}
-      <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} />
+      <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
