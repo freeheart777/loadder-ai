@@ -21,7 +21,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 
-DATABASE_PATH="$dir/medical.sqlite" SITE_MEDIA_LOCAL_DIR="$dir/media" \
+DATABASE_PATH="$dir/medical.sqlite" SITE_MEDIA_LOCAL_DIR="$dir/media" MEDICAL_DOCUMENT_DEV_DIR="$dir/private" \
 NODE_ENV=test API_HOST=127.0.0.1 API_PORT="$api_port" \
 AUTH_EXPOSE_DEV_OTP=true AUTH_HASH_SECRET=medical-e2e-secret \
 BUSINESS_BUILDER_PUBLIC_APPS_ENABLED=true CLIENT_ORIGINS="$web_base" \

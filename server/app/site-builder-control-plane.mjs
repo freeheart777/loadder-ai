@@ -18,6 +18,9 @@ import { createSiteProjectsRouter } from "./routes/site-projects.mjs";
 import { createSiteStorageRouter } from "./routes/site-storage.mjs";
 import { createSiteMediaRouter } from "./routes/site-media.mjs";
 import { createLearningEnrollmentsRouter } from "./routes/learning-enrollments.mjs";
+import { createMedicalDocumentAdminRouter } from "./routes/medical-documents.mjs";
+import { createMedicalDocumentService } from "./services/medical-document-service.mjs";
+import { createMedicalStorage } from "./services/medical-document-storage.mjs";
 import { createPatientIdentityAdminRouter } from "./routes/patient-identity.mjs";
 import { createPatientIdentityService } from "./services/patient-identity-service.mjs";
 import { otpDeliveryConfigured, smsOtpDelivery } from "./services/patient-otp-delivery.mjs";
@@ -85,6 +88,7 @@ export function mountSiteBuilderControlPlane({
   );
   app.use(mountPath, createSiteMediaRouter({ service: mediaService, db }));
   app.use(mountPath, createPatientIdentityAdminRouter({ service: createPatientIdentityService({ db, hashSecret: environment.authHashSecret, deliver: smsOtpDelivery, deliveryConfigured: () => otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }) }), db }));
+  app.use(mountPath, createMedicalDocumentAdminRouter({ service: createMedicalDocumentService({ db, storage: createMedicalStorage({ nodeEnv: environment.nodeEnv }), nodeEnv: environment.nodeEnv }), db }));
   app.use(mountPath, createLearningEnrollmentsRouter({ service: createLearningAccessService({ db, mediaService }), db }));
   app.use(
     mountPath,

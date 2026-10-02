@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { expect, request, test, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
 import { navaMedicalV1 } from "../../src/components/store-studio-v16/templates/nava-medical-v1";
 
@@ -7,6 +8,7 @@ const ok = async (response: APIResponse) => { const body = await response.json()
 
 let api: APIRequestContext, siteId = "";
 let serviceA = "", serviceB = "", providerA = "", providerB = "";
+const doctorSessions: Record<string, { token: string; expiresAt: string; displayName: string | null }> = {};
 const date = (() => new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10))();
 const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
 
@@ -34,6 +36,7 @@ test.beforeAll(async () => {
   // Dr. A offers only video for this service, although the service also allows in-person.
   await ok(await api.put(`/api/booking/providers/${providerA}/services/${serviceA}/modalities`, { data: { siteProjectId: siteId, modalities: ["VIDEO"] } }));
   await post("/api/booking/availability", { providerId: providerA, weekday, startsAt: "10:00", endsAt: "11:00", capacity: 3 });
+  await post("/api/booking/availability", { providerId: providerA, weekday, startsAt: "12:00", endsAt: "13:00", capacity: 3 });
 
   // The NAVA starter, with its sample cards linked to the real Booking records.
   const tpl = JSON.parse(JSON.stringify(navaMedicalV1));
@@ -202,7 +205,7 @@ test("patient signs in with mobile + OTP, books with that identity, and signs ou
   const next = page.locator('[data-appointment="next"]');
   await expect(next).toContainText("ویزیت آزمون الف"); await expect(next).toContainText("دکتر آزمون الف"); await expect(next).toContainText("ویدئویی"); await expect(next).toContainText(reference); await expect(next).toContainText("در انتظار تأیید");
   await expect(page.locator("[data-appointment]"), "the earlier anonymous booking with the same name is not claimed").toHaveCount(1);
-  await expect(page.locator("main")).not.toContainText(/پرداخت|پیام|مدارک|لغو نوبت|تغییر زمان/);
+  await expect(page.locator("main")).not.toContainText(/پرداخت|پیام|لغو نوبت|تغییر زمان/);
   await noOverflow(page);
   await page.screenshot({ path: "test-results/medical-patient-portal-390.png", fullPage: true });
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -241,6 +244,7 @@ test("doctor portal: own appointments and schedule only, confirm, availability, 
     await page.getByLabel("کد تأیید پزشک").fill((await page.locator("[data-dev-otp] bdi").innerText()).trim());
     await page.getByRole("button", { name: "تأیید و ورود" }).click();
     await expect(page.getByRole("button", { name: "خروج" })).toBeVisible();
+    doctorSessions[mobile] = await page.evaluate((id) => JSON.parse(sessionStorage.getItem(`loadder-doctor:${id}`) || "null"), siteId);
     return { context, page };
   };
   // An unknown number is told nothing different and gets no account.
@@ -279,4 +283,76 @@ test("doctor portal: own appointments and schedule only, confirm, availability, 
   await expect(b.page.locator("[data-appointment]")).toHaveCount(0);
   await expect(b.page.locator("main")).not.toContainText("بیمار آزمون");
   await b.context.close();
+});
+
+test("private documents: patient uploads, doctor of that appointment reads, others and operators are held back", async ({ browser }) => {
+  const PDF = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+  const pub = `/api/auth/site/${siteId}`;
+  const anon = await request.newContext({ baseURL: apiBase });
+  // API-level patient sign-in and booking (the UI journeys are covered above).
+  const otp = await ok(await anon.post(`${pub}/patient/otp`, { data: { mobile: "09128880001" } }));
+  const signed = await ok(await anon.post(`${pub}/patient/verify`, { data: { mobile: "09128880001", code: otp.developmentOtp, name: "بیمار مدارک" } }));
+  const identity = { "X-Loadder-App-Token": signed.session.token, "X-Loadder-App-Project": signed.authProjectId };
+  const booked = await ok(await anon.post(`${pub}/booking/appointments`, { headers: identity, data: { serviceId: serviceA, providerId: providerA, date, startsAt: "12:00", customerName: "بیمار مدارک", customerContact: "09128880001", modality: "VIDEO" } }));
+  const appointmentId = booked.appointment.id as string;
+
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(([id, session]) => { sessionStorage.setItem(`loadder-patient:${id}`, JSON.stringify(session)); }, [siteId, { token: signed.session.token, authProjectId: signed.authProjectId, expiresAt: signed.session.expiresAt, displayName: "بیمار مدارک" }] as const);
+  const page = await context.newPage();
+  await page.goto(spa("/patient/portal"));
+  await page.getByRole("button", { name: "مدارک" }).first().click();
+  await expect(page.locator("[data-documents-empty]")).toBeVisible();
+  // SVG and other types are refused with a truthful message.
+  await page.getByLabel("عنوان مدرک").fill("تصویر");
+  await page.getByLabel("فایل مدرک").setInputFiles({ name: "x.svg", mimeType: "image/svg+xml", buffer: Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'><script>1</script></svg>") });
+  await page.getByRole("button", { name: "بارگذاری خصوصی" }).click();
+  await expect(page.getByRole("alert")).toContainText("فقط فایل‌های PDF");
+  await page.getByLabel("عنوان مدرک").fill("نتیجه آزمایش خون");
+  await page.getByLabel("فایل مدرک").setInputFiles({ name: "blood.pdf", mimeType: "application/pdf", buffer: PDF });
+  await page.getByRole("button", { name: "بارگذاری خصوصی" }).click();
+  await expect(page.locator("[data-document]")).toContainText("نتیجه آزمایش خون");
+  await expect(page.locator("[data-document]")).toContainText("بررسی امنیتی انجام نشده");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.locator("[data-document]").getByRole("button", { name: "دانلود" }).click()]);
+  expect(fs.readFileSync((await download.path())!).equals(PDF)).toBe(true);
+  await noOverflow(page);
+  await page.screenshot({ path: "test-results/medical-patient-documents-390.png", fullPage: true });
+
+  // The patient's own file is unreachable without their session, and without a public path.
+  const row = await anon.get(`${pub}/patient/appointments/${appointmentId}/documents`, { headers: { "X-Loadder-App-Token": "forged" } });
+  expect(row.status()).toBe(401);
+  const documents = (await ok(await anon.get(`${pub}/patient/appointments/${appointmentId}/documents`, { headers: identity }))).documents as Array<{ id: string }>;
+  expect(JSON.stringify(documents)).not.toMatch(/storage|sha256|private/i);
+
+  // The assigned doctor reads it; the other doctor cannot.
+  // Doctor sessions come from the doctor-portal journey above (sign-in is throttled per number).
+  const doctorSession = async (mobile: string) => ({ "X-Loadder-App-Token": doctorSessions[mobile].token });
+  const docA = await doctorSession("09127770001"), docB = await doctorSession("09127770002");
+  expect((await anon.get(`${pub}/doctor/appointments/${appointmentId}/documents`, { headers: docB })).status(), "another doctor's appointment").toBe(404);
+  expect((await anon.get(`${pub}/doctor/documents/${documents[0].id}/file`, { headers: docB })).status()).toBe(404);
+  const mine = await anon.get(`${pub}/doctor/documents/${documents[0].id}/file`, { headers: docA });
+  expect(mine.status()).toBe(200); expect((await mine.body()).equals(PDF)).toBe(true);
+  expect(mine.headers()["cache-control"]).toBe("no-store"); expect(mine.headers()["x-content-type-options"]).toBe("nosniff");
+
+  const doctorContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await doctorContext.addInitScript(([id, session]) => { sessionStorage.setItem(`loadder-doctor:${id}`, JSON.stringify(session)); }, [siteId, doctorSessions["09127770001"]] as const);
+  const doctorPage = await doctorContext.newPage();
+  await doctorPage.goto(spa("/doctor"));
+  const item = doctorPage.locator('[data-appointment="upcoming"]').filter({ hasText: "بیمار مدارک" });
+  await item.getByRole("button", { name: "مدارک" }).click();
+  await expect(item.locator("[data-document]")).toContainText("نتیجه آزمایش خون");
+  await noOverflow(doctorPage);
+  await doctorPage.context().close();
+
+  // Operators see metadata only; opening a file needs a stated reason and is audited.
+  const listed = await ok(await api.get(`/api/site-projects/${siteId}/medical-documents`));
+  expect(JSON.stringify(listed)).not.toContain("نتیجه آزمایش خون");
+  expect((await api.post(`/api/site-projects/${siteId}/medical-documents/${documents[0].id}/access`, { data: {} })).status()).toBe(400);
+  const opened = await api.post(`/api/site-projects/${siteId}/medical-documents/${documents[0].id}/access`, { data: { reason: "درخواست پشتیبانی توسط بیمار" } });
+  expect(opened.status()).toBe(200); expect((await opened.body()).equals(PDF)).toBe(true);
+
+  // Deleting removes access for everyone.
+  await page.locator("[data-document]").getByRole("button", { name: "حذف" }).click();
+  await expect(page.locator("[data-documents-empty]")).toBeVisible();
+  expect((await anon.get(`${pub}/doctor/documents/${documents[0].id}/file`, { headers: docA })).status()).toBe(404);
+  await context.close(); await anon.dispose();
 });
