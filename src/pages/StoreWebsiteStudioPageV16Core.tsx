@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
-import { controlCenterPath } from "../components/control-center/modules";
+import { bookingManagementPath, controlCenterPath } from "../components/control-center/modules";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
 import StudioCanvas from "../components/store-studio-v16/StudioCanvas";
@@ -730,7 +730,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const managerLinks = [
     capabilities.includes("blog") ? { id: "content", to: "/dashboard/content", label: "مدیریت محتوا" } : null,
     capabilities.includes("commerce") ? { id: "commerce", to: "/dashboard/websites/commerce", label: "مدیریت فروش" } : null,
-    capabilities.includes("booking") ? { id: "booking", to: "/dashboard/booking", label: "مدیریت نوبت‌دهی" } : null,
+    capabilities.includes("booking") ? { id: "booking", to: bookingManagementPath(project?.id, project?.siteType), label: "مدیریت نوبت‌دهی" } : null,
   ].filter((link): link is { id: string; to: string; label: string } => Boolean(link));
   const publishedUrl = project?.status === "PUBLISHED" ? `${commerce ? "/store" : "/site"}/${project.id}` : "";
   // Vertical sites (Medical/Education) may link cards to canonical Booking records.

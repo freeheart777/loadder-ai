@@ -13,6 +13,8 @@ export type Vocabulary = {
   schedule: string; appointment: string; appointments: string; files: string;
   /** One customer ("بیمار"/"دانشجو"), the care/lesson mode noun, and the modes a service may offer. */
   person: string; mode: string; modes: readonly (readonly [string, string])[];
+  /** Names this centre's section in the shared "Content" explainer, e.g. «بخش درمان». */
+  contentNoun: string;
 };
 
 /** Persian indefinite form: «پزشک» → «پزشکی», «دوره» → «دوره‌ای». */
@@ -20,9 +22,9 @@ export const indef = (word: string) => (word.endsWith("ه") ? `${word}‌ای` :
 
 export type ModuleDef = { key: ModuleKey; capability: Capability; group: "overview" | "operate" | "content" | "system"; label: (v: Vocabulary) => string };
 
-const MEDICAL: Vocabulary = { center: "مرکز مدیریت درمانی", people: "بیماران", provider: "پزشک", providers: "پزشکان", service: "خدمت", services: "خدمات", schedule: "برنامهٔ پزشکان", appointment: "نوبت", appointments: "نوبت‌ها", files: "فایل‌ها", person: "بیمار", mode: "شیوه مراجعه", modes: [["IN_PERSON", "حضوری"], ["VIDEO", "ویدئویی"], ["AUDIO", "صوتی"], ["TEXT", "متنی"]] };
-const EDUCATION: Vocabulary = { center: "مرکز مدیریت آموزش", people: "دانشجویان", provider: "مدرس", providers: "مدرس‌ها", service: "دوره", services: "دوره‌ها", schedule: "برنامهٔ مدرس‌ها", appointment: "رزرو", appointments: "رزروها", files: "منابع آموزشی", person: "دانشجو", mode: "نوع کلاس", modes: [["IN_PERSON", "حضوری"], ["ONLINE", "آنلاین"]] };
-const STORE: Vocabulary = { center: "مرکز مدیریت فروشگاه", people: "مشتریان", provider: "ارائه‌دهنده", providers: "ارائه‌دهندگان", service: "خدمت", services: "خدمات", schedule: "برنامه", appointment: "نوبت", appointments: "نوبت‌ها", files: "فایل‌ها", person: "مشتری", mode: "شیوه ارائه", modes: [["IN_PERSON", "حضوری"], ["ONLINE", "آنلاین"], ["VIDEO", "ویدئویی"], ["AUDIO", "صوتی"]] };
+const MEDICAL: Vocabulary = { center: "مرکز مدیریت درمانی", people: "بیماران", provider: "پزشک", providers: "پزشکان", service: "خدمت", services: "خدمات", schedule: "برنامهٔ پزشکان", appointment: "نوبت", appointments: "نوبت‌ها", files: "فایل‌ها", person: "بیمار", mode: "شیوه مراجعه", modes: [["IN_PERSON", "حضوری"], ["VIDEO", "ویدئویی"], ["AUDIO", "صوتی"], ["TEXT", "متنی"]], contentNoun: "بخش درمان" };
+const EDUCATION: Vocabulary = { center: "مرکز مدیریت آموزش", people: "دانشجویان", provider: "مدرس", providers: "مدرس‌ها", service: "دوره", services: "دوره‌ها", schedule: "برنامهٔ مدرس‌ها", appointment: "رزرو", appointments: "رزروها", files: "منابع آموزشی", person: "دانشجو", mode: "نوع کلاس", modes: [["IN_PERSON", "حضوری"], ["ONLINE", "آنلاین"]], contentNoun: "بخش آموزش" };
+const STORE: Vocabulary = { center: "مرکز مدیریت فروشگاه", people: "مشتریان", provider: "ارائه‌دهنده", providers: "ارائه‌دهندگان", service: "خدمت", services: "خدمات", schedule: "برنامه", appointment: "نوبت", appointments: "نوبت‌ها", files: "فایل‌ها", person: "مشتری", mode: "شیوه ارائه", modes: [["IN_PERSON", "حضوری"], ["ONLINE", "آنلاین"], ["VIDEO", "ویدئویی"], ["AUDIO", "صوتی"]], contentNoun: "مرکز کنترل" };
 const GENERIC: Vocabulary = { ...STORE, center: "مرکز کنترل" };
 /** Booking management outside any one site (the workspace's own services and providers). */
 export const WORKSPACE_BOOKING: Vocabulary = { ...GENERIC, center: "مدیریت نوبت‌دهی" };
@@ -78,3 +80,10 @@ export const websiteStudioPath = (siteProjectId: string, siteType?: string | nul
 
 /** The public site's address for a project (storefronts live under /store, every other type under /site). */
 export const publicSitePath = (siteProjectId: string, siteType?: string | null) => `${controlCenterKind(siteType) === "STORE" ? "/store" : "/site"}/${encodeURIComponent(siteProjectId)}`;
+
+/**
+ * Where "manage bookings" leads from a site's Website Studio: the site's own Control Center
+ * appointments when its capabilities include them, else the workspace Booking Studio.
+ */
+export const bookingManagementPath = (siteProjectId: string | undefined, siteType?: string | null) =>
+  siteProjectId && controlCenterFor(siteType).modules.some((m) => m.key === "appointments") ? controlCenterPath(siteProjectId, "appointments") : "/dashboard/booking";

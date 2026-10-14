@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { apiFetch } from "../../lib/api";
 import { formatAppointmentWhen } from "../../lib/appointmentTime";
+import { bookingReadPath, bookingRequestInit } from "./bookingRequest";
 import { indef } from "./modules";
 import type { Vocabulary } from "./modules";
 import { Empty, Panel, Problem, Row, button, fa, ghost, input, useQuery } from "./ui";
@@ -18,11 +19,11 @@ const STATUS: Record<string, string> = { PENDING: "در انتظار تأیید"
 
 /** Booking records for one site (`?siteProjectId=`) or for the workspace itself, plus the one mutation helper. */
 export function useBookingAdmin(siteProjectId: string | undefined, setNotice: (notice: Notice) => void, afterChange?: () => Promise<unknown> | void) {
-  const booking = useQuery<BookingData>(siteProjectId ? `/api/booking?siteProjectId=${encodeURIComponent(siteProjectId)}` : "/api/booking");
+  const booking = useQuery<BookingData>(bookingReadPath(siteProjectId));
   const { reload } = booking;
   const act: Act = useCallback(async (path, method, body, ok = "انجام شد.") => {
     setNotice(null);
-    const response = await apiFetch(path, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify({ ...(siteProjectId ? { siteProjectId } : {}), ...body }) : undefined });
+    const response = await apiFetch(path, bookingRequestInit(siteProjectId, method, body));
     const result = await response.json().catch(() => ({}));
     setNotice(response.ok ? { tone: "ok", text: ok } : { tone: "error", text: result.message || "عملیات انجام نشد." });
     await Promise.all([reload(), afterChange?.()]);

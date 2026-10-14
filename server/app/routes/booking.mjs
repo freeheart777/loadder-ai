@@ -21,9 +21,20 @@ export function createBookingRouter({ repository, siteProjectService, db = null 
     if (error instanceof BookingError || error instanceof SiteProjectError) return res.status(error.status || 400).json({ success: false, code: error.code, message: error.message });
     throw error;
   };
+  // Absent => the legacy view. Present but malformed (wrong type, blank, too long, repeated, or
+  // disagreeing between query and body) => 400, never a silent fall back to the legacy scope.
+  const MAX_SITE_ID = 80;
+  const explicitSiteId = (value) => {
+    if (value === undefined) return undefined;
+    const id = text(value, MAX_SITE_ID);
+    if (!id) throw new BookingError("BOOKING_SITE_ID_INVALID", 400, "siteProjectId is invalid.");
+    return id;
+  };
   const scopeOf = (req) => {
-    const siteProjectId = text(req.query?.siteProjectId, 80) || text(req.body?.siteProjectId, 80);
-    if (!siteProjectId) return { scope: LEGACY_BOOKING_SCOPE, enabled: siteProjectService.list().some(hasBooking) };
+    const fromQuery = explicitSiteId(req.query?.siteProjectId), fromBody = explicitSiteId(req.body?.siteProjectId);
+    if (fromQuery !== undefined && fromBody !== undefined && fromQuery !== fromBody) throw new BookingError("BOOKING_SITE_ID_CONFLICT", 400, "siteProjectId differs between query and body.");
+    const siteProjectId = fromQuery ?? fromBody;
+    if (siteProjectId === undefined) return { scope: LEGACY_BOOKING_SCOPE, enabled: siteProjectService.list().some(hasBooking) };
     const site = siteProjectService.get(siteProjectId);
     return { scope: bookingScopeForSite(site), enabled: hasBooking(site) };
   };

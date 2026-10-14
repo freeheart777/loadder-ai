@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { controlCenterFor, controlCenterKind, controlCenterPath, indef, publicSitePath, websiteStudioPath, workspaceBookingModules } from "../../src/components/control-center/modules.ts";
+import { bookingManagementPath, controlCenterFor, controlCenterKind, controlCenterPath, indef, publicSitePath, websiteStudioPath, workspaceBookingModules } from "../../src/components/control-center/modules.ts";
 
 const labels = (type) => controlCenterFor(type).modules.map((m) => m.label);
 const keys = (type) => controlCenterFor(type).modules.map((m) => m.key);
@@ -54,4 +54,21 @@ test("workspace Booking Studio reuses only the booking modules", () => {
 
 test("Persian indefinite forms used in empty states", () => {
   assert.equal(indef("پزشک"), "پزشکی"); assert.equal(indef("دوره"), "دوره‌ای"); assert.equal(indef("مدرس"), "مدرسی"); assert.equal(indef("نوبت"), "نوبتی");
+});
+
+test("Website Studio's booking action lands on the site's own appointments when its Control Center has them", () => {
+  assert.equal(bookingManagementPath("s1", "MEDICAL"), "/dashboard/websites/s1/control/appointments");
+  assert.equal(bookingManagementPath("s1", "education"), "/dashboard/websites/s1/control/appointments");
+  assert.equal(bookingManagementPath("a b", "MEDICAL"), controlCenterPath("a b", "appointments"), "reuses the one path helper");
+  // No site appointments module (or no site yet): the workspace Booking Studio is the right place.
+  assert.equal(bookingManagementPath("s1", "CORPORATE"), "/dashboard/booking");
+  assert.equal(bookingManagementPath("s1", "STORE"), "/dashboard/booking");
+  assert.equal(bookingManagementPath(undefined, "MEDICAL"), "/dashboard/booking");
+});
+
+test("each kind names its content section through the vocabulary, not a page-level branch", () => {
+  assert.equal(controlCenterFor("MEDICAL").vocabulary.contentNoun, "بخش درمان");
+  assert.equal(controlCenterFor("EDUCATION").vocabulary.contentNoun, "بخش آموزش");
+  assert.equal(controlCenterFor("STORE").vocabulary.contentNoun, "مرکز کنترل");
+  assert.equal(controlCenterFor("BUSINESS").vocabulary.contentNoun, "مرکز کنترل");
 });

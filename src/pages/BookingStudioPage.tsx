@@ -26,7 +26,7 @@ export default function BookingStudioPage() {
     if (key === "providers") return <ProvidersPanel vocab={vocab} providers={providers} act={act} error={booking.error} hint="ارائه‌دهندگانی که زمان‌های قابل رزرو را ارائه می‌کنند." />;
     if (key === "services") return <ServicesPanel vocab={vocab} services={services} providers={providers} associations={data?.associations || []} act={act} error={booking.error} hint="خدمت‌های قابل رزرو، مدت و هزینهٔ آن‌ها." />;
     if (key === "schedules") return <SchedulesPanel vocab={vocab} providers={providers} availability={data?.availability || []} act={act} hint="بازه‌های هفتگی حضور هر ارائه‌دهنده." />;
-    return <AppointmentsPanel vocab={vocab} appointments={data?.appointments || []} services={services} providers={providers} associations={data?.associations || []} manualCreate act={act} error={booking.error} hint="همهٔ نوبت‌های ثبت‌شده در این Workspace." />;
+    return <AppointmentsPanel vocab={vocab} appointments={data?.appointments || []} services={services} providers={providers} associations={data?.associations || []} manualCreate act={act} error={booking.error} hint="فقط نوبت‌های عمومی و قدیمی Workspace که به هیچ سایتی وصل نیستند. نوبت‌های هر سایت را در مرکز کنترل همان سایت ببینید." />;
   };
 
   return <ControlCenterShell kind="GENERIC" title="استودیوی نوبت‌دهی" kicker={vocab.center} modules={modules} active={active} pathFor={(key) => `/dashboard/booking/${key}`} backTo={{ label: "داشبورد", to: "/dashboard" }}>

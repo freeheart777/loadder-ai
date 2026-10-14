@@ -198,3 +198,41 @@ test("operator Booking API: explicit site scope, legacy default, foreign site 40
     assert.equal(runWithWorkspace("ws-1", () => f.audit.list({ resourceId: appointment.id })).length, 1);
   } finally { await new Promise((resolve) => server.close(resolve)); f.db.close(); }
 });
+
+test("operator Booking API: an explicitly invalid siteProjectId is a 400, never the legacy scope", async () => {
+  const f = fixture();
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.user = { id: "owner" }; runWithWorkspace("ws-1", next); });
+  app.use(createBookingRouter({ repository: f.booking, siteProjectService: f.projects, db: f.db }));
+  f.db.prepare("INSERT INTO workspace_memberships(id,workspace_id,user_id,status,role) VALUES('m1','ws-1','owner','active','owner')").run();
+  const server = app.listen(0, "127.0.0.1"); await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (method, path, body) => { const res = await fetch(`${base}${path}`, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); return { status: res.status, body: await res.json() }; };
+  const legacyServices = () => runWithWorkspace("ws-1", () => f.booking.listServices(LEGACY_BOOKING_SCOPE)).length;
+  try {
+    const before = legacyServices();
+    // Query: blank, too long, repeated.
+    for (const query of ["siteProjectId=", `siteProjectId=${"x".repeat(81)}`, "siteProjectId=a&siteProjectId=b"]) {
+      const res = await call("GET", `/booking?${query}`);
+      assert.equal(res.status, 400, `GET ?${query.slice(0, 30)}`); assert.equal(res.body.code, "BOOKING_SITE_ID_INVALID");
+    }
+    // Body: wrong type, blank, null, too long, on a write that would otherwise create a legacy row.
+    for (const bad of [123, true, ["a"], {}, "", "   ", null, "x".repeat(81)]) {
+      const res = await call("POST", "/booking/services", { siteProjectId: bad, name: "leak", durationMinutes: 20 });
+      assert.equal(res.status, 400, `body siteProjectId ${JSON.stringify(bad)?.slice(0, 20)}`); assert.equal(res.body.code, "BOOKING_SITE_ID_INVALID");
+    }
+    assert.equal(legacyServices(), before, "no rejected request created a legacy row");
+    // Query and body must not disagree (query used to win silently).
+    const conflict = await call("POST", `/booking/providers?siteProjectId=${f.medA.id}`, { siteProjectId: f.medB.id, name: "x" });
+    assert.equal(conflict.status, 400); assert.equal(conflict.body.code, "BOOKING_SITE_ID_CONFLICT");
+
+    // Unchanged semantics: absent => legacy, valid => site, agreeing query+body ok, foreign => 404.
+    assert.equal((await call("GET", "/booking")).status, 200);
+    assert.deepEqual(names((await call("GET", "/booking")).body.services), ["legacy-service"]);
+    assert.deepEqual(names((await call("GET", `/booking?siteProjectId=${f.medA.id}`)).body.services), ["A-service"]);
+    assert.equal((await call("POST", `/booking/providers?siteProjectId=${f.medA.id}`, { siteProjectId: f.medA.id, name: "same" })).status, 201);
+    assert.equal((await call("GET", `/booking?siteProjectId=${f.foreign.id}`)).status, 404);
+    assert.equal((await call("GET", `/booking?siteProjectId=${"y".repeat(80)}`)).status, 404, "a well-formed but unknown id is a 404, not a 400");
+  } finally { await new Promise((resolve) => server.close(resolve)); f.db.close(); }
+});

@@ -1,13 +1,18 @@
 import { useState } from "react";
+import type { ComponentType } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import ControlCenterShell from "../components/control-center/ControlCenterShell";
 import type { ShellLink } from "../components/control-center/ControlCenterShell";
 import EducationModules from "../components/control-center/EducationModules";
 import MedicalModules from "../components/control-center/MedicalModules";
 import { controlCenterFor, controlCenterPath, publicSitePath, websiteStudioPath } from "../components/control-center/modules";
-import type { ModuleKey } from "../components/control-center/modules";
+import type { ControlCenterKind, ModuleKey, Vocabulary } from "../components/control-center/modules";
 import { NoticeBar, Panel, Problem, Row, ghost, useQuery } from "../components/control-center/ui";
 import type { Notice } from "../components/control-center/ui";
+
+type VerticalModuleProps = { siteProjectId: string; module: ModuleKey; vocab: Vocabulary; setNotice: (notice: Notice) => void };
+/** Vertical-only modules per site kind. A new vertical adds one entry here and its capabilities in modules.ts. */
+const VERTICAL_MODULES: Partial<Record<ControlCenterKind, ComponentType<VerticalModuleProps>>> = { MEDICAL: MedicalModules, EDUCATION: EducationModules };
 
 type Project = { name?: string; siteType?: string; status?: string };
 const STATUS_LABEL: Record<string, string> = { PUBLISHED: "منتشرشده", DRAFT: "پیش‌نویس" };
@@ -37,9 +42,9 @@ export default function ControlCenterPage() {
   if (!active) return <Navigate to={controlCenterPath(siteProjectId)} replace />;
 
   const body = (key: ModuleKey) => {
-    if (key === "content") return <ContentPanel project={project} editTo={websiteStudioPath(siteProjectId, project.siteType)} noun={kind === "MEDICAL" ? "بخش درمان" : kind === "EDUCATION" ? "بخش آموزش" : "مرکز کنترل"} />;
-    if (kind === "MEDICAL") return <MedicalModules siteProjectId={siteProjectId} module={key} vocab={vocab} setNotice={setNotice} />;
-    if (kind === "EDUCATION") return <EducationModules siteProjectId={siteProjectId} module={key} vocab={vocab} setNotice={setNotice} />;
+    if (key === "content") return <ContentPanel project={project} editTo={websiteStudioPath(siteProjectId, project.siteType)} noun={vocab.contentNoun} />;
+    const Vertical = VERTICAL_MODULES[kind];
+    if (Vertical) return <Vertical siteProjectId={siteProjectId} module={key} vocab={vocab} setNotice={setNotice} />;
     if (key === "commerce") return <CommerceLinks />;
     return <Overview project={project} siteProjectId={siteProjectId} />;
   };

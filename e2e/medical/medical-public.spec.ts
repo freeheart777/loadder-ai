@@ -275,9 +275,13 @@ test("doctor portal: own appointments and schedule only, confirm, availability, 
   await a.page.getByRole("button", { name: "تأیید نوبت" }).first().click();
   await expect(a.page.locator('[data-appointment="upcoming"]').filter({ hasText: "تأییدشده" })).toHaveCount(1);
   // own availability: add and cancel
-  await a.page.getByLabel("روز هفته").selectOption("3");
+  // Dr. A's seeded slots sit on `weekday`, which follows today's UTC date. Add on a day that can never
+  // coincide with it, so "exactly one slot on that day" holds whichever weekday the suite runs on.
+  const addedWeekday = (weekday + 3) % 7;
+  const dayNames = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"]; // index = Date#getUTCDay, as in the doctor portal
+  await a.page.getByLabel("روز هفته").selectOption(String(addedWeekday));
   await a.page.getByRole("button", { name: "افزودن زمان" }).click();
-  const added = a.page.locator("[data-slot]").filter({ hasText: "چهارشنبه" });
+  const added = a.page.locator("[data-slot]").filter({ hasText: new RegExp(`^${dayNames[addedWeekday]} ·`) }); // anchored: "شنبه" is a substring of every other weekday name
   await expect(added).toHaveCount(1);
   await added.getByRole("button", { name: "لغو" }).click();
   await expect(a.page.locator('[data-slot="CANCELLED"]')).toHaveCount(1);
