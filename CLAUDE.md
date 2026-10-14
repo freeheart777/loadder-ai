@@ -31,3 +31,14 @@ Guidance for Claude Code sessions working in this repository. This file is read 
 - Keep the Website Builder core and AI-personalization layer in separate modules/files; never inline an AI call into core editor, persistence, or storefront-rendering logic.
 - After completing a milestone, update `.claude/current-state.md` (and `docs/BUILD_STATE.md` if it's a repo-sync milestone) rather than leaving state only in chat.
 - Record any non-obvious decision (why a branch was preferred, why a file was removed, why an approach was chosen) in `.claude/decisions.md` so future sessions don't re-litigate it.
+
+## Graph-first discovery (Graphify)
+
+Architecture maps and the how-to live in `docs/architecture/` (`LOADDER_RUNTIME_ARCHITECTURE_MAP.md`, `LOADDER_DEPENDENCY_AUDIT.md`, `LOADDER_GRAPHIFY_WORKFLOW.md`). They describe implemented behaviour at a recorded commit; reuse them instead of re-deriving, and update only the section you touched.
+
+- Use the Graphify MCP tools for "where / who imports / what depends" questions, and **always pass `project_path: "/Users/azaddel/Developer/loadder-agent"`** (the server's default graph is another project's).
+- Prefer `get_neighbors` with an exact `node_id` and `relation_filter: "imports_from"` and a small `token_budget`. Do not trust `shortest_path` endpoints; verify with `get_neighbors` or a source read.
+- Confirm graph findings with a narrow source read (`file:line`). The graph cannot see HTTP calls, SQL, route paths, middleware order, config, tests or Docker.
+- Do not read `server/index.mjs` or `server/app/routes/auth.mjs` whole; `grep -n` the symbol and read ~30 lines.
+- Before relying on the graph compare `graphify-out/graph.json` `built_at_commit` with `git rev-parse HEAD`; if stale run `graphify update .` (AST only, ~6 s, no LLM). Do not rebuild from scratch. `graphify-out/` is never committed.
+- Load skills on demand, smallest set per task. Keep analysis, implementation and verification separate. Never touch runtime data (`server/db/loadder.sqlite`, sidecars, `server/data`, Docker volumes) to inspect architecture. Documentation is intent, not behaviour.

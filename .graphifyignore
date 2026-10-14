@@ -6,3 +6,24 @@ coverage/
 *.zip
 *.log
 graphify-out/
+
+# Loadder: keep the graph on runtime source. Excluded on purpose (see docs/architecture/LOADDER_GRAPHIFY_WORKFLOW.md):
+# runtime state and secrets, generated output, tests/e2e (noise for architecture questions), backups and dumps, media.
+.env
+.env.*
+!.env.example
+server/data/
+server/db/*.sqlite
+server/db/*.sqlite-*
+.loadder-object-storage/
+test-results/
+playwright-report/
+server/test/
+server/test-helpers/
+e2e/
+public/
+*.bak
+LOADDER_*.txt
+.claude/
+.continue/
+.agents/
