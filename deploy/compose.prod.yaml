@@ -1,0 +1,98 @@
+# Loadder Docker D2: single-server production deployment (SQLite on a local volume, one server replica).
+#   docker compose --env-file deploy/.env.production -f deploy/compose.prod.yaml up -d --build
+# See docs/DOCKER_D2.md. Secrets live only in deploy/.env.production (untracked) and are never baked into images.
+name: loadder-prod
+
+x-server: &server
+  image: loadder-server:${LOADDER_VERSION:-local}
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.server
+  env_file: [.env.production]
+  environment: &server-env
+    NODE_ENV: production
+    API_HOST: 0.0.0.0
+    API_PORT: "3001"
+    PUBLIC_SITE_HOST: 0.0.0.0
+    PUBLIC_SITE_PORT: "3002"
+    # Two origins: the app (SPA + API) and the published sites.
+    CLIENT_ORIGINS: https://${LOADDER_APP_HOST:?set LOADDER_APP_HOST}
+    API_PUBLIC_URL: https://${LOADDER_APP_HOST}
+    PUBLIC_SITE_BASE_URL: https://${LOADDER_SITES_HOST:?set LOADDER_SITES_HOST}
+    TRUST_PROXY: "1"
+    DATABASE_PATH: /data/db/loadder.sqlite
+    SITE_MEDIA_LOCAL_DIR: /data/site-media
+    MEDICAL_DOCUMENT_DEV_DIR: /data/medical-private
+    LOADDER_OBJECT_STORAGE_DIR: /data/object-storage
+    AUTH_EXPOSE_DEV_OTP: "false"
+    AUTH_HASH_SECRET: ${AUTH_HASH_SECRET:?set AUTH_HASH_SECRET in deploy/.env.production}
+  user: "1000:1000"
+  read_only: true
+  tmpfs: ["/tmp"]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  volumes: ["loadder-data:/data"]
+  logging: &logging
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  # One-shot: apply pending migrations before the API serves. A failure stops the rollout.
+  migrate:
+    <<: *server
+    command: ["node", "scripts/migrate.mjs"]
+    restart: "no"
+
+  server:
+    <<: *server
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 40s          # above PROCESS_SHUTDOWN_GRACE_MS (30 s)
+    mem_limit: ${LOADDER_SERVER_MEM:-1g}
+    pids_limit: 512
+    # Internal only: nothing here is published to the host. Caddy reaches it on the compose network.
+    expose: ["3001", "3002"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "Promise.all([fetch('http://127.0.0.1:3001/api/health').then((r)=>r.ok),fetch('http://127.0.0.1:3002/sites/_health').then((r)=>r.status<500)]).then((ok)=>process.exit(ok.every(Boolean)?0:1),()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    image: loadder-web:${LOADDER_VERSION:-local}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        # Compiled into the bundle: the browser calls the API on the application origin.
+        VITE_API_BASE_URL: https://${LOADDER_APP_HOST}
+    depends_on:
+      server: { condition: service_healthy }
+    environment:
+      LOADDER_APP_HOST: ${LOADDER_APP_HOST}
+      LOADDER_SITES_HOST: ${LOADDER_SITES_HOST}
+      LOADDER_ACME_EMAIL: ${LOADDER_ACME_EMAIL:?set LOADDER_ACME_EMAIL}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    init: true
+    restart: unless-stopped
+    mem_limit: 256m
+    volumes: ["caddy-data:/data", "caddy-config:/config"]
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  loadder-data:
+  caddy-data:
+  caddy-config:

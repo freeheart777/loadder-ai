@@ -41,3 +41,7 @@ stitch_loadder_medical_booking_platform.zip
 
 # Local runtime data (media uploads, private dev stores): never committed
 server/data/
+
+# Docker D2: real deployment secrets and local backups are never committed
+deploy/.env.production
+deploy/backups/

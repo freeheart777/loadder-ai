@@ -1,0 +1,29 @@
+# Overlay for docker acceptance runs (docker/prod-e2e.sh) ONLY: production images and topology, but
+# plain HTTP on *.localhost and development-style sign-in so the browser suites can obtain a code.
+# Never use this file for a real deployment.
+services:
+  migrate: &test-env
+    environment: &test-env-vars
+      NODE_ENV: test
+      CLIENT_ORIGINS: http://app.localhost
+      API_PUBLIC_URL: http://app.localhost
+      PUBLIC_SITE_BASE_URL: http://sites.localhost
+      AUTH_EXPOSE_DEV_OTP: "true"
+      AUTH_HASH_SECRET: acceptance-test-secret
+      BUSINESS_BUILDER_PUBLIC_APPS_ENABLED: "true"
+      # No real SMS in browser suites: the simulator is accepted outside production only.
+      SMS_PROVIDER: simulator
+      KAVENEGAR_API_KEY: ""
+  server:
+    environment: *test-env-vars
+  web:
+    build:
+      args:
+        VITE_API_BASE_URL: http://app.localhost
+        CADDYFILE: deploy/Caddyfile.test
+    ports: !reset []
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

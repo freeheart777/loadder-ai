@@ -823,7 +823,9 @@ seedDefaultAutomations(
   defaultAutomations
 );
 
-seedCRMData();
+// Demo CRM customers exist for development and demos only; a production database starts without them.
+// (The marketing channel/platform catalog is reference data and is still seeded.)
+if (environment.nodeEnv !== "production") seedCRMData();
 seedMarketingData();
 
 /* =========================================================

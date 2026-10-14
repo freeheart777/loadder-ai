@@ -1,0 +1,14 @@
+# Only the server tree enters this image, minus tests, runtime state, secrets and backups.
+*
+!server
+!deploy/server-entrypoint.sh
+**/node_modules
+server/test
+server/test-helpers
+server/data
+server/db/*.sqlite
+server/db/*.sqlite-*
+**/.env
+**/.env.*
+**/*.bak
+**/*.log

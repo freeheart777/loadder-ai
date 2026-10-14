@@ -1,0 +1,28 @@
+# TEST ONLY overlay (docker/prod-e2e.sh): the Playwright container of the D1 stack, pointed at the
+# production images through Caddy (http://app.localhost, http://sites.localhost) and the same /data volume.
+services:
+  playwright:
+    profiles: ["e2e"]
+    build: { context: .., dockerfile: Dockerfile, target: e2e }
+    image: loadder-e2e
+    entrypoint: ["/app/docker/e2e-entrypoint.sh"]
+    working_dir: /app
+    # The forwarder listens on port 80 as the unprivileged node user.
+    sysctls: { net.ipv4.ip_unprivileged_port_start: "0" }
+    # glibc does not resolve *.localhost (Chromium does); Node, used for API setup in the suites, needs it.
+    extra_hosts: ["app.localhost:127.0.0.1", "sites.localhost:127.0.0.1"]
+    depends_on:
+      server: { condition: service_healthy }
+      web: { condition: service_healthy }
+    environment:
+      E2E_BASE_URL: http://app.localhost
+      E2E_API_BASE_URL: http://app.localhost
+      E2E_DATABASE_PATH: /data/db/loadder.sqlite
+      E2E_VIDEO_FIXTURE: /tmp/performance.webm
+      E2E_FORWARDS: "80=web:80"
+    volumes:
+      - loadder-data:/data
+      - ../e2e:/app/e2e:ro
+      - ../docker/e2e-entrypoint.sh:/app/docker/e2e-entrypoint.sh:ro
+      - ../src:/app/src:ro
+      - ../test-results:/app/test-results

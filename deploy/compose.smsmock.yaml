@@ -1,0 +1,19 @@
+# TEST ONLY overlay (deploy/prod-auth-check.sh): the real Kavenegar URL resolves to a local TLS mock.
+# The server stays in NODE_ENV=production; only the SMS endpoint is substituted.
+services:
+  sms-mock:
+    image: node:22-bookworm-slim
+    command: ["node", "/mock/sms-mock.mjs"]
+    volumes:
+      - ./test/sms-mock.mjs:/mock/sms-mock.mjs:ro
+      - ${SMS_MOCK_CERTS:?}:/certs:ro
+    networks:
+      default:
+        aliases: [api.kavenegar.com]
+  server:
+    environment:
+      SMS_PROVIDER: kavenegar
+      KAVENEGAR_API_KEY: mock-key-not-a-secret
+      NODE_EXTRA_CA_CERTS: /certs/cert.pem
+    volumes:
+      - ${SMS_MOCK_CERTS:?}:/certs:ro

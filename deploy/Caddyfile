@@ -1,0 +1,46 @@
+# Production edge: TLS, static SPA, API and public-site routing. Hostnames come from the environment.
+{
+	email {$LOADDER_ACME_EMAIL}
+}
+
+# Application origin: the SPA and the API (same origin, so cookies and CORS stay simple).
+{$LOADDER_APP_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	handle /api/* {
+		request_body {
+			max_size 25MB
+		}
+		reverse_proxy server:3001
+	}
+
+	handle {
+		root * /srv
+		# Hashed build assets never change; everything else (index.html, media) must revalidate.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@shell not path /assets/*
+		header @shell Cache-Control "no-cache"
+		# SPA fallback: unknown paths get index.html so client-side routes survive a reload.
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Published sites live on their own origin, away from the authenticated application.
+{$LOADDER_SITES_HOST} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	reverse_proxy server:3002
+}

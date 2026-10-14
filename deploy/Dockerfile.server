@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+# Loadder production server image (D2): API + public-site runtime + outbox worker, started by the
+# existing supervisor (server/start.mjs). Production dependencies only, no compiler and no dev
+# tooling: better-sqlite3 loads its bundled Linux prebuild (install scripts are skipped).
+FROM node:22-bookworm-slim AS deps
+WORKDIR /app/server
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
+
+FROM node:22-bookworm-slim AS runtime
+ENV NODE_ENV=production
+# /data is the only writable path; everything under /app is root-owned and read-only to the app.
+RUN mkdir -p /data && chown node:node /data
+WORKDIR /app/server
+COPY --from=deps /app/server/node_modules ./node_modules
+COPY server/ ./
+COPY deploy/server-entrypoint.sh /usr/local/bin/loadder-entrypoint
+RUN chmod 0755 /usr/local/bin/loadder-entrypoint
+USER node
+VOLUME ["/data"]
+ENTRYPOINT ["/usr/local/bin/loadder-entrypoint"]
+CMD ["node", "start.mjs"]
