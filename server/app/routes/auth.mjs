@@ -38,8 +38,12 @@ import { notifyCustomerPaid } from "../commerce/payment-customer-notification.mj
 import { sendMessage } from "../../services/messaging.mjs";
 import { createBookingRepository, BookingError } from "../repositories/booking-repository.mjs";
 
-export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false }) {
+export function createAuthRouter({ authService, nodeEnv = "development", exposeDevelopmentOtp = false, deliverOtp = smsOtpDelivery, otpDeliveryReady = () => otpDeliveryConfigured({ nodeEnv }) }) {
   const router = express.Router();
+  // Operator sign-in codes are SMS-delivered. In production (or whenever the code is not exposed for
+  // development) delivery is mandatory and fails closed: no delivery path, no code. Failures never echo
+  // the code, the recipient or the provider error (provider URLs can carry credentials).
+  const otpDeliveryRequired = nodeEnv === "production" || !exposeDevelopmentOtp;
   const publicSiteRepository = createSiteProjectRepository(db);
   const ecommerceService = createEcommerceService({ db });
   const siteLeadService = createSiteLeadService({ db });
@@ -86,7 +90,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
     const mediaService=createSiteMediaService({repository:createSiteMediaRepository(db),siteProjectService:createSiteProjectService({repository:createSiteProjectRepository(db)}),storage:createSiteMediaStorageAdapter()});
     router.use(createPublicEducationRouter({db,bookingRepository,accessService:createLearningAccessService({db,mediaService})}));
   }
-  router.get("/status",(req,res)=>res.json({success:true,mode:"persistent-session",productionReady:false,otpDelivery:"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"}));
+  router.get("/status",(req,res)=>{const otpReady=otpDeliveryReady();return res.json({success:true,mode:"persistent-session",productionReady:nodeEnv==="production"&&otpReady,otpDelivery:otpReady?"configured":"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"})});
   const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`,category:typeof req.query.category==="string"?req.query.category.slice(0,80):"",bookingCatalog:bookingCatalogFor(bookingRepository,published.project)},products);if(html===null)return res.status(404).send("Page not found");res.set(publishedSiteHeaders());return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
   router.get("/sites/:id/:slug/:detail",(req,res)=>sendLegacySite(req,res,req.params.slug,req.params.detail));
   router.get("/sites/:id/:slug",(req,res)=>sendLegacySite(req,res,req.params.slug));
@@ -177,7 +181,22 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
     }
   });
 
-  router.post("/send-otp",sendOtpLimiter,(req,res)=>{try{const result=authService.requestOtp(req.body||{}),response={success:true,message:"کد تأیید ایجاد شد.",expiresAt:result.challenge.expiresAt};if(nodeEnv!=="production"&&exposeDevelopmentOtp)response.developmentOtp=result.code;return res.json(response)}catch(e){return handleAuthError(e,res)}});
+  router.post("/send-otp",sendOtpLimiter,async(req,res)=>{try{
+    if(otpDeliveryRequired&&!otpDeliveryReady())throw new AuthError("ارسال کد تأیید در حال حاضر در دسترس نیست.",503,"OTP_DELIVERY_NOT_CONFIGURED");
+    const result=authService.requestOtp(req.body||{});
+    try{await deliverOtp({mobile:result.challenge.mobile,code:result.code})}
+    catch(deliveryError){
+      if(otpDeliveryRequired){
+        authService.cancelOtp(result.challenge.id);
+        console.error("Operator OTP delivery failed:",deliveryError?.name||"Error");
+        throw new AuthError("ارسال کد تأیید ممکن نشد. دوباره تلاش کنید.",503,"OTP_DELIVERY_FAILED");
+      }
+      // Development with the code exposed in the response: delivery is best effort and the code stays usable.
+      console.warn("Operator OTP delivery skipped in development:",deliveryError?.name||"Error");
+    }
+    const response={success:true,message:"کد تأیید ایجاد شد.",expiresAt:result.challenge.expiresAt};
+    if(nodeEnv!=="production"&&exposeDevelopmentOtp)response.developmentOtp=result.code;
+    return res.json(response)}catch(e){return handleAuthError(e,res)}});
   router.post("/verify-otp",(req,res)=>{try{const result=authService.verifyOtp(req.body||{});res.cookie(SESSION_COOKIE_NAME,result.sessionToken,authService.sessionCookieOptions(nodeEnv));return res.json({success:true,user:result.user,memberships:result.memberships,activeWorkspace:result.activeWorkspace,authDisposition:result.authDisposition})}catch(e){return handleAuthError(e,res)}});
   router.get("/me",(req,res)=>{const identity=authService.resolveSession(getSessionToken(req));if(!identity)return res.status(401).json({success:false,message:"Authentication required."});return res.json({success:true,user:identity.user,memberships:identity.memberships,activeWorkspace:identity.activeWorkspace})});
   router.post("/logout",(req,res)=>{authService.revokeSession(getSessionToken(req));res.clearCookie(SESSION_COOKIE_NAME,{httpOnly:true,secure:nodeEnv==="production",sameSite:"lax",path:"/"});return res.json({success:true})});

@@ -97,6 +97,11 @@ export function createAuthService({
     return { challenge, code };
   }
 
+  // An undelivered code must not stay valid: expire it so only a code the user could receive can verify.
+  function cancelOtp(challengeId) {
+    repository.consumeOtpChallenge(challengeId, now().toISOString());
+  }
+
   function verifyOtp({ mobile: rawMobile, code: rawCode }) {
     const mobile = normalizeMobile(rawMobile);
     const code = String(rawCode || "").trim();
@@ -288,6 +293,7 @@ export function createAuthService({
 
   return {
     requestOtp,
+    cancelOtp,
     verifyOtp,
     resolveSession,
     revokeSession,

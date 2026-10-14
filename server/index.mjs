@@ -16,6 +16,7 @@ import crypto from "crypto";
 
 import { environment } from "./app/config/environment.mjs";
 import aiRouter from "./app/routes/ai.mjs";
+import { otpDeliveryConfigured } from "./app/services/patient-otp-delivery.mjs";
 import { createAuthRouter } from "./app/routes/auth.mjs";
 import { createWorkspaceRouter } from "./app/routes/workspaces.mjs";
 import { createPlatformAdminRouter, createPlatformAdminReadModel } from "./app/routes/platform-admin.mjs";
@@ -375,8 +376,8 @@ app.get("/api/health", (req, res) => {
     },
     auth: {
       mode: "persistent-session",
-      productionReady: false,
-      otpDelivery: "not-connected",
+      productionReady: environment.nodeEnv === "production" && otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }),
+      otpDelivery: otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }) ? "configured" : "not-connected",
     },
     timestamp: new Date().toISOString(),
   });
