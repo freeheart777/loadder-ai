@@ -1,0 +1,4 @@
+# Overlay used by docker/e2e.sh only: the test run needs no host ports, so it can run beside a dev stack.
+services:
+  server: { ports: !reset [] }
+  web: { ports: !reset [] }

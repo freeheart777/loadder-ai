@@ -1,0 +1,37 @@
+# Docker build context hygiene (D1). Nothing here may enter an image.
+# Version control and local tooling
+.git
+.github
+.claude
+.continue
+.agents
+.vscode
+.idea
+.DS_Store
+graphify-out
+
+# Secrets and local environment
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
+# Host-built or generated output (dependencies are installed inside Linux)
+**/node_modules
+dist
+dist-ssr
+test-results
+playwright-report
+**/*.log
+
+# Runtime state: the tracked SQLite snapshot, WAL sidecars, uploads and stores
+server/data
+server/db/*.sqlite
+server/db/*.sqlite-*
+.loadder-object-storage
+
+# Backup / context artifacts with no runtime purpose
+**/*.bak
+LOADDER_*.txt
+stitch_loadder_medical_booking_platform.zip
