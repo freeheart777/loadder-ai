@@ -8,7 +8,7 @@ import type { InlineMediaTarget } from "../components/store-studio-v16/StudioCan
 import StudioToolbar from "../components/store-studio-v16/StudioToolbar";
 import { defaultProductSettings, designDefaults, productsForSection, restoreConfig } from "../components/store-studio-v16/config";
 import { isCommerceSite, siteTypeDefinition } from "../components/store-studio-v16/site-types";
-import { activePageOf, navigationPages, newPage, normalizeSlug, slugProblem, withActivePageSections, withPages } from "../components/store-studio-v16/pages";
+import { activePageOf, navigationPages, newPage, normalizeSlug, scopeSelection, slugProblem, withActivePageSections, withPages } from "../components/store-studio-v16/pages";
 import { createConfigFromTemplate, templatesForSiteKind } from "../components/store-studio-v16/templates/registry";
 import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
@@ -756,7 +756,9 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
 
   // The canvas and inspector always operate on the SELECTED page's sections.
   // For a single-page site (every STORE) this is exactly config.sections.
-  const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
+  const canvasConfig = useMemo<StudioConfig>(() => { const scoped = scopeSelection(config); return { ...scoped, sections: activePageOf(scoped).sections }; }, [config]);
+  // Persist the scoped selection too, so no action can act on an element of another page.
+  useEffect(() => { setConfig((c) => scopeSelection(c)); }, [config.activePageId, config.selectedElement.type, config.selectedElement.id]);
   const hasUnsavedChanges = Boolean(project && savedDocument.current !== editorDocumentKey(config));
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) outside text fields; text fields keep the browser's own undo.
   useEffect(() => {

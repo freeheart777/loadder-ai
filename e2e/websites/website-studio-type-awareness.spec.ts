@@ -57,10 +57,45 @@ async function expectBusinessStudio(page: Page, siteType: string, project: { id:
   await inspector.getByLabel("عنوان صفحه", { exact: true }).last().fill("صفحهٔ آزمون");
   await inspector.getByLabel("آدرس صفحه", { exact: true }).last().fill("probe");
   await expect(select.locator("option", { hasText: "صفحهٔ آزمون" })).toHaveCount(1);
-  const home = (await select.locator("option").first().getAttribute("value"))!;
+
+  // The new page is empty and active: nothing from another page is selected or editable on it.
+  const heroTitle = `عنوان صفحهٔ اصلی ${Date.now()}`;
+  const header = inspector.locator("b").first();
+  await expect(header).not.toHaveText("بنر اصلی");
+  await inspector.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await expect(inspector.getByLabel("عنوان", { exact: true }), "no hero editor on another page").toHaveCount(0);
+  await expect(page.locator('[data-canvas-interactive="true"] h2'), "no hero (or any section) on the empty page").toHaveCount(0);
+
+  // Section dropdown: Persian names, stored types unchanged.
+  await inspector.getByRole("button", { name: "بخش‌ها", exact: true }).click();
+  const addSelect = inspector.locator("label", { hasText: "افزودن بخش" }).locator("select");
+  const labels = await addSelect.locator("option").allTextContents();
+  expect(labels.filter((text) => /^[a-z-]+$/i.test(text.trim())), "no raw section keys").toEqual([]);
+  for (const expected of ["درباره ما", "خدمات", "تماس", "متن", "فاصله"]) expect(labels).toContain(expected);
+  expect(await addSelect.locator("option").evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value))).toEqual(expect.arrayContaining(["about", "services", "contact", "text", "spacer"]));
+  await addSelect.selectOption("about");
+  await expect(page.locator('[data-canvas-interactive="true"]').getByText("درباره ما").first()).toBeVisible();
+
+  // Edit the Home hero, come back to the new page, and the hero is neither shown nor changed there; Home keeps its edit.
+  const homeId = (await select.locator("option").first().getAttribute("value"))!;
+  const newId = (await select.inputValue());
+  await select.selectOption(homeId);
+  await page.locator('[data-canvas-interactive="true"] h2').first().click();
+  await inspector.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await inspector.getByLabel("عنوان", { exact: true }).first().fill(heroTitle);
+  await select.selectOption(newId);
+  await expect(page.getByText(heroTitle), "the Home hero is not shown on another page").toHaveCount(0);
+  await inspector.getByRole("button", { name: "ویرایش", exact: true }).click();
+  // The page now has its own section: the selection is that section, never the Home hero, and editing it cannot touch Home.
+  await expect(inspector.locator("b").first()).not.toHaveText("بنر اصلی");
+  await inspector.getByLabel("عنوان", { exact: true }).first().fill("عنوان بخش همین صفحه");
+  await expect(page.locator('[data-canvas-interactive="true"]').getByText("عنوان بخش همین صفحه").first()).toBeVisible();
+  await select.selectOption(homeId);
+  await expect(page.locator('[data-canvas-interactive="true"]').getByText(heroTitle)).toBeVisible();
+  await select.selectOption(newId);
   await select.selectOption({ label: "صفحهٔ آزمون" });
   await expect(select).toHaveValue(await select.locator("option", { hasText: "صفحهٔ آزمون" }).getAttribute("value") as string);
-  await select.selectOption(home);
+  await select.selectOption(homeId);
 
   const saved = page.waitForResponse((r) => r.url() === `${apiBase}/api/site-projects/${project.id}` && r.request().method() === "PATCH" && r.status() === 200);
   await page.getByRole("button", { name: "ذخیره", exact: true }).click();
@@ -110,6 +145,12 @@ test("Store Studio keeps its storefront pages and quick-add actions", async ({ b
     const options = await select.locator("option").allTextContents();
     for (const storePage of ["خانه فروشگاه", "سبد خرید", "تسویه حساب"]) expect(options).toContain(storePage);
     await expect(page.getByRole("button", { name: "تخفیف‌ها" })).toBeVisible();
+    const toggle = page.getByRole("button", { name: /پنل ویرایش/ });
+    if ((await toggle.getAttribute("aria-label")) === "باز کردن پنل ویرایش") await toggle.click();
+    await page.locator("[data-studio-inspector]").getByRole("button", { name: "بخش‌ها", exact: true }).click();
+    const storeLabels = await page.locator("[data-studio-inspector] label", { hasText: "افزودن بخش" }).locator("select option").allTextContents();
+    expect(storeLabels.filter((text) => /^[a-z-]+$/i.test(text.trim())), "no raw section keys in the store").toEqual([]);
+    for (const expected of ["محصولات", "بنر", "اعتماد و ضمانت"]) expect(storeLabels).toContain(expected);
     await select.selectOption({ label: "سبد خرید" });
     await expect(select).toHaveValue("cart");
     await select.selectOption({ label: "خانه فروشگاه" });

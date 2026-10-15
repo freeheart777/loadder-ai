@@ -112,3 +112,21 @@ export function withActivePageSections(config: StudioConfig, sections: SectionCo
   const pages = config.pages.map((page) => (page.id === activePageOf(config).id ? { ...page, sections } : page));
   return { ...config, pages, sections: pages[0].sections };
 }
+
+/**
+ * The selection must belong to the active page. On a business site the Hero renders on Home only, and a section
+ * belongs to exactly one page, so a selection left over from another page is dropped instead of being shown or edited.
+ * Header (site-wide) and store pages are untouched.
+ */
+export function scopeSelection(config: StudioConfig): StudioConfig {
+  if (config.siteKind === "STORE") return config;
+  const selection = config.selectedElement;
+  const page = activePageOf(config);
+  const onHome = config.pages[0]?.id === page?.id;
+  let valid = true;
+  if (selection.type === "hero") valid = onHome;
+  else if (selection.type !== "header" && selection.id) valid = (page?.sections ?? []).some((section) => section.id === selection.id);
+  if (valid) return config;
+  const first = onHome ? null : page?.sections.find((section) => section.enabled) ?? null;
+  return { ...config, selectedElement: onHome ? { type: "hero", id: "hero" } : first ? { type: first.type === "banner" ? "banner" : first.type === "trust" ? "trust" : "section", id: first.id } : { type: "section", id: null } };
+}

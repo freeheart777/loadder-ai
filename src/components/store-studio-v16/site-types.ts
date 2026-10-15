@@ -48,3 +48,11 @@ export const allowsSectionType = (kind: SiteKind | undefined, type: SectionConfi
 /** Anchor used for in-page navigation and CTA targets. */
 export const sectionAnchor = (section: Pick<SectionConfig, "id" | "anchor">): string =>
   String(section.anchor || section.id).replace(/[^a-zA-Z0-9_-]/g, "-");
+
+/** User-facing names of section types (same wording as the capability registry); the stored type keys are unchanged. */
+export const SECTION_TYPE_LABELS: Record<SectionConfig["type"], string> = {
+  about: "درباره ما", services: "خدمات", portfolio: "نمونه‌کارها", team: "تیم", "text-image": "متن و تصویر",
+  cta: "دعوت به اقدام", contact: "تماس", text: "متن", spacer: "فاصله", products: "محصولات", banner: "بنر",
+  trust: "اعتماد و ضمانت", "category-grid": "دسته‌بندی‌ها", brand: "برندها",
+};
+export const sectionTypeLabel = (type: string) => SECTION_TYPE_LABELS[type as SectionConfig["type"]] ?? type;
