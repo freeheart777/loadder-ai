@@ -12,7 +12,7 @@ test.use({ actionTimeout: 15_000 });
 type Case = { route: string; label: string; heroTitle: string; commerce: boolean };
 const cases: Case[] = [
   ...businessLaunchTemplates.map((template) => ({ route: "/dashboard/websites/corporate", label: template.label, heroTitle: String(template.hero?.title || ""), commerce: false })),
-  { route: "/dashboard/websites", label: "Loadder Commerce Modern V1", heroTitle: "کالای مورد نظرتان را با بهترین قیمت پیدا کنید", commerce: true },
+  { route: "/dashboard/websites/store", label: "Loadder Commerce Modern V1", heroTitle: "کالای مورد نظرتان را با بهترین قیمت پیدا کنید", commerce: true },
 ];
 const viewports = [
   { name: "desktop", width: 1440, height: 900 },
@@ -59,6 +59,8 @@ for (const scenario of cases) {
       const createdResponse = await created;
       expect(createdResponse.status()).toBe(201);
       const project = (await createdResponse.json()).project;
+      // A store is persisted as STORE: the commerce services and the public storefront only serve STORE projects.
+      if (scenario.commerce) expect(project.siteType).toBe("STORE");
       await expect(page).toHaveURL(new RegExp(`project=${project.id}`));
       const canvas = page.locator('[data-canvas-interactive="true"]');
       await expect(canvas.getByText(scenario.heroTitle, { exact: true }).first()).toBeVisible();

@@ -592,7 +592,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       const out = await read(await apiFetch("/api/site-projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, siteType: template?.siteType || (siteKind === "STORE" ? "STORE" : "CORPORATE"), content }),
+        body: JSON.stringify({ name, siteType: siteKind === "STORE" ? "STORE" : (template?.siteType || "CORPORATE"), content }),
       }));
       const createdProject = out.project as Project;
       setProject(createdProject);
