@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run one browser suite against the PRODUCTION images and topology (Caddy edge, built SPA, internal-only
 # server, one-shot migrations) on a throw-away volume, inside Linux:
-#   docker/prod-e2e.sh medical|education|commerce|corporate|store
+#   docker/prod-e2e.sh medical|education|commerce|corporate|store|builder
 # The overlay (deploy/compose.test.yaml) keeps production images and wiring but serves plain HTTP on
 # *.localhost and uses development-style sign-in so the suites can obtain a code. Production-mode
 # behaviour (Secure cookies, no dev OTP, SMS fail-closed) is covered by deploy/prod-auth-check.sh.
@@ -13,7 +13,8 @@ case "${1:-}" in
   commerce) spec=e2e/commerce/cart-checkout-order.spec.ts ;;
   corporate) spec=e2e/corporate ;;
   store) spec=e2e/store/store-studio-v16.spec.ts ;;
-  *) echo "usage: docker/prod-e2e.sh medical|education|commerce|corporate|store" >&2; exit 2 ;;
+  builder) spec=e2e/websites/website-builder-acceptance.spec.ts ;;
+  *) echo "usage: docker/prod-e2e.sh medical|education|commerce|corporate|store|builder" >&2; exit 2 ;;
 esac
 [ -f deploy/.env.production ] || { echo "create deploy/.env.production first (copy deploy/.env.production.example)" >&2; exit 2; }
 export LOADDER_VERSION="${LOADDER_VERSION:-e2e}"
