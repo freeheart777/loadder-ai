@@ -42,8 +42,8 @@ test(`creating a website from "${template.label}" twice in one workspace never f
   const page = await context.newPage();
   try {
     const first = await createFromTemplate(page);
-    // The exact UI creation contract: named after the template, BUSINESS, a V16 document.
-    expect(first.payload).toMatchObject({ name: template.label, siteType: "BUSINESS" });
+    // The exact UI creation contract: named after the template, its own site type, a V16 document.
+    expect(first.payload).toMatchObject({ name: template.label, siteType: "MEDICAL" });   // the clinic starter is a canonical MEDICAL site
     expect(first.payload.content?.storeBuilderV16?.version).toBe(16);
     expect(first.status, JSON.stringify(first.body)).toBe(201);
     await expect(page).toHaveURL(new RegExp(`project=${first.body.project.id}`));
@@ -78,12 +78,16 @@ test("all five starter choices are discoverable from the new-website picker; Sto
   try {
     await page.goto("/dashboard/websites/corporate?new=1");
     for (const label of ["موسسه حقوقی", "کلینیک و پزشک", "مرکز آموزشی", "شرکت حرفه‌ای"]) await expect(page.getByRole("button", { name: new RegExp(label) })).toHaveCount(1);
-    await expect(page.getByRole("button", { name: /Loadder Commerce Modern V1/ }), "store template is not offered as a BUSINESS template").toHaveCount(0);
+    // The Store starter is offered here on purpose (see templates/registry.ts) but must never be the preselected default of a business flow.
+    const storeTemplate = page.getByRole("button", { name: /Loadder Commerce Modern V1/ });
+    await expect(storeTemplate).toHaveCount(1);
+    await expect(storeTemplate).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator('button[aria-pressed="true"]')).toHaveCount(1);
     const storeEntry = page.locator("[data-store-entry]");
     await expect(storeEntry).toHaveCount(1);
     await expect(storeEntry).toContainText("فروشگاه اینترنتی");
     await storeEntry.click();
-    await expect(page).toHaveURL(/\/dashboard\/websites\?new=1$/);
+    await expect(page).toHaveURL(/\/dashboard\/websites\/store\?new=1$/);
     await expect(page.getByRole("button", { name: /Loadder Commerce Modern V1/ })).toHaveCount(1);
     await expect(page.locator("[data-store-entry]"), "the store picker does not link to itself").toHaveCount(0);
     await expect(page.getByRole("heading", { name: "ساخت فروشگاه اینترنتی" })).toBeVisible();

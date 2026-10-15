@@ -226,7 +226,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const [needsCreate, setNeedsCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const templateOptions = templatesForSiteKind(siteKind);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(templateOptions[0]?.id ?? null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>((templateOptions.find((template) => template.siteKind === siteKind) ?? templateOptions[0])?.id ?? null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pickerSectionId, setPickerSectionId] = useState<string | null>(null);
   const [createProductOpen, setCreateProductOpen] = useState(false);
@@ -814,7 +814,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
-      <aside data-studio-inspector className={`min-h-0 min-w-0 overflow-hidden border-white/10 bg-[#0a111b] transition-all lg:order-2 lg:border-r ${inspectorOpen ? "fixed inset-x-0 bottom-0 z-[60] max-h-[70vh] overflow-y-auto rounded-t-2xl border-t shadow-2xl lg:static lg:max-h-none lg:rounded-none lg:border-t-0 lg:shadow-none" : "hidden pointer-events-none opacity-0 lg:block"}`}>
+      <aside data-studio-inspector className={`min-h-0 min-w-0 overflow-hidden border-white/10 bg-[#0a111b] transition-all lg:order-2 lg:border-r ${inspectorOpen ? "fixed inset-x-0 bottom-0 z-[60] h-[70vh] rounded-t-2xl border-t shadow-2xl lg:static lg:h-auto lg:rounded-none lg:border-t-0 lg:shadow-none" : "hidden pointer-events-none opacity-0 lg:block"}`}>
         <InspectorPanel {...inspectorProps} tab={tab} onTab={setTab} />
       </aside>
 
