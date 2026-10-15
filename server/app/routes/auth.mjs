@@ -15,8 +15,7 @@ import { publishedSiteHeaders } from "../services/public-site-headers.mjs";
 import { createConsultationRouter } from "./consultations.mjs";
 import { createConsultationService } from "../services/consultation-service.mjs";
 import { createMedicalDocumentRouter } from "./medical-documents.mjs";
-import { createMedicalDocumentService } from "../services/medical-document-service.mjs";
-import { createMedicalStorage } from "../services/medical-document-storage.mjs";
+import { createConfiguredMedicalDocuments } from "../services/medical-document-runtime.mjs";
 import { createDoctorPortalRouter, createPatientIdentityRouter } from "./patient-identity.mjs";
 import { createPatientIdentityService } from "../services/patient-identity-service.mjs";
 import { otpDeliveryConfigured, smsOtpDelivery } from "../services/patient-otp-delivery.mjs";
@@ -104,7 +103,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
   const publicBookingSite=(id)=>{const site=publicSite(id);return site&&bookingEnabled(site)?site:null};
   const publicBooking=(req,res)=>{const site=publicBookingSite(req.params.siteProjectId);if(!site){publicNotFound(res,"BOOKING_NOT_AVAILABLE");return null}return site};
   const bookingText=(value,max=200)=>typeof value==="string"&&value.trim()&&value.trim().length<=max?value.trim():null;
-  const medicalDocumentService=createMedicalDocumentService({db,storage:createMedicalStorage({nodeEnv}),nodeEnv});
+  const medicalDocumentService=createConfiguredMedicalDocuments({db,nodeEnv}).service;
   const patientIdentityService=createPatientIdentityService({db,hashSecret:environment.authHashSecret,deliver:smsOtpDelivery,deliveryConfigured:()=>otpDeliveryConfigured({nodeEnv}),exposeDevelopmentCode:nodeEnv!=="production"&&exposeDevelopmentOtp});
   router.use(createPatientIdentityRouter({service:patientIdentityService,siteLookup:publicSite,bookingRepository}));
   router.use(createDoctorPortalRouter({service:patientIdentityService,siteLookup:publicSite,bookingRepository}));

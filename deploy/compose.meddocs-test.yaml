@@ -1,0 +1,6 @@
+# TEST ONLY overlay (deploy/medical-docs-check.sh): enable Medical documents in PRODUCTION mode with a
+# test-only ClamAV signature (a harmless marker string) so a rejected upload can be demonstrated for real.
+services:
+  clamav:
+    volumes:
+      - ./test/loadder-test.ndb:/var/lib/clamav/loadder-test.ndb

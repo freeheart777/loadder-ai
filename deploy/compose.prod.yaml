@@ -25,6 +25,12 @@ x-server: &server
     MEDICAL_DOCUMENT_DEV_DIR: /data/medical-private
     LOADDER_OBJECT_STORAGE_DIR: /data/object-storage
     AUTH_EXPOSE_DEV_OTP: "false"
+    # Medical documents: OFF unless explicitly enabled AND configured (see docs/DOCKER_D2.md). Never enabled by default.
+    MEDICAL_DOCUMENTS_ENABLED: ${MEDICAL_DOCUMENTS_ENABLED:-false}
+    MEDICAL_DOCUMENT_ENCRYPTION_KEY: ${MEDICAL_DOCUMENT_ENCRYPTION_KEY:-}
+    MEDICAL_DOCUMENT_DIR: /data/medical-private
+    CLAMAV_HOST: ${CLAMAV_HOST:-}
+    CLAMAV_PORT: "3310"
     AUTH_HASH_SECRET: ${AUTH_HASH_SECRET:?set AUTH_HASH_SECRET in deploy/.env.production}
   user: "1000:1000"
   read_only: true
@@ -47,6 +53,7 @@ services:
     <<: *server
     depends_on:
       migrate: { condition: service_completed_successfully }
+      clamav: { condition: service_healthy, required: false }
     init: true
     restart: unless-stopped
     stop_grace_period: 40s          # above PROCESS_SHUTDOWN_GRACE_MS (30 s)
@@ -60,6 +67,28 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  # Malware scanner for Medical documents. Only started with `--profile medical-docs`; the server reaches it
+  # at CLAMAV_HOST=clamav:3310. Needs outbound internet to fetch signatures and about 2 GB of memory.
+  clamav:
+    profiles: ["medical-docs"]
+    image: clamav/clamav:stable
+    platform: linux/amd64        # the official image is amd64-only (emulated on arm64 hosts)
+    restart: unless-stopped
+    mem_limit: 2g
+    # The image's entrypoint starts as root, fixes ownership of the signature database and drops to the clamav user.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    volumes: ["clamav-db:/var/lib/clamav"]
+    expose: ["3310"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 20s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+    logging: *logging
 
   web:
     image: loadder-web:${LOADDER_VERSION:-local}
@@ -94,5 +123,6 @@ services:
 
 volumes:
   loadder-data:
+  clamav-db:
   caddy-data:
   caddy-config:

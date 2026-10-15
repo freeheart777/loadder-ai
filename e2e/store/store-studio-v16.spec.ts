@@ -125,7 +125,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
 
     await test.step("draft preview, immutable live publication and rollback stay in parity", async () => {
       const publishedA = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}/publish` && response.request().method() === "POST" && response.status() === 200);
-      await journey.page.getByRole("button", { name: "انتشار نسخه", exact: true }).click();
+      await journey.page.getByRole("button", { name: "انتشار", exact: true }).click();
       await publishedA;
       await expect(journey.page.getByText("نسخه منتشرشده با موفقیت ایجاد شد.")).toBeVisible();
 
@@ -141,10 +141,10 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       const savedB = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}` && response.request().method() === "PATCH" && response.status() === 200);
       await journey.page.getByRole("button", { name: "ذخیره", exact: true }).click();
       await savedB;
-      await journey.page.getByRole("button", { name: "پیش‌نمایش پیش‌نویس", exact: true }).click();
+      await journey.page.getByRole("button", { name: "پیش‌نمایش", exact: true }).click();
       await expect(journey.page.locator('[data-canvas-interactive="false"]').getByRole("heading", { name: "پیش‌نویس منتشرنشده ب", exact: true })).toBeVisible();
       await expect(journey.page.locator('[data-canvas-interactive="false"] [data-hero-layout="background"]')).toBeVisible();
-      await journey.page.getByText("پیش‌نمایش پیش‌نویس", { exact: true }).locator("..").getByRole("button").click();
+      await journey.page.getByRole("button", { name: "بستن پیش‌نمایش", exact: true }).click();
 
       await journey.page.goto(`/store/${journey.projectId}`);
       await expect(journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true })).toBeVisible();
@@ -152,7 +152,7 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
 
       await openStudio(journey.page, journey.projectId);
       const publishedB = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}/publish` && response.status() === 200);
-      await journey.page.getByRole("button", { name: "انتشار نسخه", exact: true }).click();
+      await journey.page.getByRole("button", { name: "انتشار نسخه جدید", exact: true }).click();
       await publishedB;
       await journey.page.goto(`/store/${journey.projectId}`);
       await expect(journey.page.getByRole("heading", { name: "پیش‌نویس منتشرنشده ب", exact: true })).toBeVisible();

@@ -82,6 +82,21 @@ bash deploy/restore.sh <db.sqlite> <files.tgz> --yes   # replaces ALL data; take
 - Backups contain customer data. Copy them off the server, encrypt them at rest, restrict access. Nothing here does off-site copies or retention; schedule `backup.sh` (cron/systemd timer) and ship the output.
 - A backup that has never been restored is not verified. `deploy/prod-auth-check.sh` performs a full backup, mutate, restore round trip on throw-away volumes.
 
+## Medical documents (optional, explicit opt-in)
+Patients can upload private documents (PDF, JPEG, PNG, WebP up to 10 MB) that only they, the doctor of that appointment and an audited, reason-stated operator access can open. In production this only runs when **all** of the following hold; otherwise uploads answer `503` and nothing is stored:
+1. `MEDICAL_DOCUMENTS_ENABLED=true` (exact value).
+2. `MEDICAL_DOCUMENT_ENCRYPTION_KEY`: 32 bytes as 64 hex characters or base64 (`openssl rand -hex 32`). Documents are encrypted per object with AES-256-GCM before they touch the disk, bound to their storage key; backups and volume snapshots hold **ciphertext only**.
+3. The ClamAV scanner: set `CLAMAV_HOST=clamav` and start with `--profile medical-docs`. Every upload is scanned before it is stored; an infected file is rejected (`422`), and a scanner outage or timeout answers `503` and stores nothing (fail closed). In production a document is readable only if its scan state is `clean`.
+
+```bash
+docker compose --env-file deploy/.env.production -f deploy/compose.prod.yaml --profile medical-docs up -d --build
+```
+The Medical Control Center settings tab reports the real state (`productionReady`, scanner, storage, encryption). Operational notes:
+- **Key custody is yours.** Keep the key outside the data volume and outside backups (a password manager or secret store). **Losing the key makes every stored document permanently unreadable**; there is no recovery and no key rotation yet (a rotation tool is deferred).
+- ClamAV needs about 2 GB of memory and outbound internet to refresh signatures. The official image is amd64-only (emulated on arm64 hosts); `platform: linux/amd64` is pinned.
+- The key and the scanner address are the only new secrets/settings; nothing else changes for non-Medical sites.
+- Not provided: antivirus on the host, per-document retention policy, key rotation, off-site encrypted backups.
+
 ## Operations
 ```bash
 docker compose -p loadder-prod --env-file deploy/.env.production -f deploy/compose.prod.yaml ps
@@ -98,12 +113,13 @@ Hardening in place: non-root user, read-only root filesystem (writable `/data` a
 | TLS edge, SPA fallback, caching, headers, API/sites routing | `deploy/smoke.sh` |
 | Production-mode sign-in over TLS (Secure/HttpOnly/SameSite=Lax host-only cookie), publishing, sites origin CSP, SMS outage fails closed with no leakage, restart persistence, backup/restore round trip | `deploy/prod-auth-check.sh` |
 | Browser suites on the production images and topology (Medical 17, Education 5) | `docker/prod-e2e.sh medical|education` |
+| Medical documents in production mode: encrypted at rest, real ClamAV (clean accepted, flagged file rejected, outage fails closed), patient/doctor/operator access, ciphertext-only backups | `deploy/medical-docs-check.sh` |
 
 The browser suites run with development-style sign-in over plain HTTP (`deploy/compose.test.yaml`) because they obtain codes from the API response; production-mode behaviour is covered by `prod-auth-check.sh`. **Not validated:** a real DNS name with a public certificate, a real SMS provider, x86-64 hardware (tested on arm64; the bundled SQLite binding ships Linux x86-64 and arm64 builds), load, and real payment providers.
 
 ## Limits and known gaps
 - **Single node.** SQLite, local files, in-memory rate limits and one outbox worker: do not run more than one `server` container or put the volume on network storage.
-- **Medical documents are disabled in production** (they answer `503 MEDICAL_STORAGE_NOT_CONFIGURED`) until private encrypted storage and a malware scanner are wired and validated. Everything else in the Medical vertical works.
+- **Medical documents are OFF by default in production** (`503`, nothing stored). Enabling them is an explicit, separately gated step; see "Medical documents" below.
 - Custom customer domains need on-demand TLS (not part of D2).
 - `/api/health` and `/api/auth/status` are public and show the environment name, migration list and OTP readiness.
 - No off-site backups, retention, metrics or alerting.

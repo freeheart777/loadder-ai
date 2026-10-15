@@ -24,8 +24,7 @@ import { createMedicalControlCenterRouter } from "./routes/medical-control-cente
 import { createMedicalControlCenterService } from "./services/medical-control-center-service.mjs";
 import { getMessagingStatus } from "../services/messaging.mjs";
 import { createMedicalDocumentAdminRouter } from "./routes/medical-documents.mjs";
-import { createMedicalDocumentService } from "./services/medical-document-service.mjs";
-import { createMedicalStorage } from "./services/medical-document-storage.mjs";
+import { createConfiguredMedicalDocuments } from "./services/medical-document-runtime.mjs";
 import { createPatientIdentityAdminRouter } from "./routes/patient-identity.mjs";
 import { createPatientIdentityService } from "./services/patient-identity-service.mjs";
 import { otpDeliveryConfigured, smsOtpDelivery } from "./services/patient-otp-delivery.mjs";
@@ -93,8 +92,7 @@ export function mountSiteBuilderControlPlane({
   );
   app.use(mountPath, createSiteMediaRouter({ service: mediaService, db }));
   app.use(mountPath, createPatientIdentityAdminRouter({ service: createPatientIdentityService({ db, hashSecret: environment.authHashSecret, deliver: smsOtpDelivery, deliveryConfigured: () => otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }) }), db }));
-  const medicalStorage = createMedicalStorage({ nodeEnv: environment.nodeEnv });
-  const medicalDocumentService = createMedicalDocumentService({ db, storage: medicalStorage, nodeEnv: environment.nodeEnv });
+  const { storage: medicalStorage, scanner: medicalScanner, service: medicalDocumentService } = createConfiguredMedicalDocuments({ db, nodeEnv: environment.nodeEnv });
   app.use(mountPath, createMedicalDocumentAdminRouter({ service: medicalDocumentService, db }));
   app.use(mountPath, createConsultationAdminRouter({ service: createConsultationService({ db }), db }));
   app.use(mountPath, createMedicalControlCenterRouter({
@@ -103,9 +101,9 @@ export function mountSiteBuilderControlPlane({
       const sms = getMessagingStatus().sms;
       return {
         otpDelivery: { configured: otpDeliveryConfigured({ nodeEnv: environment.nodeEnv }), provider: sms.provider, simulator: sms.provider === "simulator" },
-        // Production-ready means a real scanner AND production-grade private storage. Neither
-        // exists yet, so this is false in every environment, development included.
-        documents: { productionReady: false, scannerConfigured: false, storage: medicalStorage.kind, runnable: medicalDocumentService.productionReady() },
+        // Production-ready means production mode with a real scanner AND encrypted private storage, both
+        // explicitly configured. Development never reports production-ready.
+        documents: { productionReady: environment.nodeEnv === "production" && medicalDocumentService.productionReady(), scannerConfigured: Boolean(medicalScanner), storage: medicalStorage.kind, encrypted: medicalStorage.encrypted === true, reason: medicalStorage.reason ?? null, runnable: medicalDocumentService.productionReady() },
         environment: environment.nodeEnv,
       };
     } }),
