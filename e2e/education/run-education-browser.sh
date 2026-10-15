@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Isolated Education gate: fresh SQLite + media dir, local API and Vite server,
+# Isolated Education gate (portal + onboarding journeys): fresh SQLite + media dir, local API and Vite server,
 # torn down on exit. The public-app router is enabled because students sign in
 # through the existing app-user invite flow.
 dir="$(mktemp -d "${TMPDIR:-/tmp}/loadder-education-e2e.XXXXXX")"
@@ -37,7 +37,7 @@ web_pid="$!"
 for _ in $(seq 1 40); do
   if curl --fail --silent "$api_base/api/health" >/dev/null && curl --fail --silent "$web_base/" >/dev/null; then
     E2E_API_BASE_URL="$api_base" E2E_BASE_URL="$web_base" E2E_DATABASE_PATH="$dir/education.sqlite" E2E_VIDEO_FIXTURE="$dir/performance.webm" \
-      npx playwright test e2e/education/education-portal.spec.ts --project=chromium
+      npx playwright test e2e/education --project=chromium
     exit 0
   fi
   sleep 1

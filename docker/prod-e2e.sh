@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 case "${1:-}" in
   medical) spec=e2e/medical/medical-public.spec.ts ;;
-  education) spec=e2e/education/education-portal.spec.ts ;;
+  education) spec=e2e/education ;;
   commerce) spec=e2e/commerce/cart-checkout-order.spec.ts ;;
   corporate) spec=e2e/corporate ;;
   store) spec=e2e/store/store-studio-v16.spec.ts ;;

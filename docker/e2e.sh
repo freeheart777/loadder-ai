@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 unset LOADDER_WEB_PORT LOADDER_API_PORT LOADDER_PUBLIC_PORT
 case "${1:-}" in
   medical) spec=e2e/medical/medical-public.spec.ts ;;
-  education) spec=e2e/education/education-portal.spec.ts ;;
+  education) spec=e2e/education ;;
   *) echo "usage: docker/e2e.sh medical|education" >&2; exit 2 ;;
 esac
 dc() { docker compose -p loadder-e2e -f compose.yaml -f compose.e2e.yaml --profile e2e "$@"; }
