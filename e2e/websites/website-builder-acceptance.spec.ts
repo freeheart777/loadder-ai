@@ -25,6 +25,7 @@ async function openInspector(page: Page) {
   await page.getByText("تنظیمات دقیق").first().click();
   await expect(page.locator("[data-studio-inspector]").getByRole("button", { name: "طراحی", exact: true })).toBeVisible();
 }
+const tab0 = async (page: Page) => { await expect(page.getByRole("button", { name: "افزودن بخش" }).first()).toBeVisible(); };
 const tab = async (page: Page, name: string) => { await openInspector(page); await page.locator("[data-studio-inspector]").getByRole("button", { name, exact: true }).click(); };
 
 test("1-3. a new customer signs in, creates a website from a template and sees meaningful editable content", async ({ browser }) => {
@@ -210,6 +211,29 @@ test("15-16. the customer changes the site, republishes, and the public site fol
   await visitor.reload();
   await expect(visitor.getByRole("heading", { name: "عنوان نسخهٔ دوم" })).toBeVisible();
   await page.close();
+});
+
+test("responsive editing: on tablet and mobile the canvas fills the screen and the settings open as a sheet", async () => {
+  for (const [name, width, height] of [["tablet", 820, 1180], ["mobile", 390, 844]] as const) {
+    const page = await owner.newPage();
+    await page.setViewportSize({ width, height });
+    await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
+    await tab0(page);
+    await noOverflow(page, `${name} studio`);
+    // No dead blank area above the canvas: the first editable block starts near the top of the screen.
+    const top = await page.getByRole("button", { name: "افزودن بخش" }).first().evaluate((el) => el.getBoundingClientRect().top);
+    expect(top, `${name}: canvas starts high on the screen`).toBeLessThan(height * 0.45);
+    await page.getByRole("button", { name: "باز کردن پنل ویرایش" }).click();
+    const sheet = page.locator("[data-studio-inspector]");
+    await expect(sheet.getByRole("button", { name: "طراحی", exact: true })).toBeVisible();
+    await sheet.getByRole("button", { name: "طراحی", exact: true }).click();
+    await expect(sheet.getByLabel("اصلی", { exact: true }).first()).toBeVisible();
+    await noOverflow(page, `${name} studio with settings`);
+    await page.screenshot({ path: `test-results/builder-10-${name}-settings.png` });
+    await page.getByRole("button", { name: "بستن پنل ویرایش" }).click();
+    await expect(sheet).toBeHidden();
+    await page.close();
+  }
 });
 
 test("17. rollback restores the earlier live version (API only today: the Studio has no rollback control)", async ({ browser }) => {

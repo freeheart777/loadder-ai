@@ -792,11 +792,11 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
-      <aside data-studio-inspector className={`order-1 min-h-0 min-w-0 overflow-hidden border-r border-white/10 bg-[#0a111b] transition-all lg:order-2 ${inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+      <aside data-studio-inspector className={`min-h-0 min-w-0 overflow-hidden border-white/10 bg-[#0a111b] transition-all lg:order-2 lg:border-r ${inspectorOpen ? "fixed inset-x-0 bottom-0 z-[60] max-h-[70vh] overflow-y-auto rounded-t-2xl border-t shadow-2xl lg:static lg:max-h-none lg:rounded-none lg:border-t-0 lg:shadow-none" : "hidden pointer-events-none opacity-0 lg:block"}`}>
         <InspectorPanel {...inspectorProps} tab={tab} onTab={setTab} />
       </aside>
 
-      <button type="button" onClick={() => setInspectorOpen((v) => !v)} aria-label={inspectorOpen ? "بستن پنل ویرایش" : "باز کردن پنل ویرایش"} className="absolute left-3 top-3 z-50 hidden h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-700 shadow-lg lg:flex">
+      <button type="button" onClick={() => setInspectorOpen((v) => !v)} aria-label={inspectorOpen ? "بستن پنل ویرایش" : "باز کردن پنل ویرایش"} className="absolute left-3 top-3 z-50 flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-700 shadow-lg">
         {inspectorOpen ? <CaretLeft size={15} /> : <CaretRight size={15} />}{inspectorOpen ? "بستن تنظیمات" : "تنظیمات دقیق"}
       </button>
     </div>
