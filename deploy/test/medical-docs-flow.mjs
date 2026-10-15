@@ -98,6 +98,26 @@ check("opening a file as operator needs a reason", (await app("POST", `/api/site
 const opened = await app("POST", `/api/site-projects/${site}/medical-documents/${docId}/access`, { cookie: op, body: { reason: "support request by patient" } });
 check("with a reason it opens (and is audited)", opened.status === 200 && opened.raw.equals(PDF), `${opened.status}`);
 
+console.log("== unauthorized and cross-tenant access");
+const EICAR = Buffer.from("X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*");
+const eicarUpload = await upload(EICAR, "application/pdf", "eicar");
+check("an EICAR file is refused (not an allowed document type) and nothing is stored", eicarUpload.status >= 400 && eicarUpload.status < 500 && storeCount() === before + 1, `${eicarUpload.status} count ${storeCount()}`);
+check("operator routes reject an anonymous caller", (await app("GET", `/api/site-projects/${site}/medical-documents`)).status === 401, "anonymous");
+const opB = await signInOperator("09126660002", "Other Workspace");
+const siteB = (await app("POST", "/api/site-projects", { cookie: opB, body: { name: "Other Clinic", siteType: "MEDICAL", content: {} } })).json.project.id;
+await app("POST", `/api/site-projects/${siteB}/publish`, { cookie: opB }); await app("POST", `/api/site-projects/${siteB}/patient-identity`, { cookie: opB });
+const unknown = "11111111-1111-4111-8111-111111111111";
+const foreignList = await app("GET", `/api/site-projects/${site}/medical-documents`, { cookie: opB });
+const unknownList = await app("GET", `/api/site-projects/${unknown}/medical-documents`, { cookie: opB });
+check("another workspace's operator sees nothing of site A (same as a nonexistent site)", foreignList.status === unknownList.status && !JSON.stringify(foreignList.json).includes(docId), `${foreignList.status} vs ${unknownList.status}`);
+const foreignOpen = await app("POST", `/api/site-projects/${site}/medical-documents/${docId}/access`, { cookie: opB, body: { reason: "attempt" } });
+check("another workspace's operator cannot open the file", foreignOpen.status >= 400 && !foreignOpen.raw.equals(PDF), `${foreignOpen.status}`);
+const pubB = `/api/auth/site/${siteB}`;
+const crossPatient = await request("GET", APP, `${pubB}/patient/documents/${docId}/file`, { headers: identity });
+check("a patient session from site A cannot read documents through site B", crossPatient.status >= 400 && !crossPatient.raw.equals(PDF), `${crossPatient.status}`);
+const crossDoctor = await request("GET", APP, `${pubB}/doctor/documents/${docId}/file`, { headers: { "X-Loadder-App-Token": doc1 } });
+check("a doctor session from site A cannot read documents through site B", crossDoctor.status >= 400 && !crossDoctor.raw.equals(PDF), `${crossDoctor.status}`);
+
 console.log("== scanner outage fails closed");
 dc("stop", "clamav");
 const down = await upload(PDF, "application/pdf", "بدون اسکنر");
@@ -108,14 +128,37 @@ for (let i = 0; i < 60; i++) { if (dc("ps", "--format", "{{.Service}}={{.Health}
 const back = await upload(PDF, "application/pdf", "بعد از بازگشت");
 check("uploads work again once the scanner is back", back.status === 201, `${back.status} ${back.raw.toString().slice(0, 120)}`);
 
-console.log("== backups hold ciphertext only");
+console.log("== backups and plaintext hygiene");
+const composeExtra = FILES.split(" ").filter((f) => f !== "deploy/compose.prod.yaml").map((f) => `-f ${f}`).join(" ") + " --profile medical-docs";
+const scriptEnv = { ...process.env, LOADDER_PROJECT: PROJECT, LOADDER_COMPOSE_EXTRA: composeExtra };
 const backupDir = fs.mkdtempSync("/tmp/meddocs-backup-");
-execFileSync("bash", ["deploy/backup.sh", backupDir], { env: { ...process.env, LOADDER_PROJECT: PROJECT, LOADDER_COMPOSE_EXTRA: FILES.split(" ").filter((f) => f !== "deploy/compose.prod.yaml").map((f) => `-f ${f}`).join(" ") + " --profile medical-docs" }, stdio: "pipe" });
-const archive = fs.readdirSync(backupDir).find((f) => f.startsWith("files-"));
-const listing = execFileSync("tar", ["-tzf", `${backupDir}/${archive}`], { encoding: "utf8" });
+execFileSync("bash", ["deploy/backup.sh", backupDir], { env: scriptEnv, stdio: "pipe" });
+const dbBackup = `${backupDir}/${fs.readdirSync(backupDir).find((f) => f.startsWith("loadder-"))}`, filesBackup = `${backupDir}/${fs.readdirSync(backupDir).find((f) => f.startsWith("files-"))}`;
+const listing = execFileSync("tar", ["-tzf", filesBackup], { encoding: "utf8" });
 const objectPath = listing.split("\n").find((l) => l.startsWith("medical-private/") && !l.endsWith("/"));
-const extracted = execFileSync("tar", ["-xzOf", `${backupDir}/${archive}`, objectPath], { maxBuffer: 16 * 1024 * 1024 });
+const extracted = execFileSync("tar", ["-xzOf", filesBackup, objectPath], { maxBuffer: 16 * 1024 * 1024 });
 check("the backup contains the object, encrypted", Boolean(objectPath) && extracted.subarray(0, 4).toString() === "LMD1" && !extracted.includes(Buffer.from("PATIENT-SECRET")), objectPath || "no object");
+const needle = "PATIENT-SECRET-BLOOD-GROUP";
+const archiveText = execFileSync("tar", ["-xzOf", filesBackup], { maxBuffer: 64 * 1024 * 1024 });
+check("no plaintext document content in the files backup or the database backup", !archiveText.includes(Buffer.from(needle)) && !fs.readFileSync(dbBackup).includes(Buffer.from(needle)), "plaintext found in a backup");
+const volumeHits = dc("exec", "-T", "server", "sh", "-c", `grep -rl "${needle}" /data 2>/dev/null | wc -l`).trim();
+check("no plaintext document content anywhere in the data volume", volumeHits === "0", `${volumeHits} file(s)`);
+
+console.log("== restore keeps documents readable with the correct key only");
+const del = await request("DELETE", APP, `${pub}/patient/documents/${docId}`, { headers: identity });
+check("the patient deletes the document (access removed)", del.status === 200 && (await request("GET", APP, `${pub}/patient/documents/${docId}/file`, { headers: identity })).status === 404, `${del.status}`);
+execFileSync("bash", ["deploy/restore.sh", dbBackup, filesBackup, "--yes", "--no-pre-backup"], { env: scriptEnv, stdio: "pipe" });
+const restored = await request("GET", APP, `${pub}/patient/documents/${docId}/file`, { headers: identity });
+check("after restore the document is readable again, byte for byte", restored.status === 200 && restored.raw.equals(PDF), `${restored.status}`);
+const rekey = (key) => execFileSync("docker", [...dcArgs, "up", "-d", "--no-deps", "server"], { env: { ...process.env, MEDICAL_DOCUMENT_ENCRYPTION_KEY: key }, stdio: "pipe" });
+const waitHealthy = async () => { for (let i = 0; i < 60; i++) { if (dc("ps", "--format", "{{.Service}}={{.Health}}").includes("server=healthy")) return; await sleep(3000); } };
+rekey("f".repeat(64)); await waitHealthy();
+const wrongKey = await request("GET", APP, `${pub}/patient/documents/${docId}/file`, { headers: identity });
+check("with a WRONG key the file is not served and nothing leaks", wrongKey.status >= 400 && !wrongKey.raw.includes(Buffer.from("PATIENT-SECRET")), `${wrongKey.status}`);
+rekey(process.env.MEDICAL_DOCUMENT_ENCRYPTION_KEY); await waitHealthy();
+const again = await request("GET", APP, `${pub}/patient/documents/${docId}/file`, { headers: identity });
+check("with the correct key it is readable again", again.status === 200 && again.raw.equals(PDF), `${again.status}`);
+
 const logs = dc("logs", "server", "--no-color");
 check("server logs contain neither document content nor the key", !logs.includes("PATIENT-SECRET") && !logs.includes(process.env.MEDICAL_DOCUMENT_ENCRYPTION_KEY), "leak in logs");
 fs.rmSync(backupDir, { recursive: true, force: true });
