@@ -18,6 +18,8 @@ import { environment } from "./app/config/environment.mjs";
 import aiRouter from "./app/routes/ai.mjs";
 import { otpDeliveryConfigured } from "./app/services/patient-otp-delivery.mjs";
 import { createAuthRouter } from "./app/routes/auth.mjs";
+import { createPublicSiteMediaRouter } from "./app/routes/public-site-media.mjs";
+import { createSiteMediaStorageAdapter } from "./app/services/site-media-storage-adapter.mjs";
 import { createWorkspaceRouter } from "./app/routes/workspaces.mjs";
 import { createPlatformAdminRouter, createPlatformAdminReadModel } from "./app/routes/platform-admin.mjs";
 import { createBusinessProfileRouter } from "./app/routes/business-profile.mjs";
@@ -382,6 +384,9 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Site imagery (never documents/audio/video) must load for anonymous visitors of published sites.
+app.use("/api", createPublicSiteMediaRouter({ db, storage: createSiteMediaStorageAdapter() }));
 
 app.use(createRequireAuth(authService));
 app.use(
