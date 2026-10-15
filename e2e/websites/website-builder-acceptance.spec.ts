@@ -248,6 +248,49 @@ test("section operations (move, duplicate, disable, delete) and page deletion be
   await page.close();
 });
 
+test("undo and redo step back and forward through edits, by button and by keyboard", async () => {
+  test.setTimeout(120_000);
+  const page = await owner.newPage();
+  await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
+  await expect(page.getByRole("button", { name: "افزودن بخش" }).first()).toBeVisible();
+  await tab(page, "صفحه‌ها");
+  await page.locator("[data-studio-inspector]").getByRole("button", { name: /^خانه/ }).first().click();
+  const undo = page.getByRole("button", { name: "واگرد", exact: true });
+  const redo = page.getByRole("button", { name: "ازنو", exact: true });
+  await expect(undo, "nothing to undo on a freshly opened site").toBeDisabled();
+  const hero = page.locator('[data-editor-element="hero"]').getByRole("heading").first();
+  const original = (await hero.innerText()).trim();
+  await hero.click();
+  const title = page.getByLabel("عنوان", { exact: true }).first();
+  await title.fill("گام اول");
+  await expect(page.getByRole("heading", { name: "گام اول" })).toBeVisible();
+  await page.waitForTimeout(900);
+  await title.fill("گام دوم");
+  await expect(page.getByRole("heading", { name: "گام دوم" })).toBeVisible();
+  await undo.click();
+  await expect(page.getByRole("heading", { name: "گام اول" })).toBeVisible();
+  await expect(redo).toBeEnabled();
+  await undo.click();
+  await expect(page.getByRole("heading", { name: original })).toBeVisible();
+  await expect(undo).toBeDisabled();
+  await redo.click();
+  await expect(page.getByRole("heading", { name: "گام اول" })).toBeVisible();
+  // keyboard (outside text fields): focus the canvas heading's page area, not an input
+  await page.getByRole("button", { name: "افزودن بخش" }).first().focus();
+  await page.keyboard.press("Control+Z");
+  await expect(page.getByRole("heading", { name: original })).toBeVisible();
+  await page.keyboard.press("Control+Shift+Z");
+  await expect(page.getByRole("heading", { name: "گام اول" })).toBeVisible();
+  // a new edit after undo drops the redo branch
+  await undo.click();
+  await title.fill("شاخهٔ تازه");
+  await expect(redo).toBeDisabled();
+  // leave the saved draft as it was
+  await undo.click();
+  await page.screenshot({ path: "test-results/builder-13-undo.png" });
+  await page.close();
+});
+
 test("unsaved edits are guarded: leaving the page asks first, and saving removes the guard", async () => {
   const page = await owner.newPage();
   await page.goto(`/dashboard/websites/corporate?project=${siteId}`);

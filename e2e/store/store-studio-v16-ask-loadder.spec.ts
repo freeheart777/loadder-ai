@@ -24,8 +24,8 @@ async function createJourney(browser: Browser, testInfo: TestInfo): Promise<Jour
   return { api, context, page, projectId: created.project.id };
 }
 
-async function openStudio(page: Page) {
-  await page.goto("/dashboard/websites");
+async function openStudio(page: Page, projectId: string) {
+  await page.goto(`/dashboard/websites/store?project=${projectId}`);
   await expect(page.locator('[data-studio-version="16"]')).toBeVisible();
 }
 
@@ -33,7 +33,12 @@ test("Ask Loadder: select a section, preview, confirm apply, then undo, entirely
   test.setTimeout(90_000);
   const journey = await createJourney(browser, testInfo);
   try {
-    await openStudio(journey.page);
+    await openStudio(journey.page, journey.projectId);
+    // The project was created through the API with an empty document, so the default sections exist only in the Studio until the first save:
+    // Ask Loadder works on the persisted document, so the customer saves first (a UI-created site is already seeded and saved).
+    const seeded = journey.page.waitForResponse((r) => r.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}` && r.request().method() === "PATCH" && r.status() === 200);
+    await journey.page.getByRole("button", { name: "ذخیره", exact: true }).click();
+    await seeded;
 
     // 1-2. Select the default products section and open Ask Loadder for it.
     await journey.page.getByRole("heading", { name: "محصولات منتخب", exact: true }).click();

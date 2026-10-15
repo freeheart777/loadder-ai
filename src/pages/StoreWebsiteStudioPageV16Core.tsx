@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, ArrowUUpLeft, ArrowUUpRight, CaretLeft, CaretRight, CursorClick, Plus, Tag, X } from "@phosphor-icons/react";
 import { bookingManagementPath, controlCenterPath } from "../components/control-center/modules";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import InspectorPanel from "../components/store-studio-v16/InspectorPanel";
@@ -14,6 +14,7 @@ import type { WebsiteTemplate } from "../components/store-studio-v16/templates/t
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
 import PublishedVersions from "../components/store-studio-v16/PublishedVersions";
+import { useUndoRedo } from "../components/store-studio-v16/useUndoRedo";
 import { invalidateActiveStoreProject } from "../lib/activeStoreProject";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
@@ -215,6 +216,12 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // inferred from template labels or the current canvas kind.
   const [capabilities, setCapabilities] = useState<string[]>([]);
   const [config, setConfig] = useState<StudioConfig>(() => restoreConfig({}, siteKind));
+  const applyHistoryStep = useCallback((snapshot: StudioConfig) => setConfig((current) => {
+    // Undo/redo restores the document, not what the customer is looking at: keep the current page and selection when they still exist.
+    const stillThere = snapshot.pages.some((page) => page.id === current.activePageId);
+    return { ...snapshot, selectedElement: current.selectedElement, activePage: current.activePage, activePageId: stillThere ? current.activePageId : snapshot.pages[0]?.id ?? current.activePageId };
+  }), []);
+  const history = useUndoRedo(config, editorDocumentKey, applyHistoryStep);
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [tab, setTab] = useState<"context" | "sections" | "design" | "pages">("context");
   const [busy, setBusy] = useState(true);
@@ -280,6 +287,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
         const loadedConfig = restoreConfig(loaded.content || {}, String(loaded.siteType).toUpperCase() === "STORE" ? "STORE" : "BUSINESS");
         setConfig(loadedConfig);
+        history.reset(loadedConfig);
         savedDocument.current = editorDocumentKey(loadedConfig);
         if (showPreviewOnOpen) setPreviewOpen(true);
         setAssets((detail.assets || []).filter((a: MediaAsset) => typeof a.url === "string"));
@@ -592,6 +600,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       draftRevision.current = null;
       const createdConfig = restoreConfig(createdProject.content || {}, siteKind);
       setConfig(createdConfig);
+      history.reset(createdConfig);
       savedDocument.current = editorDocumentKey(createdConfig);
       setAssets([]);
       setNeedsCreate(false);
@@ -672,8 +681,11 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // system, never by overwriting content directly. This just syncs the
   // Studio's own view onto whatever that system just made authoritative.
   function onAskLoadderApplied(content: Record<string, any>, revision: number) {
-    const nextConfig = restoreConfig(content, siteKind);
+    const restored = restoreConfig(content, siteKind);
+    // Keep the section being edited selected: the Ask Loadder panel (with its Undo) lives on that selection.
+    const nextConfig = { ...restored, selectedElement: config.selectedElement, activePage: config.activePage, activePageId: restored.pages.some((page) => page.id === config.activePageId) ? config.activePageId : restored.activePageId };
     setConfig(nextConfig);
+    history.reset(nextConfig);
     savedDocument.current = editorDocumentKey(nextConfig);
     setProject((current) => (current ? { ...current, content } : current));
     draftRevision.current = revision;
@@ -689,6 +701,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     setProject(loaded);
     draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
     setConfig(nextConfig);
+    history.reset(nextConfig);
     savedDocument.current = editorDocumentKey(nextConfig);
     setMessage("نسخهٔ انتخاب‌شده دوباره منتشر شد.");
   }
@@ -741,6 +754,19 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // For a single-page site (every STORE) this is exactly config.sections.
   const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
   const hasUnsavedChanges = Boolean(project && savedDocument.current !== editorDocumentKey(config));
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) outside text fields; text fields keep the browser's own undo.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) { event.preventDefault(); history.undo(); }
+      else if ((key === "z" && event.shiftKey) || key === "y") { event.preventDefault(); history.redo(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [history]);
   // Closing or reloading the tab with unsaved edits asks first (the browser shows its own generic prompt).
   useEffect(() => {
     if (!hasUnsavedChanges) return undefined;
@@ -795,6 +821,10 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       <span data-persisted-site-type className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/55 lg:flex">نوع سایت: {siteTypeLabel(project?.siteType)}</span>
       {managerLinks.map((link) => <Link key={link.id} to={link.to} data-site-manager={link.id} className="hidden min-h-10 items-center rounded-xl border border-sky-300/20 bg-sky-400/10 px-3 text-[10px] font-bold text-sky-100 hover:bg-sky-400/20 lg:flex">{link.label}</Link>)}
       {publishedUrl && <a href={publishedUrl} target="_blank" rel="noreferrer" className="hidden min-h-10 items-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 lg:flex">آدرس عمومی <ArrowRight size={13} className="rotate-[-45deg]"/></a>}
+      <div className="flex items-center gap-1" role="group" aria-label="واگرد و ازنو">
+        <button type="button" onClick={history.undo} disabled={!history.canUndo} aria-label="واگرد" title="واگرد (Ctrl+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpLeft size={16} /></button>
+        <button type="button" onClick={history.redo} disabled={!history.canRedo} aria-label="ازنو" title="ازنو (Ctrl+Shift+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpRight size={16} /></button>
+      </div>
       {project?.status === "PUBLISHED" && !commerce && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} />}
       <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
     </header>
