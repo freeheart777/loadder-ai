@@ -825,7 +825,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         <button type="button" onClick={history.undo} disabled={!history.canUndo} aria-label="واگرد" title="واگرد (Ctrl+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpLeft size={16} /></button>
         <button type="button" onClick={history.redo} disabled={!history.canRedo} aria-label="ازنو" title="ازنو (Ctrl+Shift+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpRight size={16} /></button>
       </div>
-      {project?.status === "PUBLISHED" && !commerce && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} />}
+      {project?.status === "PUBLISHED" && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} />}
       <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
     </header>
 

@@ -157,8 +157,20 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
       await journey.page.goto(`/store/${journey.projectId}`);
       await expect(journey.page.getByRole("heading", { name: "پیش‌نویس منتشرنشده ب", exact: true })).toBeVisible();
 
-      await expectJsonOk(await journey.api.post(`/api/site-projects/${journey.projectId}/publish-rollback`, { data: { targetVersionId: versionA } }));
-      await journey.page.reload();
+      // Roll back from the Studio UI: the dialog lists both versions, the older one is made live again as a NEW version.
+      await openStudio(journey.page, journey.projectId);
+      await journey.page.locator("[data-published-versions-open]").click();
+      const dialog = journey.page.getByRole("dialog", { name: "نسخه‌های منتشرشده" });
+      await expect(dialog.locator("[data-version]")).toHaveCount(2);
+      journey.page.once("dialog", (d) => void d.accept());
+      const rolledBack = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}/publish-rollback` && response.status() === 200);
+      await dialog.locator('[data-version="1"]').getByRole("button", { name: "بازگردانی" }).click();
+      await rolledBack;
+      await journey.page.locator("[data-published-versions-open]").click();
+      await expect(dialog.locator("[data-version]")).toHaveCount(3);
+      await expect(dialog.locator('[data-version="3"]')).toContainText("فعلی");
+      await journey.page.getByRole("button", { name: "بستن", exact: true }).click();
+      await journey.page.goto(`/store/${journey.projectId}`);
       await expect(journey.page.getByRole("heading", { name: "قهرمان فارسی فروشگاه", exact: true })).toBeVisible();
       await journey.page.setViewportSize({ width: 390, height: 844 });
       const overflow = await journey.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
