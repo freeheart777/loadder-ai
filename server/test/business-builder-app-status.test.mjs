@@ -5,6 +5,7 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, before } from "node:test";
+import Database from "better-sqlite3";
 import { fileURLToPath } from "node:url";
 
 // An app is served to its invited users (invite exchange, public runtime, Education portal) only when its status is
@@ -69,4 +70,53 @@ test("only owners and admins of the app's own workspace can change it; bad input
   const source = readFileSync(join(SERVER_DIR, "app/routes/business-builder.mjs"), "utf8");
   const route = source.slice(source.indexOf('"/business-builder/projects/:id/status"'), source.indexOf('"/business-builder/projects/:id/versions/:versionId/restore"'));
   assert.match(route, /if\(!isAdmin\(q\)\)return s\.status\(403\)/, "same owner/admin guard as the access-policy route (members are refused)");
+});
+
+test("role matrix: owner and admin may change the status; an ordinary member gets 403, a foreign workspace 404, an anonymous caller 401; a refused request mutates nothing", async () => {
+  const path = `/api/business-builder/projects/${appId}/status`;
+  const statusOf = async () => (await call(A, "GET", `/api/business-builder/projects/${appId}`)).json.project.status;
+  const gateOpen = async () => (await exchange("not-a-real-token")).status === 401;   // 401: app located (ready); 404: draft
+  const set = (cookie, status) => call(cookie, "POST", path, { status });
+
+  // There is no product API for adding members, so the two extra users get real membership rows in the OWNER's
+  // workspace (the test owns this temporary database); they then use the product's own workspace switch.
+  const workspaceId = (await call(A, "GET", "/api/workspaces")).json.activeWorkspace.id;
+  const member = await signIn("09121110103", "Plain Member"), admin = await signIn("09121110104", "Workspace Admin");
+  const db = new Database(join(dir, "s.sqlite"));
+  try {
+    for (const [cookie, role] of [[member, "member"], [admin, "admin"]]) {
+      const userId = (await call(cookie, "GET", "/api/auth/me")).json.user.id;
+      db.prepare("INSERT INTO workspace_memberships(id,workspace_id,user_id,status,role,created_at,updated_at) VALUES(?,?,?,?,?,?,?)").run(`m-${role}-${userId}`, workspaceId, userId, "active", role, new Date().toISOString(), new Date().toISOString());
+      assert.equal((await call(cookie, "POST", "/api/workspaces/active", { workspaceId })).status, 200, `${role} switches into the owner's workspace`);
+    }
+  } finally { db.close(); }
+  // The member really is inside the workspace: they can read the app, so the refusal below is about role, not isolation.
+  assert.equal((await call(member, "GET", `/api/business-builder/projects/${appId}`)).status, 200, "the member can see the app");
+
+  // Start from a known state: draft.
+  assert.equal((await set(A, "draft")).status, 200); assert.equal(await statusOf(), "draft");
+  assert.equal(await gateOpen(), false);
+
+  // Refused while draft: nothing opens.
+  for (const [label, cookie, expected] of [["ordinary member", member, 403], ["foreign workspace", B, 404], ["anonymous", null, 401]]) {
+    const res = await set(cookie, "ready");
+    assert.equal(res.status, expected, `${label} cannot open the app`);
+    assert.equal(await statusOf(), "draft", `${label}: status unchanged`);
+    assert.equal(await gateOpen(), false, `${label}: the public gate stayed closed`);
+  }
+  assert.equal((await set(member, "ready")).json.code, "ADMIN_FORBIDDEN");
+
+  // Owner opens; refused callers cannot close it again.
+  assert.equal((await set(A, "ready")).status, 200); assert.equal(await gateOpen(), true);
+  for (const [label, cookie, expected] of [["ordinary member", member, 403], ["foreign workspace", B, 404], ["anonymous", null, 401]]) {
+    assert.equal((await set(cookie, "draft")).status, expected, `${label} cannot close the app`);
+    assert.equal(await statusOf(), "ready", `${label}: status unchanged`);
+    assert.equal(await gateOpen(), true, `${label}: the public gate stayed open`);
+  }
+
+  // An admin of the workspace may change it, in both directions.
+  assert.equal((await set(admin, "draft")).status, 200); assert.equal(await statusOf(), "draft"); assert.equal(await gateOpen(), false);
+  assert.equal((await set(admin, "ready")).status, 200); assert.equal(await statusOf(), "ready"); assert.equal(await gateOpen(), true);
+  assert.equal((await set(A, "draft")).status, 200, "the owner can close it again");
+  assert.equal(await statusOf(), "draft");
 });
