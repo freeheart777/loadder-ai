@@ -113,7 +113,7 @@ Hardening in place: non-root user, read-only root filesystem (writable `/data` a
 | TLS edge, SPA fallback, caching, headers, API/sites routing | `deploy/smoke.sh` |
 | Production-mode sign-in over TLS (Secure/HttpOnly/SameSite=Lax host-only cookie), publishing, sites origin CSP, SMS outage fails closed with no leakage, restart persistence, backup/restore round trip | `deploy/prod-auth-check.sh` |
 | Browser suites on the production images and topology (Medical 17, Education 5) | `docker/prod-e2e.sh medical|education` |
-| Medical documents in production mode: encrypted at rest, real ClamAV (clean accepted, flagged file rejected, outage fails closed), patient/doctor/operator access, ciphertext-only backups | `deploy/medical-docs-check.sh` |
+| Medical documents in production mode (41 checks): encrypted at rest, real ClamAV (clean accepted, flagged file rejected, outage fails closed), patient/doctor/operator access rules, anonymous and cross-workspace access denied, no plaintext in the volume or in either backup, restore returns the document byte for byte, a wrong key serves nothing and the correct key works again, no content or key in logs | `deploy/medical-docs-check.sh` |
 
 The browser suites run with development-style sign-in over plain HTTP (`deploy/compose.test.yaml`) because they obtain codes from the API response; production-mode behaviour is covered by `prod-auth-check.sh`. **Not validated:** a real DNS name with a public certificate, a real SMS provider, x86-64 hardware (tested on arm64; the bundled SQLite binding ships Linux x86-64 and arm64 builds), load, and real payment providers.
 
