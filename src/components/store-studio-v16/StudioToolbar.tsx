@@ -26,7 +26,7 @@ const pages = [
   ["success", "سفارش موفق"],
 ] as const;
 
-export default function StudioToolbar({ device, page, status, dirty = false, busy, onDevice, onPage, onPreview, onSave, onPublish, controlCenterHref }: {
+export default function StudioToolbar({ device, page, status, dirty = false, busy, onDevice, onPage, onPreview, onSave, onPublish, controlCenterHref, pageOptions, activePageId, onSelectPage }: {
   device: DeviceMode;
   page: PageMode;
   busy: boolean;
@@ -39,7 +39,12 @@ export default function StudioToolbar({ device, page, status, dirty = false, bus
   onPublish: () => void;
   /** Build -> Operate: the same SiteProject's Control Center. */
   controlCenterHref?: string;
+  /** Non-commerce sites: the site's own pages (home, about, contact, ...). Commerce sites use the storefront page set. */
+  pageOptions?: { id: string; title: string }[];
+  activePageId?: string;
+  onSelectPage?: (pageId: string) => void;
 }) {
+  const ownPages = pageOptions && onSelectPage ? pageOptions : null;
   return (
     <div className="flex min-w-0 flex-1 basis-[44rem] flex-wrap items-center justify-end gap-2.5">
       <div className="hidden min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[.035] px-3 xl:flex">
@@ -51,10 +56,14 @@ export default function StudioToolbar({ device, page, status, dirty = false, bus
       </div>
 
       <label className="relative min-w-[155px]">
-        <span className="sr-only">صفحه فروشگاه</span>
-        <select value={page} onChange={(event) => onPage(event.target.value as PageMode)} className="min-h-11 w-full appearance-none rounded-2xl border border-white/10 bg-white/[.045] py-2 pl-8 pr-3 text-xs font-black text-white outline-none transition hover:bg-white/[.07] focus:border-violet-400/50">
-          {pages.map(([value, label]) => <option key={value} value={value} className="bg-slate-950">{label}</option>)}
-        </select>
+        <span className="sr-only">{ownPages ? "صفحهٔ سایت" : "صفحه فروشگاه"}</span>
+        {ownPages
+          ? <select data-page-select="site" value={activePageId} onChange={(event) => onSelectPage?.(event.target.value)} className="min-h-11 w-full appearance-none rounded-2xl border border-white/10 bg-white/[.045] py-2 pl-8 pr-3 text-xs font-black text-white outline-none transition hover:bg-white/[.07] focus:border-violet-400/50">
+            {ownPages.map((item) => <option key={item.id} value={item.id} className="bg-slate-950">{item.title}</option>)}
+          </select>
+          : <select data-page-select="store" value={page} onChange={(event) => onPage(event.target.value as PageMode)} className="min-h-11 w-full appearance-none rounded-2xl border border-white/10 bg-white/[.045] py-2 pl-8 pr-3 text-xs font-black text-white outline-none transition hover:bg-white/[.07] focus:border-violet-400/50">
+            {pages.map(([value, label]) => <option key={value} value={value} className="bg-slate-950">{label}</option>)}
+          </select>}
         <GlobeHemisphereWest className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-white/35" size={15} />
       </label>
 

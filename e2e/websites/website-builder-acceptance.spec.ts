@@ -121,7 +121,7 @@ test("4-10. one design session: text, image, brand, a new section, a second page
   await page.reload();
   // The Studio reopens on the page last worked on (the new, still empty "news" page): its header already shows the saved brand and menu.
   await expect(page.getByText(state.brand).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "اخبار شرکت" }).or(page.getByText("اخبار شرکت")).first()).toBeVisible();
+  await expect(page.locator('[data-canvas-interactive="true"]').getByText("اخبار شرکت").first()).toBeVisible();
   await tab(page, "صفحه‌ها");
   await page.locator("[data-studio-inspector]").getByRole("button", { name: /^خانه/ }).first().click();
   await page.waitForTimeout(800);
