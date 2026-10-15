@@ -278,3 +278,20 @@ test("product create HTTP endpoint fails visibly and safely on an unexpected ser
   assert.equal(body.message, "Unable to process ecommerce operation.");
   assert.doesNotMatch(JSON.stringify(body), /simulated database detail/);
 });
+
+test("merchandised products carry their variants, so the storefront can tell what is purchasable", () => {
+  const { store, service } = fixture();
+  runWithWorkspace("ws-1", () => {
+    const featured = service.createProduct(store.id, { name:"Featured", currency:"IRT", basePriceMinor:5000, sku:"F-1", inventoryQuantity:10, status:"ACTIVE", featured:true });
+    const soldOut = service.createProduct(store.id, { name:"Sold out", currency:"IRT", basePriceMinor:5000, sku:"S-1", inventoryQuantity:0, status:"ACTIVE", featured:true });
+    for (const source of ["featured", "newest"]) {
+      const byId = Object.fromEntries(service.merchandisingProducts(store.id, { source }).map((p) => [p.id, p]));
+      assert.equal(byId[featured.id].variants.length, 1, `${source}: variants present`);
+      assert.equal(byId[featured.id].variants[0].inventoryQuantity, 10, `${source}: inventory present`);
+      assert.equal(byId[soldOut.id].variants[0].inventoryQuantity, 0);
+    }
+    // Same shape as the catalog listing, so a card can never disagree with the product page.
+    const listed = service.listProducts(store.id).find((p) => p.id === featured.id);
+    assert.deepEqual(service.merchandisingProducts(store.id, { source: "featured" }).find((p) => p.id === featured.id).variants, listed.variants);
+  });
+});
