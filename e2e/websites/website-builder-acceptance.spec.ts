@@ -21,9 +21,10 @@ test.describe.configure({ mode: "serial" });
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function openInspector(page: Page) {
-  if (await page.locator("[data-studio-inspector]").getByRole("button", { name: "طراحی", exact: true }).isVisible().catch(() => false)) return;
-  await page.getByText("تنظیمات دقیق").first().click();
-  await expect(page.locator("[data-studio-inspector]").getByRole("button", { name: "طراحی", exact: true })).toBeVisible();
+  const toggle = page.getByRole("button", { name: /پنل ویرایش/ });
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-label")) === "باز کردن پنل ویرایش") await toggle.click();
+  await expect(page.getByRole("button", { name: "بستن پنل ویرایش" })).toBeVisible();
 }
 const tab0 = async (page: Page) => { await expect(page.getByRole("button", { name: "افزودن بخش" }).first()).toBeVisible(); };
 const tab = async (page: Page, name: string) => { await openInspector(page); await page.locator("[data-studio-inspector]").getByRole("button", { name, exact: true }).click(); };
@@ -210,6 +211,40 @@ test("15-16. the customer changes the site, republishes, and the public site fol
   expect((await pub).status()).toBe(200);
   await visitor.reload();
   await expect(visitor.getByRole("heading", { name: "عنوان نسخهٔ دوم" })).toBeVisible();
+  await page.close();
+});
+
+test("section operations (move, duplicate, disable, delete) and page deletion behave on the live document", async () => {
+  test.setTimeout(120_000);
+  const page = await owner.newPage();
+  await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
+  await expect(page.getByRole("button", { name: "افزودن بخش" }).first()).toBeVisible();
+  await tab(page, "صفحه‌ها");
+  await page.locator("[data-studio-inspector]").getByRole("button", { name: /^خانه/ }).first().click();
+  await tab(page, "بخش‌ها");
+  const ins = page.locator("[data-studio-inspector]");
+  const order = async () => page.locator("h2:not([data-studio-inspector] h2)").allInnerTexts();
+  const rows = ins.getByRole("button", { name: "تکثیر" });
+  const before = await rows.count();
+  const first = ins.getByRole("button", { name: "پایین" }).first();
+  const names0 = await order();
+  await first.click();
+  const names1 = await order();
+  expect(names1.join("|"), "moving the first section down changes the order").not.toBe(names0.join("|"));
+  await rows.first().click();
+  await expect(rows).toHaveCount(before + 1);                         // duplicate
+  await ins.getByRole("button", { name: "حذف" }).first().click();
+  await expect(rows).toHaveCount(before);                             // delete
+  await tab(page, "صفحه‌ها");
+  // Pages: add a throw-away page, reorder it, delete it; the Home page can never be deleted.
+  const pageCount = () => ins.getByRole("button", { name: /^(خانه|اخبار شرکت|صفحه)/ }).count();
+  const startPages = await pageCount();
+  await ins.getByRole("button", { name: "افزودن صفحه" }).click();
+  await expect.poll(pageCount).toBe(startPages + 1);
+  await ins.getByRole("button", { name: "بالا" }).first().click();
+  await ins.getByRole("button", { name: "حذف صفحه" }).first().click();
+  await expect.poll(pageCount).toBe(startPages);
+  await page.screenshot({ path: "test-results/builder-12-pages.png" });
   await page.close();
 });
 
