@@ -393,5 +393,56 @@ test("18. another workspace cannot read, change, publish or roll back the site",
   const mine = await (await owner.request.get(base)).json();
   expect(mine.project.name).toBe("شرکت حرفه‌ای");
   await intruder.close();
-  await owner.close();
 });
+
+test("explicit save: a failed save keeps the work marked unsaved and retry succeeds; a stale tab cannot overwrite newer work", async () => {
+  const page = await owner.newPage();
+  const editColour = async (p: Page, value: string) => p.locator("[data-studio-inspector]").getByLabel("اصلی", { exact: true }).first().fill(value);
+  const prompted = (p: Page) => p.evaluate(() => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; });
+  const save = (p: Page) => p.getByRole("button", { name: "ذخیره", exact: true });
+  const isSave = (r: { url(): string; request(): { method(): string } }) => r.url() === `${apiBase}/api/site-projects/${siteId}` && r.request().method() === "PATCH";
+
+  await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
+  await tab(page, "طراحی");
+  await editColour(page, "#0ea5e9");
+  await expect(page.getByText("تغییرات ذخیره نشده").first()).toBeVisible();
+
+  // The server fails: nothing is lost, the page still says unsaved and still guards leaving.
+  await page.route(`${apiBase}/api/site-projects/${siteId}`, (route) => route.request().method() === "PATCH" ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ success: false, message: "خطای موقت سرور" }) }) : route.continue());
+  await save(page).click();
+  await expect(page.getByText("خطای موقت سرور").first()).toBeVisible();
+  await expect(page.getByText("تغییرات ذخیره نشده").first()).toBeVisible();
+  expect(await prompted(page), "still guarded after a failed save").toBe(true);
+
+  // Retry once the server is back: saved, guard removed, and it survives a reload.
+  await page.unroute(`${apiBase}/api/site-projects/${siteId}`);
+  const ok = page.waitForResponse((r) => isSave(r) && r.status() === 200);
+  await save(page).click();
+  await ok;
+  await expect(page.getByText("همه تغییرات ذخیره شده").first()).toBeVisible();
+  expect(await prompted(page)).toBe(false);
+  await page.reload();
+  await tab(page, "طراحی");
+  await expect(page.locator("[data-studio-inspector]").getByLabel("اصلی", { exact: true }).first()).toHaveValue("#0ea5e9");
+
+  // Two tabs: B opens, A saves newer work, B (now stale) must be refused instead of silently overwriting A.
+  const tabB = await owner.newPage();
+  await tabB.goto(`/dashboard/websites/corporate?project=${siteId}`);
+  await tab(tabB, "طراحی");
+  await editColour(page, "#f97316");
+  const savedA = page.waitForResponse((r) => isSave(r) && r.status() === 200);
+  await save(page).click();
+  await savedA;
+  await editColour(tabB, "#111827");
+  const refused = tabB.waitForResponse(isSave);
+  await save(tabB).click();
+  expect((await refused).status(), "stale save is refused").toBe(409);
+  await expect(tabB.getByText("تغییرات ذخیره نشده").first(), "refused work stays marked unsaved").toBeVisible();
+  const stored = await (await owner.request.get(`${apiBase}/api/site-projects/${siteId}`)).json();
+  expect(JSON.stringify(stored.project.content)).toContain("#f97316");
+  expect(JSON.stringify(stored.project.content)).not.toContain("#111827");
+  await tabB.close();
+  await page.close();
+});
+
+test.afterAll(async () => { await owner?.close().catch(() => undefined); });
