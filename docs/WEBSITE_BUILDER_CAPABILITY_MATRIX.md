@@ -10,7 +10,8 @@ Status: WORKING / FIXED (was broken, fixed here, covered) / INCOMPLETE / NOT IMP
 | New-website picker: Store, Clinic, Law, Education, Corporate, Hybrid, Nava Medical | WORKING | `website-template-creation.spec.ts`, acceptance step 1 |
 | Create from a template, named after it, seeded with real sections and photos | WORKING | acceptance 1-3 |
 | Business flow preselected the Store template | FIXED | default is now the first template of the route's kind |
-| Create blank site | NOT VERIFIED | button present, not exercised |
+| Create blank site and blank store | WORKING | `website-blank-and-preview.spec.ts`: skeleton site edits, saves, reloads, publishes; blank store is persisted as STORE |
+| Store created from the picker template was unusable publicly | FIXED | template carried `ECOMMERCE`; public storefront answered 'Store not found' (P0). Stores are now persisted as STORE |
 
 ## B. Visual Studio
 | Capability | Status | Evidence |
@@ -25,8 +26,9 @@ Status: WORKING / FIXED (was broken, fixed here, covered) / INCOMPLETE / NOT IMP
 | Leave with unsaved changes asks first | FIXED | `beforeunload` guard; was absent |
 | Undo / redo (buttons, Ctrl/Cmd+Z, Shift+Z) | FIXED | was NOT IMPLEMENTED; acceptance "undo and redo" |
 | Preview (desktop, mobile) | WORKING | acceptance 11 |
-| Private preview link | NOT VERIFIED | covered by `website-release-flow.spec.ts` only on the full runtime |
-| Autosave | NOT IMPLEMENTED | P2: save is explicit by design ("save and publish are independent") |
+| Private preview link and its access control | WORKING | release flow (6 templates) and blank spec: token required, wrong/malformed/other-project token refused, noindex, draft edits reach the link but not the public site, other workspace gets 404 |
+| Explicit save | WORKING | failed save keeps work unsaved and guarded, retry succeeds, stale tab refused with 409 |
+| Autosave | NOT IMPLEMENTED | by design; needs a product decision |
 
 ## C. Pages
 | Capability | Status | Evidence |
@@ -42,7 +44,7 @@ Status: WORKING / FIXED (was broken, fixed here, covered) / INCOMPLETE / NOT IMP
 | Edit after publish does not change the live site until republished | WORKING | acceptance 15-16 |
 | Republish | WORKING | acceptance 15-16 |
 | Rollback from the Studio (corporate/business sites) | FIXED | versions dialog; was API only |
-| Rollback UI for Store sites | NOT IMPLEMENTED | P1: API works, dialog intentionally limited to non-commerce sites until verified |
+| Rollback UI for Store sites | FIXED | same dialog; `store-studio-v16.spec.ts` rolls back through the UI and checks the public storefront |
 | Uploaded images visible on the public site | FIXED | was 401 for every visitor (P0): new public route serves site imagery only |
 
 ## E. Responsive
@@ -50,7 +52,7 @@ Status: WORKING / FIXED (was broken, fixed here, covered) / INCOMPLETE / NOT IMP
 |---|---|---|
 | Edit on tablet and phone | FIXED | settings were an invisible half-screen block with no toggle (P0 for those devices); now a bottom sheet |
 | Public site on mobile without overflow | WORKING | acceptance 14 |
-| Mobile Studio header is cramped, title overlaps buttons | INCOMPLETE | P2 cosmetic |
+| Studio header on tablet/phone | FIXED | wraps; overlap asserted at 820 and 390 px |
 
 ## F. Business integrations (existing suites, production topology)
 | Integration | Status | Evidence |
@@ -59,8 +61,8 @@ Status: WORKING / FIXED (was broken, fixed here, covered) / INCOMPLETE / NOT IMP
 | Medical to site-scoped appointments and documents | WORKING | `prod-e2e medical` 17, `medical-docs-check` |
 | Education to portal and enrolment | WORKING | `prod-e2e education` 12 |
 | Corporate contact and lead capture, multi-page | WORKING | `prod-e2e corporate` 5 |
-| Legal to Booking Studio | NOT VERIFIED | resolver unit tests only; no browser journey |
-| Control Center link from the Studio | NOT VERIFIED | button present |
+| Legal to Booking Studio | WORKING | `website-legal-booking.spec.ts`: Studio link, provider/service/schedule, published site's booking page lists them, other workspace 404 |
+| Control Center link from the Studio | NOT VERIFIED | button present; Medical/Education centres covered by their suites |
 
 ## G. Security and tenancy
 | Capability | Status | Evidence |
