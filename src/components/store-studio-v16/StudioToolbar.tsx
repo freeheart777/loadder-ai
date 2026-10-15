@@ -41,7 +41,7 @@ export default function StudioToolbar({ device, page, status, dirty = false, bus
   controlCenterHref?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2.5">
+    <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center justify-end gap-2.5 lg:basis-0">
       <div className="hidden min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[.035] px-3 xl:flex">
         <span className="relative grid h-7 w-7 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300">
           <Storefront size={16} weight="fill" />

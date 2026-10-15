@@ -313,6 +313,20 @@ test("responsive editing: on tablet and mobile the canvas fills the screen and t
     await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
     await tab0(page);
     await noOverflow(page, `${name} studio`);
+    // The header never lets the title and its controls overlap, and nothing sits outside the screen.
+    const clashes = await page.locator("[data-studio-header]").evaluate((header) => {
+      const boxes = [...header.querySelectorAll("h1, a, button, select")].map((el) => ({ el, r: el.getBoundingClientRect() })).filter(({ r }) => r.width > 0 && r.height > 0);
+      const out: string[] = [];
+      for (const { el, r } of boxes) if (r.left < -1 || r.right > window.innerWidth + 1) out.push(`off-screen: ${(el.textContent || el.getAttribute("aria-label") || el.tagName).slice(0, 30)}`);
+      for (let i = 0; i < boxes.length; i += 1) for (let j = i + 1; j < boxes.length; j += 1) {
+        const x = boxes[i].r, y = boxes[j].r;
+        if (boxes[i].el.contains(boxes[j].el) || boxes[j].el.contains(boxes[i].el)) continue;
+        if (x.left < y.right - 1 && y.left < x.right - 1 && x.top < y.bottom - 1 && y.top < x.bottom - 1) out.push(`${(boxes[i].el.textContent || "").slice(0, 20)} overlaps ${(boxes[j].el.textContent || "").slice(0, 20)}`);
+      }
+      return out;
+    });
+    expect(clashes, `${name}: header overlaps`).toEqual([]);
+    await page.screenshot({ path: `test-results/builder-09-${name}-header.png`, clip: { x: 0, y: 0, width, height: 260 } });
     // No dead blank area above the canvas: the first editable block starts near the top of the screen.
     const top = await page.getByRole("button", { name: "افزودن بخش" }).first().evaluate((el) => el.getBoundingClientRect().top);
     expect(top, `${name}: canvas starts high on the screen`).toBeLessThan(height * 0.45);
