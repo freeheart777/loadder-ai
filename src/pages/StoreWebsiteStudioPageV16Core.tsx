@@ -727,6 +727,13 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // For a single-page site (every STORE) this is exactly config.sections.
   const canvasConfig = useMemo<StudioConfig>(() => ({ ...config, sections: activePageOf(config).sections }), [config]);
   const hasUnsavedChanges = Boolean(project && savedDocument.current !== editorDocumentKey(config));
+  // Closing or reloading the tab with unsaved edits asks first (the browser shows its own generic prompt).
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsavedChanges]);
   const managerLinks = [
     capabilities.includes("blog") ? { id: "content", to: "/dashboard/content", label: "مدیریت محتوا" } : null,
     capabilities.includes("commerce") ? { id: "commerce", to: "/dashboard/websites/commerce", label: "مدیریت فروش" } : null,

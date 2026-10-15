@@ -213,6 +213,21 @@ test("15-16. the customer changes the site, republishes, and the public site fol
   await page.close();
 });
 
+test("unsaved edits are guarded: leaving the page asks first, and saving removes the guard", async () => {
+  const page = await owner.newPage();
+  await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
+  await expect(page.getByRole("button", { name: "افزودن بخش" }).first()).toBeVisible();
+  const prompted = async () => page.evaluate(() => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; });
+  expect(await prompted(), "no prompt while everything is saved").toBe(false);
+  await tab(page, "طراحی");
+  await page.locator("[data-studio-inspector]").getByLabel("اصلی", { exact: true }).first().fill("#7c3aed");
+  await expect(page.getByText("تغییرات ذخیره نشده").first()).toBeVisible();
+  expect(await prompted(), "prompt with unsaved changes").toBe(true);
+  await page.locator("[data-studio-inspector]").getByLabel("اصلی", { exact: true }).first().fill(state.color);   // back to the saved value
+  await expect.poll(prompted, { message: "undoing by hand to the saved state clears the guard" }).toBe(false);
+  await page.close();
+});
+
 test("responsive editing: on tablet and mobile the canvas fills the screen and the settings open as a sheet", async () => {
   for (const [name, width, height] of [["tablet", 820, 1180], ["mobile", 390, 844]] as const) {
     const page = await owner.newPage();
