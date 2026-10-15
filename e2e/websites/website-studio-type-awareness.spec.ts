@@ -39,6 +39,14 @@ async function expectBusinessStudio(page: Page, siteType: string, project: { id:
   await expect(page.getByRole("button", { name: "تخفیف‌ها" }), "no discount quick-add").toHaveCount(0);
   await expect(page.locator('[data-quick-add="discounts"]')).toHaveCount(0);
   await expect(page.getByText("صفحه فروشگاه", { exact: true })).toHaveCount(0);
+  // Site-type icon, a single "create another site" action on desktop, and no store wording in the Inspector.
+  expect(await page.locator("[data-site-icon]").getAttribute("data-site-icon")).not.toBe("STORE");
+  expect(await page.locator("[data-create-another-site]:visible").count(), "one create-another action on desktop").toBe(1);
+  const toggle0 = page.getByRole("button", { name: /پنل ویرایش/ });
+  if ((await toggle0.getAttribute("aria-label")) === "باز کردن پنل ویرایش") await toggle0.click();
+  await page.locator("[data-studio-inspector]").getByRole("button", { name: "طراحی", exact: true }).click();
+  await expect(page.locator("[data-studio-inspector]").getByText("ظاهر کلی فروشگاه")).toHaveCount(0);
+  await expect(page.locator("[data-studio-inspector]").getByText("ظاهر کلی سایت")).toBeVisible();
 
   // A new page appears in the selector, switching shows it, and save + preview + publish still work.
   const toggle = page.getByRole("button", { name: /پنل ویرایش/ });
@@ -66,6 +74,13 @@ async function expectBusinessStudio(page: Page, siteType: string, project: { id:
   await page.reload();
   await expect(page.locator("[data-page-select]")).toHaveAttribute("data-page-select", "site");
   await expect(page.locator("[data-page-select] option", { hasText: "صفحهٔ آزمون" })).toHaveCount(1);
+
+  // Entry page: a fresh entry opens on Home even though the new page was last worked on; ?page= is explicit navigation.
+  await expect(page.locator("[data-page-select] option:checked")).toHaveText(await page.locator("[data-page-select] option").first().innerText());
+  const detail = await (await page.request.get(`${apiBase}/api/site-projects/${project.id}`)).json();
+  const extra = detail.project.content.storeBuilderV16.pages.find((item: { title: string }) => item.title === "صفحهٔ آزمون");
+  await page.goto(`/dashboard/websites/corporate?project=${project.id}&page=${extra.id}`);
+  await expect(page.locator("[data-page-select]")).toHaveValue(extra.id);
 }
 
 for (const [label, route, name, siteType] of [
@@ -91,6 +106,7 @@ test("Store Studio keeps its storefront pages and quick-add actions", async ({ b
     expect(project.siteType).toBe("STORE");
     const select = page.locator("[data-page-select]");
     await expect(select).toHaveAttribute("data-page-select", "store");
+    expect(await page.locator("[data-site-icon]").getAttribute("data-site-icon")).toBe("STORE");
     const options = await select.locator("option").allTextContents();
     for (const storePage of ["خانه فروشگاه", "سبد خرید", "تسویه حساب"]) expect(options).toContain(storePage);
     await expect(page.getByRole("button", { name: "تخفیف‌ها" })).toBeVisible();

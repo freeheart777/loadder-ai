@@ -204,6 +204,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const requestedProjectId = searchParams.get("project");
   const forceCreate = searchParams.get("new") === "1";
   const showPreviewOnOpen = searchParams.get("preview") === "1";
+  const requestedPageId = searchParams.get("page");
   const commerce = isCommerceSite(siteKind);
   const [project, setProject] = useState<Project | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -286,6 +287,9 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         setCapabilities(Array.isArray(detail.capabilities) ? detail.capabilities.filter((value: unknown): value is string => typeof value === "string") : []);
         draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
         const loadedConfig = restoreConfig(loaded.content || {}, String(loaded.siteType).toUpperCase() === "STORE" ? "STORE" : "BUSINESS");
+        // A fresh Studio entry opens on Home (or the page named by ?page=), not on whichever page was last saved.
+        const entryPage = loadedConfig.pages.find((item) => item.id === requestedPageId) ?? loadedConfig.pages.find((item) => item.isHome) ?? loadedConfig.pages[0];
+        if (entryPage) { loadedConfig.activePageId = entryPage.id; loadedConfig.selectedElement = { type: "hero", id: "hero" }; }
         setConfig(loadedConfig);
         history.reset(loadedConfig);
         savedDocument.current = editorDocumentKey(loadedConfig);
@@ -306,7 +310,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       }
     })();
     return () => c.abort();
-  }, [commerce, forceCreate, requestedProjectId, showPreviewOnOpen, siteKind]);
+  }, [commerce, forceCreate, requestedPageId, requestedProjectId, showPreviewOnOpen, siteKind]);
 
   // Dynamic section sources are resolved by the canonical Commerce query. The
   // resulting products are transient render data; draft content retains only
@@ -826,7 +830,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         <button type="button" onClick={history.redo} disabled={!history.canRedo} aria-label="ازنو" title="ازنو (Ctrl+Shift+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpRight size={16} /></button>
       </div>
       {project?.status === "PUBLISHED" && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} />}
-      <StudioToolbar pageOptions={commerce ? undefined : config.pages.map((item) => ({ id: item.id, title: item.title }))} activePageId={config.activePageId} onSelectPage={commerce ? undefined : actions.selectPage} device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
+      <StudioToolbar siteType={project?.siteType} pageOptions={commerce ? undefined : config.pages.map((item) => ({ id: item.id, title: item.title }))} activePageId={config.activePageId} onSelectPage={commerce ? undefined : actions.selectPage} device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>
@@ -836,7 +840,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         </nav>}
         <div className="sticky top-2 z-40 mx-auto mb-3 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-white/15 bg-[#111827]/92 p-1.5 shadow-xl backdrop-blur">
           <span className="px-3 py-2 text-[10px] font-bold text-emerald-200">عکس‌ها: مستقیم روی خود تصویر</span>
-          <Link to="/dashboard/websites" data-create-another-site className="rounded-xl px-3 py-2 text-[11px] font-bold text-emerald-200 hover:bg-white/10">ساخت سایت دیگر</Link>
+          <Link to="/dashboard/websites" data-create-another-site className="rounded-xl px-3 py-2 text-[11px] font-bold text-emerald-200 hover:bg-white/10 md:hidden">ساخت سایت دیگر</Link>
           <button onClick={() => { setTab("sections"); setInspectorOpen(true); }} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10"><Plus size={16} /> افزودن بخش</button>
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
           {(commerce || capabilities.includes("commerce")) && <button data-quick-add="discounts" onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>}

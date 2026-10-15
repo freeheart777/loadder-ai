@@ -92,7 +92,7 @@ test("4-10. one design session: text, image, brand, a new section, a second page
 
   // 6a. Brand name (header).
   await page.getByText("شرکت شما").first().click();
-  await page.locator("[data-studio-inspector]").getByLabel("نام فروشگاه", { exact: true }).fill(state.brand);
+  await page.locator("[data-studio-inspector]").getByLabel("نام برند", { exact: true }).fill(state.brand);
   await expect(page.getByText(state.brand).first()).toBeVisible();
 
   // 6b. Add a section: choosing a type in the "add section" control adds it.
@@ -119,12 +119,10 @@ test("4-10. one design session: text, image, brand, a new section, a second page
   await saved;
   await expect(page.getByText("آخرین تغییرات ذخیره شده").first()).toBeVisible();
   await page.reload();
-  // The Studio reopens on the page last worked on (the new, still empty "news" page): its header already shows the saved brand and menu.
+  // A fresh Studio entry opens on Home even though the new "news" page was the last one worked on; the saved menu lists it.
   await expect(page.getByText(state.brand).first()).toBeVisible();
+  await expect(page.locator("[data-page-select] option:checked")).toHaveText(/خانه/);
   await expect(page.locator('[data-canvas-interactive="true"]').getByText("اخبار شرکت").first()).toBeVisible();
-  await tab(page, "صفحه‌ها");
-  await page.locator("[data-studio-inspector]").getByRole("button", { name: /^خانه/ }).first().click();
-  await page.waitForTimeout(800);
   await expect(page.getByRole("heading", { name: state.heroTitle })).toBeVisible();
   await expect(page.getByText(state.brand).first()).toBeVisible();
   expect(await page.locator("img").first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0), "uploaded image survives reload").toBe(true);

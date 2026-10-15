@@ -8,6 +8,11 @@ import {
   GlobeHemisphereWest,
   RocketLaunch,
   Storefront,
+  Stethoscope,
+  Scales,
+  GraduationCap,
+  Buildings,
+  type Icon,
 } from "@phosphor-icons/react";
 import type { DeviceMode, PageMode } from "./types";
 
@@ -16,6 +21,8 @@ const devices = [
   ["tablet", "تبلت", DeviceTablet],
   ["mobile", "موبایل", DeviceMobile],
 ] as const;
+
+const siteIcons: Record<string, Icon> = { STORE: Storefront, ECOMMERCE: Storefront, MEDICAL: Stethoscope, LEGAL: Scales, EDUCATION: GraduationCap };
 
 const pages = [
   ["storefront", "خانه فروشگاه"],
@@ -26,7 +33,7 @@ const pages = [
   ["success", "سفارش موفق"],
 ] as const;
 
-export default function StudioToolbar({ device, page, status, dirty = false, busy, onDevice, onPage, onPreview, onSave, onPublish, controlCenterHref, pageOptions, activePageId, onSelectPage }: {
+export default function StudioToolbar({ device, page, status, dirty = false, busy, onDevice, onPage, onPreview, onSave, onPublish, controlCenterHref, pageOptions, activePageId, onSelectPage, siteType }: {
   device: DeviceMode;
   page: PageMode;
   busy: boolean;
@@ -43,13 +50,16 @@ export default function StudioToolbar({ device, page, status, dirty = false, bus
   pageOptions?: { id: string; title: string }[];
   activePageId?: string;
   onSelectPage?: (pageId: string) => void;
+  /** Persisted site type; picks the status icon. */
+  siteType?: string;
 }) {
+  const SiteIcon = siteIcons[String(siteType || "").toUpperCase()] ?? Buildings;
   const ownPages = pageOptions && onSelectPage ? pageOptions : null;
   return (
     <div className="flex min-w-0 flex-1 basis-[44rem] flex-wrap items-center justify-end gap-2.5">
       <div className="hidden min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[.035] px-3 xl:flex">
-        <span className="relative grid h-7 w-7 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300">
-          <Storefront size={16} weight="fill" />
+        <span data-site-icon={Object.keys(siteIcons).includes(String(siteType || "").toUpperCase()) ? String(siteType).toUpperCase() : "BUSINESS"} className="relative grid h-7 w-7 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300">
+          <SiteIcon size={16} weight="fill" />
           <i className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0a111b]" />
         </span>
         <div className="leading-tight"><b className="block text-[11px] text-white/80">{status === "PUBLISHED" ? "نسخه‌ای منتشر شده" : "پیش‌نویس"}</b><span className={`text-[9px] ${dirty ? "text-amber-200" : "text-white/35"}`}>{dirty ? "تغییرات ذخیره نشده" : "آخرین تغییرات ذخیره شده"} · ذخیره و انتشار مستقل‌اند</span></div>
