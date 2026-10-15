@@ -1,0 +1,7 @@
+# LOCAL STAGING on a developer machine (deploy/local.sh): the production images and topology on plain HTTP at
+# http://app.localhost and http://sites.localhost, bound to 127.0.0.1 ONLY. Use together with compose.prod.yaml and
+# compose.test.yaml (which provides the local hostnames, simulator SMS and development sign-in codes).
+# NEVER use this for a real deployment; nothing here is reachable from another machine.
+services:
+  web:
+    ports: ["127.0.0.1:80:80"]

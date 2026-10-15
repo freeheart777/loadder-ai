@@ -82,6 +82,15 @@ bash deploy/restore.sh <db.sqlite> <files.tgz> --yes   # replaces ALL data; take
 - Backups contain customer data. Copy them off the server, encrypt them at rest, restrict access. Nothing here does off-site copies or retention; schedule `backup.sh` (cron/systemd timer) and ship the output.
 - A backup that has never been restored is not verified. `deploy/prod-auth-check.sh` performs a full backup, mutate, restore round trip on throw-away volumes.
 
+## Local staging on a developer machine
+The production images and topology can run locally, on plain HTTP at `http://app.localhost` (the app) and `http://sites.localhost` (published sites), bound to `127.0.0.1` only, with an isolated persistent volume:
+```bash
+cp deploy/.env.production.example deploy/.env.production   # once; placeholder values are fine locally
+bash deploy/local.sh up        # build if needed and start (about 15 s once images exist)
+bash deploy/local.sh status | logs [service] | down
+```
+Sign-in codes are shown on the sign-in screen (development mode, simulator SMS), so no external credentials are needed. Data lives in the Docker volume `loadder-local_loadder-data` and survives `down`/`up`; `local.sh` never deletes it (removing it is an explicit `docker volume rm`). Verified on Apple Silicon (linux/arm64). This is not a deployment path: nothing is reachable from another machine, and sign-in is not production-grade.
+
 ## Medical documents (optional, explicit opt-in)
 Patients can upload private documents (PDF, JPEG, PNG, WebP up to 10 MB) that only they, the doctor of that appointment and an audited, reason-stated operator access can open. In production this only runs when **all** of the following hold; otherwise uploads answer `503` and nothing is stored:
 1. `MEDICAL_DOCUMENTS_ENABLED=true` (exact value).
