@@ -10,7 +10,13 @@ type Project = { id: string; siteType: string };
 async function signIn(browser: Browser, name: string): Promise<{ api: APIRequestContext; context: BrowserContext }> {
   const api = await request.newContext({ baseURL: apiBaseURL });
   const mobile = `091${`${Date.now()}${Math.floor(Math.random() * 999)}`.slice(-8)}`;
-  const sent = await api.post("/api/auth/send-otp", { data: { mobile, name } });
+  let sent = await api.post("/api/auth/send-otp", { data: { mobile, name } });
+  // Sign-in codes are rate limited per client (5 a minute): honour Retry-After like a real client instead of weakening the limiter.
+  if (sent.status() === 429) {
+    const waitSeconds = Math.min(65, Number(sent.headers()["retry-after"]) || 61);
+    await new Promise((resolve) => setTimeout(resolve, (waitSeconds + 1) * 1000));
+    sent = await api.post("/api/auth/send-otp", { data: { mobile, name } });
+  }
   const otp = await sent.json();
   expect(sent.ok(), JSON.stringify(otp)).toBeTruthy();
   const verified = await api.post("/api/auth/verify-otp", { data: { mobile, code: otp.developmentOtp } });
@@ -60,16 +66,16 @@ async function expectMobileActionableControlCenter(page: Page, expected: "bookin
   expect(await overflow(page), "Control Center mobile horizontal overflow").toBeLessThanOrEqual(1);
 }
 
-async function expectMobileBookingStudioFromManager(page: Page, projectId: string) {
+async function expectMobileBookingDestination(page: Page, projectId: string, destination: { href: string; url: RegExp }) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/dashboard/websites/corporate?project=${projectId}`);
   await expect(page.locator("[data-site-manager-menu]")).toBeVisible();
   const booking = mobileManager(page, "booking");
-  await expect(booking).toHaveAttribute("href", "/dashboard/booking");
+  await expect(booking).toHaveAttribute("href", destination.href);
   await booking.click();
-  await expect(page).toHaveURL(/\/dashboard\/booking$/);
-  await expect(page.getByRole("heading", { name: "مدیریت نوبت‌دهی" })).toBeVisible();
-  expect(await overflow(page), "Booking Studio mobile horizontal overflow").toBeLessThanOrEqual(1);
+  await expect(page).toHaveURL(destination.url);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  expect(await overflow(page), "Booking destination mobile horizontal overflow").toBeLessThanOrEqual(1);
 }
 
 test("Medical customer entry persists Booking capability and Booking Studio manages canonical records", async ({ browser }) => {
@@ -88,30 +94,51 @@ test("Medical customer entry persists Booking capability and Booking Studio mana
     await expect(page.getByRole("button", { name: "قالب‌ها", exact: true })).toHaveCount(0);
     await expect(page.locator("[data-create-another-site]").first()).toHaveAttribute("href", "/dashboard/websites");
 
+    // A Medical site manages its Booking in ITS OWN Control Center (site-scoped), not in the workspace studio.
+    const controlRoot = `/dashboard/websites/${medical.id}/control`;
+    await expect(desktopManager(page, "booking")).toHaveAttribute("href", `${controlRoot}/appointments`);
     await desktopManager(page, "booking").click();
-    await expect(page).toHaveURL(/\/dashboard\/booking$/);
-    await expect(page.getByRole("heading", { name: "مدیریت نوبت‌دهی" })).toBeVisible();
-    await expect(page.getByText("هنوز خدمتی ثبت نشده است.")).toBeVisible();
-    await expect(page.getByText("هنوز ارائه‌دهنده‌ای ثبت نشده است.")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${controlRoot}/appointments$`));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByText("نوبتی برای نمایش وجود ندارد.")).toBeVisible();
+    const go = async (module: string) => { await page.locator(`a[href$="/control/${module}"]`).first().click(); await expect(page).toHaveURL(new RegExp(`/control/${module}$`)); };
 
+    await go("providers");
+    await expect(page.getByText("هنوز پزشکی تعریف نشده است.")).toBeVisible();
+    await page.getByLabel("نام پزشک").fill("دکتر آزمون");
+    await page.getByRole("button", { name: "افزودن پزشک" }).click();
+    await expect(page.locator("[data-provider]").filter({ hasText: "دکتر آزمون" })).toBeVisible();
+
+    await go("services");
+    await expect(page.getByText("هنوز خدمتی تعریف نشده است.")).toBeVisible();
     await page.getByLabel("نام خدمت").fill("ویزیت اولیه");
-    await page.getByRole("button", { name: "افزودن خدمت", exact: true }).click();
-    await expect(page.locator("p").filter({ hasText: /^ویزیت اولیه$/ })).toBeVisible();
-    await page.getByLabel("نام ارائه‌دهنده").fill("دکتر آزمون");
-    await page.getByRole("button", { name: "افزودن", exact: true }).click();
-    await expect(page.locator("p").filter({ hasText: /^دکتر آزمون$/ })).toBeVisible();
-    await page.getByRole("button", { name: "اتصال", exact: true }).click();
-    await expect(page.locator("p").filter({ hasText: /^دکتر آزمون ← ویزیت اولیه$/ })).toBeVisible();
-    await page.getByRole("button", { name: "ذخیره بازه", exact: true }).click();
-    await expect(page.getByText(/دکتر آزمون · یکشنبه/)).toBeVisible();
+    await page.getByRole("button", { name: "افزودن خدمت" }).click();
+    await expect(page.locator("[data-service]").filter({ hasText: "ویزیت اولیه" })).toBeVisible();
+    await page.getByLabel("پزشک", { exact: true }).selectOption({ label: "دکتر آزمون" });
+    await page.getByLabel("خدمت", { exact: true }).selectOption({ label: "ویزیت اولیه" });
+    await page.getByRole("button", { name: "اتصال پزشک به خدمت" }).click();
+    await expect(page.getByRole("status")).toContainText("متصل شد");
 
-    const booking = await expectOk(await api.get("/api/booking"));
-    expect(booking.services.map((item: { name: string }) => item.name)).toContain("ویزیت اولیه");
-    expect(booking.providers.map((item: { name: string }) => item.name)).toContain("دکتر آزمون");
-    expect(booking.associations).toHaveLength(1);
-    expect(booking.availability).toHaveLength(1);
+    await go("schedules");
+    await page.getByLabel("پزشک زمان").selectOption({ label: "دکتر آزمون" });
+    await page.getByRole("button", { name: "افزودن زمان" }).click();
+    await expect(page.locator("[data-slot]").filter({ hasText: "09:00–10:00" }).first()).toBeVisible();
 
-    await expectMobileBookingStudioFromManager(page, medical.id);
+    // The records are the canonical Booking records, stamped with THIS site and invisible everywhere else.
+    const scoped = await expectOk(await api.get(`/api/booking?siteProjectId=${medical.id}`));
+    expect(scoped.services.map((item: { name: string; site_project_id: string }) => [item.name, item.site_project_id])).toEqual([["ویزیت اولیه", medical.id]]);
+    expect(scoped.providers.map((item: { name: string; site_project_id: string }) => [item.name, item.site_project_id])).toEqual([["دکتر آزمون", medical.id]]);
+    expect(scoped.associations).toHaveLength(1);
+    expect(scoped.availability).toHaveLength(1);
+    const workspaceView = await expectOk(await api.get("/api/booking"));
+    expect(workspaceView.services.map((item: { name: string }) => item.name), "strict Medical scope: nothing in the workspace-level view").not.toContain("ویزیت اولیه");
+    expect(workspaceView.providers.map((item: { name: string }) => item.name)).not.toContain("دکتر آزمون");
+
+    // Persistence: a fresh load of the module shows the stored records.
+    await page.goto(`${controlRoot}/services`);
+    await expect(page.locator("[data-service]").filter({ hasText: "ویزیت اولیه" })).toBeVisible();
+
+    await expectMobileBookingDestination(page, medical.id, { href: `${controlRoot}/appointments`, url: new RegExp(`${controlRoot}/appointments$`) });
   } finally { await context.close(); await api.dispose(); }
 });
 
@@ -140,11 +167,20 @@ test("Legal has its own persisted Booking capability and a non-Booking project c
     const detail = await expectOk(await legalSession.api.get(`/api/site-projects/${legal.id}`));
     expect(detail.capabilities).toContain("booking");
     expect(legal.siteType).toBe("LEGAL");
+    // Legal has Booking but no site appointments module: its action is the workspace Booking Studio.
+    await expect(desktopManager(page, "booking")).toHaveAttribute("href", "/dashboard/booking");
     await desktopManager(page, "booking").click();
     await expect(page).toHaveURL(/\/dashboard\/booking$/);
-    await expect(page.getByText("هنوز خدمتی ثبت نشده است.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "استودیوی نوبت‌دهی" })).toBeVisible();
+    await expect(page.getByText("نوبتی برای نمایش وجود ندارد.")).toBeVisible();
+    await page.locator('a[href$="/dashboard/booking/services"]').first().click();
+    await expect(page).toHaveURL(/\/dashboard\/booking\/services$/);
+    await expect(page.getByText("هنوز خدمتی تعریف نشده است.")).toBeVisible();
+    // The site's own Control Center does not offer a modules it lacks: the old per-site booking address resolves to its overview.
+    await page.goto(`/dashboard/websites/${legal.id}/control/appointments`);
+    await expect(page).toHaveURL(new RegExp(`/dashboard/websites/${legal.id}/control$`));
     await expectMobileActionableControlCenter(page, "booking");
-    await expectMobileBookingStudioFromManager(page, legal.id);
+    await expectMobileBookingDestination(page, legal.id, { href: "/dashboard/booking", url: /\/dashboard\/booking$/ });
   } finally { await legalSession.context.close(); await legalSession.api.dispose(); }
 
   const blankSession = await signIn(browser, "Booking Disabled Closure E2E");
