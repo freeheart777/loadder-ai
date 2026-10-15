@@ -58,7 +58,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 
 function Range({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
-  return <label className="block text-xs text-white/55"><span className="flex justify-between"><span>{label}</span><b>{value}</b></span><input type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} className="mt-2 w-full" /></label>;
+  return <label className="block text-xs text-white/55"><span className="flex justify-between"><span>{label}</span><b>{value}</b></span><input type="range" aria-label={label} min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} className="mt-2 w-full" /></label>;
 }
 
 function Color({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
