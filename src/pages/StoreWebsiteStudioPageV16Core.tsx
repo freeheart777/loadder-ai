@@ -13,6 +13,7 @@ import { createConfigFromTemplate, templatesForSiteKind } from "../components/st
 import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
+import PublishedVersions from "../components/store-studio-v16/PublishedVersions";
 import { invalidateActiveStoreProject } from "../lib/activeStoreProject";
 import { uploadSiteMedia } from "../lib/siteMediaUpload";
 
@@ -679,6 +680,19 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     setMessage("Ask Loadder بخش انتخاب‌شده را به‌روزرسانی کرد.");
   }
 
+  // A rollback re-publishes an earlier version AND replaces the draft with it: load that draft as the Studio's new baseline.
+  async function reloadAfterRollback() {
+    if (!project) return;
+    const detail = await read(await apiFetch(`/api/site-projects/${project.id}`));
+    const loaded = detail.project as Project;
+    const nextConfig = restoreConfig(loaded.content || {}, siteKind);
+    setProject(loaded);
+    draftRevision.current = typeof detail.draftRevision === "number" ? detail.draftRevision : null;
+    setConfig(nextConfig);
+    savedDocument.current = editorDocumentKey(nextConfig);
+    setMessage("نسخهٔ انتخاب‌شده دوباره منتشر شد.");
+  }
+
   async function save() {
     if (!project) return;
     setBusy(true);
@@ -781,6 +795,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
       <span data-persisted-site-type className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/55 lg:flex">نوع سایت: {siteTypeLabel(project?.siteType)}</span>
       {managerLinks.map((link) => <Link key={link.id} to={link.to} data-site-manager={link.id} className="hidden min-h-10 items-center rounded-xl border border-sky-300/20 bg-sky-400/10 px-3 text-[10px] font-bold text-sky-100 hover:bg-sky-400/20 lg:flex">{link.label}</Link>)}
       {publishedUrl && <a href={publishedUrl} target="_blank" rel="noreferrer" className="hidden min-h-10 items-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 lg:flex">آدرس عمومی <ArrowRight size={13} className="rotate-[-45deg]"/></a>}
+      {project?.status === "PUBLISHED" && !commerce && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} />}
       <StudioToolbar device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
     </header>
 

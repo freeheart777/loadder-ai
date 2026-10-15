@@ -251,17 +251,29 @@ test("responsive editing: on tablet and mobile the canvas fills the screen and t
   }
 });
 
-test("17. rollback restores the earlier live version (API only today: the Studio has no rollback control)", async ({ browser }) => {
-  const api = owner.request;
-  const { versions } = await (await api.get(`${apiBase}/api/site-projects/${siteId}/versions`)).json();
-  expect(versions.map((v: { version: number }) => v.version).sort()).toEqual([1, 2]);
-  const first = versions.find((v: { version: number }) => v.version === 1);
-  const rolled = await api.post(`${apiBase}/api/site-projects/${siteId}/publish-rollback`, { data: { targetVersionId: first.id } });
-  expect(rolled.status()).toBe(200);
+test("17. the customer rolls back to the earlier published version from the Studio", async ({ browser }) => {
+  test.setTimeout(90_000);
+  const page = await owner.newPage();
+  await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
+  await page.getByRole("button", { name: "نسخه‌های منتشرشده" }).click();
+  const dialog = page.getByRole("dialog", { name: "نسخه‌های منتشرشده" });
+  await expect(dialog.locator("[data-version]")).toHaveCount(2);
+  await expect(dialog.locator('[data-version="2"]')).toContainText("فعلی");
+  page.once("dialog", (d) => void d.accept());
+  await dialog.locator('[data-version="1"]').getByRole("button", { name: "بازگردانی" }).click();
+  await expect(dialog).toBeHidden();
+  // The Studio now holds the restored draft and the live site shows the earlier version again.
+  await expect(page.getByRole("heading", { name: state.heroTitle })).toBeVisible();
   const visitor = await (await browser.newContext()).newPage();
   await visitor.goto(publicSite);
   await expect(visitor.getByRole("heading", { name: state.heroTitle })).toBeVisible();
   await expect(visitor.getByText("عنوان نسخهٔ دوم")).toHaveCount(0);
+  // History keeps everything: the rollback is a new, third version.
+  await page.getByRole("button", { name: "نسخه‌های منتشرشده" }).click();
+  await expect(dialog.locator("[data-version]")).toHaveCount(3);
+  await expect(dialog.locator('[data-version="3"]')).toContainText("فعلی");
+  await page.screenshot({ path: "test-results/builder-11-versions.png" });
+  await page.close();
 });
 
 test("18. another workspace cannot read, change, publish or roll back the site", async ({ browser }) => {
