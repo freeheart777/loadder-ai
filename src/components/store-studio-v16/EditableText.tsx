@@ -75,11 +75,17 @@ export default function EditableText({ as: Tag = "span", field, value, className
   if (!editing) {
     return <Tag
       key="view"
-      className={`${className ?? ""} cursor-text rounded-sm outline-none hover:outline hover:outline-1 hover:outline-dashed hover:outline-violet-400/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-500`}
+      className={`${className ?? ""} [overflow-wrap:anywhere] cursor-text rounded-sm outline-none hover:outline hover:outline-1 hover:outline-dashed hover:outline-violet-400/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-500`}
       style={style}
       tabIndex={0}
       data-editable-field={label(field)}
       data-editable-scope={field.scope}
+      aria-description="برای ویرایش متن دوبار کلیک کنید یا Enter بزنید"
+      onClick={(event: React.MouseEvent) => {
+        // Touch screens have no double click: a tap on text of an element that is already selected starts editing.
+        const owner = (event.currentTarget as HTMLElement).closest("[data-editor-selected]");
+        if (window.matchMedia("(pointer: coarse)").matches && owner?.getAttribute("data-editor-selected") === "true") { event.stopPropagation(); begin(); }
+      }}
       onDoubleClick={(event: React.MouseEvent) => { event.stopPropagation(); begin(); }}
       onKeyDown={(event: KeyboardEvent) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === "F2")) { event.preventDefault(); event.stopPropagation(); begin(); } }}
     >{value || fallback || ""}{children}</Tag>;
@@ -88,7 +94,7 @@ export default function EditableText({ as: Tag = "span", field, value, className
   return <Tag
     key="edit"
     ref={focusEnd}
-    className={`${className ?? ""} cursor-text rounded-sm outline outline-2 outline-violet-500`}
+    className={`${className ?? ""} [overflow-wrap:anywhere] cursor-text rounded-sm outline outline-2 outline-violet-500`}
     style={{ ...style, minWidth: "1ch", whiteSpace: spec.multiline ? "pre-wrap" : undefined }}
     contentEditable
     suppressContentEditableWarning

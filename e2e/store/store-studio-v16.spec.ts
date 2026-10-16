@@ -214,6 +214,8 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
         await journey.page.setViewportSize(viewport);
         await openStudio(journey.page, journey.projectId);
         await journey.page.getByRole("heading", { name: "محصولات منتخب", exact: true }).click();
+        // Beside the canvas the panel follows the selection; on a phone it is a sheet that opens on request (it would cover the canvas being edited).
+        if (viewport.width < 1024) await journey.page.getByRole("button", { name: "باز کردن پنل ویرایش" }).click();
         const inspector = journey.page.locator("[data-studio-inspector]");
         const scrollRegion = journey.page.locator("[data-inspector-scroll-region]");
         await expect(inspector).toBeVisible();

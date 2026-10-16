@@ -388,7 +388,9 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   function selectCanvasElement(selectedElement: Selection) {
     setConfig((cur) => ({ ...cur, selectedElement }));
     setTab("context");
-    setInspectorOpen(true);
+    // Beside the canvas (lg and up) the panel follows the selection. Below lg it is a bottom sheet that would cover the
+    // canvas the customer is tapping and typing on, so it opens only on request (the "ویرایش" button or the settings toggle).
+    if (window.matchMedia("(min-width: 1024px)").matches) setInspectorOpen(true);
   }
 
   function patchProductSection(sectionId: string, updater: (s: ProductSettings) => ProductSettings) {
@@ -785,6 +787,18 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [history]);
+  // Escape closes the settings panel (a bottom sheet below lg) unless a text field is being edited.
+  useEffect(() => {
+    if (!inspectorOpen) return undefined;
+    const onEscape = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key !== "Escape" || event.defaultPrevented || target?.isContentEditable) return;
+      if (window.matchMedia("(min-width: 1024px)").matches) return;
+      setInspectorOpen(false);
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [inspectorOpen]);
   // Closing or reloading the tab with unsaved edits asks first (the browser shows its own generic prompt).
   useEffect(() => {
     if (!hasUnsavedChanges) return undefined;
