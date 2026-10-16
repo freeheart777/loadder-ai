@@ -51,7 +51,7 @@ Run the narrowest command that proves the change, then the build gate. Commands 
 |---|---|
 | Website Builder, Studio, templates, visual editing | `e2e/websites/run-website-e2e.sh e2e/websites/<spec>.spec.ts` (real API + public-site runtime, throw-away DB); `npm run test:e2e:corporate`; site platform: `node --test test/site-platform*` from `server/` |
 | Booking | `node --test --test-concurrency=1 server/test/booking-*.test.mjs`; browser: `e2e/websites/website-legal-booking.spec.ts` via the runner above, `e2e/medical/run-medical-browser.sh` |
-| Commerce and Store | `npm run test:e2e:store`; `npm run test:e2e:commerce`; `server/test/` commerce and ecommerce tests |
+| Commerce and Store | `npm run test:e2e:store`; `npm run test:e2e:commerce`; `node --test --test-concurrency=1 server/test/commerce-*.test.mjs server/test/ecommerce-*.test.mjs` |
 | Authentication and tenant boundaries | `server/test/`: `auth`, `tenant-isolation`, `workspace-authorization`, `boundary-public-and-tenant`, `public-site-security`; `node server/scripts/security-static-gate.mjs` |
 | Database boundaries | `npm run check:db-boundary` |
 | Business Builder runtime | `node --test --test-concurrency=1 server/test/business-builder-*.test.mjs` (fast gate) |
