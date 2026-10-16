@@ -1,5 +1,8 @@
 import { expect, request, test, type APIRequestContext, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
+// The Studio keeps secondary actions (Control Center, versions, public address, other sites) in the "more" menu.
+const openMore = async (page: import("@playwright/test").Page) => { await expect(page.locator('[data-canvas-interactive="true"]').first()).toBeVisible({ timeout: 20_000 }); const trigger = page.locator("[data-studio-more]"); await expect(trigger).toBeVisible({ timeout: 20_000 }); if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click(); };
+
 const apiBaseURL = process.env.E2E_API_BASE_URL;
 if (!apiBaseURL) throw new Error("E2E_API_BASE_URL is required for the Site Platform browser closure.");
 
@@ -44,7 +47,7 @@ async function createFromCustomerEntry(page: Page, label: string): Promise<Proje
 }
 
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-const desktopManager = (page: Page, id: string) => page.locator(`[data-site-manager="${id}"]`).first();
+const desktopManager = (page: Page, id: string) => page.locator(`[data-studio-more-menu] [data-site-manager="${id}"]`);
 const mobileManager = (page: Page, id: string) => page.locator(`[data-site-manager="${id}"]`).last();
 
 async function expectMobileActionableControlCenter(page: Page, expected: "booking" | "no-booking") {
@@ -90,13 +93,17 @@ test("Medical customer entry persists Booking capability and Booking Studio mana
     // The starter choice is project truth. Returning to the Studio must not
     // reopen a second template/type picker or let UI state choose a new type.
     await page.reload();
+    await openMore(page);
     await expect(page.locator("[data-persisted-site-type]")).toContainText("کلینیک و پزشک");
     await expect(page.getByRole("button", { name: "قالب‌ها", exact: true })).toHaveCount(0);
+    await openMore(page);
     await expect(page.locator("[data-create-another-site]").first()).toHaveAttribute("href", "/dashboard/websites");
 
     // A Medical site manages its Booking in ITS OWN Control Center (site-scoped), not in the workspace studio.
     const controlRoot = `/dashboard/websites/${medical.id}/control`;
+    await openMore(page);
     await expect(desktopManager(page, "booking")).toHaveAttribute("href", `${controlRoot}/appointments`);
+    await openMore(page);
     await desktopManager(page, "booking").click();
     await expect(page).toHaveURL(new RegExp(`${controlRoot}/appointments$`));
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -153,6 +160,7 @@ test("Ecommerce starter reopens in the canonical Store Studio without a second t
     expect(detail.capabilities).toEqual(expect.arrayContaining(["commerce", "payments"]));
     await expect(page).toHaveURL(new RegExp(`/dashboard/websites/store\\?project=${ecommerce.id}`));
     await page.reload();
+    await openMore(page);
     await expect(page.locator("[data-persisted-site-type]")).toContainText("فروشگاه اینترنتی");
     await expect(page.getByRole("button", { name: "قالب‌ها", exact: true })).toHaveCount(0);
   } finally { await context.close(); await api.dispose(); }
@@ -168,7 +176,9 @@ test("Legal has its own persisted Booking capability and a non-Booking project c
     expect(detail.capabilities).toContain("booking");
     expect(legal.siteType).toBe("LEGAL");
     // Legal has Booking but no site appointments module: its action is the workspace Booking Studio.
+    await openMore(page);
     await expect(desktopManager(page, "booking")).toHaveAttribute("href", "/dashboard/booking");
+    await openMore(page);
     await desktopManager(page, "booking").click();
     await expect(page).toHaveURL(/\/dashboard\/booking$/);
     await expect(page.getByRole("heading", { name: "استودیوی نوبت‌دهی" })).toBeVisible();
@@ -189,6 +199,7 @@ test("Legal has its own persisted Booking capability and a non-Booking project c
     const corporate = await createFromCustomerEntry(blankPage, "شرکت حرفه‌ای");
     const detail = await expectOk(await blankSession.api.get(`/api/site-projects/${corporate.id}`));
     expect(detail.capabilities).not.toContain("booking");
+    await openMore(blankPage);
     await expect(desktopManager(blankPage, "booking")).toHaveCount(0);
     await expect(desktopManager(blankPage, "content")).toHaveAttribute("href", "/dashboard/content");
     await expect(desktopManager(blankPage, "commerce")).toHaveCount(0);
@@ -231,17 +242,22 @@ test("Control Center is truthful and Hybrid exposes only its persisted Content a
     await expect(hybridCenter.getByRole("link", { name: "محتوا" })).toHaveAttribute("href", "/dashboard/content");
     await expect(hybridCenter.getByRole("link", { name: "تجارت" })).toHaveAttribute("href", "/dashboard/websites/commerce");
     await page.goto(`/dashboard/websites/corporate?project=${hybrid.id}`);
+    await openMore(page);
     await expect(desktopManager(page, "content")).toHaveAttribute("href", "/dashboard/content");
+    await openMore(page);
     await expect(desktopManager(page, "commerce")).toHaveAttribute("href", "/dashboard/websites/commerce");
+    await openMore(page);
     await expect(desktopManager(page, "booking")).toHaveCount(0);
     await page.locator('[data-storefront-renderer="store-studio-v16"]').first().click();
     await expect(page.getByRole("button", { name: "صفحه‌ها", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "صفحه‌ها", exact: true }).click();
     await expect(page.locator('[data-page-manager="v16"]')).toBeVisible();
     await expect(page.getByText("صفحه خانه آدرس اصلی سایت است و حذف نمی‌شود.")).toBeVisible();
+    await openMore(page);
     await desktopManager(page, "content").click();
     await expect(page).toHaveURL(/\/dashboard\/content$/);
     await page.goto(`/dashboard/websites/corporate?project=${hybrid.id}`);
+    await openMore(page);
     await desktopManager(page, "commerce").click();
     await expect(page).toHaveURL(/\/dashboard\/websites\/commerce$/);
     await page.setViewportSize({ width: 390, height: 844 });

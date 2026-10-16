@@ -16,6 +16,8 @@ import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
 import { writeField } from "../components/store-studio-v16/editable-fields";
 import { commitActiveInlineEdit as commitActiveEdit } from "../components/store-studio-v16/EditableText";
 import type { InlineEdit } from "../components/store-studio-v16/EditableText";
+import StudioMoreMenu from "../components/store-studio-v16/StudioMoreMenu";
+import type { MoreItem } from "../components/store-studio-v16/StudioMoreMenu";
 import PublishedVersions from "../components/store-studio-v16/PublishedVersions";
 import { useUndoRedo } from "../components/store-studio-v16/useUndoRedo";
 import { invalidateActiveStoreProject } from "../lib/activeStoreProject";
@@ -219,6 +221,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   // Website Platform document on the server. They are deliberately not
   // inferred from template labels or the current canvas kind.
   const [capabilities, setCapabilities] = useState<string[]>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const [config, setConfig] = useState<StudioConfig>(() => restoreConfig({}, siteKind));
   const applyHistoryStep = useCallback((snapshot: StudioConfig) => setConfig((current) => {
     // Undo/redo restores the document, not what the customer is looking at: keep the current page and selection when they still exist.
@@ -795,6 +798,15 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     capabilities.includes("booking") ? { id: "booking", to: bookingManagementPath(project?.id, project?.siteType), label: "مدیریت نوبت‌دهی" } : null,
   ].filter((link): link is { id: string; to: string; label: string } => Boolean(link));
   const publishedUrl = project?.status === "PUBLISHED" ? `${commerce ? "/store" : "/site"}/${project.id}` : "";
+  const moreItems: MoreItem[] = [
+    { kind: "link", id: "my-sites", label: "سایت‌های من", to: "/dashboard/websites" },
+    { kind: "link", id: "create-another", label: "ساخت سایت دیگر", to: "/dashboard/websites", attrs: { "data-create-another-site": "true" } },
+    { kind: "info", id: "site-type", label: `نوع سایت: ${siteTypeLabel(project?.siteType)}`, attrs: { "data-persisted-site-type": "true" } },
+    ...managerLinks.map((link): MoreItem => ({ kind: "link", id: `manager-${link.id}`, label: link.label, to: link.to, attrs: { "data-site-manager": link.id } })),
+    ...(project ? [{ kind: "link", id: "control-center", label: "مرکز کنترل", to: controlCenterPath(project.id), attrs: { "data-studio-control-center": "true" } } as MoreItem] : []),
+    ...(project?.status === "PUBLISHED" ? [{ kind: "button", id: "versions", label: "نسخه‌های منتشرشده", onSelect: () => setVersionsOpen(true) } as MoreItem] : []),
+    ...(publishedUrl ? [{ kind: "external", id: "public-url", label: "آدرس عمومی", href: publishedUrl } as MoreItem] : []),
+  ];
   // Vertical sites (Medical/Education) may link cards to canonical Booking records.
   const projectId = project?.id, projectType = String(project?.siteType || "").toUpperCase();
   useEffect(() => {
@@ -831,17 +843,13 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     <header data-studio-header className="flex min-h-20 flex-wrap items-center gap-x-3 gap-y-2 border-b border-white/10 bg-[#0a111b] px-4 py-3">
       <Link to="/dashboard" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10"><ArrowRight /></Link>
       <div className="min-w-0 flex-1 basis-40 sm:flex-none sm:basis-auto sm:min-w-36"><div className="truncate text-[10px] font-black tracking-[.18em] text-emerald-300">LOADDER VISUAL STUDIO · V16</div><h1 className="truncate font-black">{project?.name || (commerce ? "فروشگاه شما" : "وب‌سایت شما")}</h1><p className={`mt-1 flex items-center gap-1 text-[10px] ${hasUnsavedChanges ? "text-amber-200" : "text-white/35"}`}><CursorClick />{hasUnsavedChanges ? "تغییرات ذخیره‌نشده" : "همه تغییرات ذخیره شده"}</p></div>
-      <Link to="/dashboard/websites" className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/65 hover:bg-white/[.05] xl:flex">سایت‌های من</Link>
-      <Link to="/dashboard/websites" data-create-another-site className="hidden min-h-10 items-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 hover:bg-emerald-400/20 md:flex">ساخت سایت دیگر</Link>
-      <span data-persisted-site-type className="hidden min-h-10 items-center rounded-xl border border-white/10 px-3 text-[10px] font-bold text-white/55 lg:flex">نوع سایت: {siteTypeLabel(project?.siteType)}</span>
-      {managerLinks.map((link) => <Link key={link.id} to={link.to} data-site-manager={link.id} className="hidden min-h-10 items-center rounded-xl border border-sky-300/20 bg-sky-400/10 px-3 text-[10px] font-bold text-sky-100 hover:bg-sky-400/20 lg:flex">{link.label}</Link>)}
-      {publishedUrl && <a href={publishedUrl} target="_blank" rel="noreferrer" className="hidden min-h-10 items-center gap-1 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-[10px] font-bold text-emerald-100 lg:flex">آدرس عمومی <ArrowRight size={13} className="rotate-[-45deg]"/></a>}
       <div className="flex items-center gap-1" role="group" aria-label="واگرد و ازنو">
         <button type="button" onClick={history.undo} disabled={!history.canUndo} aria-label="واگرد" title="واگرد (Ctrl+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpLeft size={16} /></button>
         <button type="button" onClick={history.redo} disabled={!history.canRedo} aria-label="ازنو" title="ازنو (Ctrl+Shift+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpRight size={16} /></button>
       </div>
-      {project?.status === "PUBLISHED" && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} />}
-      <StudioToolbar siteType={project?.siteType} pageOptions={commerce ? undefined : config.pages.map((item) => ({ id: item.id, title: item.title }))} activePageId={config.activePageId} onSelectPage={commerce ? undefined : actions.selectPage} device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => { commitActiveEdit(); setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } })); }} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
+      <StudioMoreMenu items={moreItems} />
+      {project?.status === "PUBLISHED" && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} open={versionsOpen} onOpenChange={setVersionsOpen} hideTrigger />}
+      <StudioToolbar siteType={project?.siteType} pageOptions={commerce ? undefined : config.pages.map((item) => ({ id: item.id, title: item.title }))} activePageId={config.activePageId} onSelectPage={commerce ? undefined : actions.selectPage} device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => { commitActiveEdit(); setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } })); }} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>

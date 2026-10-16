@@ -1,5 +1,8 @@
 import { expect, request, test, type APIRequestContext, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
+// The Studio keeps secondary actions (Control Center, versions, public address, other sites) in the "more" menu.
+const openMore = async (page: import("@playwright/test").Page) => { await expect(page.locator('[data-canvas-interactive="true"]').first()).toBeVisible({ timeout: 20_000 }); const trigger = page.locator("[data-studio-more]"); await expect(trigger).toBeVisible({ timeout: 20_000 }); if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click(); };
+
 // Legal firm -> Booking Studio, through the real UI: create from the law template, reach Booking from the Studio,
 // define a provider and a service there, and see them stamped with THIS site only.
 const apiBaseURL = process.env.E2E_API_BASE_URL;
@@ -35,7 +38,8 @@ test("a law firm site reaches Booking Studio from the Studio and manages its own
     expect(detail.capabilities).toContain("booking");
 
     // The Studio offers Booking management (desktop header and the mobile menu both carry it).
-    const booking = page.locator('[data-site-manager="booking"]').first();
+    await openMore(page);
+    const booking = page.locator('[data-studio-more-menu] [data-site-manager="booking"]');
     await expect(booking).toHaveAttribute("href", "/dashboard/booking");
     await booking.click();
     await expect(page).toHaveURL(/\/dashboard\/booking\/?$/);

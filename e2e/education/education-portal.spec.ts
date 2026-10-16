@@ -3,6 +3,9 @@ import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { expect, request, test, type APIRequestContext, type APIResponse, type Browser, type Page } from "@playwright/test";
 
+// The Studio keeps secondary actions (Control Center, versions, public address, other sites) in the "more" menu.
+const openMore = async (page: import("@playwright/test").Page) => { await expect(page.locator('[data-canvas-interactive="true"]').first()).toBeVisible({ timeout: 20_000 }); const trigger = page.locator("[data-studio-more]"); await expect(trigger).toBeVisible({ timeout: 20_000 }); if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click(); };
+
 const apiBase = process.env.E2E_API_BASE_URL, dbPath = process.env.E2E_DATABASE_PATH, videoFixture = process.env.E2E_VIDEO_FIXTURE;
 if (!apiBase || !dbPath || !videoFixture) throw new Error("E2E_API_BASE_URL, E2E_DATABASE_PATH and E2E_VIDEO_FIXTURE are required.");
 const Database = createRequire(import.meta.url)("../../server/node_modules/better-sqlite3");
@@ -141,6 +144,7 @@ test("Control Center: Education sidebar vocabulary, Booking management on canoni
   await expect(page.locator('[data-cc-action="view-website"]')).toHaveAttribute("href", `/site/${siteId}`);
   await page.locator('[data-cc-action="edit-website"]').click();
   await expect(page).toHaveURL(new RegExp(`/dashboard/websites/corporate\\?project=${siteId}`));
+  await openMore(page);
   await expect(page.locator("[data-studio-control-center]")).toBeVisible({ timeout: 20_000 });
   await page.locator("[data-studio-control-center]").click();
   await expect(page).toHaveURL(new RegExp(`/dashboard/websites/${siteId}/control$`));

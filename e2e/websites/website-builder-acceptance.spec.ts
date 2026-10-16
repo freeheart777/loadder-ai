@@ -1,5 +1,8 @@
 import { expect, request, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 
+// The Studio keeps secondary actions (Control Center, versions, public address, other sites) in the "more" menu.
+const openMore = async (page: import("@playwright/test").Page) => { await expect(page.locator('[data-canvas-interactive="true"]').first()).toBeVisible({ timeout: 20_000 }); const trigger = page.locator("[data-studio-more]"); await expect(trigger).toBeVisible({ timeout: 20_000 }); if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click(); };
+
 // Customer acceptance of the Website Builder through the real UI, end to end:
 // sign in -> create from a template -> replace text and imagery -> brand colours and typography -> add a section ->
 // second page -> navigation -> save -> reload -> preview desktop/mobile -> publish -> public site -> edit again ->
@@ -158,7 +161,8 @@ test("11-13. preview desktop and mobile, publish, open the public site", async (
   const published = await res.json();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "test-results/builder-8-published.png" });
-  const publicUrl = await page.getByRole("link", { name: "آدرس عمومی" }).getAttribute("href");
+  await openMore(page);
+  const publicUrl = await page.getByRole("menuitem", { name: "آدرس عمومی" }).getAttribute("href");
   publicSite = publicUrl!;
   await page.close();
 });
@@ -345,7 +349,8 @@ test("17. the customer rolls back to the earlier published version from the Stud
   test.setTimeout(90_000);
   const page = await owner.newPage();
   await page.goto(`/dashboard/websites/corporate?project=${siteId}`);
-  await page.getByRole("button", { name: "نسخه‌های منتشرشده" }).click();
+  await openMore(page);
+  await page.getByRole("menuitem", { name: "نسخه‌های منتشرشده" }).click();
   const dialog = page.getByRole("dialog", { name: "نسخه‌های منتشرشده" });
   await expect(dialog.locator("[data-version]")).toHaveCount(2);
   await expect(dialog.locator('[data-version="2"]')).toContainText("فعلی");
@@ -359,7 +364,8 @@ test("17. the customer rolls back to the earlier published version from the Stud
   await expect(visitor.getByRole("heading", { name: state.heroTitle })).toBeVisible();
   await expect(visitor.getByText("عنوان نسخهٔ دوم")).toHaveCount(0);
   // History keeps everything: the rollback is a new, third version.
-  await page.getByRole("button", { name: "نسخه‌های منتشرشده" }).click();
+  await openMore(page);
+  await page.getByRole("menuitem", { name: "نسخه‌های منتشرشده" }).click();
   await expect(dialog.locator("[data-version]")).toHaveCount(3);
   await expect(dialog.locator('[data-version="3"]')).toContainText("فعلی");
   await page.screenshot({ path: "test-results/builder-11-versions.png" });

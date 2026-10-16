@@ -41,7 +41,9 @@ async function expectBusinessStudio(page: Page, siteType: string, project: { id:
   await expect(page.getByText("صفحه فروشگاه", { exact: true })).toHaveCount(0);
   // Site-type icon, a single "create another site" action on desktop, and no store wording in the Inspector.
   expect(await page.locator("[data-site-icon]").getAttribute("data-site-icon")).not.toBe("STORE");
-  expect(await page.locator("[data-create-another-site]:visible").count(), "one create-another action on desktop").toBe(1);
+  await page.locator("[data-studio-more]").click();
+  expect(await page.locator("[data-create-another-site]:visible").count(), "one create-another action on desktop (in the more menu)").toBe(1);
+  await page.keyboard.press("Escape");
   const toggle0 = page.getByRole("button", { name: /پنل ویرایش/ });
   if ((await toggle0.getAttribute("aria-label")) === "باز کردن پنل ویرایش") await toggle0.click();
   await page.locator("[data-studio-inspector]").getByRole("button", { name: "طراحی", exact: true }).click();

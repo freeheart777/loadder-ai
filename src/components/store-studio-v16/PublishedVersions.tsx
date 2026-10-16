@@ -12,8 +12,10 @@ async function read(response: Response) {
 
 // Published history of a site: the newest version is live; any earlier one can be made live again.
 // A rollback publishes a NEW version holding the old content (nothing is deleted) and replaces the draft with it.
-export default function PublishedVersions({ projectId, dirty, onRolledBack }: { projectId: string; dirty: boolean; onRolledBack: () => Promise<void> }) {
-  const [open, setOpen] = useState(false);
+export default function PublishedVersions({ projectId, dirty, onRolledBack, open: controlledOpen, onOpenChange, hideTrigger = false }: { projectId: string; dirty: boolean; onRolledBack: () => Promise<void>; open?: boolean; onOpenChange?: (open: boolean) => void; hideTrigger?: boolean }) {
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = controlledOpen ?? ownOpen;
+  const setOpen = (value: boolean) => { setOwnOpen(value); onOpenChange?.(value); };
   const [versions, setVersions] = useState<Version[]>([]);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -41,7 +43,7 @@ export default function PublishedVersions({ projectId, dirty, onRolledBack }: { 
   }
 
   return <>
-    <button type="button" onClick={() => setOpen(true)} data-published-versions-open className="flex min-h-10 items-center gap-1 rounded-xl border border-white/10 bg-white/[.045] px-3 text-[10px] font-bold text-white/80 hover:bg-white/[.08]"><ClockCounterClockwise size={14} /> نسخه‌های منتشرشده</button>
+    {!hideTrigger && <button type="button" onClick={() => setOpen(true)} data-published-versions-open className="flex min-h-10 items-center gap-1 rounded-xl border border-white/10 bg-white/[.045] px-3 text-[10px] font-bold text-white/80 hover:bg-white/[.08]"><ClockCounterClockwise size={14} /> نسخه‌های منتشرشده</button>}
     {open && <div role="dialog" aria-label="نسخه‌های منتشرشده" data-published-versions className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/80 p-4">
       <div className="max-h-[80vh] w-full max-w-md overflow-auto rounded-2xl border border-white/10 bg-[#0a111b] p-4 text-white shadow-2xl">
         <div className="mb-3 flex items-center justify-between"><b>نسخه‌های منتشرشده</b><button type="button" aria-label="بستن" onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl bg-white/10"><X size={16} /></button></div>

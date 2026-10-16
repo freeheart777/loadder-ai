@@ -2,6 +2,9 @@ import fs from "node:fs";
 import { expect, request, test, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
 import { navaMedicalV1 } from "../../src/components/store-studio-v16/templates/nava-medical-v1";
 
+// The Studio keeps secondary actions (Control Center, versions, public address, other sites) in the "more" menu.
+const openMore = async (page: import("@playwright/test").Page) => { await expect(page.locator('[data-canvas-interactive="true"]').first()).toBeVisible({ timeout: 20_000 }); const trigger = page.locator("[data-studio-more]"); await expect(trigger).toBeVisible({ timeout: 20_000 }); if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click(); };
+
 const apiBase = process.env.E2E_API_BASE_URL;
 if (!apiBase) throw new Error("E2E_API_BASE_URL is required.");
 const ok = async (response: APIResponse) => { const body = await response.json(); expect(response.ok(), JSON.stringify(body)).toBeTruthy(); return body; };
@@ -701,6 +704,7 @@ test("Control Center: one shell, capability-driven Medical sidebar on the right,
   await page.locator('[data-cc-action="edit-website"]').click();
   await expect(page).toHaveURL(new RegExp(`/dashboard/websites/corporate\\?project=${siteId}`));
   // Build -> Operate: the Studio toolbar links back to the same project's Control Center.
+  await openMore(page);
   const back = page.locator("[data-studio-control-center]");
   await expect(back).toBeVisible({ timeout: 20_000 });
   await back.click();

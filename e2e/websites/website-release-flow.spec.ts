@@ -1,6 +1,9 @@
 import { expect, request, test, type Browser, type Page } from "@playwright/test";
 import { businessLaunchTemplates } from "../../src/components/store-studio-v16/templates/business-launch-v1";
 
+// The Studio keeps secondary actions (Control Center, versions, public address, other sites) in the "more" menu.
+const openMore = async (page: import("@playwright/test").Page) => { await expect(page.locator('[data-canvas-interactive="true"]').first()).toBeVisible({ timeout: 20_000 }); const trigger = page.locator("[data-studio-more]"); await expect(trigger).toBeVisible({ timeout: 20_000 }); if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click(); };
+
 // Website Builder V16 release flow, for every shipped template:
 // template → create → Studio → edit → save → preview → (private preview link)
 // → publish → public address at desktop / tablet / mobile.
@@ -94,7 +97,8 @@ for (const scenario of cases) {
       const published = page.waitForResponse((res) => res.url().endsWith(`/api/site-projects/${project.id}/publish`) && res.request().method() === "POST");
       await page.getByRole("button", { name: "انتشار", exact: true }).click();
       expect((await published).status()).toBe(200);
-      const publicLink = page.getByRole("link", { name: /آدرس عمومی/ });
+      await openMore(page);
+      const publicLink = page.getByRole("menuitem", { name: /آدرس عمومی/ });
       await expect(publicLink).toBeVisible();
       const href = await publicLink.getAttribute("href");
       expect(href).toBe(`${scenario.commerce ? "/store" : "/site"}/${project.id}`);

@@ -1,5 +1,8 @@
 import { expect, request, test, type APIRequestContext, type APIResponse, type Browser, type BrowserContext, type Page, type TestInfo } from "@playwright/test";
 
+// The Studio keeps secondary actions (Control Center, versions, public address, other sites) in the "more" menu.
+const openMore = async (page: import("@playwright/test").Page) => { await expect(page.locator('[data-canvas-interactive="true"]').first()).toBeVisible({ timeout: 20_000 }); const trigger = page.locator("[data-studio-more]"); await expect(trigger).toBeVisible({ timeout: 20_000 }); if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click(); };
+
 const apiBaseURL = process.env.E2E_API_BASE_URL;
 
 if (!apiBaseURL) throw new Error("E2E_API_BASE_URL is required for the Store Studio journey.");
@@ -159,14 +162,16 @@ test("canonical authenticated Store Studio V16 customer journey", async ({ brows
 
       // Roll back from the Studio UI: the dialog lists both versions, the older one is made live again as a NEW version.
       await openStudio(journey.page, journey.projectId);
-      await journey.page.locator("[data-published-versions-open]").click();
+      await openMore(journey.page);
+      await journey.page.getByRole("menuitem", { name: "نسخه‌های منتشرشده" }).click();
       const dialog = journey.page.getByRole("dialog", { name: "نسخه‌های منتشرشده" });
       await expect(dialog.locator("[data-version]")).toHaveCount(2);
       journey.page.once("dialog", (d) => void d.accept());
       const rolledBack = journey.page.waitForResponse((response) => response.url() === `${apiBaseURL}/api/site-projects/${journey.projectId}/publish-rollback` && response.status() === 200);
       await dialog.locator('[data-version="1"]').getByRole("button", { name: "بازگردانی" }).click();
       await rolledBack;
-      await journey.page.locator("[data-published-versions-open]").click();
+      await openMore(journey.page);
+      await journey.page.getByRole("menuitem", { name: "نسخه‌های منتشرشده" }).click();
       await expect(dialog.locator("[data-version]")).toHaveCount(3);
       await expect(dialog.locator('[data-version="3"]')).toContainText("فعلی");
       await journey.page.getByRole("button", { name: "بستن", exact: true }).click();
