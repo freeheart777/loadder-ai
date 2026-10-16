@@ -248,7 +248,9 @@ test("Control Center is truthful and Hybrid exposes only its persisted Content a
     await expect(desktopManager(page, "commerce")).toHaveAttribute("href", "/dashboard/websites/commerce");
     await openMore(page);
     await expect(desktopManager(page, "booking")).toHaveCount(0);
-    await page.locator('[data-storefront-renderer="store-studio-v16"]').first().click();
+    // Open the settings panel through its own toggle (a click in the middle of the canvas can land on a photo, whose click replaces the image).
+    const panelToggle = page.getByRole("button", { name: /پنل ویرایش/ });
+    if ((await panelToggle.getAttribute("aria-label")) === "باز کردن پنل ویرایش") await panelToggle.click();
     await expect(page.getByRole("button", { name: "صفحه‌ها", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "صفحه‌ها", exact: true }).click();
     await expect(page.locator('[data-page-manager="v16"]')).toBeVisible();
