@@ -24,3 +24,21 @@ People shown are generic stock models, never real lawyers, doctors, instructors,
 | corporate/project-1.webp | Office Work | energepic.com | CC0 1.0 | https://stocksnap.io/photo/office-work-42H3JH8QI5 |
 | corporate/project-2.webp | Architectural Design | Karol Dach | CC0 1.0 | https://stocksnap.io/photo/architectural-design-2XJ1VEE57Q |
 | corporate/project-3.webp | Architecture Buildings | Rikki Chan | CC0 1.0 | https://stocksnap.io/photo/architecture-buildings-RJ7E7DFMXN |
+
+## Added for the Hybrid and Education templates (JPEG, resized to 1100px wide)
+
+All CC0 1.0 from [StockSnap.io](https://stocksnap.io), found through the Openverse API.
+
+| File | Photo | Creator | Source |
+| --- | --- | --- | --- |
+| hybrid/hero.jpg | Interior Design | Breather | https://stocksnap.io/photo/interior-design-478BZDEA2Y |
+| hybrid/workshop.jpg | Carpenter Workshop | James Frid | https://stocksnap.io/photo/carpenter-workshop-YPM6VH3FCW |
+| hybrid/product-1.jpg | Furniture Table | donterase | https://stocksnap.io/photo/furniture-table-D7CB4MUN1O |
+| hybrid/product-2.jpg | Wooden Bowl | The World is a Stage | https://stocksnap.io/photo/wooden-bowl-AMW6XPP8AT |
+| hybrid/product-3.jpg | Bookshelf Shelves | Jay Mantri | https://stocksnap.io/photo/bookshelf-shelves-14B430281B |
+| hybrid/project-1.jpg | Interior Design | Kristin Hardwick | https://stocksnap.io/photo/interior-design-WP7CVEDSVY |
+| hybrid/project-2.jpg | Interior Design | Dahl House Design | https://stocksnap.io/photo/interior-design-D0NOMANBA7 |
+| education/hero-music.jpg | Piano Keys | Jamille Queiroz | https://stocksnap.io/photo/piano-keys-970B97AC50 |
+| education/course-1.jpg | Acoustic Guitar | Negative Space | https://stocksnap.io/photo/acoustic-guitar-HP2GGWWPIN |
+| education/course-2.jpg | Violin Music | Chuttersnap | https://stocksnap.io/photo/violin-music-1WAF03ZD60 |
+| education/course-3.jpg | Piano Keys | Freestocks.org | https://stocksnap.io/photo/piano-keys-DPYMRMG50T |

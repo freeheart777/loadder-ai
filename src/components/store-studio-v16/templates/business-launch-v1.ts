@@ -8,7 +8,7 @@ const cards = (id: string, type: "services" | "team" | "portfolio", title: strin
 const story = (id: string, title: string, navLabel: string, subtitle: string, body: string, type: "text" | "text-image" = "text") => section(id, type, title, subtitle, { showInNav: true, navLabel, body });
 // Bundled CC0 stock photos (public/template-images, see CREDITS.md). The URL is absolute so the
 // stored value is the same https address on the canvas, previews and the server-rendered site.
-const templatePhoto = (path: string) => `${typeof window === "undefined" ? "" : window.location.origin}/template-images/${path}.webp`;
+const templatePhoto = (path: string, ext: "webp" | "jpg" = "webp") => `${typeof window === "undefined" ? "" : window.location.origin}/template-images/${path}.${ext}`;
 
 // Medical: default copy and bundled stock photos (hero, doctor portraits).
 // All text and images stay editable; services and text sections carry no images.
@@ -17,8 +17,8 @@ const medicalCards = (id: string, type: "services" | "team", title: string, navL
 
 const medical: WebsiteTemplate = {
   id: "medical-practice-v1", label: "کلینیک و پزشک", description: "معرفی پزشک، خدمات درمانی و درخواست نوبت.", siteKind: "BUSINESS", siteType: "MEDICAL",
-  design: { primaryColor: "#0f766e", secondaryColor: "#ccfbf1" }, header: { storeName: "کلینیک شما" },
-  hero: { layout: "background", eyebrow: "مراقبت درمانی حرفه‌ای", title: "مراقبت از سلامت شما، با آرامش و دقت", subtitle: "خدمات تخصصی، توضیح روشن مسیر درمان و پیگیری پس از مراجعه در یک مکان.", ctaLabel: "رزرو نوبت", ctaHref: "#contact-main", imageUrl: templatePhoto("medical/hero"), backgroundColor: "#134e4a", overlayOpacity: 52 },
+  design: { primaryColor: "#0f766e", secondaryColor: "#ccfbf1" }, header: { storeName: "کلینیک شما" }, nav: { enabled: true, ctaLabel: "رزرو نوبت", ctaHref: "/booking" },
+  hero: { layout: "background", eyebrow: "مراقبت درمانی حرفه‌ای", title: "مراقبت از سلامت شما، با آرامش و دقت", subtitle: "خدمات تخصصی، توضیح روشن مسیر درمان و پیگیری پس از مراجعه در یک مکان.", ctaLabel: "رزرو نوبت", ctaHref: "/booking", imageUrl: templatePhoto("medical/hero"), backgroundColor: "#134e4a", overlayOpacity: 52 },
   sections: [
     medicalCards("doctor-main", "team", "پزشکان ما", "پزشکان", [
       ["پزشک متخصص", "حوزه تخصص پزشک", "معرفی کوتاه پزشک و روزهای حضور در کلینیک را اینجا بنویسید.", templatePhoto("medical/doctor-1")],
@@ -35,6 +35,7 @@ const medical: WebsiteTemplate = {
       ["مراقبت پس از درمان", "توصیه‌ها و پیگیری", "راهنمایی برای دوره بهبود و مراجعه‌های بعدی."],
     ]),
     story("testimonials-main", "تجربه مراجعان", "نظرات", "نظر مراجعان برای ما ارزشمند است", "تجربه مراجعان را پس از دریافت رضایت آن‌ها در این بخش منتشر کنید."),
+    section("booking-cta", "cta", "نوبت می‌خواهید؟", "خدمت و پزشک را انتخاب کنید و از میان زمان‌های آزاد، نوبت خود را ثبت کنید.", { ctaLabel: "رزرو نوبت", ctaHref: "/booking", backgroundColor: "#0f766e", textColor: "#ffffff" }),
     { ...contact("درخواست نوبت"), subtitle: "نام و شماره تماس خود را بنویسید تا برای هماهنگی زمان مراجعه با شما تماس بگیریم." },
   ],
 };
@@ -88,7 +89,7 @@ const educationPage = (id: string, title: string, slug: string, sections: Sectio
 const education: WebsiteTemplate = {
   id: "education-center-v1", label: "مرکز آموزشی", description: "دوره‌ها، مدرسان، تجربه دانش‌پذیران و ثبت‌نام.", siteKind: "BUSINESS", siteType: "EDUCATION",
   design: { primaryColor: "#a98242", secondaryColor: "#e9ddc4", backgroundColor: "#242321", textColor: "#f5f0e5", surfaceColor: "#f5f0e5" }, header: { storeName: "آموزشگاه موسیقی شما", backgroundColor: "#242321", textColor: "#f5f0e5", sticky: true },
-  hero: { layout: "centered", eyebrow: "آموزش موسیقی، با تمرین و همراهی", title: "صدای خودتان را پیدا کنید", subtitle: "دوره‌ها، کارگاه‌ها و کلاس‌های موسیقی با مسیر یادگیری روشن و قابل ویرایش.", ctaLabel: "رزرو کلاس", ctaHref: "/booking", imageUrl: templatePhoto("education/hero"), backgroundColor: "#242321", textColor: "#f5f0e5", overlayOpacity: 60 },
+  hero: { layout: "centered", eyebrow: "آموزش موسیقی، با تمرین و همراهی", title: "صدای خودتان را پیدا کنید", subtitle: "دوره‌ها، کارگاه‌ها و کلاس‌های موسیقی با مسیر یادگیری روشن و قابل ویرایش.", ctaLabel: "رزرو کلاس", ctaHref: "/booking", imageUrl: templatePhoto("education/hero-music", "jpg"), backgroundColor: "#242321", textColor: "#f5f0e5", overlayOpacity: 60 },
   sections: [
     educationCards("courses-main", "services", "دوره‌های آموزشی", "دوره‌ها", [
       ["دوره مقدماتی", "شروع اصولی و کاربردی", "آشنایی با مفاهیم پایه و تمرین عملی از جلسه اول."],
@@ -112,7 +113,17 @@ const education: WebsiteTemplate = {
       seo: { title: "آموزشگاه موسیقی", description: "آموزش موسیقی، دوره‌ها و کارگاه‌های قابل ویرایش." },
       sections: [
         story("education-intro", "یادگیری موسیقی، قدم‌به‌قدم", "", "مسیر روشن برای تمرین", "برنامه آموزشی، تمرین و همراهی مدرس را متناسب با نیاز هنرجو معرفی کنید."),
-        story("education-note", "برای شروع آماده‌اید؟", "", "رزرو از مسیر رسمی", "برای انتخاب زمان مناسب، از دکمه رزرو کلاس استفاده کنید."),
+        educationCards("courses-home", "portfolio", "دوره‌های آموزشی", "", [
+          ["گیتار و ساز زهی", "از نخستین نت تا اجرای کامل", "تمرین عملی از جلسه اول، با برنامه تمرین هفتگی و بازخورد مدرس.", templatePhoto("education/course-1", "jpg")],
+          ["ویولن و سازهای ارکستری", "تکنیک، گوش و اجرا", "مسیر مرحله‌ای برای تقویت تکنیک و آمادگی برای اجرا.", templatePhoto("education/course-2", "jpg")],
+          ["پیانو و کیبورد", "نت‌خوانی و نوازندگی", "آموزش نت‌خوانی همراه با تمرین قطعه‌های ساده تا پیشرفته.", templatePhoto("education/course-3", "jpg")],
+        ]),
+        educationCards("teachers-home", "team", "مدرسان", "", [
+          ["مدرس دوره", "حوزه تدریس", "معرفی کوتاه مدرس و دوره‌هایی که تدریس می‌کند را اینجا بنویسید.", templatePhoto("education/instructor-1")],
+          ["مدرس دوره", "حوزه تدریس", "معرفی کوتاه مدرس و دوره‌هایی که تدریس می‌کند را اینجا بنویسید.", templatePhoto("education/instructor-2")],
+        ]),
+        section("education-booking-cta", "cta", "برای شروع آماده‌اید؟", "زمان مناسب کلاس را از مسیر رسمی رزرو انتخاب کنید.", { ctaLabel: "رزرو کلاس", ctaHref: "/booking", backgroundColor: "#a98242", textColor: "#ffffff" }),
+        { ...contact("ثبت‌نام و مشاوره"), subtitle: "دوره مورد نظر و شماره تماس خود را بنویسید تا برای راهنمایی و ثبت‌نام با شما تماس بگیریم." },
       ],
     },
     educationPage("page-courses", "دوره‌ها", "courses", [
@@ -178,14 +189,38 @@ const corporate: WebsiteTemplate = {
   ],
 };
 
+// Hybrid: a craft business that designs/builds to order AND shows ready-made products.
+// Capability boundary (verified in the backend): Commerce (cart, checkout, discounts) is STORE-only, so the product
+// showcase here is DISPLAY + INQUIRY: it carries no prices, stock, cart or checkout, and every call to action leads to
+// the lead form. Booking is not part of the HYBRID archetype either. Nothing below pretends otherwise.
+const hybridCards = (id: string, type: "services" | "portfolio", title: string, subtitle: string, navLabel: string, entries: [title: string, subtitle: string, body: string, imageUrl?: string][], extra: Partial<SectionConfig> = {}) =>
+  ({ ...cards(id, type, title, navLabel, []), subtitle, items: entries.map(([name, detail, body, imageUrl = ""], index) => ({ ...item(`${id}-${index}`, name, detail), body, imageUrl })), ...extra });
+
 const hybrid: WebsiteTemplate = {
-  id: "hybrid-business-v1", label: "کسب‌وکار ترکیبی", description: "صفحات معرفی، مقالات و فروش محصولات در یک سایت.", siteKind: "BUSINESS", siteType: "HYBRID",
-  design: { primaryColor: "#0f766e", secondaryColor: "#ecfdf5" }, header: { storeName: "کسب‌وکار شما" },
-  hero: { layout: "split", eyebrow: "کسب‌وکار شما، یکپارچه و حرفه‌ای", title: "معرفی، محتوا و فروش در یک سایت", subtitle: "داستان کسب‌وکار، مقاله‌ها و محصولات خود را در کنار هم به مشتریان نشان دهید.", ctaLabel: "مشاهده محصولات", ctaHref: "#products-main", imageUrl: templatePhoto("corporate/hero") },
+  id: "hybrid-business-v1", label: "کسب‌وکار ترکیبی", description: "خدمات سفارشی، ویترین محصولات آماده، نمونه‌کارها و دریافت استعلام در یک سایت.", siteKind: "BUSINESS", siteType: "HYBRID",
+  design: { primaryColor: "#b45309", secondaryColor: "#fef3c7", backgroundColor: "#faf7f2", textColor: "#292524", surfaceColor: "#ffffff" },
+  header: { storeName: "کارگاه و فروشگاه شما", backgroundColor: "#1c1917", textColor: "#fafaf9", sticky: true },
+  nav: { enabled: true, ctaLabel: "استعلام و سفارش", ctaHref: "#contact-main" },
+  footer: { enabled: true, text: "طراحی، ساخت و فروش محصولات دست‌ساز.", backgroundColor: "#1c1917", textColor: "#e7e5e4" },
+  hero: { layout: "background", eyebrow: "طراحی، ساخت و فروش", title: "از طرح تا ساخت؛ کاری که ماندگار می‌ماند", subtitle: "سفارش ساخت اختصاصی بدهید یا از محصولات آماده ما دیدن کنید. هر دو مسیر با یک گفتگو شروع می‌شود.", ctaLabel: "مشاهده محصولات", ctaHref: "#products-main", imageUrl: templatePhoto("hybrid/hero", "jpg"), backgroundColor: "#1c1917", overlayOpacity: 48 },
   sections: [
-    section("about-main", "about", "درباره ما", "داستان کسب‌وکار ما", { showInNav: true, navLabel: "درباره ما", imageUrl: templatePhoto("corporate/about"), body: "در این بخش داستان شکل‌گیری کسب‌وکار، رویکرد و ارزش پیشنهادی خود را معرفی کنید." }),
-    story("articles-main", "مقالات", "مقالات", "دانش و تجربه ما", "مقاله‌ها و راهنماهای مفید خود را در این بخش منتشر کنید."),
-    { ...contact("شروع گفتگو"), subtitle: "اطلاعات تماس خود را ثبت کنید تا با شما در ارتباط باشیم." },
+    hybridCards("services-main", "services", "خدمات طراحی و ساخت سفارشی", "از اندازه‌گیری تا نصب، همراه شما هستیم.", "خدمات", [
+      ["طراحی و مشاوره", "طرح متناسب با فضا و بودجه شما", "نیاز و فضای شما را بررسی می‌کنیم و طرح و مواد مناسب را پیشنهاد می‌دهیم."],
+      ["ساخت سفارشی", "از نقشه تا محصول نهایی", "ساخت در کارگاه خودمان با پیگیری مرحله‌به‌مرحله و گزارش پیشرفت."],
+      ["نصب و پشتیبانی", "تحویل و نصب در محل", "نصب دقیق و پشتیبانی پس از تحویل برای اطمینان از رضایت شما."],
+    ]),
+    hybridCards("products-main", "portfolio", "محصولات آماده", "نمونه‌ای از محصولات موجود. برای قیمت و سفارش، فرم استعلام را پر کنید.", "محصولات", [
+      ["سینی و میز کنار چوبی", "دست‌ساز · موجود برای سفارش", "سینی و میز کنار چوب راش با روکش مقاوم؛ قیمت و موجودی را از ما بپرسید.", templatePhoto("hybrid/product-1", "jpg")],
+      ["ست ظروف چوب", "دست‌ساز · قابل سفارش در اندازه دلخواه", "قاشق، چنگال و کاسه چوبی با کیفیت مناسب استفاده روزانه.", templatePhoto("hybrid/product-2", "jpg")],
+      ["کتابخانه و قفسه", "ساخت اختصاصی بر اساس اندازه", "قفسه‌های مدولار با طراحی متناسب با فضای شما.", templatePhoto("hybrid/product-3", "jpg")],
+    ], { backgroundColor: "#fff7ed" }),
+    section("about-main", "text-image", "داستان کارگاه", "چرا کار دست؟", { showInNav: true, navLabel: "درباره ما", imageUrl: templatePhoto("hybrid/workshop", "jpg"), mediaPosition: "start", body: "داستان کارگاه، سال‌های تجربه و روش کار خود را در چند جمله روشن بنویسید؛ مشتری باید بداند چه کسی محصول را می‌سازد." }),
+    hybridCards("projects-main", "portfolio", "نمونه پروژه‌ها", "تجربه‌ای از کارهای انجام‌شده برای مشتریان.", "نمونه‌کارها", [
+      ["بازطراحی فضای کار", "پروژه سفارشی", "طراحی و ساخت مبلمان اختصاصی برای یک فضای کاری.", templatePhoto("hybrid/project-1", "jpg")],
+      ["دکور و مبلمان خانه", "پروژه سفارشی", "هماهنگی طرح، رنگ و مواد با فضای زندگی مشتری.", templatePhoto("hybrid/project-2", "jpg")],
+    ]),
+    section("inquiry-cta", "cta", "پروژه یا سفارشی در ذهن دارید؟", "توضیح کوتاهی بنویسید؛ برای مشاوره و برآورد با شما تماس می‌گیریم.", { ctaLabel: "ارسال استعلام", ctaHref: "#contact-main", backgroundColor: "#b45309", textColor: "#ffffff" }),
+    { ...contact("استعلام و سفارش"), subtitle: "نام، شماره تماس و توضیح سفارش خود را بنویسید تا با شما تماس بگیریم." },
   ],
 };
 
