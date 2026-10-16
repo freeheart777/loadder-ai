@@ -45,13 +45,15 @@ function Hero(props: CanvasProps) {
   const { hero } = config;
   const mobile = device === "mobile";
   const openCollection = () => props.runtimeAdapter?.openCollection() ?? onRuntimePage?.("collection");
+  // A business hero button goes where the author pointed it (ctaHref); the booking link is only its fallback. Stores keep the storefront action.
+  const heroHref = config.siteKind === "STORE" ? undefined : (hero.ctaHref || props.bookingHref);
   const height = mobile ? Math.max(400, Math.min(hero.height, 560)) : Math.max(280, hero.height);
   const copy = <div className={`relative z-[45] ${hero.layout === "centered" ? "mx-auto max-w-3xl text-center" : "max-w-xl"}`} style={{ textAlign: hero.layout === "centered" ? "center" : hero.alignment }}>
     <EditableText field={{ scope: "hero", field: "eyebrow" }} value={hero.eyebrow} fallback="انتخاب امروز" className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-black" />
     <EditableText as="h2" field={{ scope: "hero", field: "title" }} value={hero.title} className="mt-5 font-black leading-[1.1]" style={{ fontSize: mobile ? 36 : 52 * config.design.headingScale / 100 }} />
     <EditableText as="p" field={{ scope: "hero", field: "subtitle" }} value={hero.subtitle} className={`mt-5 text-sm leading-8 opacity-80 ${hero.layout === "centered" ? "mx-auto max-w-2xl" : "max-w-lg"}`} />
-    {props.bookingHref && !interactive
-      ? <AuthorLink href={props.bookingHref} interactive={false} className="mt-7 inline-flex min-h-12 items-center gap-2 px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}>{hero.ctaLabel || "رزرو نوبت"}<ArrowLeft size={16}/></AuthorLink>
+    {heroHref
+      ? <AuthorLink href={heroHref} base={props.pageBasePath} interactive={interactive} className="mt-7 inline-flex min-h-12 items-center gap-2 px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}><EditableText field={{ scope: "hero", field: "ctaLabel" }} value={hero.ctaLabel} fallback="مشاهده" /><ArrowLeft size={16}/></AuthorLink>
       : <button type="button" onClick={!interactive ? openCollection : undefined} className="mt-7 inline-flex min-h-12 items-center gap-2 px-7 text-sm font-black text-white" style={{ background: config.design.primaryColor, borderRadius: config.design.buttonRadius }}><EditableText field={{ scope: "hero", field: "ctaLabel" }} value={hero.ctaLabel} fallback="مشاهده محصولات" /><ArrowLeft size={16}/></button>}
   </div>;
   const mediaControl = interactive && <InlineMediaControl target={{ kind: "hero" }} onUpload={props.onImageUpload} busy={props.imageBusy} label={hero.imageUrl ? "تعویض عکس" : "افزودن عکس"} empty={!hero.imageUrl}/>;
@@ -278,7 +280,7 @@ function ContactForm({ section, config, onSubmit }: { section: SectionConfig; co
   // Hidden from people, visible to form-filling bots. Never shown, never focusable.
   const [honeypot, setHoneypot] = useState("");
   const field = (key: keyof typeof form) => ({ value: form[key], onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((current) => ({ ...current, [key]: event.target.value })) });
-  const input = "min-h-12 w-full rounded-xl border border-black/10 bg-white px-4 text-sm outline-none focus:border-violet-400";
+  const input = "min-h-12 w-full rounded-xl border border-black/10 bg-white px-4 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:border-violet-400";
   if (state === "done") return <p role="status" data-lead-state="submitted" className="rounded-2xl bg-emerald-50 p-5 text-sm font-bold text-emerald-700">{section.contact?.successMessage}</p>;
   return <form data-lead-form="corporate" className="grid gap-3" onSubmit={async (event) => {
     event.preventDefault();
