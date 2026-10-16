@@ -573,6 +573,10 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     setMessage("بخش کپی شد.");
   }
 
+  function hideSection(id: string) {
+    setConfig((c) => ({ ...withActivePageSections(c, activePageOf(c).sections.map((s) => (s.id === id ? { ...s, enabled: false } : s))), selectedElement: { type: "section", id: null } }));
+    setMessage("بخش پنهان شد؛ از تب «بخش‌ها» دوباره فعال می‌شود.");
+  }
   function deleteSection(id: string) {
     setConfig((c) => ({ ...withActivePageSections(c, activePageOf(c).sections.filter((s) => s.id !== id)), selectedElement: { type: "hero", id: "hero" } }));
     setInspectorOpen(false);
@@ -852,7 +856,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
           {(commerce || capabilities.includes("commerce")) && <button data-quick-add="discounts" onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>}
         </div>
-        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas inlineEdit={inlineEdit} config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
+        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas inlineEdit={inlineEdit} config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onToggleSection={hideSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
       <aside data-studio-inspector className={`min-h-0 min-w-0 overflow-hidden border-white/10 bg-[#0a111b] transition-all lg:order-2 lg:border-r ${inspectorOpen ? "fixed inset-x-0 bottom-0 z-[60] h-[70vh] rounded-t-2xl border-t shadow-2xl lg:static lg:h-auto lg:rounded-none lg:border-t-0 lg:shadow-none" : "hidden pointer-events-none opacity-0 lg:block"}`}>

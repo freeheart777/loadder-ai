@@ -111,6 +111,7 @@ test("a blank site shows an always-visible add-image action on an empty image sl
   try {
     const project = await createFrom(page, "/dashboard/websites/corporate", null);
     const empties = canvas(page).locator('[data-media-empty="true"]');
+    await expect(empties.first(), "a blank site has an empty image slot").toBeAttached();
     const count = await empties.count();
     expect(count, "a blank site has an empty image slot").toBeGreaterThan(0);
     const control = empties.first();
