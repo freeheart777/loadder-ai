@@ -16,6 +16,7 @@ import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
 import { writeField } from "../components/store-studio-v16/editable-fields";
 import { commitActiveInlineEdit as commitActiveEdit } from "../components/store-studio-v16/EditableText";
 import type { InlineEdit } from "../components/store-studio-v16/EditableText";
+import TemplateLivePreview from "../components/store-studio-v16/TemplateLivePreview";
 import StudioMoreMenu from "../components/store-studio-v16/StudioMoreMenu";
 import type { MoreItem } from "../components/store-studio-v16/StudioMoreMenu";
 import PublishedVersions from "../components/store-studio-v16/PublishedVersions";
@@ -152,12 +153,6 @@ function applyMediaToConfig(current: StudioConfig, target: InlineMediaTarget, ur
   return current;
 }
 
-function TemplatePreview({ template }: { template: WebsiteTemplate }) {
-  const palette: Record<string, string> = { "medical-practice-v1": "from-teal-800 via-teal-700 to-cyan-500", "nava-medical-v1": "from-stone-200 via-emerald-100 to-stone-300", "legal-firm-v1": "from-stone-950 via-stone-800 to-amber-700", "education-center-v1": "from-indigo-950 via-indigo-700 to-violet-500", "corporate-company-v1": "from-sky-950 via-sky-700 to-cyan-400", "commerce-modern-v1": "from-slate-950 via-violet-700 to-emerald-400" };
-  const labels = template.sections.slice(0, 3).map((section) => section.title);
-  return <div aria-hidden="true" className="overflow-hidden rounded-xl border border-white/10 bg-white"><div className={`h-14 bg-gradient-to-bl ${palette[template.id] || "from-slate-800 to-slate-500"} p-3`}><i className="block h-1.5 w-12 rounded bg-white/70"/><i className="mt-2 block h-2 w-2/3 rounded bg-white/90"/></div><div className="grid grid-cols-3 gap-1.5 p-2">{labels.map((label) => <span key={label} className="min-h-9 rounded-md bg-slate-100 p-1 text-[7px] font-bold text-slate-500">{label}</span>)}</div></div>;
-}
-
 function templateExperience(template: WebsiteTemplate) {
   const details: Record<string, { useCases: string; recommendation: string }> = {
     "nava-medical-v1": { useCases: "کلینیک · پزشکان · مجله", recommendation: "برای کلینیک با پزشکان، خدمات و نوبت‌دهی واقعی" },
@@ -165,6 +160,7 @@ function templateExperience(template: WebsiteTemplate) {
     "legal-firm-v1": { useCases: "موسسه حقوقی · وکیل", recommendation: "برای تخصص‌ها، تیم حقوقی و مشاوره" },
     "education-center-v1": { useCases: "آموزشگاه · دوره‌ها", recommendation: "برای دوره‌ها، مدرسان و ثبت‌نام" },
     "corporate-company-v1": { useCases: "شرکت · سازمان", recommendation: "برای خدمات، نمونه‌کار و ارتباط تجاری" },
+    "hybrid-business-v1": { useCases: "خدمات سفارشی · ویترین محصولات", recommendation: "برای کسب‌وکاری که هم خدمت می‌دهد و هم محصول نشان می‌دهد؛ سفارش از راه استعلام" },
     "commerce-modern-v1": { useCases: "فروشگاه آنلاین", recommendation: "برای محصولات، تخفیف‌ها و خرید" },
   };
   return details[template.id] || { useCases: "وب‌سایت حرفه‌ای", recommendation: template.description };
@@ -188,7 +184,7 @@ function CreateWebsiteScreen({ commerce, templates, selectedTemplateId, onSelect
       <p className="mt-2 text-xs leading-6 text-white/45">{commerce ? "یک قالب آماده را انتخاب کنید یا از یک فروشگاه خالی شروع کنید." : "برای شروع، یک سایت خالی می‌سازیم؛ همه‌چیز را در همین Studio ویرایش می‌کنید."}</p>
       {templates.length > 0 && <div className="mt-5 grid gap-3">
         {templates.map((template) => <button key={template.id} type="button" onClick={() => onSelectTemplate(template.id)} aria-pressed={selectedTemplateId === template.id} className={`overflow-hidden rounded-2xl border text-right transition ${selectedTemplateId === template.id ? "border-emerald-400 bg-emerald-400/10 shadow-[0_14px_36px_rgba(52,211,153,.12)]" : "border-white/10 bg-white/[.03] hover:border-white/25 hover:bg-white/[.05]"}`}>
-          <div className="border-b border-white/10 bg-slate-950/30 p-3"><TemplatePreview template={template}/></div>
+          <div className="border-b border-white/10 bg-slate-950/30 p-3"><TemplateLivePreview template={template}/></div>
           <span className="block p-4"><b className="block text-sm">{template.label}</b><span className="mt-1 block text-[10px] font-bold text-emerald-200">{templateExperience(template).useCases}</span><span className="mt-1 block text-[11px] leading-5 text-white/40">{templateExperience(template).recommendation}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black ${selectedTemplateId === template.id ? "bg-emerald-400 text-slate-950" : "bg-white/10 text-white/60"}`}>{selectedTemplateId === template.id ? "انتخاب شده" : "انتخاب قالب"}</span></span>
         </button>)}
       </div>}
