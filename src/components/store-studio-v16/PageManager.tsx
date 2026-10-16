@@ -17,7 +17,7 @@ export default function PageManager({ config, actions }: { config: StudioConfig;
   return (
     <div className="space-y-4" data-page-manager="v16">
       <div>
-        <p className="text-[10px] font-black tracking-[.18em] text-emerald-300">PAGES</p>
+        <p className="text-[10px] font-black tracking-[.18em] text-emerald-300">صفحه‌ها</p>
         <h2 className="mt-1 text-lg font-black">صفحه‌های سایت</h2>
         <p className="mt-2 text-xs leading-6 text-white/40">قالب، هدر و فوتر بین همه صفحه‌ها مشترک است؛ بخش‌ها، آدرس و SEO برای هر صفحه جداگانه است.</p>
       </div>
