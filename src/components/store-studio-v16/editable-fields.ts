@@ -56,6 +56,7 @@ const isHome = (config: StudioConfig) => config.pages[0]?.id === config.activePa
 export function normalizeFieldText(value: unknown, multiline: boolean, maxLength = multiline ? MULTI : SINGLE): string {
   let text = String(value ?? "").replace(/\r\n?/g, "\n");
   // Control characters (except tab and newline), bidi overrides/isolates and the BOM are never stored.
+  // oxlint-disable-next-line no-control-regex -- intentionally matching control characters in order to drop them
   text = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F‪-‮⁦-⁩﻿]/g, "");
   text = multiline ? text.replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n") : text.replace(/[\n\t]+/g, " ");
   return text.slice(0, maxLength);

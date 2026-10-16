@@ -13,6 +13,8 @@ import { createConfigFromTemplate, templatesForSiteKind } from "../components/st
 import type { WebsiteTemplate } from "../components/store-studio-v16/templates/types";
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
+import { writeField } from "../components/store-studio-v16/editable-fields";
+import type { InlineEdit } from "../components/store-studio-v16/EditableText";
 import PublishedVersions from "../components/store-studio-v16/PublishedVersions";
 import { useUndoRedo } from "../components/store-studio-v16/useUndoRedo";
 import { invalidateActiveStoreProject } from "../lib/activeStoreProject";
@@ -759,6 +761,8 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
   const canvasConfig = useMemo<StudioConfig>(() => { const scoped = scopeSelection(config); return { ...scoped, sections: activePageOf(scoped).sections }; }, [config]);
   // Persist the scoped selection too, so no action can act on an element of another page.
   useEffect(() => { setConfig((c) => scopeSelection(c)); }, [config.activePageId, config.selectedElement.type, config.selectedElement.id]);
+  // Direct text editing on the canvas writes through the editable-field registry into the same document state as the Inspector.
+  const inlineEdit = useMemo<InlineEdit>(() => ({ config: canvasConfig, commit: (ref, text) => setConfig((c) => writeField(c, ref, text) ?? c) }), [canvasConfig]);
   const hasUnsavedChanges = Boolean(project && savedDocument.current !== editorDocumentKey(config));
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) outside text fields; text fields keep the browser's own undo.
   useEffect(() => {
@@ -847,7 +851,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
           <button onClick={() => insertSection(0, "banner")} className="rounded-xl px-3 py-2 text-[11px] font-bold hover:bg-white/10">بنر</button>
           {(commerce || capabilities.includes("commerce")) && <button data-quick-add="discounts" onClick={addDiscountSection} className="rounded-xl px-3 py-2 text-[11px] font-bold text-rose-200 hover:bg-rose-500/10"><Tag size={16} /> تخفیف‌ها</button>}
         </div>
-        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
+        {busy && !project ? <div className="grid min-h-96 place-items-center text-slate-500">در حال آماده‌سازی…</div> : <StudioCanvas inlineEdit={inlineEdit} config={canvasConfig} products={products} merchandisingProducts={merchandisingProducts} device={device} selected={canvasConfig.selectedElement} select={selectCanvasElement} onEditElement={actions.select} onAddProduct={setPickerSectionId} onReorderProduct={reorderProduct} onInsertSection={insertSection} onReorderSection={reorderSection} onMoveSection={moveSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onImageUpload={uploadMedia} imageBusy={mediaBusy} />}
       </section>
 
       <aside data-studio-inspector className={`min-h-0 min-w-0 overflow-hidden border-white/10 bg-[#0a111b] transition-all lg:order-2 lg:border-r ${inspectorOpen ? "fixed inset-x-0 bottom-0 z-[60] h-[70vh] rounded-t-2xl border-t shadow-2xl lg:static lg:h-auto lg:rounded-none lg:border-t-0 lg:shadow-none" : "hidden pointer-events-none opacity-0 lg:block"}`}>
