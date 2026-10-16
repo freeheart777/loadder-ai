@@ -42,3 +42,31 @@ Architecture maps and the how-to live in `docs/architecture/` (`LOADDER_RUNTIME_
 - Do not read `server/index.mjs` or `server/app/routes/auth.mjs` whole; `grep -n` the symbol and read ~30 lines.
 - Before relying on the graph compare `graphify-out/graph.json` `built_at_commit` with `git rev-parse HEAD`; if stale run `graphify update .` (AST only, ~6 s, no LLM). Do not rebuild from scratch. `graphify-out/` is never committed.
 - Load skills on demand, smallest set per task. Keep analysis, implementation and verification separate. Never touch runtime data (`server/db/loadder.sqlite`, sidecars, `server/data`, Docker volumes) to inspect architecture. Documentation is intent, not behaviour.
+
+## Verification map
+
+Run the narrowest command that proves the change, then the build gate. Commands below exist in `package.json`, `server/package.json`, `e2e/`, `docker/` or `.github/workflows/`; CI is the authority for the full run. Release rules: `docs/ENGINEERING_STANDARD.md` (gate list) and `docs/LOADDER_ENGINEERING_SYSTEM.md` (Definition of Done).
+
+| Change area | Verify with |
+|---|---|
+| Website Builder, Studio, templates, visual editing | `e2e/websites/run-website-e2e.sh e2e/websites/<spec>.spec.ts` (real API + public-site runtime, throw-away DB); `npm run test:e2e:corporate`; site platform: `node --test test/site-platform*` from `server/` |
+| Booking | `node --test --test-concurrency=1 server/test/booking-*.test.mjs`; browser: `e2e/websites/website-legal-booking.spec.ts` via the runner above, `e2e/medical/run-medical-browser.sh` |
+| Commerce and Store | `npm run test:e2e:store`; `npm run test:e2e:commerce`; `server/test/` commerce and ecommerce tests |
+| Authentication and tenant boundaries | `server/test/`: `auth`, `tenant-isolation`, `workspace-authorization`, `boundary-public-and-tenant`, `public-site-security`; `node server/scripts/security-static-gate.mjs` |
+| Database boundaries | `npm run check:db-boundary` |
+| Business Builder runtime | `node --test --test-concurrency=1 server/test/business-builder-*.test.mjs` (fast gate) |
+| Build and release | `npm run lint`; `npm run build`; `npm run test:server`; release drill tests named in `.github/workflows/business-builder-release-drill.yml`; production topology: `docker/prod-e2e.sh` (Docker, only when asked) |
+
+Workflow-to-area mapping lives in `.github/workflows/` (e.g. `store-studio-browser-e2e.yml`, `corporate-website-e2e.yml`, `security-supply-chain.yml`). Do not invent a command: if none covers the change, say so and name the gap.
+
+## UI verification checklist
+
+Required for any Studio, template, canvas or public-page change. Source-string assertions and green CI are not proof of a visual outcome.
+
+1. **Targeted tests:** run the Playwright spec(s) for the area (map above) and the server tests for any API touched.
+2. **Real browser:** drive the real flow (Chrome DevTools MCP or Playwright): create/open, edit, save, reload, confirm it persisted.
+3. **Screenshots:** capture and actually look at the changed screens (Studio and the published page); compare against the intended result.
+4. **Console and network:** list console messages and failed requests; there must be no new errors.
+5. **Responsive:** check desktop, tablet and mobile widths; also RTL/Persian where text changes.
+6. **Boundaries:** confirm the capability gate (e.g. Commerce is STORE-only, Booking scope) and that another workspace cannot see or change the data.
+7. **Report evidence:** state which pages, widths and screenshots were checked. If no browser run happened, say "visual acceptance not verified" instead of claiming it.

@@ -1,14 +1,15 @@
 # Active Task
 
-**Current focus:** Environment preparation for low-token-usage work on the Loadder Website Builder (V16). No implementation coding has started yet.
+**Current focus:** customer-facing visual acceptance and the website-building experience, on top of the finished Website Builder V18.
 
-**Scope for this task (do not expand):**
-- Create `CLAUDE.md` and `.claude/` memory files. (done)
-- Verify GitHub access, filesystem access, and existing MCP configuration — install nothing new. (done — GitHub confirmed; no Filesystem MCP needed, native tools suffice; no other MCP config installed)
-- Sync repo: `git fetch --all --prune`, verify `origin/main`, fast-forward local `main` only, remove the corrupted stray file `src/pages/StoreWebsiteStudioPageV16.tsx`. (done — HEAD now `570927a`, matches expected)
-- Write `docs/BUILD_STATE.md` summarizing branch/commit/discovered modules/next step. (done)
-- **Stop. Do not begin coding this session** unless explicitly told to.
+**Status:**
+- Website Builder V18 is implemented and pushed. Latest verified commit: `417e239` (`automation/loadder-roadmap`).
+- **No new architecture phase is authorized.** Do not start V19 or a new gate without an explicit instruction.
+- Claude workflow optimization (state archive, verification map, UI checklist in `CLAUDE.md`) is documentation-only.
 
-**Explicitly out of scope right now:** implementing any Website Builder feature, modifying any file under `src/` or `server/` beyond the one corrupted-file removal, reviewing unrelated modules (CRM, Analytics, Automation, Ads, etc.).
+**Scope rules (do not expand):**
+- Work only on the files the stated task names. Use the Verification map and UI verification checklist in `CLAUDE.md` before claiming anything is done.
+- Do not install skills, plugins or dependencies. Google Agent Skills were audited and rejected.
+- Do not touch runtime data: `server/db/loadder.sqlite`, `server/data`, Docker volumes.
 
-**Next task once this finishes:** to be chosen by the user, informed by `docs/BUILD_STATE.md`'s "next recommended task" section — likely picking up the V16 lineage at the next gate after `codex/v16-component-contract-gate-03` (the current tip of `origin/main`).
+**Pointers:** current state `.claude/current-state.md`; history `docs/CURRENT_STATE_ARCHIVE_V16_2026-09.md`; V18 notes `docs/WEBSITE_BUILDER_V18.md`.

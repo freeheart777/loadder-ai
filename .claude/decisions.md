@@ -4,6 +4,16 @@ Append-only record of non-obvious decisions and their reasoning, so future sessi
 
 ---
 
+## 2026-10-17 — Claude workflow: archive instead of delete; verification map in CLAUDE.md
+
+**Decision:** The 2026-09 milestone log from `current-state.md` was moved verbatim to `docs/CURRENT_STATE_ARCHIVE_V16_2026-09.md`; `current-state.md` is now a ~4 KB summary with SHAs. A verification map and UI checklist were added to `CLAUDE.md`. No skills, plugins or dependencies were added.
+
+**Why:** `current-state.md` had grown to ~73 KB (~18k tokens) and was stale (nothing after 2026-09-25) while `CLAUDE.md` told every session to read it. Google Agent Skills (`google/skills`) were audited and rejected: all GCP-specific, no frontend, Playwright or a11y coverage.
+
+**Do not repeat:** re-auditing Google skills; re-growing `current-state.md` with per-PR narrative (add a SHA row, put detail in `docs/`).
+
+---
+
 ## 2026-09-24 — Treat `origin/main` as the best V16 candidate, not any feature branch
 
 **Decision:** When asked to find "the most complete and production-ready Website Builder implementation," the answer is `origin/main` (tip at the time: `570927aaee3f91072c3b76c101349625eef92501`), not a specific feature branch.
