@@ -123,7 +123,7 @@ test("A: the SPA public projection resolves published Education without treating
 });
 
 test("A: the commerce decision is STORE-only for every site type", () => {
-  for (const siteType of ["STORE", "store", "BUSINESS", "MEDICAL", "LEGAL", "NEWS", undefined]) {
+  for (const siteType of ["STORE", "store", "BUSINESS", "MEDICAL", "LEGAL", "HYBRID", "hybrid", "NEWS", undefined]) {
     assert.equal(commerceEnabled({ siteType }), String(siteType || "").toUpperCase() === "STORE", String(siteType));
   }
   assert.equal(commerceEnabled(null), false);

@@ -25,9 +25,9 @@ export const LEGACY_CAPABILITY_MAP = Object.freeze({
 /** Integrations, never loaded by the website runtime. */
 const INTEGRATION_CAPABILITIES = new Set(["analytics", "ads"]);
 
-/** Commerce is available only to the persisted commerce-capable verticals. */
+/** Commerce (cart, checkout, discounts) is available only to STORE projects (ECOMMERCE is its alias). HYBRID is a showcase + inquiry site, not a store. */
 const COMMERCE_CAPABILITIES = new Set(["commerce", "payments"]);
-const isCommerceProject = (project) => new Set(["STORE", "ECOMMERCE", "HYBRID"]).has(String(project?.siteType || "").toUpperCase());
+const isCommerceProject = (project) => new Set(["STORE", "ECOMMERCE"]).has(String(project?.siteType || "").toUpperCase());
 
 const declaredCapabilities = (project, content) => {
   const stored = content?.websitePlatform?.capabilities;

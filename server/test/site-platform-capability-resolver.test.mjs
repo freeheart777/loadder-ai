@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   LEGACY_CAPABILITY_MAP, PENDING_CAPABILITIES, SUPPORTED_CAPABILITIES, resolveCapabilities,
 } from "../app/site-platform/capability-resolver.mjs";
-import { ensureWebsitePlatformContent } from "../app/services/website-platform-definition.mjs";
+import { createWebsitePlatformDefinition, ensureWebsitePlatformContent } from "../app/services/website-platform-definition.mjs";
 
 const SITE_TYPES = ["STORE", "BUSINESS", "MEDICAL", "LEGAL", "CORPORATE", "EDUCATION", "ECOMMERCE", "HYBRID", "NEWS", "UNKNOWN", undefined];
 // The content a site project actually stores after creation.
@@ -36,7 +36,7 @@ test("LEGAL resolves registered booking and keeps people", () => {
 
 test("approved starters persist their vertical capabilities", () => {
   assert.deepEqual(resolveCapabilities({ siteType: "ECOMMERCE" }, created("ECOMMERCE")).capabilities, ["core", "commerce", "payments", "forms"]);
-  assert.deepEqual(resolveCapabilities({ siteType: "HYBRID" }, created("HYBRID")).capabilities, ["core", "commerce", "payments", "forms", "blog", "people"]);
+  assert.deepEqual(resolveCapabilities({ siteType: "HYBRID" }, created("HYBRID")).capabilities, ["core", "forms", "blog", "people"]);
   const education = resolveCapabilities({ siteType: "EDUCATION" }, created("EDUCATION"));
   assert.ok(education.capabilities.includes("blog"));
   assert.ok(education.capabilities.includes("booking"));
@@ -61,7 +61,7 @@ test("compatibility: commerce and payments are limited to persisted commerce ver
       resolveCapabilities({ siteType }, { websitePlatform: { capabilities: [] } }),
     ];
     for (const { capabilities } of variants) {
-      const expected = siteType === "STORE" || siteType === "ECOMMERCE" || siteType === "HYBRID";
+      const expected = siteType === "STORE" || siteType === "ECOMMERCE";
       assert.equal(capabilities.includes("commerce"), expected, `${siteType} commerce`);
       assert.equal(capabilities.includes("payments"), expected, `${siteType} payments`);
     }
@@ -124,4 +124,13 @@ test("the resolver never mutates its input", () => {
   const before = structuredClone(content);
   resolveCapabilities({ siteType: "STORE" }, content);
   assert.deepEqual(content, before);
+});
+
+test("HYBRID never gains Commerce, even if a stored document declares it, and keeps lead/people/blog", () => {
+  for (const content of [created("HYBRID"), {}, { websitePlatform: { capabilities: ["commerce", "catalog", "payments", "forms", "lead"] } }]) {
+    const { capabilities } = resolveCapabilities({ siteType: "HYBRID" }, content);
+    assert.ok(!capabilities.includes("commerce") && !capabilities.includes("payments"));
+    assert.ok(capabilities.includes("forms"));
+  }
+  assert.ok(!createWebsitePlatformDefinition({ siteType: "HYBRID" }).capabilities.some((c) => c === "commerce" || c === "catalog"));
 });

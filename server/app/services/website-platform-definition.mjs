@@ -20,7 +20,8 @@ const CAPABILITIES_BY_ARCHETYPE = Object.freeze({
   // This only exposes the integration; starter creation never seeds booking
   // services, providers, availability, or appointments.
   education: ["courses", "booking", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
-  hybrid: ["commerce", "catalog", "lead", "team", "content", "forms", "analytics", "ads", "landing"],
+  // Hybrid is presentation + services + product showcase + leads; Commerce is STORE-only.
+  hybrid: ["lead", "team", "content", "forms", "analytics", "ads", "landing"],
   custom: ["forms", "analytics", "landing"],
 });
 
