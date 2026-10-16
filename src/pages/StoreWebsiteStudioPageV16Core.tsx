@@ -14,6 +14,7 @@ import type { WebsiteTemplate } from "../components/store-studio-v16/templates/t
 import type { DeviceMode, MediaAsset, PageConfig, Product, ProductSettings, SectionConfig, SectionItem, Selection, SiteKind, StudioActions, StudioConfig } from "../components/store-studio-v16/types";
 import { API_BASE_URL, apiFetch, getCanonicalStoreProjectId } from "../lib/api";
 import { writeField } from "../components/store-studio-v16/editable-fields";
+import { commitActiveInlineEdit as commitActiveEdit } from "../components/store-studio-v16/EditableText";
 import type { InlineEdit } from "../components/store-studio-v16/EditableText";
 import PublishedVersions from "../components/store-studio-v16/PublishedVersions";
 import { useUndoRedo } from "../components/store-studio-v16/useUndoRedo";
@@ -359,17 +360,17 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
     patchSeo: (p) => setConfig((c) => ({ ...c, seo: { ...c.seo, ...p } })),
     patchNav: (p) => setConfig((c) => ({ ...c, nav: { ...c.nav, ...p } })),
     patchFooter: (p) => setConfig((c) => ({ ...c, footer: { ...c.footer, ...p } })),
-    selectPage: (pageId) => setConfig((c) => ({ ...c, activePageId: pageId, selectedElement: { type: "hero", id: "hero" } })),
-    addPage: () => setConfig((c) => {
+    selectPage: (pageId) => { commitActiveEdit(); setConfig((c) => ({ ...c, activePageId: pageId, selectedElement: { type: "hero", id: "hero" } })); },
+    addPage: () => { commitActiveEdit(); setConfig((c) => {
       const index = c.pages.length + 1;
       const page = newPage(`صفحه ${index}`, `page-${index}`, []);
       return { ...withPages(c, [...c.pages, page]), activePageId: page.id };
-    }),
+    }); },
     patchPage: (pageId, patch) => setConfig((c) => withPages(c, c.pages.map((page) => (page.id === pageId ? { ...page, ...patch } : page)))),
     // Home is the site root and cannot be removed.
-    deletePage: (pageId) => setConfig((c) => (c.pages[0]?.id === pageId || c.pages.length < 2
+    deletePage: (pageId) => { commitActiveEdit(); setConfig((c) => (c.pages[0]?.id === pageId || c.pages.length < 2
       ? c
-      : { ...withPages(c, c.pages.filter((page) => page.id !== pageId)), activePageId: c.activePageId === pageId ? c.pages[0].id : c.activePageId })),
+      : { ...withPages(c, c.pages.filter((page) => page.id !== pageId)), activePageId: c.activePageId === pageId ? c.pages[0].id : c.activePageId })); },
     movePage: (pageId, delta) => setConfig((c) => {
       const i = c.pages.findIndex((page) => page.id === pageId), t = i + delta;
       // Home stays first: neither it nor another page may take position 0.
@@ -836,7 +837,7 @@ export default function StoreWebsiteStudioPageV16({ siteKind = "STORE" }: { site
         <button type="button" onClick={history.redo} disabled={!history.canRedo} aria-label="ازنو" title="ازنو (Ctrl+Shift+Z)" className="grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-white/80 hover:bg-white/[.08] disabled:opacity-30"><ArrowUUpRight size={16} /></button>
       </div>
       {project?.status === "PUBLISHED" && <PublishedVersions projectId={project.id} dirty={hasUnsavedChanges} onRolledBack={reloadAfterRollback} />}
-      <StudioToolbar siteType={project?.siteType} pageOptions={commerce ? undefined : config.pages.map((item) => ({ id: item.id, title: item.title }))} activePageId={config.activePageId} onSelectPage={commerce ? undefined : actions.selectPage} device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } }))} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
+      <StudioToolbar siteType={project?.siteType} pageOptions={commerce ? undefined : config.pages.map((item) => ({ id: item.id, title: item.title }))} activePageId={config.activePageId} onSelectPage={commerce ? undefined : actions.selectPage} device={device} page={config.activePage} status={project?.status} dirty={hasUnsavedChanges} busy={busy || !project || mediaBusy} onDevice={setDevice} onPage={(activePage) => { commitActiveEdit(); setConfig((c) => ({ ...c, activePage, selectedElement: { type: activePage === "storefront" ? "hero" : activePage, id: activePage === "storefront" ? "hero" : activePage } })); }} onPreview={() => { setPreviewTokenUrl(""); setPreviewOpen(true); }} onSave={() => void save()} onPublish={() => void publish()} controlCenterHref={project ? controlCenterPath(project.id) : undefined} />
     </header>
 
     <div className={`relative grid h-[calc(100vh-80px)] grid-cols-1 transition-[grid-template-columns] duration-200 ${inspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_300px]" : "lg:grid-cols-[minmax(0,1fr)_0px]"}`}>

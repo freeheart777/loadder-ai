@@ -18,7 +18,7 @@ case "${1:-}" in
   blank) spec=e2e/websites/website-blank-and-preview.spec.ts ;;
   release) spec=e2e/websites/website-release-flow.spec.ts ;;
   awareness) spec=e2e/websites/website-studio-type-awareness.spec.ts ;;
-  inline) spec=e2e/websites/website-inline-editing.spec.ts ;;
+  inline) spec=e2e/websites/website-inline-editing ;;
   *) echo "usage: docker/prod-e2e.sh medical|education|commerce|corporate|store|builder|legal|blank|release|awareness|inline" >&2; exit 2 ;;
 esac
 [ -f deploy/.env.production ] || { echo "create deploy/.env.production first (copy deploy/.env.production.example)" >&2; exit 2; }

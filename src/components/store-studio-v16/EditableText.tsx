@@ -22,6 +22,15 @@ type Props = {
   children?: ReactNode;   // optional decoration rendered after the text while NOT editing
 };
 
+/**
+ * Leaving a page (or changing the page list) first commits a text edit in progress to the page it belongs to.
+ * All direct DOM access for inline editing lives in this module; the state-owned canvas and Studio page stay free of it.
+ */
+export function commitActiveInlineEdit() {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.dataset.editing === "true") active.blur();
+}
+
 const label = (field: EditableFieldRef) => ("field" in field ? field.field : "text");
 
 export default function EditableText({ as: Tag = "span", field, value, className, style, fallback, children }: Props) {
