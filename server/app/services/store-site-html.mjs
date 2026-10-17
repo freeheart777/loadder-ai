@@ -39,14 +39,17 @@ function productsForSection(products, settings, canonicalProducts = null) {
   return settings.source === "bestselling" ? [] : products;
 }
 
-function productCardHtml(product, settings, overrides) {
+function productCardHtml(product, settings, overrides, storefrontUrl) {
   const override = overrides[product.id] || {};
   const variant = (product.variants || []).find((v) => isVariantPurchasable(v)) || product.variants?.[0];
   const purchasable = (product.variants || []).some((v) => isVariantPurchasable(v));
   const image = url(override.imageUrl) || url(variant?.imageUrl) || url(product.metadata?.gallery?.[0]) || "";
   const compareAt = settings.showCompareAt !== false && product.compareAtPriceMinor && product.compareAtPriceMinor > product.basePriceMinor ? product.compareAtPriceMinor : null;
   const badge = override.promotionBadge && settings.showPromotionBadge !== false ? `<span class="badge">${escape(override.promotionBadgeText || "فروش ویژه")}</span>` : "";
-  return `<article class="product-card">${image ? `<div class="product-media"><img src="${escape(image)}" alt="${escape(product.name)}" loading="lazy">${badge}</div>` : `<div class="product-media product-media-empty">${badge}</div>`}<div class="product-body">${settings.showBrand !== false && (product.brand || product.category) ? `<span class="product-eyebrow">${escape(product.brand || product.category)}</span>` : ""}<b class="product-name">${escape(product.name)}</b><div class="product-price">${settings.showPrice !== false ? `<strong>${formatMoney(product.basePriceMinor, product.currency)}</strong>` : ""}${compareAt ? `<del>${formatMoney(compareAt, product.currency)}</del>` : ""}</div>${settings.showCartButton !== false ? `<span class="product-cta">${purchasable ? escape(override.ctaLabel || "افزودن به سبد خرید") : "ناموجود"}</span>` : ""}</div></article>`;
+  const href = storefrontUrl ? `${storefrontUrl}/product/${encodeURIComponent(product.slug || product.id)}` : "";
+  const card = `<article class="product-card">${image ? `<div class="product-media"><img src="${escape(image)}" alt="${escape(product.name)}" loading="lazy">${badge}</div>` : `<div class="product-media product-media-empty">${badge}</div>`}<div class="product-body">${settings.showBrand !== false && (product.brand || product.category) ? `<span class="product-eyebrow">${escape(product.brand || product.category)}</span>` : ""}<b class="product-name">${escape(product.name)}</b><div class="product-price">${settings.showPrice !== false ? `<strong>${formatMoney(product.basePriceMinor, product.currency)}</strong>` : ""}${compareAt ? `<del>${formatMoney(compareAt, product.currency)}</del>` : ""}</div>${settings.showCartButton !== false && (href || !purchasable) ? `<span class="product-cta">${purchasable ? escape(override.ctaLabel || "مشاهده و خرید") : "ناموجود"}</span>` : ""}</div></article>`;
+  // A static page cannot add to a cart: the card leads to the interactive product page, where the real cart lives.
+  return href ? `<a class="product-link" href="${escape(href)}">${card}</a>` : card;
 }
 
 /** A snapshot at render time — the SSR page has no client-side clock, so this is the sale state as of publish/request, not a live countdown. saleLabel renders on its own; saleEndsAt only adds the countdown/expiry state next to it. */
@@ -77,12 +80,12 @@ function itemGridHtml(section) {
 // are never emitted.
 const spacerHtml = (section) => `<div style="height:${num(section.spacingTop, 0) + num(section.spacingBottom, 0)}px"></div>`;
 
-const productsHtml = (section, { open, close, products, merchandisingProducts, commerce }) => {
+const productsHtml = (section, { open, close, products, merchandisingProducts, commerce, storefrontUrl }) => {
   const settings = section.productSettings || {};
   const cap = Math.max(1, Math.min(12, num(section.visibleProductCount, 12)));
   const shown = productsForSection(products, settings, merchandisingProducts?.[section.id]).slice(0, cap);
   return `${open}${saleLineHtml(section)}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
-    shown.length ? `<div class="product-grid">${shown.map((product) => productCardHtml(product, settings, commerce.productOverrides || {})).join("")}</div>` : `<div class="empty-products">هنوز محصولی در این بخش نیست.</div>`
+    shown.length ? `<div class="product-grid">${shown.map((product) => productCardHtml(product, settings, commerce.productOverrides || {}, storefrontUrl)).join("")}</div>` : `<div class="empty-products">هنوز محصولی در این بخش نیست.</div>`
   }${close}`;
 };
 
@@ -108,11 +111,11 @@ const SECTION_RENDERERS = new Map([
 /** Section types with a dedicated store renderer (read-only; for agreement tests). */
 export const STORE_SECTION_TYPES = Object.freeze([...SECTION_RENDERERS.keys()]);
 
-function sectionHtml(section, products, merchandisingProducts, commerce) {
+function sectionHtml(section, products, merchandisingProducts, commerce, storefrontUrl) {
   const style = `background:${color(section.backgroundColor, "#ffffff")};color:${color(section.textColor, "#0f172a")};padding-top:${num(section.spacingTop, 28)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
   const open = `<section data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
   const close = `</div></section>`;
-  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, products, merchandisingProducts, commerce });
+  return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, products, merchandisingProducts, commerce, storefrontUrl });
 }
 
 /**
@@ -120,7 +123,7 @@ function sectionHtml(section, products, merchandisingProducts, commerce) {
  * `products` is the live catalog for this store (ecommerceService.listProducts output).
  * Returns null for any non-root slug, since a STORE site has exactly one page.
  */
-export function renderStoreSite(project, version, content, productData, { slug = "", basePath = "" } = {}) {
+export function renderStoreSite(project, version, content, productData, { slug = "", basePath = "", storefrontUrl = "" } = {}) {
   if (slug) return null;
 
   const presentation = projectPublicStorePresentation(content).storeBuilderV16 || {};
@@ -129,6 +132,8 @@ export function renderStoreSite(project, version, content, productData, { slug =
   const hero = presentation.hero || {};
   const seo = presentation.seo || {};
   const commerce = presentation.commerce || {};
+  // The interactive storefront (cart, checkout) is a separate app origin; without one this page stays a catalogue.
+  storefrontUrl = /^https?:\/\//i.test(storefrontUrl) ? storefrontUrl.replace(/\/+$/, "") : "";
   const sections = (presentation.sections || []).filter((section) => section.enabled !== false);
   // Keep the old array argument readable for direct renderer consumers.
   const products = Array.isArray(productData) ? productData : (productData?.products || []);
@@ -150,8 +155,8 @@ export function renderStoreSite(project, version, content, productData, { slug =
     + `.hero p{opacity:.78;margin:0}.hero-cta{display:inline-flex;margin-top:22px;background:${primary};color:#fff;border-radius:${num(design.buttonRadius, 12)}px;padding:12px 22px;font-weight:800;text-decoration:none}`
     + `.hero-media img{width:100%;border-radius:${num(design.cardRadius, 18)}px;display:block}`
     + `.section-head{margin-bottom:22px}.section-head h2{font-size:clamp(20px,3vw,28px);margin:6px 0 0}.eyebrow{font-size:12px;font-weight:800;color:${primary}}.muted{opacity:.7}`
-    + `.product-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}`
-    + `.product-card{border:1px solid rgba(0,0,0,.06);background:#fff;border-radius:${num(design.cardRadius, 18)}px;overflow:hidden}`
+    + `.product-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}`
+    + `.product-link{display:block;color:inherit;text-decoration:none}.product-link:focus-visible,.hero-cta:focus-visible,.cart-link:focus-visible{outline:3px solid ${primary};outline-offset:2px}.cart-link{margin-inline-start:auto;font-weight:800;color:inherit}.product-card{border:1px solid rgba(0,0,0,.06);background:#fff;border-radius:${num(design.cardRadius, 18)}px;overflow:hidden}`
     + `.product-media{position:relative;aspect-ratio:1;background:#f1f5f9}.product-media img{width:100%;height:100%;object-fit:contain;display:block}`
     + `.badge{position:absolute;top:10px;right:10px;background:#f43f5e;color:#fff;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800}`
     + `.product-body{padding:16px}.product-eyebrow{display:block;font-size:11px;opacity:.55}.product-name{display:block;margin-top:4px}`
@@ -160,7 +165,7 @@ export function renderStoreSite(project, version, content, productData, { slug =
     + `.empty-products{border:1px dashed rgba(0,0,0,.15);border-radius:${num(design.cardRadius, 18)}px;padding:32px;text-align:center;opacity:.55}`
     + `.banner{display:grid;border-radius:${num(design.cardRadius, 18)}px;overflow:hidden}.banner img{width:100%;height:100%;object-fit:cover}.banner-copy{padding:24px}`
     + `.sale-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}.sale-badge{background:#e11d48;color:#fff;border-radius:999px;padding:4px 12px;font-size:11px}.sale-state{font-size:12px;opacity:.7}`
-    + `.item-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}`
+    + `.item-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}`
     + `.item-tile{display:block;text-align:center;text-decoration:none;color:inherit;border:1px solid rgba(0,0,0,.06);background:#fff;border-radius:${num(design.cardRadius, 18)}px;overflow:hidden}`
     + `.item-media{aspect-ratio:1;background:#f1f5f9}.item-media img{width:100%;height:100%;object-fit:cover;display:block}.item-title{display:block;padding:10px;font-size:13px}`
     + `footer.site{background:${color(header.backgroundColor, "#0f172a")};color:#e2e8f0;margin-top:8px}`
@@ -176,7 +181,7 @@ export function renderStoreSite(project, version, content, productData, { slug =
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<title>${escape(title)}</title>${description ? `<meta name="description" content="${escape(description)}">` : ""}`
     + `<meta name="generator" content="Loadder Site Builder"><style>${css}</style></head><body data-site-kind="STORE" data-published-version="${escape(version?.version ?? "draft")}">`
-    + `<header class="site"><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span></div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section, products, merchandisingProducts, commerce)).join("")}</main>`
+    + `<header class="site"><div class="wrap bar"><span class="brand">${url(header.logoUrl) ? `<img src="${escape(url(header.logoUrl))}" alt="${escape(siteName)}">` : ""}${escape(siteName)}</span>${storefrontUrl ? `<a class="cart-link" href="${escape(storefrontUrl)}/cart">سبد خرید</a>` : ""}</div></header>${heroHtml}<main>${sections.map((section) => sectionHtml(section, products, merchandisingProducts, commerce, storefrontUrl)).join("")}</main>`
     + `<footer class="site"><div class="wrap foot"><b>${escape(siteName)}</b><span>نسخه ${escape(version?.version ?? "draft")} · منتشرشده با Loadder</span></div></footer>`
     + `</body></html>`;
 }

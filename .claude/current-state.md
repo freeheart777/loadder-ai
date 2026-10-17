@@ -37,6 +37,11 @@ Commit SHAs for Commerce Gates 1-3.5 and Payment Hardening P0/P1 are in the arch
 - Render baselines in `server/test/__snapshots__/site-render-baseline/`: regenerate only on intended change (`UPDATE_SNAPSHOTS=1`).
 - Payments: ZarinPal is the first gateway (see `decisions.md`).
 
+## Store customer readiness (Batch B, 2026-10-17)
+
+- Published Store HTML now links products and cart into the interactive `/store/:id` app (see `decisions.md`); Commerce Modern ships brand/category sections disabled. Coverage: `e2e/commerce/store-published-page.spec.ts` (run with the commerce CI setup, not `run-website-e2e.sh`, which lacks the commerce proxy config).
+- Not verified: real payment-gateway checkout (only manual checkout is exercised), Store visual baselines, `/store/:id` SPA contrast/axe.
+
 ## Open product decisions (owner's, not implementation tasks)
 
 1. Allow Commerce for HYBRID projects, or keep it STORE-only. Changing the rule needs a separate ADR plus tenant/authorization test updates.

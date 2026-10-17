@@ -64,6 +64,11 @@ const bookingRedirectUrl = (siteId, query) => {
   return `${origin.replace(/\/+$/, "")}/site/${encodeURIComponent(siteId)}/booking${pass ? `?${pass}` : ""}`;
 };
 
+export const storefrontUrlFor = (siteId) => {
+  const origin = environment.clientOrigins?.[0];
+  return origin ? `${origin.replace(/\/+$/, "")}/store/${encodeURIComponent(siteId)}` : "";
+};
+
 export function createPublicSitesRouter({ repository, ecommerceService = null, createEcommerceService = null, bookingRepository = null }) {
   const router = express.Router();
   // The ecommerce service is created on the first commerce request and reused;
@@ -95,7 +100,7 @@ export function createPublicSitesRouter({ repository, ecommerceService = null, c
   const sendPublished = (req, res, published, basePage = {}) => {
     if (!published) return res.status(404).send("Site not found");
     const bookingCatalog = bookingCatalogFor(bookingRepository, published.project);
-    const page = { ...basePage, category: typeof req.query?.category === "string" ? req.query.category.slice(0, 80) : "", bookingCatalog };
+    const page = { ...basePage, category: typeof req.query?.category === "string" ? req.query.category.slice(0, 80) : "", bookingCatalog, storefrontUrl: storefrontUrlFor(published.project.id) };
     const runtimeProducts = productsFor(published.project, published.version.content);
     const html = renderPublishedSite(published.project, published.version, published.assets, page, runtimeProducts);
     // A slug that resolves to no published page is a 404, never a silent Home.

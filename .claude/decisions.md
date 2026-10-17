@@ -82,3 +82,10 @@ Why: one audited entry point for capability decisions, renderers that cannot dri
 ## 2026-10-02 — Medical/NAVA Phase 0 locked (ADR-005)
 
 Patient identity = existing app-user + mobile OTP (identifier table, no passwords, simulator only outside production, production fails closed). Medical documents get a dedicated private primitive, never `site_media_assets`. Booking becomes site-scoped via nullable `site_project_id` (MEDICAL strict, other types legacy-compatible; no Booking V2, no backfill). PR #246 is audited and ported selectively (link policy, public headers + `media-src`, lead honeypot), never merged; PR #52 is visual reference only. Full record, migrations 099–105 and execution order: `docs/architecture/ADR-005-medical-vertical-phase0.md`. Why: one platform, no duplicate auth/Booking/media; medical data needs stronger treatment than Education files.
+
+## 2026-10-17 — Store Batch B: published HTML page hands off to the interactive storefront
+
+- The server-rendered Store page (`/sites/:id`, `/api/auth/sites/:id`, custom domains) is static HTML and cannot hold a cart. It used to show an "add to cart" span that did nothing and had no link into the store. Product cards now link to `<CLIENT_ORIGIN>/store/:id/product/:slug` and the header links to `/cart`; with no client origin configured the page stays a catalogue with no purchase button (sold-out state kept). The interactive `/store/:id` app keeps the only cart/checkout; no commerce logic was added to the renderer.
+- Commerce Modern starter: the category and brand sections ship **disabled**. Their sample names ("برند یک/دو/سه", generic categories) have no images and read as false partner claims when published; the merchant enables them after entering real data.
+- Product/item grids use `auto-fill`, so a store with one product does not stretch its card across the page.
+- Render baselines (`v16-store-home`, two store edge cases) regenerated for exactly these changes.

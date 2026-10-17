@@ -66,7 +66,8 @@ export const commerceModernV1: WebsiteTemplate = {
     {
       id: "category-grid-main",
       type: "category-grid",
-      enabled: true,
+      // Sample names and no images: the merchant turns this on after naming their real categories.
+      enabled: false,
       title: "دسته‌بندی‌های پرطرفدار",
       subtitle: "مسیر سریع‌تر برای پیدا کردن کالای مورد نظر",
       backgroundColor: "#ffffff",
@@ -102,7 +103,8 @@ export const commerceModernV1: WebsiteTemplate = {
     {
       id: "brand-main",
       type: "brand",
-      enabled: true,
+      // "Brand one/two/three" are placeholders and would read as false partner claims if published.
+      enabled: false,
       title: "برندهای معتبر همکار",
       subtitle: "",
       backgroundColor: "#ffffff",

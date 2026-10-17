@@ -4,7 +4,7 @@ import { AuthError, SESSION_COOKIE_NAME } from "../services/auth-service.mjs";
 import { getSessionToken } from "../middleware/auth.mjs";
 import { db } from "../../db/workspace-database.mjs";
 import { createSiteProjectRepository } from "../repositories/site-project-repository.mjs";
-import { bookingCatalogFor, renderPublishedSite } from "./public-sites.mjs";
+import { bookingCatalogFor, renderPublishedSite, storefrontUrlFor } from "./public-sites.mjs";
 import { bookingEnabled, commerceEnabled } from "../site-platform/runtime-capabilities.mjs";
 import { createEcommerceService, isVariantPurchasable } from "../services/ecommerce-service.mjs";
 import { projectPublicStorePresentation } from "../services/store-public-presentation.mjs";
@@ -90,7 +90,7 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
     router.use(createPublicEducationRouter({db,bookingRepository,accessService:createLearningAccessService({db,mediaService})}));
   }
   router.get("/status",(req,res)=>{const otpReady=otpDeliveryReady();return res.json({success:true,mode:"persistent-session",productionReady:nodeEnv==="production"&&otpReady,otpDelivery:otpReady?"configured":"not-connected",developmentOtpExposed:nodeEnv!=="production"&&exposeDevelopmentOtp,publicBusinessAppsEnabled:process.env.BUSINESS_BUILDER_PUBLIC_APPS_ENABLED==="true"})});
-  const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`,category:typeof req.query.category==="string"?req.query.category.slice(0,80):"",bookingCatalog:bookingCatalogFor(bookingRepository,published.project)},products);if(html===null)return res.status(404).send("Page not found");res.set(publishedSiteHeaders());return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
+  const sendLegacySite=(req,res,slug,detailSlug="")=>{try{const published=publicSiteRepository.getPublishedPublic(req.params.id);if(!published)return res.status(404).send("Site not found");const products=commerceEnabled(published.project)?runWithWorkspace(published.project.workspaceId,()=>ecommerceService.listProducts(published.project.id)):[];const html=renderPublishedSite(published.project,published.version,published.assets,{slug,detailSlug,basePath:`/api/auth/sites/${req.params.id}`,category:typeof req.query.category==="string"?req.query.category.slice(0,80):"",bookingCatalog:bookingCatalogFor(bookingRepository,published.project),storefrontUrl:storefrontUrlFor(published.project.id)},products);if(html===null)return res.status(404).send("Page not found");res.set(publishedSiteHeaders());return res.type("html").send(html)}catch(error){console.error("Published site error:",error);return res.status(500).send("Unable to render site")}};
   router.get("/sites/:id/:slug/:detail",(req,res)=>sendLegacySite(req,res,req.params.slug,req.params.detail));
   router.get("/sites/:id/:slug",(req,res)=>sendLegacySite(req,res,req.params.slug));
   router.get("/sites/:id",(req,res)=>sendLegacySite(req,res,""));
