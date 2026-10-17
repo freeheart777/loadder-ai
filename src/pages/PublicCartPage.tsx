@@ -107,7 +107,7 @@ export default function PublicCartPage() {
                     <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-slate-100 text-2xl">📦</div>
                     <div className="min-w-0 flex-1">
                       <b className="block truncate">{item.productName}</b>
-                      <div className="mt-1 text-xs text-slate-500">{item.variantTitle}</div>
+                      {item.variantTitle && item.variantTitle !== "Default" && <div className="mt-1 text-xs text-slate-500">{item.variantTitle}</div>}
                       <div className="mt-3 font-black">{money(item.lineTotalMinor, cart.currency)}</div>
                     </div>
                   </div>

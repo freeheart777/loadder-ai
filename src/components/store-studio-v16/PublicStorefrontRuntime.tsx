@@ -39,10 +39,13 @@ export default function PublicStorefrontRuntime({ page }: { page: "storefront" |
     openCollection: () => navigate(base),
     openProduct: (product: Product) => navigate(`${base}/product/${encodeURIComponent(product.slug || product.id)}`),
     openCart: () => navigate(`${base}/cart`),
-    addProduct: async (product: Product) => {
+    addProduct: async (product: Product, variantId?: string) => {
       try {
         setNotice("");
-        const variant = (product.variants || []).find((item) => item.id && (item.purchasable ?? (item.inventoryPolicy !== "DENY" || item.inventoryQuantity > 0)));
+        const purchasable = (item: NonNullable<Product["variants"]>[number]) => item.purchasable ?? (item.inventoryPolicy !== "DENY" || item.inventoryQuantity > 0);
+        // A chosen variant is added exactly as chosen (or refused); only a call without a choice falls back to the first available one.
+        const variant = variantId ? (product.variants || []).find((item) => item.id === variantId) : (product.variants || []).find((item) => item.id && purchasable(item));
+        if (variant?.id && !purchasable(variant)) throw new Error("این گزینه اکنون موجود نیست.");
         if (!variant?.id) throw new Error("این محصول اکنون قابل سفارش نیست.");
         await addPublicCartItem(storeId, product.currency, variant.id, 1);
         setCart(await getPublicCart(storeId));
