@@ -8,12 +8,18 @@ export function gatewayCredentials(config) {
   return { merchantId: config.credential_reference, sandbox: options.sandbox === true };
 }
 
+// Gateway verify codes that definitively mean "this session was not paid" (ZarinPal errorList: -51 "Session is not
+// valid, session is not active paid try"). Everything else without success -- other documented codes (-50 amount
+// mismatch, -52 unexpected error, -53/-54/-55, -9..-19 request/terminal errors), undocumented or malformed answers --
+// is AMBIGUOUS: money may have moved, so it must never become a terminal FAILED. Only -51 is trusted to close an attempt.
+const DEFINITIVE_NOT_PAID = new Set([-51]);
+
 // The single verify -> settle path, shared by the gateway callback and merchant reconcile.
 // Outcome is decided only by a server-to-server verify with the stored amount; settlement goes
 // through paymentAttemptService.settleVerified() and the migration-087 triggers.
 //   paid    - order is PAID
 //   failed  - gateway definitively said not paid (attempt FAILED/CANCELLED)
-//   pending - unknown right now (gateway unreachable, no answer code, or settlement needs a human)
+//   pending - unknown right now (gateway unreachable, no answer code, ambiguous code, or settlement needs a human)
 // onSettled({ db, workspaceId, orderId, attemptId, refId }) runs once, after commit, only for the call that
 // actually settled the order -- never for a replayed callback or a repeat reconcile. Its failures are logged only.
 export function createPaymentVerificationService({ db, paymentAttemptService, adapters = paymentAdapters, logger = console, onSettled = null } = {}) {
@@ -38,7 +44,11 @@ export function createPaymentVerificationService({ db, paymentAttemptService, ad
       }
       if (!verification.verified) {
         if (verification.code == null) return { result: "pending", attempt, reason: "GATEWAY_NO_ANSWER" };
-        return { result: "failed", attempt: paymentAttemptService.recordOutcome(attempt.id, "FAILED", `GATEWAY_VERIFY_${verification.code}`) };
+        if (DEFINITIVE_NOT_PAID.has(verification.code)) return { result: "failed", attempt: paymentAttemptService.recordOutcome(attempt.id, "FAILED", `GATEWAY_VERIFY_${verification.code}`) };
+        // Ambiguous: keep the attempt open for a human / a later reconcile (RECONCILIATION_REQUIRED is non-terminal and
+        // counts as "open", so retry verifies it first and refuses a second charge while it stays unresolved).
+        logger.error?.(`Payment ${attempt.id}: ambiguous gateway verify answer (code ${verification.code}); flagged for reconciliation.`);
+        return { result: "pending", attempt: paymentAttemptService.recordOutcome(attempt.id, "RECONCILIATION_REQUIRED", `GATEWAY_VERIFY_AMBIGUOUS_${verification.code}`), reason: "GATEWAY_AMBIGUOUS" };
       }
       try {
         // Same synchronous step as settleVerified (no await in between), so a concurrent callback cannot

@@ -192,54 +192,126 @@ async function receiptHeaders(orderId) {
 }
 
 // ---------------------------------------------------------------- 2. R1: verification failure classes
-test("R1: network failure, HTTP 5xx without a code, and an empty answer leave the attempt open (pending)", async () => {
-  for (const reply of [() => { throw new Error("socket hang up"); }, () => new Response("<html>502</html>", { status: 502 }), () => ({})]) {
+// ZarinPal errorList (zarinpal.com/docs/paymentGateway/errorList): 100 success, 101 already verified, -51 "session is not
+// active paid try" (the only verify code trusted as definitively unpaid). The page labels no code final/retryable except
+// -12 "try again later", so every other code is treated as AMBIGUOUS and must stay recoverable. Codes are opaque numbers here.
+const AMBIGUOUS_CODES = [-50, -52, -53, -54, -55, -12, -9, -10, -11, -1, 0, 7, 12345, -987654];
+
+test("R1 fixed: definitive rejection (-51) fails the attempt; the order stays UNPAID", async () => {
+  const { orderId, attempt } = await checkout();
+  gateway.verify = rejectedWith(-51);
+  assert.equal(location(await callback(attempt, "OK")), `/store/store-a/order-success/${orderId}?payment=failed`);
+  assert.deepEqual(attemptStatus(attempt.id), { status: "FAILED", verification_code: "GATEWAY_VERIFY_-51" });
+  assert.equal(order(orderId).payment_status, "UNPAID");
+});
+
+test("R1 fixed: every other gateway code is ambiguous -> RECONCILIATION_REQUIRED, never terminal, never PAID", async () => {
+  for (const code of AMBIGUOUS_CODES) {
     const { orderId, attempt } = await checkout();
-    gateway.verify = reply;
-    const back = await callback(attempt, "OK");
-    assert.equal(location(back), `/store/store-a/order-success/${orderId}?payment=pending`);
-    assert.equal(attemptStatus(attempt.id).status, "REDIRECT_READY");
+    gateway.verify = rejectedWith(code);
+    assert.equal(location(await callback(attempt, "OK")), `/store/store-a/order-success/${orderId}?payment=pending`, `code ${code}`);
+    assert.deepEqual(attemptStatus(attempt.id), { status: "RECONCILIATION_REQUIRED", verification_code: `GATEWAY_VERIFY_AMBIGUOUS_${code}` }, `code ${code}`);
     assert.equal(order(orderId).payment_status, "UNPAID");
   }
 });
 
-test("KNOWN BEHAVIOUR R1: every non-success answer that carries a code is treated as definitive and terminally FAILS the attempt", async () => {
-  // Codes are used as opaque numbers. This test does NOT claim any of them is definitive or transient at
-  // ZarinPal -- the semantics are unverified (see report). It pins that Loadder does not distinguish.
-  for (const code of [-51, -50, -54, -9, -1, 0, 7, 12345]) {
-    const { orderId, attempt } = await checkout();
-    gateway.verify = rejectedWith(code);
-    const back = await callback(attempt, "OK");
-    assert.equal(location(back), `/store/store-a/order-success/${orderId}?payment=failed`, `code ${code}`);
-    assert.deepEqual(attemptStatus(attempt.id), { status: "FAILED", verification_code: `GATEWAY_VERIFY_${code}` }, `code ${code}`);
+test("R1 fixed: malformed answers (success code without ref_id, code 101 without ref_id, string code) are ambiguous", async () => {
+  for (const reply of [{ data: { code: 100 }, errors: [] }, { data: { code: 101 }, errors: [] }, { data: [], errors: { code: "-51" } }]) {
+    const { attempt } = await checkout();
+    gateway.verify = () => reply;
+    await callback(attempt, "OK");
+    assert.equal(attemptStatus(attempt.id).status, "RECONCILIATION_REQUIRED", JSON.stringify(reply));
   }
 });
 
-test("KNOWN BEHAVIOUR R1: a success code without ref_id is treated as a definitive failure", async () => {
-  const { attempt } = await checkout();
-  gateway.verify = () => ({ data: { code: 100 }, errors: [] }); // malformed success: ambiguous, not a rejection
+test("R1: network failure / HTTP 5xx / empty answer leave the attempt exactly as it was (REDIRECT_READY)", async () => {
+  for (const reply of [() => { throw new Error("timeout"); }, () => new Response("oops", { status: 504 }), () => ({})]) {
+    const { attempt } = await checkout();
+    gateway.verify = reply;
+    await callback(attempt, "OK");
+    assert.equal(attemptStatus(attempt.id).status, "REDIRECT_READY");
+  }
+});
+
+test("R1 fixed: an ambiguous answer is recoverable -- merchant reconcile settles it once the gateway confirms payment", async () => {
+  const { orderId, attempt } = await checkout();
+  gateway.verify = rejectedWith(-52);
   await callback(attempt, "OK");
+  gateway.verify = paid(730001);
+  const reconcile = await merchant("POST", `/commerce/payment-attempts/${attempt.id}/reconcile`, {});
+  assert.equal(reconcile.body.result, "paid");
+  assert.deepEqual(order(orderId), { status: "PENDING", payment_status: "PAID", payment_reference: "730001" });
+  assert.equal(attemptStatus(attempt.id).status, "SUCCEEDED");
+});
+
+test("R1 fixed: ambiguous then a later callback/reconcile showing payment settles exactly once", async () => {
+  const { orderId, attempt } = await checkout();
+  gateway.verify = rejectedWith(-54);
+  await callback(attempt, "OK");
+  gateway.verify = paid(730002);
+  assert.equal(location(await callback(attempt, "OK")), `/store/store-a/order-success/${orderId}?payment=paid`);
+  const before = verifiesBefore();
+  assert.equal(location(await callback(attempt, "OK")), `/store/store-a/order-success/${orderId}?payment=paid`); // replay
+  assert.equal((await merchant("POST", `/commerce/payment-attempts/${attempt.id}/reconcile`, {})).body.result, "paid"); // repeat reconcile
+  assert.equal(verifiesBefore(), before, "settled attempts are not re-verified");
+  assert.equal(order(orderId).payment_reference, "730002");
+});
+
+test("R1 fixed: ambiguous then a definitive -51 closes the attempt on reconcile", async () => {
+  const { attempt } = await checkout();
+  gateway.verify = rejectedWith(-52);
+  await callback(attempt, "OK");
+  gateway.verify = rejectedWith(-51);
+  assert.equal((await merchant("POST", `/commerce/payment-attempts/${attempt.id}/reconcile`, {})).body.result, "failed");
   assert.equal(attemptStatus(attempt.id).status, "FAILED");
 });
 
-test("KNOWN DEFECT R1: a FAILED attempt is never re-verified, so a later-paid transaction cannot be settled", async () => {
+test("R1 fixed: retry during uncertainty never opens a second charge (and verifies the open attempt first)", async () => {
   const { orderId, attempt } = await checkout();
-  gateway.verify = rejectedWith(-9999);
+  gateway.verify = rejectedWith(-52);
   await callback(attempt, "OK");
-  gateway.verify = paid(700010);
-  const before = verifiesBefore();
-  await callback(attempt, "OK");
-  const reconcile = await merchant("POST", `/commerce/payment-attempts/${attempt.id}/reconcile`, {});
-  assert.equal(reconcile.body.result, "failed");
-  assert.equal(verifiesBefore(), before);
+  const headers = await receiptHeaders(orderId);
+  const requests = gateway.requests.length;
+  const refused = await call("POST", `${base}/auth/storefront/orders/${orderId}/pay`, {}, headers);
+  assert.equal(refused.status, 409);
+  assert.equal(refused.body.code, "PAYMENT_IN_PROGRESS");
+  assert.equal(gateway.requests.length, requests, "no new gateway payment request");
+  assert.equal(attemptsFor(orderId).length, 1);
+  // The same retry, once the gateway now confirms the money, settles instead of charging again.
+  gateway.verify = paid(730003);
+  const settled = await call("POST", `${base}/auth/storefront/orders/${orderId}/pay`, {}, headers);
+  assert.equal(settled.body.result, "paid");
+  assert.equal(attemptsFor(orderId).length, 1);
+  assert.equal(order(orderId).payment_status, "PAID");
+});
+
+test("R1 fixed: repeated ambiguous callbacks stay idempotent (one attempt, still open, no settlement)", async () => {
+  const { orderId, attempt } = await checkout();
+  gateway.verify = rejectedWith(-52);
+  for (let i = 0; i < 3; i++) assert.equal(location(await callback(attempt, "OK")), `/store/store-a/order-success/${orderId}?payment=pending`);
+  assert.equal(attemptsFor(orderId).length, 1);
+  assert.equal(attemptStatus(attempt.id).status, "RECONCILIATION_REQUIRED");
   assert.equal(order(orderId).payment_status, "UNPAID");
 });
 
-test("R1 desired: an unclassified/unknown gateway code must not terminally fail the attempt (policy decision required)", { todo: "R1: needs authoritative ZarinPal code classification before it can be decided" }, async () => {
-  const { attempt } = await checkout();
-  gateway.verify = rejectedWith(-987654);
+test("R1 + D3: NOK then an ambiguous answer then a paid answer still ends PAID", async () => {
+  const { orderId, attempt } = await checkout();
+  await callback(attempt, "NOK");
+  gateway.verify = rejectedWith(-52);
   await callback(attempt, "OK");
-  assert.notEqual(attemptStatus(attempt.id).status, "FAILED");
+  gateway.verify = paid(730004);
+  assert.equal((await merchant("POST", `/commerce/payment-attempts/${attempt.id}/reconcile`, {})).body.result, "paid");
+  assert.equal(order(orderId).payment_status, "PAID");
+});
+
+test("R1: a transaction id already used by another attempt cannot settle a second one (settlement conflict stays recoverable)", async () => {
+  const first = await checkout(), second = await checkout();
+  gateway.verify = paid(730005);
+  await callback(first.attempt, "OK");
+  await callback(second.attempt, "OK"); // same gateway ref_id for a different attempt
+  assert.equal(order(first.orderId).payment_status, "PAID");
+  assert.equal(order(second.orderId).payment_status, "UNPAID");
+  assert.equal(attemptStatus(second.attempt.id).status, "RECONCILIATION_REQUIRED");
 });
 
 // ---------------------------------------------------------------- 3. D1: inventory and coupon lifecycle
