@@ -167,10 +167,9 @@ export function createAuthRouter({ authService, nodeEnv = "development", exposeD
       if(row.status==="SUCCEEDED")return back("paid");
       if(row.status==="FAILED"||row.status==="CANCELLED")return back("failed");
       if(req.query.Status!=="OK"){
-        // Only an attempt still waiting on the customer can be cancelled; a verified-but-unsettled one never is.
-        if(row.status!=="CREATED"&&row.status!=="REDIRECT_READY")return back("pending");
-        runWithWorkspace(row.workspaceId,()=>paymentAttemptService.recordOutcome(row.id,"CANCELLED","GATEWAY_STATUS_NOK"));
-        return back("failed");
+        // D3: the browser's NOK is unauthenticated and the gateway reports "unpaid" until the customer finishes,
+        // so neither cancel nor verify here. The attempt stays open; retry/reconcile settle it via verifyAndSettle().
+        return back("pending");
       }
       const { result }=await runWithWorkspace(row.workspaceId,()=>paymentVerificationService.verifyAndSettle(row.id));
       return back(result);

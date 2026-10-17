@@ -93,18 +93,20 @@ const payAgain = (orderId, receipt) => call("POST", `/auth/storefront/orders/${o
 const age = (orderId) => db.prepare("UPDATE ecommerce_payment_attempts SET updated_at=? WHERE order_id=?").run(new Date(Date.now() - 20 * 60 * 1000).toISOString(), orderId);
 const callback = (a, status = "OK") => call("GET", `/auth/storefront/payments/${a.id}/callback?Authority=${a.provider_attempt_reference}&Status=${status}`);
 
-test("retry after a cancelled payment starts a new attempt without re-verifying closed ones", async () => {
+test("customer NOK keeps the attempt open: immediate retry refused, then a gateway-confirmed unpaid link is closed and a new one starts", async () => {
   const { orderId, receipt } = await checkout();
-  await callback(attempts(orderId)[0], "NOK");
+  assert.equal((await callback(attempts(orderId)[0], "NOK")).status, 303);
+  assert.deepEqual(attempts(orderId).map((a) => a.status), ["REDIRECT_READY"]);
   const verifies = gateway.verifies.length;
+  const refused = await payAgain(orderId, receipt);
+  assert.equal(refused.status, 409);
+  assert.equal(gateway.verifies.length, verifies);
+  age(orderId);
+  gateway.verify = unpaidReply;
   const retried = await payAgain(orderId, receipt);
-  assert.equal(retried.status, 200);
   assert.equal(retried.body.result, "redirect");
   const [first, second] = attempts(orderId);
-  assert.equal(first.status, "CANCELLED");
-  assert.deepEqual({ status: second.status, key: second.idempotency_key }, { status: "REDIRECT_READY", key: `retry:${orderId}:1` });
-  assert.equal(retried.body.redirectUrl, `https://sandbox.zarinpal.com/pg/StartPay/${second.provider_attempt_reference}`);
-  assert.equal(gateway.verifies.length, verifies);
+  assert.deepEqual({ first: first.status, second: second.status, key: second.idempotency_key }, { first: "FAILED", second: "REDIRECT_READY", key: `retry:${orderId}:1` });
   assert.equal(paymentStatus(orderId), "UNPAID");
 });
 
@@ -156,7 +158,7 @@ test("a link issued moments ago is never verified or superseded (customer may be
 
 test("concurrent retries: exactly one new charge", async () => {
   const { orderId, receipt } = await checkout();
-  await callback(attempts(orderId)[0], "NOK");
+  db.prepare("UPDATE ecommerce_payment_attempts SET status='CANCELLED',terminal_at=? WHERE order_id=?").run(new Date().toISOString(), orderId); // an already-closed earlier attempt
   const results = await Promise.all([payAgain(orderId, receipt), payAgain(orderId, receipt)]);
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
   assert.equal(attempts(orderId).filter((a) => a.status === "REDIRECT_READY").length, 1);

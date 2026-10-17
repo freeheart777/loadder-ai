@@ -117,43 +117,70 @@ const verifiesBefore = () => gateway.verifies.length;
 // passes; the paired `todo` test states the safe behaviour and is expected to fail until a fix lands.
 // Neither is weakened to hide the defect. A todo test that starts passing means the defect was fixed.
 
-// ---------------------------------------------------------------- 1. D3: unverified NOK callback
-test("KNOWN DEFECT D3: Status=NOK terminally CANCELS an open attempt without asking the gateway", async () => {
+// ---------------------------------------------------------------- 1. D3: unverified NOK callback (FIXED in 4C-1)
+test("D3 fixed: Status=NOK never cancels or verifies; the attempt stays open and the customer sees 'pending'", async () => {
   const { orderId, attempt } = await checkout();
   const before = verifiesBefore();
-  gateway.verify = paid(700001); // the gateway would say "paid" -- the server never asks
+  gateway.verify = paid(700001);
   const back = await callback(attempt, "NOK");
-  assert.equal(location(back), `/store/store-a/order-success/${orderId}?payment=failed`);
-  assert.equal(verifiesBefore(), before, "no server-side verification was made before cancelling");
-  assert.equal(attemptStatus(attempt.id).status, "CANCELLED");
-});
-
-test("KNOWN DEFECT D3: after a NOK cancel, a genuinely paid transaction is never settled (order stays UNPAID)", async () => {
-  const { orderId, attempt } = await checkout();
-  await callback(attempt, "NOK"); // e.g. anyone holding the callback URL, before the customer finishes paying
-  gateway.verify = paid(700002); // the customer then completes payment at the gateway
-  const before = verifiesBefore();
-  const real = await callback(attempt, "OK");
-  assert.equal(location(real), `/store/store-a/order-success/${orderId}?payment=failed`);
-  assert.equal(verifiesBefore(), before, "terminal CANCELLED short-circuits: the paid transaction is never verified");
-  assert.equal(attemptStatus(attempt.id).status, "CANCELLED");
-  assert.equal(order(orderId).payment_status, "UNPAID");
-  // Merchant reconcile cannot recover it either.
-  const reconcile = await merchant("POST", `/commerce/payment-attempts/${attempt.id}/reconcile`, {});
-  assert.equal(reconcile.body.result, "failed");
-  assert.equal(verifiesBefore(), before);
+  assert.equal(location(back), `/store/store-a/order-success/${orderId}?payment=pending`);
+  assert.equal(verifiesBefore(), before, "the browser's NOK triggers no gateway call");
+  assert.equal(attemptStatus(attempt.id).status, "REDIRECT_READY");
   assert.equal(order(orderId).payment_status, "UNPAID");
 });
 
-test("KNOWN DEFECT D3: retry after the NOK cancel opens a second attempt, so the customer can be charged twice", async () => {
+test("D3 fixed: a NOK followed by a genuinely paid transaction still settles (callback OK, or merchant reconcile)", async () => {
+  const viaCallback = await checkout();
+  await callback(viaCallback.attempt, "NOK");
+  gateway.verify = paid(700002);
+  assert.equal(location(await callback(viaCallback.attempt, "OK")), `/store/store-a/order-success/${viaCallback.orderId}?payment=paid`);
+  assert.equal(order(viaCallback.orderId).payment_status, "PAID");
+
+  const viaReconcile = await checkout();
+  await callback(viaReconcile.attempt, "NOK");
+  gateway.verify = paid(700003);
+  assert.equal((await merchant("POST", `/commerce/payment-attempts/${viaReconcile.attempt.id}/reconcile`, {})).body.result, "paid");
+  assert.equal(order(viaReconcile.orderId).payment_status, "PAID");
+});
+
+test("D3 fixed: after a NOK the customer cannot open a second charge while the first may be paid", async () => {
   const { orderId, attempt } = await checkout();
   await callback(attempt, "NOK");
-  gateway.verify = paid(700003);
+  const headers = await receiptHeaders(orderId);
+  const pay = () => call("POST", `${base}/auth/storefront/orders/${orderId}/pay`, {}, headers);
+  // Inside the in-flight window: refused outright.
+  const requests = gateway.requests.length;
+  const early = await pay();
+  assert.equal(early.status, 409);
+  assert.equal(early.body.code, "PAYMENT_IN_PROGRESS");
+  // After the window, with the gateway saying it WAS paid: settled, no second attempt, no new gateway request.
+  db.prepare("UPDATE ecommerce_payment_attempts SET updated_at=? WHERE order_id=?").run(new Date(Date.now() - 20 * 60 * 1000).toISOString(), orderId);
+  gateway.verify = paid(700004);
+  const late = await pay();
+  assert.equal(late.body.result, "paid");
+  assert.equal(attemptsFor(orderId).length, 1);
+  assert.equal(gateway.requests.length, requests);
+  assert.equal(order(orderId).payment_status, "PAID");
+});
+
+test("D3 fixed: a NOK that gets no answer from a real cancel is closed later by retry once the gateway confirms unpaid", async () => {
+  const { orderId, attempt } = await checkout();
+  await callback(attempt, "NOK");
+  db.prepare("UPDATE ecommerce_payment_attempts SET updated_at=? WHERE order_id=?").run(new Date(Date.now() - 20 * 60 * 1000).toISOString(), orderId);
+  gateway.verify = rejectedWith(-51);
   const retry = await call("POST", `${base}/auth/storefront/orders/${orderId}/pay`, {}, await receiptHeaders(orderId));
-  assert.equal(retry.status, 200);
   assert.equal(retry.body.result, "redirect");
-  assert.equal(attemptsFor(orderId).length, 2);
-  assert.deepEqual(attemptsFor(orderId).map((a) => a.status).sort(), ["CANCELLED", "REDIRECT_READY"]);
+  assert.deepEqual(attemptsFor(orderId).map((a) => a.status).sort(), ["FAILED", "REDIRECT_READY"]);
+});
+
+test("NOK on an attempt that is already verified-but-unsettled or settled changes nothing", async () => {
+  const { orderId, attempt } = await checkout();
+  gateway.verify = paid(700005);
+  await callback(attempt, "OK");
+  const before = verifiesBefore();
+  assert.equal(location(await callback(attempt, "NOK")), `/store/store-a/order-success/${orderId}?payment=paid`);
+  assert.equal(verifiesBefore(), before);
+  assert.equal(attemptStatus(attempt.id).status, "SUCCEEDED");
 });
 
 // The order receipt capability is only returned once at checkout; mint a known one for tests that need /pay.
@@ -163,14 +190,6 @@ async function receiptHeaders(orderId) {
   db.prepare("UPDATE ecommerce_orders SET receipt_capability_hash=? WHERE id=?").run(cap.hash, orderId);
   return { "x-loadder-order-capability": cap.value };
 }
-
-test("D3 desired: an unverified NOK must not make a later real payment unrecoverable", { todo: "D3: NOK callback cancels without gateway verification" }, async () => {
-  const { orderId, attempt } = await checkout();
-  await callback(attempt, "NOK");
-  gateway.verify = paid(700004);
-  await callback(attempt, "OK");
-  assert.equal(order(orderId).payment_status, "PAID");
-});
 
 // ---------------------------------------------------------------- 2. R1: verification failure classes
 test("R1: network failure, HTTP 5xx without a code, and an empty answer leave the attempt open (pending)", async () => {
@@ -235,7 +254,7 @@ test("D1 baseline: checkout deducts stock and consumes a coupon use before any p
 test("KNOWN DEFECT D1: cancelled, failed and abandoned online payments keep the stock and the coupon use", async () => {
   const useBefore = couponUses();
   const cancelled = await checkout({ quantity: 2, coupon: "SAVE10" });
-  await callback(cancelled.attempt, "NOK");
+  db.prepare("UPDATE ecommerce_payment_attempts SET status='CANCELLED',terminal_at=? WHERE id=?").run(now, cancelled.attempt.id); // closed by a future/other path; NOK no longer does this
   const failed = await checkout({ quantity: 2, coupon: "SAVE10" });
   gateway.verify = rejectedWith(-51);
   await callback(failed.attempt, "OK");
@@ -258,9 +277,11 @@ test("KNOWN DEFECT D1: cancelling the order through the status API does not rest
   assert.equal(couponUses(), useBefore + 1);
 });
 
-test("D1 desired: stock is returned when an online payment attempt is cancelled", { todo: "D1: no release path exists; design decision (attempt outcome vs. unpaid-order expiry) required" }, async () => {
+test("D1 desired: stock is returned when an online payment attempt definitively fails", { todo: "D1: no release path exists; design decision (attempt outcome vs. unpaid-order expiry) required" }, async () => {
   const { attempt, variantId } = await checkout({ quantity: 2 });
-  await callback(attempt, "NOK");
+  gateway.verify = rejectedWith(-51);
+  await callback(attempt, "OK"); // gateway-verified failure closes the attempt
+  assert.equal(attemptStatus(attempt.id).status, "FAILED");
   assert.equal(stock(variantId), 100);
 });
 

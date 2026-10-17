@@ -111,14 +111,14 @@ test("checkout -> ZarinPal redirect -> verified callback -> order PAID", async (
   assert.equal(gateway.verifies.length, 1);
 });
 
-test("customer cancels at the gateway: attempt CANCELLED, order stays UNPAID", async () => {
+test("customer cancels at the gateway: the NOK is not trusted, attempt stays open, order stays UNPAID", async () => {
   gateway.request = acceptRequest;
   const orderId = (await checkout("store-zp")).body.order.id;
   const attempt = attemptFor(orderId);
   const verifiesBefore = gateway.verifies.length;
   const back = await callback(attempt.id, { Authority: attempt.provider_attempt_reference, Status: "NOK" });
-  assert.equal(back.headers.get("location"), `/store/store-zp/order-success/${orderId}?payment=failed`);
-  assert.equal(attemptFor(orderId).status, "CANCELLED");
+  assert.equal(back.headers.get("location"), `/store/store-zp/order-success/${orderId}?payment=pending`);
+  assert.equal(attemptFor(orderId).status, "REDIRECT_READY");
   assert.equal(orderRow(orderId).payment_status, "UNPAID");
   assert.equal(gateway.verifies.length, verifiesBefore);
 });
