@@ -36,7 +36,7 @@ export default function PublicStorefrontRuntime({ page }: { page: "storefront" |
   const cartCount = (cart?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   const adapter = {
     openStorefront: () => navigate(base),
-    openCollection: () => navigate(`${base}#store-products`),
+    openCollection: () => navigate(base),
     openProduct: (product: Product) => navigate(`${base}/product/${encodeURIComponent(product.slug || product.id)}`),
     openCart: () => navigate(`${base}/cart`),
     addProduct: async (product: Product) => {

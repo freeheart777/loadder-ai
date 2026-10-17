@@ -82,7 +82,7 @@ export default function PublicCartPage() {
     <main dir="rtl" className="min-h-screen bg-slate-50 pb-28 text-slate-950 lg:pb-8">
       <header className="sticky top-0 z-20 border-b bg-white">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4">
-          <Link to={`/store/${siteProjectId}`} className="grid h-10 w-10 place-items-center rounded-xl border">
+          <Link to={`/store/${siteProjectId}`} aria-label="بازگشت به فروشگاه" className="grid h-10 w-10 place-items-center rounded-xl border">
             <ArrowRight />
           </Link>
           <b className="text-lg">سبد خرید</b>
@@ -107,17 +107,17 @@ export default function PublicCartPage() {
                     <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-slate-100 text-2xl">📦</div>
                     <div className="min-w-0 flex-1">
                       <b className="block truncate">{item.productName}</b>
-                      <div className="mt-1 text-xs text-slate-400">{item.variantTitle}</div>
+                      <div className="mt-1 text-xs text-slate-500">{item.variantTitle}</div>
                       <div className="mt-3 font-black">{money(item.lineTotalMinor, cart.currency)}</div>
                     </div>
                   </div>
                   <div className="mt-4 flex items-center justify-between">
                     <div className="flex items-center rounded-xl border bg-white">
-                      <button disabled={busy === item.variantId} onClick={() => void setQuantity(item.variantId, Math.max(0, item.quantity - 1))} className="p-3">
+                      <button disabled={busy === item.variantId} onClick={() => void setQuantity(item.variantId, Math.max(0, item.quantity - 1))} aria-label={`کاهش تعداد ${item.productName}`} className="p-3">
                         <Minus />
                       </button>
                       <b className="min-w-9 text-center">{new Intl.NumberFormat("fa-IR").format(item.quantity)}</b>
-                      <button disabled={busy === item.variantId} onClick={() => void setQuantity(item.variantId, item.quantity + 1)} className="p-3">
+                      <button disabled={busy === item.variantId} onClick={() => void setQuantity(item.variantId, item.quantity + 1)} aria-label={`افزایش تعداد ${item.productName}`} className="p-3">
                         <Plus />
                       </button>
                     </div>

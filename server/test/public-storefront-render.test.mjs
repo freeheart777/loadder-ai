@@ -46,3 +46,30 @@ test("STORE renderer includes hero, banner and multiple products", () => {
     assert.doesNotMatch(render({ storefrontUrl: "javascript:alert(1)" }), /javascript:/);
   });
 }
+
+// Batch B part 2: in-page links the public page cannot resolve (author section ids are never published) must not be dead.
+{
+  const project = { id: "s2", name: "فروشگاه", siteType: "STORE" };
+  const section = (id, extra = {}) => ({ id, type: "products", enabled: true, title: id, productSettings: { source: "all" }, ...extra });
+  const render = (sections, hero = { ctaLabel: "مشاهده", ctaHref: "#products-main" }) => renderPublishedSite(project, { version: 1, content: { storeBuilderV16: { version: 16, hero, sections } } }, [], {}, []);
+  const ids = (html) => [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+
+  test("STORE V16 hero link to an author section id resolves to the first product section", () => {
+    const html = render([section("products-main"), section("second")]);
+    assert.match(html, /class="hero-cta" href="#products-main"/);
+    for (const target of ["products-main", "products"]) assert.equal(ids(html).filter((id) => id === target).length, 1, target);
+    assert.doesNotMatch(html, /public-section-/);
+  });
+
+  test("STORE V16 an explicit anchor is the section id and is not duplicated by an alias", () => {
+    const html = render([section("x", { anchor: "products-main" })]);
+    assert.equal(ids(html).filter((id) => id === "products-main").length, 1);
+  });
+
+  test("STORE V16 category and brand tile links to hash targets resolve too, and hostile hashes add nothing", () => {
+    const tile = (href) => ({ id: "c", type: "category-grid", enabled: true, title: "c", items: [{ id: "i", title: "t", href }] });
+    const html = render([section("products-main"), tile("#shop"), tile("#a b\"><script>")], { ctaLabel: "x", ctaHref: "https://example.com" });
+    assert.ok(ids(html).includes("shop"));
+    assert.doesNotMatch(html, /<script>/);
+  });
+}

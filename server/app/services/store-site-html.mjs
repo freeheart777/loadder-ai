@@ -76,15 +76,25 @@ function itemGridHtml(section) {
 // Section render functions, dispatched by the stored legacy section type
 // (docs/decisions/PR4B-render-boundary.md). Bodies are unchanged from the
 // former if-chain; `parts` carries the shared wrapper values computed once.
-// Store sections carry no id attribute: the projection's public-section-N ids
-// are never emitted.
+// The projection's generated public-section-N ids are never emitted; a section
+// gets an id only from the author's explicit anchor. In-page links that point at
+// an author id the public page does not carry (the starters' "#products-main", the
+// older "#products") would be dead, so the first product section answers them.
+const anchorOf = (value) => String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "-");
+function unresolvedAnchors(hero, sections) {
+  const present = new Set(sections.map((section) => section.anchor && anchorOf(section.anchor)).filter(Boolean));
+  const wanted = ["#products", hero.ctaHref, ...sections.flatMap((section) => [section.ctaHref, ...(section.items || []).map((item) => item.href)])]
+    .map((href) => (typeof href === "string" && /^#[^#\s]+$/.test(href) ? anchorOf(href.slice(1)) : ""))
+    .filter((id) => id && !present.has(id));
+  return [...new Set(wanted)].slice(0, 20);
+}
 const spacerHtml = (section) => `<div style="height:${num(section.spacingTop, 0) + num(section.spacingBottom, 0)}px"></div>`;
 
 const productsHtml = (section, { open, close, products, merchandisingProducts, commerce, storefrontUrl }) => {
   const settings = section.productSettings || {};
   const cap = Math.max(1, Math.min(12, num(section.visibleProductCount, 12)));
   const shown = productsForSection(products, settings, merchandisingProducts?.[section.id]).slice(0, cap);
-  return `${open}${saleLineHtml(section)}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
+  return `${open}${section.aliasAnchors ? section.aliasAnchors.map((id) => `<span id="${escape(id)}"></span>`).join("") : ""}${saleLineHtml(section)}<div class="section-head"><span class="eyebrow">${escape(section.subtitle || "")}</span><h2>${escape(section.title || "")}</h2></div>${
     shown.length ? `<div class="product-grid">${shown.map((product) => productCardHtml(product, settings, commerce.productOverrides || {}, storefrontUrl)).join("")}</div>` : `<div class="empty-products">هنوز محصولی در این بخش نیست.</div>`
   }${close}`;
 };
@@ -113,7 +123,7 @@ export const STORE_SECTION_TYPES = Object.freeze([...SECTION_RENDERERS.keys()]);
 
 function sectionHtml(section, products, merchandisingProducts, commerce, storefrontUrl) {
   const style = `background:${color(section.backgroundColor, "#ffffff")};color:${color(section.textColor, "#0f172a")};padding-top:${num(section.spacingTop, 28)}px;padding-bottom:${num(section.spacingBottom, 32)}px`;
-  const open = `<section data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
+  const open = `<section${section.anchor ? ` id="${escape(anchorOf(section.anchor))}"` : ""} data-section-type="${escape(section.type)}" style="${style}"><div class="wrap">`;
   const close = `</div></section>`;
   return (SECTION_RENDERERS.get(section.type) || unknownSectionHtml)(section, { open, close, products, merchandisingProducts, commerce, storefrontUrl });
 }
@@ -135,6 +145,8 @@ export function renderStoreSite(project, version, content, productData, { slug =
   // The interactive storefront (cart, checkout) is a separate app origin; without one this page stays a catalogue.
   storefrontUrl = /^https?:\/\//i.test(storefrontUrl) ? storefrontUrl.replace(/\/+$/, "") : "";
   const sections = (presentation.sections || []).filter((section) => section.enabled !== false);
+  const firstProducts = sections.find((section) => section.type === "products");
+  if (firstProducts) firstProducts.aliasAnchors = unresolvedAnchors(hero, sections);
   // Keep the old array argument readable for direct renderer consumers.
   const products = Array.isArray(productData) ? productData : (productData?.products || []);
   const merchandisingProducts = Array.isArray(productData) ? {} : (productData?.merchandisingProducts || {});
